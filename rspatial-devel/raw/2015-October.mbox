@@ -1,0 +1,310 @@
+From Roger.Bivand at nhh.no  Tue Oct 13 15:41:32 2015
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Tue, 13 Oct 2015 15:41:32 +0200
+Subject: [Rspatial-devel] duplicate rownames issue in spsample?
+Message-ID: <alpine.LFD.2.20.1510131535350.10139@reclus.nhh.no>
+
+Hi,
+
+Cleaning up maptools, I'm seeing:
+
+> library(maptools)
+Loading required package: sp
+Checking rgeos availability: TRUE
+> nc_SP <- readShapePoly(system.file("shapes/sids.shp", 
+package="maptools")[1], proj4string=CRS("+proj=longlat  +ellps=clrk66"))
+> try2 <- dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f="regular")
+Warning messages:
+1: In validityMethod(object) :
+   duplicate rownames are interpreted by rgeos as MultiPoints; use 
+SpatialMultiPoints to define these; in future sp versions this warning 
+will become an error
+2: In validityMethod(object) :
+   duplicate rownames are interpreted by rgeos as MultiPoints; use 
+SpatialMultiPoints to define these; in future sp versions this warning 
+will become an error
+3: In validityMethod(object) :
+   duplicate rownames are interpreted by rgeos as MultiPoints; use 
+SpatialMultiPoints to define these; in future sp versions this warning 
+will become an error
+4: In validityMethod(object) :
+   duplicate rownames are interpreted by rgeos as MultiPoints; use 
+SpatialMultiPoints to define these; in future sp versions this warning 
+will become an error
+5: In data.row.names(row.names, rowsi, i) :
+...
+
+and:
+
+> options(warn=2)
+> try2 <- dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f="regular")
+Error in validityMethod(object) :
+   (converted from warning) duplicate rownames are interpreted by rgeos as 
+MultiPoints; use SpatialMultiPoints to define these; in future sp versions 
+this warning will become an error
+> traceback()
+16: doWithOneRestart(return(expr), restart)
+15: withOneRestart(expr, restarts[[1L]])
+14: withRestarts({
+         .Internal(.signalCondition(simpleWarning(msg, call), msg,
+             call))
+         .Internal(.dfltWarn(msg, call))
+     }, muffleWarning = function() NULL)
+13: .signalSimpleWarning("duplicate rownames are interpreted by rgeos as 
+MultiPoints; use SpatialMultiPoints to define these; in future sp versions 
+this warning will become an error",
+         quote(validityMethod(object)))
+12: warning("duplicate rownames are interpreted by rgeos as MultiPoints; 
+use SpatialMultiPoints to define these; in future sp versions this warning 
+will become an error")
+11: validityMethod(object)
+10: anyStrings(validityMethod(object))
+9: validObject(.Object)
+8: initialize(value, ...)
+7: initialize(value, ...)
+6: new("SpatialPoints", coords = coords, bbox = bbox, proj4string = 
+proj4string)
+5: SpatialPoints(crds, proj4string = proj4string)
+4: .local(x, n, type, ...)
+3: spsample(pls[[i]], x[i], type = f, offset = offset)
+2: spsample(pls[[i]], x[i], type = f, offset = offset)
+1: dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f = "regular")
+
+(i is 4 in this case, three islands)
+
+I've tried adding a rownames(x) <- NULL in sample.Polygons() (line 278), 
+but I think it is getting lost in S4 methods dispatch.
+
+Ideas?
+
+Best wishes,
+
+Roger
+
+-- 
+Roger Bivand
+Department of Economics, Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 91 00
+e-mail: Roger.Bivand at nhh.no
+
+
+From edzer.pebesma at uni-muenster.de  Tue Oct 13 16:50:21 2015
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Tue, 13 Oct 2015 10:50:21 -0400
+Subject: [Rspatial-devel] duplicate rownames issue in spsample?
+In-Reply-To: <alpine.LFD.2.20.1510131535350.10139@reclus.nhh.no>
+References: <alpine.LFD.2.20.1510131535350.10139@reclus.nhh.no>
+Message-ID: <561D1A2D.6020900@uni-muenster.de>
+
+
+
+On 13/10/15 09:41, Roger Bivand wrote:
+> Hi,
+> 
+> Cleaning up maptools, I'm seeing:
+> 
+>> library(maptools)
+> Loading required package: sp
+> Checking rgeos availability: TRUE
+>> nc_SP <- readShapePoly(system.file("shapes/sids.shp", 
+> package="maptools")[1], proj4string=CRS("+proj=longlat  +ellps=clrk66"))
+>> try2 <- dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f="regular")
+> Warning messages:
+> 1: In validityMethod(object) :
+>   duplicate rownames are interpreted by rgeos as MultiPoints; use
+> SpatialMultiPoints to define these; in future sp versions this warning
+> will become an error
+> 2: In validityMethod(object) :
+>   duplicate rownames are interpreted by rgeos as MultiPoints; use
+> SpatialMultiPoints to define these; in future sp versions this warning
+> will become an error
+> 3: In validityMethod(object) :
+>   duplicate rownames are interpreted by rgeos as MultiPoints; use
+> SpatialMultiPoints to define these; in future sp versions this warning
+> will become an error
+> 4: In validityMethod(object) :
+>   duplicate rownames are interpreted by rgeos as MultiPoints; use
+> SpatialMultiPoints to define these; in future sp versions this warning
+> will become an error
+> 5: In data.row.names(row.names, rowsi, i) :
+> ...
+> 
+> and:
+> 
+>> options(warn=2)
+>> try2 <- dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f="regular")
+> Error in validityMethod(object) :
+>   (converted from warning) duplicate rownames are interpreted by rgeos
+> as MultiPoints; use SpatialMultiPoints to define these; in future sp
+> versions this warning will become an error
+>> traceback()
+> 16: doWithOneRestart(return(expr), restart)
+> 15: withOneRestart(expr, restarts[[1L]])
+> 14: withRestarts({
+>         .Internal(.signalCondition(simpleWarning(msg, call), msg,
+>             call))
+>         .Internal(.dfltWarn(msg, call))
+>     }, muffleWarning = function() NULL)
+> 13: .signalSimpleWarning("duplicate rownames are interpreted by rgeos as
+> MultiPoints; use SpatialMultiPoints to define these; in future sp
+> versions this warning will become an error",
+>         quote(validityMethod(object)))
+> 12: warning("duplicate rownames are interpreted by rgeos as MultiPoints;
+> use SpatialMultiPoints to define these; in future sp versions this
+> warning will become an error")
+> 11: validityMethod(object)
+> 10: anyStrings(validityMethod(object))
+> 9: validObject(.Object)
+> 8: initialize(value, ...)
+> 7: initialize(value, ...)
+> 6: new("SpatialPoints", coords = coords, bbox = bbox, proj4string =
+> proj4string)
+> 5: SpatialPoints(crds, proj4string = proj4string)
+> 4: .local(x, n, type, ...)
+> 3: spsample(pls[[i]], x[i], type = f, offset = offset)
+> 2: spsample(pls[[i]], x[i], type = f, offset = offset)
+> 1: dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f = "regular")
+> 
+> (i is 4 in this case, three islands)
+> 
+> I've tried adding a rownames(x) <- NULL in sample.Polygons() (line 278),
+> but I think it is getting lost in S4 methods dispatch.
+
+Thanks; I added rownames(xy) = NULL in sample.Spatial, which is being
+called by all downstream methods. Committed to r-forge.
+
+> 
+> Ideas?
+> 
+> Best wishes,
+> 
+> Roger
+> 
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi),  University of M?nster,
+Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+Journal of Statistical Software:   http://www.jstatsoft.org/
+Computers & Geosciences:   http://elsevier.com/locate/cageo/
+Spatial Statistics Society http://www.spatialstatistics.info
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20151013/e0acf0b8/attachment.sig>
+
+From Roger.Bivand at nhh.no  Tue Oct 13 17:34:38 2015
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Tue, 13 Oct 2015 17:34:38 +0200
+Subject: [Rspatial-devel] duplicate rownames issue in spsample?
+In-Reply-To: <561D1A2D.6020900@uni-muenster.de>
+References: <alpine.LFD.2.20.1510131535350.10139@reclus.nhh.no>
+ <561D1A2D.6020900@uni-muenster.de>
+Message-ID: <alpine.LFD.2.20.1510131733411.4972@reclus.nhh.no>
+
+On Tue, 13 Oct 2015, Edzer Pebesma wrote:
+
+>
+> On 13/10/15 09:41, Roger Bivand wrote:
+>> Hi,
+>>
+>> Cleaning up maptools, I'm seeing:
+>>
+>>> library(maptools)
+>> Loading required package: sp
+>> Checking rgeos availability: TRUE
+>>> nc_SP <- readShapePoly(system.file("shapes/sids.shp",
+>> package="maptools")[1], proj4string=CRS("+proj=longlat  +ellps=clrk66"))
+>>> try2 <- dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f="regular")
+>> Warning messages:
+>> 1: In validityMethod(object) :
+>>   duplicate rownames are interpreted by rgeos as MultiPoints; use
+>> SpatialMultiPoints to define these; in future sp versions this warning
+>> will become an error
+>> 2: In validityMethod(object) :
+>>   duplicate rownames are interpreted by rgeos as MultiPoints; use
+>> SpatialMultiPoints to define these; in future sp versions this warning
+>> will become an error
+>> 3: In validityMethod(object) :
+>>   duplicate rownames are interpreted by rgeos as MultiPoints; use
+>> SpatialMultiPoints to define these; in future sp versions this warning
+>> will become an error
+>> 4: In validityMethod(object) :
+>>   duplicate rownames are interpreted by rgeos as MultiPoints; use
+>> SpatialMultiPoints to define these; in future sp versions this warning
+>> will become an error
+>> 5: In data.row.names(row.names, rowsi, i) :
+>> ...
+>>
+>> and:
+>>
+>>> options(warn=2)
+>>> try2 <- dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f="regular")
+>> Error in validityMethod(object) :
+>>   (converted from warning) duplicate rownames are interpreted by rgeos
+>> as MultiPoints; use SpatialMultiPoints to define these; in future sp
+>> versions this warning will become an error
+>>> traceback()
+>> 16: doWithOneRestart(return(expr), restart)
+>> 15: withOneRestart(expr, restarts[[1L]])
+>> 14: withRestarts({
+>>         .Internal(.signalCondition(simpleWarning(msg, call), msg,
+>>             call))
+>>         .Internal(.dfltWarn(msg, call))
+>>     }, muffleWarning = function() NULL)
+>> 13: .signalSimpleWarning("duplicate rownames are interpreted by rgeos as
+>> MultiPoints; use SpatialMultiPoints to define these; in future sp
+>> versions this warning will become an error",
+>>         quote(validityMethod(object)))
+>> 12: warning("duplicate rownames are interpreted by rgeos as MultiPoints;
+>> use SpatialMultiPoints to define these; in future sp versions this
+>> warning will become an error")
+>> 11: validityMethod(object)
+>> 10: anyStrings(validityMethod(object))
+>> 9: validObject(.Object)
+>> 8: initialize(value, ...)
+>> 7: initialize(value, ...)
+>> 6: new("SpatialPoints", coords = coords, bbox = bbox, proj4string =
+>> proj4string)
+>> 5: SpatialPoints(crds, proj4string = proj4string)
+>> 4: .local(x, n, type, ...)
+>> 3: spsample(pls[[i]], x[i], type = f, offset = offset)
+>> 2: spsample(pls[[i]], x[i], type = f, offset = offset)
+>> 1: dotsInPolys(nc_SP, as.integer(nc_SP$SID74), f = "regular")
+>>
+>> (i is 4 in this case, three islands)
+>>
+>> I've tried adding a rownames(x) <- NULL in sample.Polygons() (line 278),
+>> but I think it is getting lost in S4 methods dispatch.
+>
+> Thanks; I added rownames(xy) = NULL in sample.Spatial, which is being
+> called by all downstream methods. Committed to r-forge.
+
+Thanks, the warnings in maptools (current svn) are gone now.
+
+Roger
+
+>
+>>
+>> Ideas?
+>>
+>> Best wishes,
+>>
+>> Roger
+>>
+>
+>
+
+-- 
+Roger Bivand
+Department of Economics, Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 91 00
+e-mail: Roger.Bivand at nhh.no
+
+

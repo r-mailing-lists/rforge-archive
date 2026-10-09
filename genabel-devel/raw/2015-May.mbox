@@ -1,0 +1,2265 @@
+From lennart at karssen.org  Fri May  1 13:30:08 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 01 May 2015 13:30:08 +0200
+Subject: [GenABEL-dev] Why copy Makevars_distrib over Makevars in
+	distribution scripts?
+Message-ID: <554363C0.6090505@karssen.org>
+
+Dear list,
+
+I was looking through the scripts we use to create R packages from our
+source code (located in pkg/GenABEL-general/distrib_scripts). One step I
+found puzzling is why the file Makevars_distrib (in the src directory)
+to Makevars? This is done for DatABEL, MixABEL, VariABEL and GenABEL.
+
+When is the regular Makevars file used?
+
+
+Thanks for any insight you can give.
+
+Lennart.
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150501/6e972923/attachment.sig>
+
+From lennart at karssen.org  Fri May  1 13:48:23 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 01 May 2015 13:48:23 +0200
+Subject: [GenABEL-dev] Unknown data file in MixABEL test
+Message-ID: <55436807.9060801@karssen.org>
+
+Dear Yurii or other MixABEL devs,
+
+In response to recent questions on the forum and via e-mail I dug into
+MixABEL a bit in the last few days. The package is slowly but surely
+getting CRAN compliant again. However, one of the questions that remains
+is about the file "saved_gkin_and_h2.RData" used in one of the tests
+[1]. You created that file in r589 roughly five years ago.
+
+A quick check in the SVN log (svn log -r 1:600 -v | grep saved_gkin)
+showed that no file with the "saved_gkin" has been in SVN between r1 and
+r600.
+
+Do you remember where that file came from and who may still have a copy
+of it?
+
+
+Best,
+
+Lennart.
+
+
+[1] See line 6 in /pkg/MixABEL/tests/test_rwth.R, e.g. at
+https://r-forge.r-project.org/scm/viewvc.php/pkg/MixABEL/tests/test_rwth.R?view=markup&root=genabel
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150501/e0232f4e/attachment.sig>
+
+From lennart at karssen.org  Fri May  1 16:57:55 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 01 May 2015 16:57:55 +0200
+Subject: [GenABEL-dev] DatABEL
+In-Reply-To: <553F7D0E.5000608@fau.de>
+References: <553F7D0E.5000608@fau.de>
+Message-ID: <55439473.5020702@karssen.org>
+
+Hi Benjamin,
+
+Thanks for your interest in DatABEL. Because most of DatABEL was
+developed before I took over maintenance of the package I have put our
+development mailing list in CC. Just in case one of the other developers
+wants to chime in.
+
+On 28-04-15 14:29, Benjamin Hofner wrote:
+> Hi Lennart,
+> 
+> we are currently trying to use your package DatABEL to store the data
+> for complex GWAS analysis. We are not using your standard tool sets
+> implemented in GenABLE and co but are trying to implement a novel method
+> ourselves. Currently, we are facing several problems which are most
+> likely related to the fact that you store the data on the HDD and use
+> pointers (?) to access the data.
+
+The DatABEL package is basically an R interface to a lower-level library
+written in C++, which we call filevector [1]. Maybe it's worth looking
+at that as well. In the source code repo at [1] you will also find a few
+utilities written in C++ to convert text files to and from fvi/fvd files.
+
+When you create a DatABEL object in R it is indeed basically a pointer
+to the data in the backing file. The .fvi file contains index data which
+is then used to quickly read the actual data from the .fvd file.
+
+> 
+> 1) How can one store and share databel objects? I.e. is it possible to
+> store a databel object using save("objectname", file = "data.Rda")? On
+> one system it works fine. 
+
+So you say you basically create a DatABEL object using databel() and
+then want to save that object. Interesting, I never tried that.
+
+> It seems to be transferable if one moves the
+> Rda file together with the fvd and fvi  files (and do not rename these).
+
+Yes, that's what I expect. Because of the large amount of data the
+actual object (and therefore your .Rda file) will not be copied from the
+.fv{i,d} files when creating an object. As you surmised, it's only a
+pointer to the data (with some associated information like the buffer
+size).
+
+> Couldn't one include this file in the Rda file and or allow to alter the
+> path via
+> 
+> backingfilename() <- "newpath/filename"
+> 
+> 2) We are trying to use multicore aka mclapply techniques to speed up
+> computations. 
+
+If I understand it correctly, you would like to share a (saved) DatABEL
+object among several processes where each process works on a subset of
+the data in that object. Is that correct?
+
+My first reaction is to say that (imputed) genetic data is usually
+already split into several hundred files (assuming 1kG imputed data), so
+you could simply use those for data parallelism.
+But I can see that parallel access to a subset of a DatABEL object has
+its use.
+
+> However, this does not work as the forked processes seem
+> to have lost the pointer to the databel file. Sequentially, i.e., using
+> lapply, everything works fine. Do you have any experiences here? 
+
+Unfortunately not.
+
+
+Best regards,
+
+Lennart.
+
+
+> Can you
+> provide any help? If necessary, I can try to provide a minimal example
+> that reproduces this problem/error.
+> 
+> Best regards,
+> Benjamin
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150501/ee0e2ae1/attachment.sig>
+
+From benjamin.hofner at fau.de  Mon May  4 11:52:04 2015
+From: benjamin.hofner at fau.de (Benjamin Hofner)
+Date: Mon, 04 May 2015 11:52:04 +0200
+Subject: [GenABEL-dev] DatABEL
+In-Reply-To: <55439473.5020702@karssen.org>
+References: <553F7D0E.5000608@fau.de> <55439473.5020702@karssen.org>
+Message-ID: <55474144.2020300@fau.de>
+
+Dear Lennart,
+
+Thank you very much for your reply.
+
+We will start copying all saved files for transferring the information. 
+As we are using databel objects in more complex objects we will have to 
+think about options to do this (semi-)automatically.
+
+As a short follow up regarding paralleization: We are not estimating SNP 
+effects in parallel but multiple models that combine many SNPs. So the 
+option you raised might not be suitable. But again we seem to need to 
+think about that. Perhaps it will help to look at the filevector 
+documentation. Is it possible that you wanted to include a reference [1]?
+
+Thanks for your help,
+Benjamin
+
+Am 01.05.2015 um 16:57 schrieb L.C. Karssen:
+> Hi Benjamin,
+>
+> Thanks for your interest in DatABEL. Because most of DatABEL was
+> developed before I took over maintenance of the package I have put our
+> development mailing list in CC. Just in case one of the other developers
+> wants to chime in.
+>
+> On 28-04-15 14:29, Benjamin Hofner wrote:
+>> Hi Lennart,
+>>
+>> we are currently trying to use your package DatABEL to store the data
+>> for complex GWAS analysis. We are not using your standard tool sets
+>> implemented in GenABLE and co but are trying to implement a novel method
+>> ourselves. Currently, we are facing several problems which are most
+>> likely related to the fact that you store the data on the HDD and use
+>> pointers (?) to access the data.
+>
+> The DatABEL package is basically an R interface to a lower-level library
+> written in C++, which we call filevector [1]. Maybe it's worth looking
+> at that as well. In the source code repo at [1] you will also find a few
+> utilities written in C++ to convert text files to and from fvi/fvd files.
+>
+> When you create a DatABEL object in R it is indeed basically a pointer
+> to the data in the backing file. The .fvi file contains index data which
+> is then used to quickly read the actual data from the .fvd file.
+>
+>>
+>> 1) How can one store and share databel objects? I.e. is it possible to
+>> store a databel object using save("objectname", file = "data.Rda")? On
+>> one system it works fine.
+>
+> So you say you basically create a DatABEL object using databel() and
+> then want to save that object. Interesting, I never tried that.
+>
+>> It seems to be transferable if one moves the
+>> Rda file together with the fvd and fvi  files (and do not rename these).
+>
+> Yes, that's what I expect. Because of the large amount of data the
+> actual object (and therefore your .Rda file) will not be copied from the
+> .fv{i,d} files when creating an object. As you surmised, it's only a
+> pointer to the data (with some associated information like the buffer
+> size).
+>
+>> Couldn't one include this file in the Rda file and or allow to alter the
+>> path via
+>>
+>> backingfilename() <- "newpath/filename"
+>>
+>> 2) We are trying to use multicore aka mclapply techniques to speed up
+>> computations.
+>
+> If I understand it correctly, you would like to share a (saved) DatABEL
+> object among several processes where each process works on a subset of
+> the data in that object. Is that correct?
+>
+> My first reaction is to say that (imputed) genetic data is usually
+> already split into several hundred files (assuming 1kG imputed data), so
+> you could simply use those for data parallelism.
+> But I can see that parallel access to a subset of a DatABEL object has
+> its use.
+>
+>> However, this does not work as the forked processes seem
+>> to have lost the pointer to the databel file. Sequentially, i.e., using
+>> lapply, everything works fine. Do you have any experiences here?
+>
+> Unfortunately not.
+>
+>
+> Best regards,
+>
+> Lennart.
+>
+>
+>> Can you
+>> provide any help? If necessary, I can try to provide a minimal example
+>> that reproduces this problem/error.
+>>
+>> Best regards,
+>> Benjamin
+>
+
+-- 
+******************************************************************************
+Dr. rer. nat. Benjamin Hofner
+
+Institut f?r Medizininformatik, Biometrie und Epidemiologie
+Friedrich-Alexander-Universit?t Erlangen-N?rnberg
+Waldstr. 6 - 91054 Erlangen - Germany
+
+Tel: +49-9131-85-22707
+Fax: +49-9131-85-25740
+
+B?ro:
+   Raum 3.036
+   Universit?tsstra?e 22
+   (Eingang linke Seite des Geb?udes; Wegweiser IMBE)
+
+benjamin.hofner at fau.de
+
+http://www.imbe.med.uni-erlangen.de/cms/benjamin_hofner.html
+http://www.benjaminhofner.de
+******************************************************************************
+
+From jeffalstott at gmail.com  Mon May  4 11:17:43 2015
+From: jeffalstott at gmail.com (Jeff Alstott)
+Date: Mon, 4 May 2015 17:17:43 +0800
+Subject: [GenABEL-dev] Creating a complex coxph model
+Message-ID: <CAGoRfgH8vqH9SFvcjMpMSEONwf=BW5LQwa8PTopmJ=JuwUeb5A@mail.gmail.com>
+
+Hello,
+
+I am trying to use DatABEL do run a coxph model. I am not using DatABEL for
+its intended purpose, of running a straightforward model in which every
+column is a SNP that will be put into the model. Instead, I need to do
+something more complex. I would like to do something like this:
+
+Surv(38579, column1) ~ column2 + column3 + column2*column3 + strata(column4)
+
+Is this possible in DatABEL? This is actually just setting up the form to
+do a conditional logistic regression, which if set up correctly is
+equivalent to a Cox proportional hazards model. The survival package
+implements this nicely. I just have far too large of a dataset and want
+DatABEL to help me run the regression.
+
+
+survival's clogit:
+https://stat.ethz.ch/R-manual/R-devel/library/survival/html/clogit.html
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150504/72df5c75/attachment.html>
+
+From jeffalstott at gmail.com  Tue May  5 04:17:26 2015
+From: jeffalstott at gmail.com (Jeff Alstott)
+Date: Tue, 5 May 2015 10:17:26 +0800
+Subject: [GenABEL-dev] Creating a complex coxph model
+In-Reply-To: <CAGoRfgH8vqH9SFvcjMpMSEONwf=BW5LQwa8PTopmJ=JuwUeb5A@mail.gmail.com>
+References: <CAGoRfgH8vqH9SFvcjMpMSEONwf=BW5LQwa8PTopmJ=JuwUeb5A@mail.gmail.com>
+Message-ID: <CAGoRfgHS4wT0-cen2vuGOBVCJzpc4i9t_1w6ZRZDqnPp_U4Tpw@mail.gmail.com>
+
+Oops, that should be:
+
+Surv(rep(1, n_rows), column1) ~ column2 + column3 + column2*column3 +
+strata(column4)
+
+Thanks!
+
+
+On Mon, May 4, 2015 at 5:17 PM, Jeff Alstott <jeffalstott at gmail.com> wrote:
+
+> Hello,
+>
+> I am trying to use DatABEL do run a coxph model. I am not using DatABEL
+> for its intended purpose, of running a straightforward model in which every
+> column is a SNP that will be put into the model. Instead, I need to do
+> something more complex. I would like to do something like this:
+>
+> Surv(38579, column1) ~ column2 + column3 + column2*column3 +
+> strata(column4)
+>
+> Is this possible in DatABEL? This is actually just setting up the form to
+> do a conditional logistic regression, which if set up correctly is
+> equivalent to a Cox proportional hazards model. The survival package
+> implements this nicely. I just have far too large of a dataset and want
+> DatABEL to help me run the regression.
+>
+>
+> survival's clogit:
+> https://stat.ethz.ch/R-manual/R-devel/library/survival/html/clogit.html
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150505/7754eae7/attachment.html>
+
+From lennart at karssen.org  Fri May  8 12:20:40 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 08 May 2015 12:20:40 +0200
+Subject: [GenABEL-dev] DatABEL
+In-Reply-To: <55474144.2020300@fau.de>
+References: <553F7D0E.5000608@fau.de> <55439473.5020702@karssen.org>
+ <55474144.2020300@fau.de>
+Message-ID: <554C8DF8.8090002@karssen.org>
+
+Hi Benjamin,
+
+Sorry for the late reply. We had a couple of national holidays here.
+
+On 04-05-15 11:52, Benjamin Hofner wrote:
+> Dear Lennart,
+> 
+> Thank you very much for your reply.
+> 
+> We will start copying all saved files for transferring the information.
+> As we are using databel objects in more complex objects we will have to
+> think about options to do this (semi-)automatically.
+
+OK. It would be nice if you could let us know how you solved this.
+
+> 
+> As a short follow up regarding paralleization: We are not estimating SNP
+> effects in parallel but multiple models that combine many SNPs. So the
+> option you raised might not be suitable. But again we seem to need to
+> think about that. Perhaps it will help to look at the filevector
+> documentation. Is it possible that you wanted to include a reference [1]?
+
+Sorry about that. Here is the link to the filevector source code in our
+SVN server:
+- stable versions:
+https://r-forge.r-project.org/scm/viewvc.php/tags/filevector/?root=genabel
+- development version:
+https://r-forge.r-project.org/scm/viewvc.php/pkg/filevector/?root=genabel
+
+the fvfutil directory contains the regular (non-R) tools.
+
+
+Best,
+
+Lennart.
+
+> 
+> Thanks for your help,
+> Benjamin
+> 
+> Am 01.05.2015 um 16:57 schrieb L.C. Karssen:
+>> Hi Benjamin,
+>>
+>> Thanks for your interest in DatABEL. Because most of DatABEL was
+>> developed before I took over maintenance of the package I have put our
+>> development mailing list in CC. Just in case one of the other developers
+>> wants to chime in.
+>>
+>> On 28-04-15 14:29, Benjamin Hofner wrote:
+>>> Hi Lennart,
+>>>
+>>> we are currently trying to use your package DatABEL to store the data
+>>> for complex GWAS analysis. We are not using your standard tool sets
+>>> implemented in GenABLE and co but are trying to implement a novel method
+>>> ourselves. Currently, we are facing several problems which are most
+>>> likely related to the fact that you store the data on the HDD and use
+>>> pointers (?) to access the data.
+>>
+>> The DatABEL package is basically an R interface to a lower-level library
+>> written in C++, which we call filevector [1]. Maybe it's worth looking
+>> at that as well. In the source code repo at [1] you will also find a few
+>> utilities written in C++ to convert text files to and from fvi/fvd files.
+>>
+>> When you create a DatABEL object in R it is indeed basically a pointer
+>> to the data in the backing file. The .fvi file contains index data which
+>> is then used to quickly read the actual data from the .fvd file.
+>>
+>>>
+>>> 1) How can one store and share databel objects? I.e. is it possible to
+>>> store a databel object using save("objectname", file = "data.Rda")? On
+>>> one system it works fine.
+>>
+>> So you say you basically create a DatABEL object using databel() and
+>> then want to save that object. Interesting, I never tried that.
+>>
+>>> It seems to be transferable if one moves the
+>>> Rda file together with the fvd and fvi  files (and do not rename these).
+>>
+>> Yes, that's what I expect. Because of the large amount of data the
+>> actual object (and therefore your .Rda file) will not be copied from the
+>> .fv{i,d} files when creating an object. As you surmised, it's only a
+>> pointer to the data (with some associated information like the buffer
+>> size).
+>>
+>>> Couldn't one include this file in the Rda file and or allow to alter the
+>>> path via
+>>>
+>>> backingfilename() <- "newpath/filename"
+>>>
+>>> 2) We are trying to use multicore aka mclapply techniques to speed up
+>>> computations.
+>>
+>> If I understand it correctly, you would like to share a (saved) DatABEL
+>> object among several processes where each process works on a subset of
+>> the data in that object. Is that correct?
+>>
+>> My first reaction is to say that (imputed) genetic data is usually
+>> already split into several hundred files (assuming 1kG imputed data), so
+>> you could simply use those for data parallelism.
+>> But I can see that parallel access to a subset of a DatABEL object has
+>> its use.
+>>
+>>> However, this does not work as the forked processes seem
+>>> to have lost the pointer to the databel file. Sequentially, i.e., using
+>>> lapply, everything works fine. Do you have any experiences here?
+>>
+>> Unfortunately not.
+>>
+>>
+>> Best regards,
+>>
+>> Lennart.
+>>
+>>
+>>> Can you
+>>> provide any help? If necessary, I can try to provide a minimal example
+>>> that reproduces this problem/error.
+>>>
+>>> Best regards,
+>>> Benjamin
+>>
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150508/89301c97/attachment.sig>
+
+From lennart at karssen.org  Fri May  8 14:24:27 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 08 May 2015 14:24:27 +0200
+Subject: [GenABEL-dev] Creating a complex coxph model
+In-Reply-To: <CAGoRfgH8vqH9SFvcjMpMSEONwf=BW5LQwa8PTopmJ=JuwUeb5A@mail.gmail.com>
+References: <CAGoRfgH8vqH9SFvcjMpMSEONwf=BW5LQwa8PTopmJ=JuwUeb5A@mail.gmail.com>
+Message-ID: <554CAAFB.3080509@karssen.org>
+
+Dear Jeff,
+
+Thanks for contacting us on the mailing list.
+
+
+On 04-05-15 11:17, Jeff Alstott wrote:
+> Hello,
+> 
+> I am trying to use DatABEL do run a coxph model.
+
+I guess you mean ProbABEL, right? DatABEL is only used to store and
+efficiently access large data sets. ProbABLE implements the Cox PH model.
+
+>  I am not using DatABEL
+> for its intended purpose, of running a straightforward model in which
+> every column is a SNP that will be put into the model. Instead, I need
+> to do something more complex. I would like to do something like this:
+> 
+> Surv(38579, column1) ~ column2 + column3 + column2*column3 + strata(column4)
+> 
+
+So, from your follow-up mail:
+
+Surv(rep(1, n_rows), column1) ~ column2 + column3 + column2*column3 +
+strata(column4)
+
+Sounds interesting. One thing I didn't really understand from your
+e-mail: do the 4 columns contain SNP data? Or simple another
+(non-genetic) large data set.
+
+Currently we don't have a strata()-like function in ProbABEL, but maybe
+you could get around that by doing some recoding.
+
+
+Best regards,
+
+Lennart.
+
+> Is this possible in DatABEL? This is actually just setting up the form
+> to do a conditional logistic regression, which if set up correctly is
+> equivalent to a Cox proportional hazards model. The survival package
+> implements this nicely. I just have far too large of a dataset and want
+> DatABEL to help me run the regression.
+> 
+> 
+> survival's clogit:
+> https://stat.ethz.ch/R-manual/R-devel/library/survival/html/clogit.html
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150508/8eadf9f0/attachment.sig>
+
+From lennart at karssen.org  Fri May  8 15:26:55 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 08 May 2015 15:26:55 +0200
+Subject: [GenABEL-dev] Tolerance level in GenABEL RUnit test
+Message-ID: <554CB99F.10502@karssen.org>
+
+Dear list,
+
+I just ran the unit tests in GenABEL's /insts/unitTests/ directory and
+get the following error:
+
+  1 Test Suite :
+  GenABEL unit testing - 21 test functions, 0 errors, 1 failure
+  FAILURE in test.polylik: Error in checkEquals(h2htNew$h2an$est,
+h2htOld$h2an$est, tolerance = tol) :
+    Mean relative difference: 8.295007e-05
+  Error:
+
+  unit testing failed (#test failures: 1, #R errors: 0)
+
+
+This is a test in the runit.polylik.R file. The variable "tol" is set to
+ 2*.Machine$double.eps^0.5, which is equal to 2.980232e-08 on my
+machine. As you can see the difference in the unit test is more than
+three orders of magnitude higher.
+
+The two variables that are compared are calculated like this:
+  h2htOld <- polygenic(formula,kin=gkin,df,llfun="polylik")
+  h2htNew <- polygenic(formula,kin=gkin,df,llfun="polylik_eigen")
+
+Since I'm not an expert on the finer details of the various functions
+used in polygenic() I was hoping one of you could enlighten me and tell
+me if we should expect the comparison to give a difference of order 1e-8
+or that 1e-4 is good enough.
+
+
+Thanks for your help,
+
+Lennart.
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150508/c31d17d2/attachment.sig>
+
+From lennart at karssen.org  Fri May  8 15:52:45 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 08 May 2015 15:52:45 +0200
+Subject: [GenABEL-dev] Tolerance level in GenABEL RUnit test
+In-Reply-To: <554CB99F.10502@karssen.org>
+References: <554CB99F.10502@karssen.org>
+Message-ID: <554CBFAD.4030008@karssen.org>
+
+I spoke too early: in fact almost all checks in runit.polylik.R fail:
+
+> checkEquals(h2htNew$h2an$est,h2htOld$h2an$est, tolerance = tol)
+Error in checkEquals(h2htNew$h2an$est, h2htOld$h2an$est, tolerance = tol) :
+  Mean relative difference: 3.36492e-05
+
+>     checkEquals(h2htNew$h2an$min,h2htOld$h2an$min, tolerance = tol)
+Error in checkEquals(h2htNew$h2an$min, h2htOld$h2an$min, tolerance = tol) :
+  Mean relative difference: 5.961843e-06
+
+> checkEquals(h2htNew$residualY,h2htOld$residualY, tolerance = tol)
+Error in checkEquals(h2htNew$residualY, h2htOld$residualY, tolerance =
+tol) :
+  Mean relative difference: 4.462787e-05
+
+>     checkEquals(h2htNew$pgresidualY,h2htOld$pgresidualY, tolerance = tol)
+Error in checkEquals(h2htNew$pgresidualY, h2htOld$pgresidualY, tolerance
+= tol) :
+  Mean relative difference: 0.001496624
+
+> checkEquals(h2htNew$InvSigma,h2htOld$InvSigma, tolerance = tol)
+Error in checkEquals(h2htNew$InvSigma, h2htOld$InvSigma, tolerance = tol) :
+  Mean relative difference: 0.004265527
+
+>     checkEquals(h2htNew$measuredIDs,h2htOld$measuredIDs, tolerance = tol)
+[1] TRUE
+
+
+So the question remains: is this to be expected and should the tolerance
+be set less strict or is this a true bug that needs fixing?
+
+
+Thanks,
+
+Lennart.
+
+On 08-05-15 15:26, L.C. Karssen wrote:
+> Dear list,
+> 
+> I just ran the unit tests in GenABEL's /insts/unitTests/ directory and
+> get the following error:
+> 
+>   1 Test Suite :
+>   GenABEL unit testing - 21 test functions, 0 errors, 1 failure
+>   FAILURE in test.polylik: Error in checkEquals(h2htNew$h2an$est,
+> h2htOld$h2an$est, tolerance = tol) :
+>     Mean relative difference: 8.295007e-05
+>   Error:
+> 
+>   unit testing failed (#test failures: 1, #R errors: 0)
+> 
+> 
+> This is a test in the runit.polylik.R file. The variable "tol" is set to
+>  2*.Machine$double.eps^0.5, which is equal to 2.980232e-08 on my
+> machine. As you can see the difference in the unit test is more than
+> three orders of magnitude higher.
+> 
+> The two variables that are compared are calculated like this:
+>   h2htOld <- polygenic(formula,kin=gkin,df,llfun="polylik")
+>   h2htNew <- polygenic(formula,kin=gkin,df,llfun="polylik_eigen")
+> 
+> Since I'm not an expert on the finer details of the various functions
+> used in polygenic() I was hoping one of you could enlighten me and tell
+> me if we should expect the comparison to give a difference of order 1e-8
+> or that 1e-4 is good enough.
+> 
+> 
+> Thanks for your help,
+> 
+> Lennart.
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150508/2aeb5fcc/attachment.sig>
+
+From lrn at du.se  Mon May 11 12:53:54 2015
+From: lrn at du.se (=?iso-8859-1?Q?Lars_R=F6nneg=E5rd?=)
+Date: Mon, 11 May 2015 10:53:54 +0000
+Subject: [GenABEL-dev] Suggested RepeatABEL package
+In-Reply-To: <7d83a53c1f1543dbb8925570db41e997@ex2013mbx2.ad.du.se>
+References: <EE40BB26-1CAF-40DA-A1EA-612FEB8AD5EB@gmail.com>
+ <5DFC8AFC-99A6-4117-9418-2656CD3192EC@gmail.com>
+ <-5667536842663863949@unknownmsgid>
+ <3FB6BB54-DD33-4539-8ADA-A72F76B5979C@gmail.com>
+ <C5F39E63-2F87-40CA-95E4-D61413945BC3@gmail.com>
+ <CAHX9t6LXot-fKx_y4=5u2osWvHZEOP=CE6cpsx_8vb5GWq3QUA@mail.gmail.com>
+ <88F0F8DB0243B44995083F13BC35B166378FC815@ex1.ad.du.se>
+ <D84B9C7B-92C8-4C07-8409-87EE496469C3@gmail.com>
+ <af24952711ee4409a6e8d6b83a18d94c@ex2013mbx1.ad.du.se>
+ <035B3F5F-F739-4046-B8BE-EC5135A3B27F@gmail.com>
+ <e6d58967268f4a19aa70e1a3cd4335c9@ex2013mbx1.ad.du.se>
+ <495B26B1-1643-4DCD-923B-BBBE366386FE@gmail.com>,
+ <181DB57C-2213-4649-9BE5-DC84062610C0@cam.ac.uk>,
+ <7d83a53c1f1543dbb8925570db41e997@ex2013mbx2.ad.du.se>
+Message-ID: <80fd8635a70f44f3b21be0d299f2eb20@ex2013mbx2.ad.du.se>
+
+
+Dear GenABEL developers,
+I attach the source code for a package I have developed, and I would like it to be considered for the GenABEL suite of packages in the future. 
+
+The RepeatABEL package connects multiple phenotypic observations in an R data frame with the genotype information on the individuals given in a GenABEL object. One can perform GWAS for data having repeated observations on related individuals. The hglm package is used for variance component estimation and there are also other functionalities including spatial modelling. 
+
+The code was applied in Husby et al. (2015: Genome-wide association mapping in a wild avian population identifies a link between genetic and phenotypic variation in a life history trait. Proceedings of the Royal Society B: Biological Sciences, 282(1806), 20150156.) and now we have put the code together in a package and evaluated the method using simulations (with Eryn McFarlane and others, manuscript in preparation). I therefore believe it is ready for evaluation by the GenABEL developers.
+
+The package will be especially useful for GWAS in wildlife studies where there are large fluctuations in phenotypes between years, and these temporal effects are important to include in the model. I have a manuscript together with my co-authors that we plan to submit within the near future with a focus on GWAS in natural populations. But it should also be quite useful for most studies (including human) having repeated observations since it should be rather user friendly considering the alternatives, eg regression using average phenotypes, some GRAMMAR type of approach.
+
+Any suggested improvements are appreciated.
+
+Looking forward to your response,
+Lars R?nneg?rd
+
+Professor of Statistics
+Dalarna University, Sweden
+www.larsronnegard.se
+
+
+PS The name "RepeatABEL" was suggested by Xia Shen, which I very much appreciate.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: StartTutorial_RepeatABEL_2015May8.pdf
+Type: application/pdf
+Size: 784338 bytes
+Desc: StartTutorial_RepeatABEL_2015May8.pdf
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150511/760955c6/attachment-0001.pdf>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: RepeatABEL_0.1.tar.gz
+Type: application/x-gzip
+Size: 1902155 bytes
+Desc: RepeatABEL_0.1.tar.gz
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150511/760955c6/attachment-0001.bin>
+
+From lennart at karssen.org  Fri May 22 16:56:43 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 22 May 2015 16:56:43 +0200
+Subject: [GenABEL-dev] Preparing for the ProbABEL v0.4.5 bugfix release
+Message-ID: <555F43AB.3020007@karssen.org>
+
+Dear list,
+
+This is to inform you that I am preparing for the release of the next
+bugfix release of ProbABEL. This will be v0.4.5 containing the fixes in
+the ProbABEL v0.4.4 hotfix branch [1].
+
+If anyone has patches they would like to add to this release, please
+contact me ASAP.
+
+
+Best regards,
+
+Lennart.
+
+[1]
+https://r-forge.r-project.org/scm/viewvc.php/branches/ProbABEL-v0.4.4-hotfix/?root=genabel
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150522/38d175ea/attachment.sig>
+
+From lennart at karssen.org  Fri May 22 16:52:50 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 22 May 2015 16:52:50 +0200
+Subject: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+In-Reply-To: <552FB49D.2030400@karssen.org>
+References: <D10BA349.17E9%k.zhong@erasmusmc.nl>
+ <54EA473A.8040104@karssen.org> <D110EB4E.1801%k.zhong@erasmusmc.nl>
+ <D151435F.19C8%k.zhong@erasmusmc.nl> <552CDCC1.2020802@karssen.org>
+ <552FB49D.2030400@karssen.org>
+Message-ID: <555F42C2.1040209@karssen.org>
+
+Dear Kaiyin,
+
+Please find attached my review of the CollapsABEL package. All in all I
+must say the package is well-written and I would be happy to include it
+in the GenABEL suite once the issues mentioned in the review have been
+dealt with.
+
+
+With my apologies for the delay in the review process.
+Best regards,
+
+Lennart Karssen.
+
+On 16-04-15 15:09, L.C. Karssen wrote:
+> Dear Kaiyin,
+> 
+> A quick update on the package review: I'm having some troubles with my R
+> development environment. I hope to resolve them today so that I can
+> continue with my review of your package.
+> 
+> 
+> Lennart.
+> 
+> On 14-04-15 11:24, L.C. Karssen wrote:
+>> Dear Kaiyin,
+>>
+>>
+>> On 13-04-15 10:05, K. Zhong wrote:
+>>> Dear all,
+>>>
+>>> I have read through the technical review guidelines 
+>>
+>> Thank you for that. Also thanks for bringing CollapsABEL back to our
+>> attention, unfortunately it fell of my radar.
+>>
+>>> and I think
+>>> CollapsABEL satisfies all requirements except that `R CMD check` and `R
+>>> CMD check -as-cran` both produces one warning and two notes. The warning
+>>> is about my .git folder, which is for version control, and won?t be
+>>> present once a binary package is built, so this is a non-issue. 
+>>
+>> I agree.
+>>
+>>> The notes
+>>> are about some ?global variable? that are not global at all, and this is a
+>>> known bug of `R CMD check` (see http://tinyurl.com/o9p6vxf for an
+>>> example). 
+>>
+>> Aha. This is more reason for concern. From my own experience the CRAN
+>> staff is quite strickt. Thanks for looking into "prior art". Since the
+>> SE post you refer to is three years old and the GranovaGG package it
+>> relates to is now in CRAN, I agree that we should see if it gets
+>> accepted. However, be prepared to act in case of comments from CRAN.
+>>
+>>>
+>>> So could anyone please review this package? The submission of our paper is
+>>> waiting on this. Thanks!
+>>
+>> I will review the package today. I will also try to contact other
+>> potential reviewers directly.
+>>
+>>
+>> Best regards,
+>>
+>> Lennart.
+>>
+>>>
+>>>
+>>> Best regards,
+>>> Kaiyin ZHONG
+>>> ------------------
+>>> FMB, Erasmus MC
+>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>> k.zhong at erasmusmc.nl
+>>> kindlychung at gmail.com
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> On 23/02/15 14:42, "K. Zhong" <k.zhong at erasmusmc.nl> wrote:
+>>>
+>>>> Dear Lennart,
+>>>>
+>>>> At the moment I think it would be nice to keep the function as it is for
+>>>> current users of it and show them a message about the new package. Thank
+>>>> you for bringing this up.
+>>>>
+>>>> Best regards,
+>>>> Kaiyin ZHONG
+>>>> ------------------
+>>>> FMB, Erasmus MC
+>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>> k.zhong at erasmusmc.nl
+>>>> kindlychung at gmail.com
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>> On 22/02/15 22:16, "L.C. Karssen" <lennart at karssen.org> wrote:
+>>>>
+>>>>> Dear Kaiyin,
+>>>>>
+>>>>> Thank you for your willingness to contribute to the GenABEL project.
+>>>>>
+>>>>> On 19-02-15 14:27, K. Zhong wrote:
+>>>>>> Dear all,
+>>>>>>
+>>>>>> I have recently finished an R package for compound heterozygosity
+>>>>>> analysis for microarray/NGS data. This package (named CollapsABEL)
+>>>>>> implements an extended version of the CDH test
+>>>>>>
+>>>>>> <http://journals.plos.org/plosone/article?id=10.1371/journal.pone.002814
+>>>>>> 5
+>>>>>>> (see
+>>>>>> DOI: 10.1371/journal.pone.0028145) in a flexible, efficient and user
+>>>>>> friendly way  and has already proved useful for our analysis with
+>>>>>> certain dermatology traits.
+>>>>>
+>>>>> That sounds interesting indeed! To me it sounds like a useful addition
+>>>>> to the GenABEL suite.
+>>>>>
+>>>>>> CDH test has been implemented before as a
+>>>>>> function in the GenABEL package, but due to the simplicity of the
+>>>>>> method
+>>>>>> itself and restriction from the data format it uses, it is practically
+>>>>>> not very useful. CollapsABEL overcomes these limitations and provides a
+>>>>>> nice streamlined solution in your hands, for which reason I think it
+>>>>>> would be a nice addition to the GenABEL family.
+>>>>>
+>>>>> Do you have a suggestion on what to do with the current CDH test in the
+>>>>> GenABEL package? Is it worth to spend time maintaining it, or should we
+>>>>> replace it with a message pointing people to CollapsABEL (of course
+>>>>> assuming CollapsABEL gets accepted into the GenaBEL suite)?
+>>>>>
+>>>>>>
+>>>>>> The project is hosted on
+>>>>>> bitbucket: https://bitbucket.org/kindlychung/collapsabel/overview
+>>>>>> The R manual and an extensive tutorial can be found here:
+>>>>>> https://bitbucket.org/kindlychung/collapsabel/downloads
+>>>>>
+>>>>> Thank you for providing these links.
+>>>>>
+>>>>>>
+>>>>>> If you are willing to review this package, please let me know.
+>>>>>
+>>>>> I hope someone will step forward to do this. If you don't get a reaction
+>>>>> in the coming few weeks, please feel free to send a reminder to the list.
+>>>>>
+>>>>>
+>>>>> Best regards,
+>>>>>
+>>>>> Lennart Karssen.
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Best regards,
+>>>>>>
+>>>>>> Kaiyin ZHONG
+>>>>>> ------------------
+>>>>>> FMB, Erasmus MC
+>>>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>>>> k.zhong at erasmusmc.nl <mailto:k.zhong at erasmusmc.nl>
+>>>>>> kindlychung at gmail.com <mailto:kindlychung at gmail.com>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> _______________________________________________
+>>>>>> genabel-devel mailing list
+>>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>>>
+>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-dev
+>>>>>> e
+>>>>>> l
+>>>>>>
+>>>>>
+>>>>> -- 
+>>>>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>>>> L.C. Karssen
+>>>>> Utrecht
+>>>>> The Netherlands
+>>>>>
+>>>>> lennart at karssen.org
+>>>>> http://blog.karssen.org
+>>>>> GPG key ID: A88F554A
+>>>>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>>>>
+>>>>
+>>>
+>>
+>>
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: packageReviewCollapsABEL.pdf
+Type: application/pdf
+Size: 117329 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150522/aac2a78d/attachment-0001.pdf>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150522/aac2a78d/attachment-0001.sig>
+
+From k.zhong at erasmusmc.nl  Fri May 22 17:05:31 2015
+From: k.zhong at erasmusmc.nl (K. Zhong)
+Date: Fri, 22 May 2015 15:05:31 +0000
+Subject: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+In-Reply-To: <555F42C2.1040209@karssen.org>
+References: <D10BA349.17E9%k.zhong@erasmusmc.nl>
+ <54EA473A.8040104@karssen.org> <D110EB4E.1801%k.zhong@erasmusmc.nl>
+ <D151435F.19C8%k.zhong@erasmusmc.nl> <552CDCC1.2020802@karssen.org>
+ <552FB49D.2030400@karssen.org> <555F42C2.1040209@karssen.org>
+Message-ID: <D18511F4.1AD5%k.zhong@erasmusmc.nl>
+
+Dear Lennart,
+
+Thanks a lot for your detailed review, I find it very helpful!
+Issues mentioned therein will be fixed as soon as possible.
+
+
+Best regards,
+Kaiyin ZHONG
+------------------
+FMB, Erasmus MC
+kaiyin.co.vu <http://kaiyin.co.vu>
+k.zhong at erasmusmc.nl
+kindlychung at gmail.com
+
+
+
+
+
+
+
+
+On 22/05/15 16:52, "L.C. Karssen" <lennart at karssen.org> wrote:
+
+>Dear Kaiyin,
+>
+>Please find attached my review of the CollapsABEL package. All in all I
+>must say the package is well-written and I would be happy to include it
+>in the GenABEL suite once the issues mentioned in the review have been
+>dealt with.
+>
+>
+>With my apologies for the delay in the review process.
+>Best regards,
+>
+>Lennart Karssen.
+>
+>On 16-04-15 15:09, L.C. Karssen wrote:
+>> Dear Kaiyin,
+>> 
+>> A quick update on the package review: I'm having some troubles with my R
+>> development environment. I hope to resolve them today so that I can
+>> continue with my review of your package.
+>> 
+>> 
+>> Lennart.
+>> 
+>> On 14-04-15 11:24, L.C. Karssen wrote:
+>>> Dear Kaiyin,
+>>>
+>>>
+>>> On 13-04-15 10:05, K. Zhong wrote:
+>>>> Dear all,
+>>>>
+>>>> I have read through the technical review guidelines
+>>>
+>>> Thank you for that. Also thanks for bringing CollapsABEL back to our
+>>> attention, unfortunately it fell of my radar.
+>>>
+>>>> and I think
+>>>> CollapsABEL satisfies all requirements except that `R CMD check` and
+>>>>`R
+>>>> CMD check -as-cran` both produces one warning and two notes. The
+>>>>warning
+>>>> is about my .git folder, which is for version control, and won?t be
+>>>> present once a binary package is built, so this is a non-issue.
+>>>
+>>> I agree.
+>>>
+>>>> The notes
+>>>> are about some ?global variable? that are not global at all, and this
+>>>>is a
+>>>> known bug of `R CMD check` (see http://tinyurl.com/o9p6vxf for an
+>>>> example). 
+>>>
+>>> Aha. This is more reason for concern. From my own experience the CRAN
+>>> staff is quite strickt. Thanks for looking into "prior art". Since the
+>>> SE post you refer to is three years old and the GranovaGG package it
+>>> relates to is now in CRAN, I agree that we should see if it gets
+>>> accepted. However, be prepared to act in case of comments from CRAN.
+>>>
+>>>>
+>>>> So could anyone please review this package? The submission of our
+>>>>paper is
+>>>> waiting on this. Thanks!
+>>>
+>>> I will review the package today. I will also try to contact other
+>>> potential reviewers directly.
+>>>
+>>>
+>>> Best regards,
+>>>
+>>> Lennart.
+>>>
+>>>>
+>>>>
+>>>> Best regards,
+>>>> Kaiyin ZHONG
+>>>> ------------------
+>>>> FMB, Erasmus MC
+>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>> k.zhong at erasmusmc.nl
+>>>> kindlychung at gmail.com
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>> On 23/02/15 14:42, "K. Zhong" <k.zhong at erasmusmc.nl> wrote:
+>>>>
+>>>>> Dear Lennart,
+>>>>>
+>>>>> At the moment I think it would be nice to keep the function as it is
+>>>>>for
+>>>>> current users of it and show them a message about the new package.
+>>>>>Thank
+>>>>> you for bringing this up.
+>>>>>
+>>>>> Best regards,
+>>>>> Kaiyin ZHONG
+>>>>> ------------------
+>>>>> FMB, Erasmus MC
+>>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>>> k.zhong at erasmusmc.nl
+>>>>> kindlychung at gmail.com
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>> On 22/02/15 22:16, "L.C. Karssen" <lennart at karssen.org> wrote:
+>>>>>
+>>>>>> Dear Kaiyin,
+>>>>>>
+>>>>>> Thank you for your willingness to contribute to the GenABEL project.
+>>>>>>
+>>>>>> On 19-02-15 14:27, K. Zhong wrote:
+>>>>>>> Dear all,
+>>>>>>>
+>>>>>>> I have recently finished an R package for compound heterozygosity
+>>>>>>> analysis for microarray/NGS data. This package (named CollapsABEL)
+>>>>>>> implements an extended version of the CDH test
+>>>>>>>
+>>>>>>> 
+>>>>>>><http://journals.plos.org/plosone/article?id=10.1371/journal.pone.00
+>>>>>>>2814
+>>>>>>> 5
+>>>>>>>> (see
+>>>>>>> DOI: 10.1371/journal.pone.0028145) in a flexible, efficient and
+>>>>>>>user
+>>>>>>> friendly way  and has already proved useful for our analysis with
+>>>>>>> certain dermatology traits.
+>>>>>>
+>>>>>> That sounds interesting indeed! To me it sounds like a useful
+>>>>>>addition
+>>>>>> to the GenABEL suite.
+>>>>>>
+>>>>>>> CDH test has been implemented before as a
+>>>>>>> function in the GenABEL package, but due to the simplicity of the
+>>>>>>> method
+>>>>>>> itself and restriction from the data format it uses, it is
+>>>>>>>practically
+>>>>>>> not very useful. CollapsABEL overcomes these limitations and
+>>>>>>>provides a
+>>>>>>> nice streamlined solution in your hands, for which reason I think
+>>>>>>>it
+>>>>>>> would be a nice addition to the GenABEL family.
+>>>>>>
+>>>>>> Do you have a suggestion on what to do with the current CDH test in
+>>>>>>the
+>>>>>> GenABEL package? Is it worth to spend time maintaining it, or
+>>>>>>should we
+>>>>>> replace it with a message pointing people to CollapsABEL (of course
+>>>>>> assuming CollapsABEL gets accepted into the GenaBEL suite)?
+>>>>>>
+>>>>>>>
+>>>>>>> The project is hosted on
+>>>>>>> bitbucket: https://bitbucket.org/kindlychung/collapsabel/overview
+>>>>>>> The R manual and an extensive tutorial can be found here:
+>>>>>>> https://bitbucket.org/kindlychung/collapsabel/downloads
+>>>>>>
+>>>>>> Thank you for providing these links.
+>>>>>>
+>>>>>>>
+>>>>>>> If you are willing to review this package, please let me know.
+>>>>>>
+>>>>>> I hope someone will step forward to do this. If you don't get a
+>>>>>>reaction
+>>>>>> in the coming few weeks, please feel free to send a reminder to the
+>>>>>>list.
+>>>>>>
+>>>>>>
+>>>>>> Best regards,
+>>>>>>
+>>>>>> Lennart Karssen.
+>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> Best regards,
+>>>>>>>
+>>>>>>> Kaiyin ZHONG
+>>>>>>> ------------------
+>>>>>>> FMB, Erasmus MC
+>>>>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>>>>> k.zhong at erasmusmc.nl <mailto:k.zhong at erasmusmc.nl>
+>>>>>>> kindlychung at gmail.com <mailto:kindlychung at gmail.com>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> _______________________________________________
+>>>>>>> genabel-devel mailing list
+>>>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>>>>
+>>>>>>> 
+>>>>>>>https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel
+>>>>>>>-dev
+>>>>>>> e
+>>>>>>> l
+>>>>>>>
+>>>>>>
+>>>>>> -- 
+>>>>>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>>>>> L.C. Karssen
+>>>>>> Utrecht
+>>>>>> The Netherlands
+>>>>>>
+>>>>>> lennart at karssen.org
+>>>>>> http://blog.karssen.org
+>>>>>> GPG key ID: A88F554A
+>>>>>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>>>>>
+>>>>>
+>>>>
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> genabel-devel mailing list
+>>> genabel-devel at lists.r-forge.r-project.org
+>>> 
+>>>https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-dev
+>>>el
+>>>
+>> 
+>> 
+>> 
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> 
+>>https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-deve
+>>l
+>> 
+>
+>-- 
+>*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>L.C. Karssen
+>Utrecht
+>The Netherlands
+>
+>lennart at karssen.org
+>http://blog.karssen.org
+>GPG key ID: A88F554A
+>-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+
+From lennart at karssen.org  Fri May 22 17:38:27 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 22 May 2015 17:38:27 +0200
+Subject: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+In-Reply-To: <962CA5A5E5A32E43B7C29813704729DB5C81D047@EXCH-RX02.erasmusmc.nl>
+References: <D10BA349.17E9%k.zhong@erasmusmc.nl>
+ <54EA473A.8040104@karssen.org> <D110EB4E.1801%k.zhong@erasmusmc.nl>
+ <D151435F.19C8%k.zhong@erasmusmc.nl> <552CDCC1.2020802@karssen.org>
+ <552FB49D.2030400@karssen.org> <555F42C2.1040209@karssen.org>
+ <962CA5A5E5A32E43B7C29813704729DB5C81D047@EXCH-RX02.erasmusmc.nl>
+Message-ID: <555F4D73.5080108@karssen.org>
+
+Dear Fan,
+
+On 22-05-15 17:03, F. Liu wrote:
+> Dear Lennart,
+> Thanks so much for your effort! Highly appreciated!
+
+You are welcome!
+
+> Given your contribution, we would like to invite you as an coauthor on this paper. Please let us know if you agree.
+> The manuscript is still under preparation, we will let you know when it's ready for coauthors.
+
+Thank you for the offer, I happily accept.
+
+
+> For now please keep it unseen by public and we shall coordinate its publication time together with the paper.
+
+Of course. No problem.
+One important thing to note: if you want to keep the paper "closed" for
+now, please remove the GenABEL development mailing list from CC. The
+devel list is public and it's archives are published on the web.
+
+
+Best regards,
+
+Lennart.
+
+> Cheers,
+> Fan
+> 
+> 
+> -----Original Message-----
+> From: L.C. Karssen [mailto:lennart at karssen.org] 
+> Sent: Friday, May 22, 2015 4:53 PM
+> To: genabel-devel at lists.r-forge.r-project.org; K. Zhong
+> Cc: F. Liu
+> Subject: Re: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+> 
+> Dear Kaiyin,
+> 
+> Please find attached my review of the CollapsABEL package. All in all I must say the package is well-written and I would be happy to include it in the GenABEL suite once the issues mentioned in the review have been dealt with.
+> 
+> 
+> With my apologies for the delay in the review process.
+> Best regards,
+> 
+> Lennart Karssen.
+> 
+> On 16-04-15 15:09, L.C. Karssen wrote:
+>> Dear Kaiyin,
+>>
+>> A quick update on the package review: I'm having some troubles with my 
+>> R development environment. I hope to resolve them today so that I can 
+>> continue with my review of your package.
+>>
+>>
+>> Lennart.
+>>
+>> On 14-04-15 11:24, L.C. Karssen wrote:
+>>> Dear Kaiyin,
+>>>
+>>>
+>>> On 13-04-15 10:05, K. Zhong wrote:
+>>>> Dear all,
+>>>>
+>>>> I have read through the technical review guidelines
+>>>
+>>> Thank you for that. Also thanks for bringing CollapsABEL back to our 
+>>> attention, unfortunately it fell of my radar.
+>>>
+>>>> and I think
+>>>> CollapsABEL satisfies all requirements except that `R CMD check` and 
+>>>> `R CMD check -as-cran` both produces one warning and two notes. The 
+>>>> warning is about my .git folder, which is for version control, and 
+>>>> won?t be present once a binary package is built, so this is a non-issue.
+>>>
+>>> I agree.
+>>>
+>>>> The notes
+>>>> are about some ?global variable? that are not global at all, and 
+>>>> this is a known bug of `R CMD check` (see http://tinyurl.com/o9p6vxf 
+>>>> for an example).
+>>>
+>>> Aha. This is more reason for concern. From my own experience the CRAN 
+>>> staff is quite strickt. Thanks for looking into "prior art". Since 
+>>> the SE post you refer to is three years old and the GranovaGG package 
+>>> it relates to is now in CRAN, I agree that we should see if it gets 
+>>> accepted. However, be prepared to act in case of comments from CRAN.
+>>>
+>>>>
+>>>> So could anyone please review this package? The submission of our 
+>>>> paper is waiting on this. Thanks!
+>>>
+>>> I will review the package today. I will also try to contact other 
+>>> potential reviewers directly.
+>>>
+>>>
+>>> Best regards,
+>>>
+>>> Lennart.
+>>>
+>>>>
+>>>>
+>>>> Best regards,
+>>>> Kaiyin ZHONG
+>>>> ------------------
+>>>> FMB, Erasmus MC
+>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>> k.zhong at erasmusmc.nl
+>>>> kindlychung at gmail.com
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>> On 23/02/15 14:42, "K. Zhong" <k.zhong at erasmusmc.nl> wrote:
+>>>>
+>>>>> Dear Lennart,
+>>>>>
+>>>>> At the moment I think it would be nice to keep the function as it 
+>>>>> is for current users of it and show them a message about the new 
+>>>>> package. Thank you for bringing this up.
+>>>>>
+>>>>> Best regards,
+>>>>> Kaiyin ZHONG
+>>>>> ------------------
+>>>>> FMB, Erasmus MC
+>>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>>> k.zhong at erasmusmc.nl
+>>>>> kindlychung at gmail.com
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>> On 22/02/15 22:16, "L.C. Karssen" <lennart at karssen.org> wrote:
+>>>>>
+>>>>>> Dear Kaiyin,
+>>>>>>
+>>>>>> Thank you for your willingness to contribute to the GenABEL project.
+>>>>>>
+>>>>>> On 19-02-15 14:27, K. Zhong wrote:
+>>>>>>> Dear all,
+>>>>>>>
+>>>>>>> I have recently finished an R package for compound heterozygosity 
+>>>>>>> analysis for microarray/NGS data. This package (named 
+>>>>>>> CollapsABEL) implements an extended version of the CDH test
+>>>>>>>
+>>>>>>> <http://journals.plos.org/plosone/article?id=10.1371/journal.pone
+>>>>>>> .002814
+>>>>>>> 5
+>>>>>>>> (see
+>>>>>>> DOI: 10.1371/journal.pone.0028145) in a flexible, efficient and 
+>>>>>>> user friendly way  and has already proved useful for our analysis 
+>>>>>>> with certain dermatology traits.
+>>>>>>
+>>>>>> That sounds interesting indeed! To me it sounds like a useful 
+>>>>>> addition to the GenABEL suite.
+>>>>>>
+>>>>>>> CDH test has been implemented before as a function in the GenABEL 
+>>>>>>> package, but due to the simplicity of the method itself and 
+>>>>>>> restriction from the data format it uses, it is practically not 
+>>>>>>> very useful. CollapsABEL overcomes these limitations and provides 
+>>>>>>> a nice streamlined solution in your hands, for which reason I 
+>>>>>>> think it would be a nice addition to the GenABEL family.
+>>>>>>
+>>>>>> Do you have a suggestion on what to do with the current CDH test 
+>>>>>> in the GenABEL package? Is it worth to spend time maintaining it, 
+>>>>>> or should we replace it with a message pointing people to 
+>>>>>> CollapsABEL (of course assuming CollapsABEL gets accepted into the GenaBEL suite)?
+>>>>>>
+>>>>>>>
+>>>>>>> The project is hosted on
+>>>>>>> bitbucket: https://bitbucket.org/kindlychung/collapsabel/overview
+>>>>>>> The R manual and an extensive tutorial can be found here:
+>>>>>>> https://bitbucket.org/kindlychung/collapsabel/downloads
+>>>>>>
+>>>>>> Thank you for providing these links.
+>>>>>>
+>>>>>>>
+>>>>>>> If you are willing to review this package, please let me know.
+>>>>>>
+>>>>>> I hope someone will step forward to do this. If you don't get a 
+>>>>>> reaction in the coming few weeks, please feel free to send a reminder to the list.
+>>>>>>
+>>>>>>
+>>>>>> Best regards,
+>>>>>>
+>>>>>> Lennart Karssen.
+>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> Best regards,
+>>>>>>>
+>>>>>>> Kaiyin ZHONG
+>>>>>>> ------------------
+>>>>>>> FMB, Erasmus MC
+>>>>>>> kaiyin.co.vu <http://kaiyin.co.vu> k.zhong at erasmusmc.nl 
+>>>>>>> <mailto:k.zhong at erasmusmc.nl> kindlychung at gmail.com 
+>>>>>>> <mailto:kindlychung at gmail.com>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> _______________________________________________
+>>>>>>> genabel-devel mailing list
+>>>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>>>>
+>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gena
+>>>>>>> bel-dev
+>>>>>>> e
+>>>>>>> l
+>>>>>>>
+>>>>>>
+>>>>>> --
+>>>>>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>>>>> L.C. Karssen
+>>>>>> Utrecht
+>>>>>> The Netherlands
+>>>>>>
+>>>>>> lennart at karssen.org
+>>>>>> http://blog.karssen.org
+>>>>>> GPG key ID: A88F554A
+>>>>>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>>>>>
+>>>>>
+>>>>
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> genabel-devel mailing list
+>>> genabel-devel at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-
+>>> devel
+>>>
+>>
+>>
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-d
+>> evel
+>>
+> 
+> --
+> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+> L.C. Karssen
+> Utrecht
+> The Netherlands
+> 
+> lennart at karssen.org
+> http://blog.karssen.org
+> GPG key ID: A88F554A
+> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150522/c244a30c/attachment.sig>
+
+From f.liu at erasmusmc.nl  Fri May 22 17:03:17 2015
+From: f.liu at erasmusmc.nl (F. Liu)
+Date: Fri, 22 May 2015 15:03:17 +0000
+Subject: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+In-Reply-To: <555F42C2.1040209@karssen.org>
+References: <D10BA349.17E9%k.zhong@erasmusmc.nl>
+ <54EA473A.8040104@karssen.org> <D110EB4E.1801%k.zhong@erasmusmc.nl>
+ <D151435F.19C8%k.zhong@erasmusmc.nl> <552CDCC1.2020802@karssen.org>
+ <552FB49D.2030400@karssen.org> <555F42C2.1040209@karssen.org>
+Message-ID: <962CA5A5E5A32E43B7C29813704729DB5C81D047@EXCH-RX02.erasmusmc.nl>
+
+Dear Lennart,
+Thanks so much for your effort! Highly appreciated!
+Given your contribution, we would like to invite you as an coauthor on this paper. Please let us know if you agree.
+The manuscript is still under preparation, we will let you know when it's ready for coauthors.
+For now please keep it unseen by public and we shall coordinate its publication time together with the paper.
+Cheers,
+Fan
+
+
+-----Original Message-----
+From: L.C. Karssen [mailto:lennart at karssen.org] 
+Sent: Friday, May 22, 2015 4:53 PM
+To: genabel-devel at lists.r-forge.r-project.org; K. Zhong
+Cc: F. Liu
+Subject: Re: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+
+Dear Kaiyin,
+
+Please find attached my review of the CollapsABEL package. All in all I must say the package is well-written and I would be happy to include it in the GenABEL suite once the issues mentioned in the review have been dealt with.
+
+
+With my apologies for the delay in the review process.
+Best regards,
+
+Lennart Karssen.
+
+On 16-04-15 15:09, L.C. Karssen wrote:
+> Dear Kaiyin,
+> 
+> A quick update on the package review: I'm having some troubles with my 
+> R development environment. I hope to resolve them today so that I can 
+> continue with my review of your package.
+> 
+> 
+> Lennart.
+> 
+> On 14-04-15 11:24, L.C. Karssen wrote:
+>> Dear Kaiyin,
+>>
+>>
+>> On 13-04-15 10:05, K. Zhong wrote:
+>>> Dear all,
+>>>
+>>> I have read through the technical review guidelines
+>>
+>> Thank you for that. Also thanks for bringing CollapsABEL back to our 
+>> attention, unfortunately it fell of my radar.
+>>
+>>> and I think
+>>> CollapsABEL satisfies all requirements except that `R CMD check` and 
+>>> `R CMD check -as-cran` both produces one warning and two notes. The 
+>>> warning is about my .git folder, which is for version control, and 
+>>> won?t be present once a binary package is built, so this is a non-issue.
+>>
+>> I agree.
+>>
+>>> The notes
+>>> are about some ?global variable? that are not global at all, and 
+>>> this is a known bug of `R CMD check` (see http://tinyurl.com/o9p6vxf 
+>>> for an example).
+>>
+>> Aha. This is more reason for concern. From my own experience the CRAN 
+>> staff is quite strickt. Thanks for looking into "prior art". Since 
+>> the SE post you refer to is three years old and the GranovaGG package 
+>> it relates to is now in CRAN, I agree that we should see if it gets 
+>> accepted. However, be prepared to act in case of comments from CRAN.
+>>
+>>>
+>>> So could anyone please review this package? The submission of our 
+>>> paper is waiting on this. Thanks!
+>>
+>> I will review the package today. I will also try to contact other 
+>> potential reviewers directly.
+>>
+>>
+>> Best regards,
+>>
+>> Lennart.
+>>
+>>>
+>>>
+>>> Best regards,
+>>> Kaiyin ZHONG
+>>> ------------------
+>>> FMB, Erasmus MC
+>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>> k.zhong at erasmusmc.nl
+>>> kindlychung at gmail.com
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> On 23/02/15 14:42, "K. Zhong" <k.zhong at erasmusmc.nl> wrote:
+>>>
+>>>> Dear Lennart,
+>>>>
+>>>> At the moment I think it would be nice to keep the function as it 
+>>>> is for current users of it and show them a message about the new 
+>>>> package. Thank you for bringing this up.
+>>>>
+>>>> Best regards,
+>>>> Kaiyin ZHONG
+>>>> ------------------
+>>>> FMB, Erasmus MC
+>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>> k.zhong at erasmusmc.nl
+>>>> kindlychung at gmail.com
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>> On 22/02/15 22:16, "L.C. Karssen" <lennart at karssen.org> wrote:
+>>>>
+>>>>> Dear Kaiyin,
+>>>>>
+>>>>> Thank you for your willingness to contribute to the GenABEL project.
+>>>>>
+>>>>> On 19-02-15 14:27, K. Zhong wrote:
+>>>>>> Dear all,
+>>>>>>
+>>>>>> I have recently finished an R package for compound heterozygosity 
+>>>>>> analysis for microarray/NGS data. This package (named 
+>>>>>> CollapsABEL) implements an extended version of the CDH test
+>>>>>>
+>>>>>> <http://journals.plos.org/plosone/article?id=10.1371/journal.pone
+>>>>>> .002814
+>>>>>> 5
+>>>>>>> (see
+>>>>>> DOI: 10.1371/journal.pone.0028145) in a flexible, efficient and 
+>>>>>> user friendly way  and has already proved useful for our analysis 
+>>>>>> with certain dermatology traits.
+>>>>>
+>>>>> That sounds interesting indeed! To me it sounds like a useful 
+>>>>> addition to the GenABEL suite.
+>>>>>
+>>>>>> CDH test has been implemented before as a function in the GenABEL 
+>>>>>> package, but due to the simplicity of the method itself and 
+>>>>>> restriction from the data format it uses, it is practically not 
+>>>>>> very useful. CollapsABEL overcomes these limitations and provides 
+>>>>>> a nice streamlined solution in your hands, for which reason I 
+>>>>>> think it would be a nice addition to the GenABEL family.
+>>>>>
+>>>>> Do you have a suggestion on what to do with the current CDH test 
+>>>>> in the GenABEL package? Is it worth to spend time maintaining it, 
+>>>>> or should we replace it with a message pointing people to 
+>>>>> CollapsABEL (of course assuming CollapsABEL gets accepted into the GenaBEL suite)?
+>>>>>
+>>>>>>
+>>>>>> The project is hosted on
+>>>>>> bitbucket: https://bitbucket.org/kindlychung/collapsabel/overview
+>>>>>> The R manual and an extensive tutorial can be found here:
+>>>>>> https://bitbucket.org/kindlychung/collapsabel/downloads
+>>>>>
+>>>>> Thank you for providing these links.
+>>>>>
+>>>>>>
+>>>>>> If you are willing to review this package, please let me know.
+>>>>>
+>>>>> I hope someone will step forward to do this. If you don't get a 
+>>>>> reaction in the coming few weeks, please feel free to send a reminder to the list.
+>>>>>
+>>>>>
+>>>>> Best regards,
+>>>>>
+>>>>> Lennart Karssen.
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Best regards,
+>>>>>>
+>>>>>> Kaiyin ZHONG
+>>>>>> ------------------
+>>>>>> FMB, Erasmus MC
+>>>>>> kaiyin.co.vu <http://kaiyin.co.vu> k.zhong at erasmusmc.nl 
+>>>>>> <mailto:k.zhong at erasmusmc.nl> kindlychung at gmail.com 
+>>>>>> <mailto:kindlychung at gmail.com>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> _______________________________________________
+>>>>>> genabel-devel mailing list
+>>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>>>
+>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gena
+>>>>>> bel-dev
+>>>>>> e
+>>>>>> l
+>>>>>>
+>>>>>
+>>>>> --
+>>>>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>>>> L.C. Karssen
+>>>>> Utrecht
+>>>>> The Netherlands
+>>>>>
+>>>>> lennart at karssen.org
+>>>>> http://blog.karssen.org
+>>>>> GPG key ID: A88F554A
+>>>>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>>>>
+>>>>
+>>>
+>>
+>>
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-
+>> devel
+>>
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-d
+> evel
+> 
+
+--
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+From yurii.aulchenko at gmail.com  Tue May 26 21:00:11 2015
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Tue, 26 May 2015 21:00:11 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1987 - in
+	branches/ProbABEL-v0.4.4-hotfix/ProbABEL: . doc
+In-Reply-To: <20150526160414.BE8A4186886@r-forge.r-project.org>
+References: <20150526160414.BE8A4186886@r-forge.r-project.org>
+Message-ID: <9B5236E3-9EBE-432B-9E72-75AED94457E7@gmail.com>
+
+will this update be announced on site? - let Natalia know in case we need to push things in social networks :)
+
+Yurii
+
+> On 26 May 2015, at 18:04, noreply at r-forge.r-project.org wrote:
+> 
+> Author: lckarssen
+> Date: 2015-05-26 18:04:12 +0200 (Tue, 26 May 2015)
+> New Revision: 1987
+> 
+> Modified:
+>   branches/ProbABEL-v0.4.4-hotfix/ProbABEL/configure.ac
+>   branches/ProbABEL-v0.4.4-hotfix/ProbABEL/doc/ChangeLog
+> Log:
+> Push ProbABEL version number in the v0.4.4 hotfix branch to v0.4.5. Also update the Changelog for this release.
+> 
+> 
+> Modified: branches/ProbABEL-v0.4.4-hotfix/ProbABEL/configure.ac
+> ===================================================================
+> --- branches/ProbABEL-v0.4.4-hotfix/ProbABEL/configure.ac	2015-05-26 15:57:11 UTC (rev 1986)
+> +++ branches/ProbABEL-v0.4.4-hotfix/ProbABEL/configure.ac	2015-05-26 16:04:12 UTC (rev 1987)
+> @@ -2,7 +2,7 @@
+> # Process this file with autoconf to produce a configure script.
+> 
+> AC_PREREQ([2.67])
+> -AC_INIT(ProbABEL, 0.4.4, genabel-devel at r-forge.wu-wien.ac.at)
+> +AC_INIT(ProbABEL, 0.4.5, genabel-devel at r-forge.wu-wien.ac.at)
+> AM_INIT_AUTOMAKE([silent-rules subdir-objects])
+> AM_SILENT_RULES([yes])
+> AC_CONFIG_SRCDIR([src/data.h])
+> 
+> Modified: branches/ProbABEL-v0.4.4-hotfix/ProbABEL/doc/ChangeLog
+> ===================================================================
+> --- branches/ProbABEL-v0.4.4-hotfix/ProbABEL/doc/ChangeLog	2015-05-26 15:57:11 UTC (rev 1986)
+> +++ branches/ProbABEL-v0.4.4-hotfix/ProbABEL/doc/ChangeLog	2015-05-26 16:04:12 UTC (rev 1987)
+> @@ -1,7 +1,21 @@
+> -***** v.0.4.5 (2015)
+> +***** v.0.4.5 (2015.05.26)
+> * Fixed bug #6054: "Not all ProbABEL's short command line options are
+>   correctly parsed."
+> -* Minor fix to the manual: the Rsq values in the info file should be > 1e-16 otherwise the output will be set to 'nan'.
+> +* Fixed bug #6041: "ProbABEL's Cox module reports too many errors (beta
+> +  may be infinite, setting beta and se to 'NaN')". Thanks to Anne
+> +  Grotenhuis from the Radboud Medical Centre Nijmegen and forum user
+> +  quentin300 for their extensive bug reports and help in testing the fix.
+> +* Fixed bug #1266: "pacoxph with no covariates"; ProbABEL now also works
+> +  when no covariates have been provided. Thanks to Aaron Joon for
+> +  reporting this bug back in 2011 and to Anne Grotenhuis and to forum user
+> +  quentin300 for pushing this bug to my attention and their help in beta
+> +  testing.
+> +* pacoxph now displays the regression equation correctly.
+> +* Minor fix to the manual: the Rsq values in the info file should be >
+> +  1e-16 (and not > 0 as mentioned before) otherwise the output will be set
+> +  to 'nan'.
+> +* Minor fix to the man-pages: according to the man-pages palogist,
+> +  palinear and pacoxph all did regression using a linear model.
+> 
+> 
+> ***** v.0.4.4 (2014.11.07)
+> 
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+
+
+From lennart at karssen.org  Wed May 27 00:16:15 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 27 May 2015 00:16:15 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1987 - in
+ branches/ProbABEL-v0.4.4-hotfix/ProbABEL: . doc
+In-Reply-To: <9B5236E3-9EBE-432B-9E72-75AED94457E7@gmail.com>
+References: <20150526160414.BE8A4186886@r-forge.r-project.org>
+ <9B5236E3-9EBE-432B-9E72-75AED94457E7@gmail.com>
+Message-ID: <5564F0AF.2040806@karssen.org>
+
+Hi list,
+
+I have just uploaded the files (source + binaries for Win64 and Win32)
+to www.genabel.org and created an announcement there. The Ubuntu PPA and
+Debian packages still need to be updated.
+I'll send an announcement to the mailing lists, forum, etc. tomorrow.
+
+
+Best regards,
+
+Lennart.
+
+On 26-05-15 21:00, Yurii Aulchenko wrote:
+> will this update be announced on site? - let Natalia know in case we need to push things in social networks :)
+> 
+> Yurii
+> 
+>> On 26 May 2015, at 18:04, noreply at r-forge.r-project.org wrote:
+>>
+>> Author: lckarssen
+>> Date: 2015-05-26 18:04:12 +0200 (Tue, 26 May 2015)
+>> New Revision: 1987
+>>
+>> Modified:
+>>   branches/ProbABEL-v0.4.4-hotfix/ProbABEL/configure.ac
+>>   branches/ProbABEL-v0.4.4-hotfix/ProbABEL/doc/ChangeLog
+>> Log:
+>> Push ProbABEL version number in the v0.4.4 hotfix branch to v0.4.5. Also update the Changelog for this release.
+>>
+>>
+>> Modified: branches/ProbABEL-v0.4.4-hotfix/ProbABEL/configure.ac
+>> ===================================================================
+>> --- branches/ProbABEL-v0.4.4-hotfix/ProbABEL/configure.ac	2015-05-26 15:57:11 UTC (rev 1986)
+>> +++ branches/ProbABEL-v0.4.4-hotfix/ProbABEL/configure.ac	2015-05-26 16:04:12 UTC (rev 1987)
+>> @@ -2,7 +2,7 @@
+>> # Process this file with autoconf to produce a configure script.
+>>
+>> AC_PREREQ([2.67])
+>> -AC_INIT(ProbABEL, 0.4.4, genabel-devel at r-forge.wu-wien.ac.at)
+>> +AC_INIT(ProbABEL, 0.4.5, genabel-devel at r-forge.wu-wien.ac.at)
+>> AM_INIT_AUTOMAKE([silent-rules subdir-objects])
+>> AM_SILENT_RULES([yes])
+>> AC_CONFIG_SRCDIR([src/data.h])
+>>
+>> Modified: branches/ProbABEL-v0.4.4-hotfix/ProbABEL/doc/ChangeLog
+>> ===================================================================
+>> --- branches/ProbABEL-v0.4.4-hotfix/ProbABEL/doc/ChangeLog	2015-05-26 15:57:11 UTC (rev 1986)
+>> +++ branches/ProbABEL-v0.4.4-hotfix/ProbABEL/doc/ChangeLog	2015-05-26 16:04:12 UTC (rev 1987)
+>> @@ -1,7 +1,21 @@
+>> -***** v.0.4.5 (2015)
+>> +***** v.0.4.5 (2015.05.26)
+>> * Fixed bug #6054: "Not all ProbABEL's short command line options are
+>>   correctly parsed."
+>> -* Minor fix to the manual: the Rsq values in the info file should be > 1e-16 otherwise the output will be set to 'nan'.
+>> +* Fixed bug #6041: "ProbABEL's Cox module reports too many errors (beta
+>> +  may be infinite, setting beta and se to 'NaN')". Thanks to Anne
+>> +  Grotenhuis from the Radboud Medical Centre Nijmegen and forum user
+>> +  quentin300 for their extensive bug reports and help in testing the fix.
+>> +* Fixed bug #1266: "pacoxph with no covariates"; ProbABEL now also works
+>> +  when no covariates have been provided. Thanks to Aaron Joon for
+>> +  reporting this bug back in 2011 and to Anne Grotenhuis and to forum user
+>> +  quentin300 for pushing this bug to my attention and their help in beta
+>> +  testing.
+>> +* pacoxph now displays the regression equation correctly.
+>> +* Minor fix to the manual: the Rsq values in the info file should be >
+>> +  1e-16 (and not > 0 as mentioned before) otherwise the output will be set
+>> +  to 'nan'.
+>> +* Minor fix to the man-pages: according to the man-pages palogist,
+>> +  palinear and pacoxph all did regression using a linear model.
+>>
+>>
+>> ***** v.0.4.4 (2014.11.07)
+>>
+>> _______________________________________________
+>> Genabel-commits mailing list
+>> Genabel-commits at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150527/18c73bf0/attachment.sig>
+
+From lennart at karssen.org  Fri May 29 15:41:47 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 29 May 2015 15:41:47 +0200
+Subject: [GenABEL-dev] Suggested RepeatABEL package
+In-Reply-To: <80fd8635a70f44f3b21be0d299f2eb20@ex2013mbx2.ad.du.se>
+References: <EE40BB26-1CAF-40DA-A1EA-612FEB8AD5EB@gmail.com>
+ <5DFC8AFC-99A6-4117-9418-2656CD3192EC@gmail.com>
+ <-5667536842663863949@unknownmsgid>
+ <3FB6BB54-DD33-4539-8ADA-A72F76B5979C@gmail.com>
+ <C5F39E63-2F87-40CA-95E4-D61413945BC3@gmail.com>
+ <CAHX9t6LXot-fKx_y4=5u2osWvHZEOP=CE6cpsx_8vb5GWq3QUA@mail.gmail.com>
+ <88F0F8DB0243B44995083F13BC35B166378FC815@ex1.ad.du.se>
+ <D84B9C7B-92C8-4C07-8409-87EE496469C3@gmail.com>
+ <af24952711ee4409a6e8d6b83a18d94c@ex2013mbx1.ad.du.se>
+ <035B3F5F-F739-4046-B8BE-EC5135A3B27F@gmail.com>
+ <e6d58967268f4a19aa70e1a3cd4335c9@ex2013mbx1.ad.du.se>
+ <495B26B1-1643-4DCD-923B-BBBE366386FE@gmail.com>,
+ <181DB57C-2213-4649-9BE5-DC84062610C0@cam.ac.uk>,
+ <7d83a53c1f1543dbb8925570db41e997@ex2013mbx2.ad.du.se>
+ <80fd8635a70f44f3b21be0d299f2eb20@ex2013mbx2.ad.du.se>
+Message-ID: <55686C9B.4010003@karssen.org>
+
+Dear Lars,
+
+First of all, sorry for the delay in answering your e-mail.
+
+Thank you for submitting your RepeatABEL package to the list. I will put
+it on my "to review" list and hope to have a look at it later next week.
+In the mean time I hope one of the other GenABEL developers steps
+forward and reviews your package as well.
+
+
+Best regards,
+
+Lennart.
+
+On 11-05-15 12:53, Lars R?nneg?rd wrote:
+> 
+> Dear GenABEL developers, I attach the source code for a package I
+> have developed, and I would like it to be considered for the GenABEL
+> suite of packages in the future.
+> 
+> The RepeatABEL package connects multiple phenotypic observations in
+> an R data frame with the genotype information on the individuals
+> given in a GenABEL object. One can perform GWAS for data having
+> repeated observations on related individuals. The hglm package is
+> used for variance component estimation and there are also other
+> functionalities including spatial modelling.
+> 
+> The code was applied in Husby et al. (2015: Genome-wide association
+> mapping in a wild avian population identifies a link between genetic
+> and phenotypic variation in a life history trait. Proceedings of the
+> Royal Society B: Biological Sciences, 282(1806), 20150156.) and now
+> we have put the code together in a package and evaluated the method
+> using simulations (with Eryn McFarlane and others, manuscript in
+> preparation). I therefore believe it is ready for evaluation by the
+> GenABEL developers.
+> 
+> The package will be especially useful for GWAS in wildlife studies
+> where there are large fluctuations in phenotypes between years, and
+> these temporal effects are important to include in the model. I have
+> a manuscript together with my co-authors that we plan to submit
+> within the near future with a focus on GWAS in natural populations.
+> But it should also be quite useful for most studies (including human)
+> having repeated observations since it should be rather user friendly
+> considering the alternatives, eg regression using average phenotypes,
+> some GRAMMAR type of approach.
+> 
+> Any suggested improvements are appreciated.
+> 
+> Looking forward to your response, Lars R?nneg?rd
+> 
+> Professor of Statistics Dalarna University, Sweden 
+> www.larsronnegard.se
+> 
+> 
+> PS The name "RepeatABEL" was suggested by Xia Shen, which I very much
+> appreciate.
+> 
+> 
+> 
+> _______________________________________________ genabel-devel mailing
+> list genabel-devel at lists.r-forge.r-project.org 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>
+> 
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150529/a7f05349/attachment.sig>
+

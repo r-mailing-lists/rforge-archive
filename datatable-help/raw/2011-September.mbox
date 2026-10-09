@@ -1,0 +1,2457 @@
+From dbetebenner at nciea.org  Thu Sep  8 21:27:32 2011
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Thu, 8 Sep 2011 14:27:32 -0500
+Subject: [datatable-help] Over-writing factors
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694BF2FE5C70@AUSP01VMBX05.collaborationhost.net>
+
+Not sure whether the following is an intended behavior with data.table. Perhaps it is something idiosyncratic with factors.
+It is different than what one gets with data.frame
+
+test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+
+test.df$X <- "Something Different"
+test.dt$X <- "Something Different"
+Error in `[<-.data.table`(x, j = name, value = value) :
+  Some or all RHS not present in factor column levels
+
+
+test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+
+test.df[["X"]] <- "Something Different"
+test.dt[["X"]] <- "Something Different"
+
+
+
+
+Damian Betebenner
+Center for Assessment
+PO Box 351
+Dover, NH   03821-0351
+
+Phone (office): (603) 516-7900
+Phone (cell): (857) 234-2474
+Fax: (603) 516-7910
+
+dbetebenner at nciea.org<mailto:dbetebenner at nciea.org>
+www.nciea.org<http://www.nciea.org/>
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110908/f529ef25/attachment.htm>
+
+From mdowle at mdowle.plus.com  Fri Sep  9 00:15:54 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 08 Sep 2011 23:15:54 +0100
+Subject: [datatable-help] Over-writing factors
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694BF2FE5C70@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694BF2FE5C70@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <1315520154.2522.55.camel@netbook>
+
+It's intended. data.table requires sorted factor levels. If the levels
+somehow become unsorted then binary search joins don't work.  We might
+be able to allow it and make data.table maintain things (with a speed
+penalty due to the resort of levels and re-write of the entire integer
+column), but, allowing character columns is (hopefully) not far away
+which should be much better solution.
+
+Or, in the meantime, you can go 'under the hood'. Add "something
+different" to the end of the factor levels using levels()<-, then the
+assignment to the column should work. If that column is part of a key
+then make sure to recall setkey() which will check and resort the levels
+for you (with a warning message). If an existing level is changing name,
+then it's faster to assign (once) directly to the levels(). But again,
+careful to maintain sorted levels if that column is to be used in joins.
+
+Matthew
+
+
+On Thu, 2011-09-08 at 14:27 -0500, Damian Betebenner wrote:
+> Not sure whether the following is an intended behavior with
+> data.table. Perhaps it is something idiosyncratic with factors.
+> 
+> It is different than what one gets with data.frame
+> 
+>  
+> 
+> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+> 
+> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+> 
+>  
+> 
+> test.df$X <- "Something Different"
+> 
+> test.dt$X <- "Something Different"
+> 
+> Error in `[<-.data.table`(x, j = name, value = value) : 
+> 
+>   Some or all RHS not present in factor column levels
+> 
+>  
+> 
+>  
+> 
+> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+> 
+> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+> 
+>  
+> 
+> test.df[["X"]] <- "Something Different"
+> 
+> test.dt[["X"]] <- "Something Different"
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+> Damian Betebenner
+> 
+> Center for Assessment
+> 
+> PO Box 351
+> 
+> Dover, NH   03821-0351
+> 
+>  
+> 
+> Phone (office): (603) 516-7900
+> 
+> Phone (cell): (857) 234-2474
+> 
+> Fax: (603) 516-7910
+> 
+>  
+> 
+> dbetebenner at nciea.org
+> 
+> www.nciea.org
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From caneff at gmail.com  Fri Sep  9 18:22:46 2011
+From: caneff at gmail.com (Chris Neff)
+Date: Fri, 9 Sep 2011 12:22:46 -0400
+Subject: [datatable-help] Over-writing factors
+In-Reply-To: <1315520154.2522.55.camel@netbook>
+References: <8AD9137B75B37049AA711A4B64CEDB694BF2FE5C70@AUSP01VMBX05.collaborationhost.net>
+	<1315520154.2522.55.camel@netbook>
+Message-ID: <CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A@mail.gmail.com>
+
+This was surprising to me. I would've thought test.dt$X <- "foo" and
+test.dt[["X"]] <- "foo" should do the exact same thing because the
+entire column is being overwritten, no? I would understand the issue
+if it was test.dt$X[i] <- "foo", but it isn't.
+
+In a related note, I'm surprised this doesn't work either:
+
+> DT=data.table(x=1:10,y=1:10,key="x")
+> DT$x="foo"
+Warning message:
+In `[<-.data.table`(x, j = name, value = value) :
+  NAs introduced by coercion
+> DT[["x"]]="foo" # Works fine and sets DT$x to be a character vector with "foo" repeated.
+
+DT$x is allowed to be overwritten by other classes (i.e. DT$x <-
+rnorm(10) when DT$x starts as an integer), why not a character, or
+change "foo" to a factor and assign it if that is what must be done?
+This is also true with a non-key variable, like DT$y.
+
+
+On 8 September 2011 18:15, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> It's intended. data.table requires sorted factor levels. If the levels
+> somehow become unsorted then binary search joins don't work. ?We might
+> be able to allow it and make data.table maintain things (with a speed
+> penalty due to the resort of levels and re-write of the entire integer
+> column), but, allowing character columns is (hopefully) not far away
+> which should be much better solution.
+>
+> Or, in the meantime, you can go 'under the hood'. Add "something
+> different" to the end of the factor levels using levels()<-, then the
+> assignment to the column should work. If that column is part of a key
+> then make sure to recall setkey() which will check and resort the levels
+> for you (with a warning message). If an existing level is changing name,
+> then it's faster to assign (once) directly to the levels(). But again,
+> careful to maintain sorted levels if that column is to be used in joins.
+>
+> Matthew
+>
+>
+> On Thu, 2011-09-08 at 14:27 -0500, Damian Betebenner wrote:
+>> Not sure whether the following is an intended behavior with
+>> data.table. Perhaps it is something idiosyncratic with factors.
+>>
+>> It is different than what one gets with data.frame
+>>
+>>
+>>
+>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+>>
+>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+>>
+>>
+>>
+>> test.df$X <- "Something Different"
+>>
+>> test.dt$X <- "Something Different"
+>>
+>> Error in `[<-.data.table`(x, j = name, value = value) :
+>>
+>> ? Some or all RHS not present in factor column levels
+>>
+>>
+>>
+>>
+>>
+>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+>>
+>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+>>
+>>
+>>
+>> test.df[["X"]] <- "Something Different"
+>>
+>> test.dt[["X"]] <- "Something Different"
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> Damian Betebenner
+>>
+>> Center for Assessment
+>>
+>> PO Box 351
+>>
+>> Dover, NH ? 03821-0351
+>>
+>>
+>>
+>> Phone (office): (603) 516-7900
+>>
+>> Phone (cell): (857) 234-2474
+>>
+>> Fax: (603) 516-7910
+>>
+>>
+>>
+>> dbetebenner at nciea.org
+>>
+>> www.nciea.org
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+From mdowle at mdowle.plus.com  Fri Sep  9 18:42:37 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 9 Sep 2011 17:42:37 +0100
+Subject: [datatable-help] Over-writing factors
+References: <8AD9137B75B37049AA711A4B64CEDB694BF2FE5C70@AUSP01VMBX05.collaborationhost.net><1315520154.2522.55.camel@netbook>
+	<CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A@mail.gmail.com>
+Message-ID: <j4dflv$f1k$1@dough.gmane.org>
+
+Oops, I missed that the question was about whole column replacements.
+
+I'm generally using := now.  Will have a think about this ...
+
+"Chris Neff" <caneff at gmail.com> wrote in message 
+news:CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A at mail.gmail.com...
+This was surprising to me. I would've thought test.dt$X <- "foo" and
+test.dt[["X"]] <- "foo" should do the exact same thing because the
+entire column is being overwritten, no? I would understand the issue
+if it was test.dt$X[i] <- "foo", but it isn't.
+
+In a related note, I'm surprised this doesn't work either:
+
+> DT=data.table(x=1:10,y=1:10,key="x")
+> DT$x="foo"
+Warning message:
+In `[<-.data.table`(x, j = name, value = value) :
+  NAs introduced by coercion
+> DT[["x"]]="foo" # Works fine and sets DT$x to be a character vector with 
+> "foo" repeated.
+
+DT$x is allowed to be overwritten by other classes (i.e. DT$x <-
+rnorm(10) when DT$x starts as an integer), why not a character, or
+change "foo" to a factor and assign it if that is what must be done?
+This is also true with a non-key variable, like DT$y.
+
+
+On 8 September 2011 18:15, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> It's intended. data.table requires sorted factor levels. If the levels
+> somehow become unsorted then binary search joins don't work. We might
+> be able to allow it and make data.table maintain things (with a speed
+> penalty due to the resort of levels and re-write of the entire integer
+> column), but, allowing character columns is (hopefully) not far away
+> which should be much better solution.
+>
+> Or, in the meantime, you can go 'under the hood'. Add "something
+> different" to the end of the factor levels using levels()<-, then the
+> assignment to the column should work. If that column is part of a key
+> then make sure to recall setkey() which will check and resort the levels
+> for you (with a warning message). If an existing level is changing name,
+> then it's faster to assign (once) directly to the levels(). But again,
+> careful to maintain sorted levels if that column is to be used in joins.
+>
+> Matthew
+>
+>
+> On Thu, 2011-09-08 at 14:27 -0500, Damian Betebenner wrote:
+>> Not sure whether the following is an intended behavior with
+>> data.table. Perhaps it is something idiosyncratic with factors.
+>>
+>> It is different than what one gets with data.frame
+>>
+>>
+>>
+>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+>>
+>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+>>
+>>
+>>
+>> test.df$X <- "Something Different"
+>>
+>> test.dt$X <- "Something Different"
+>>
+>> Error in `[<-.data.table`(x, j = name, value = value) :
+>>
+>> Some or all RHS not present in factor column levels
+>>
+>>
+>>
+>>
+>>
+>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+>>
+>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+>>
+>>
+>>
+>> test.df[["X"]] <- "Something Different"
+>>
+>> test.dt[["X"]] <- "Something Different"
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> Damian Betebenner
+>>
+>> Center for Assessment
+>>
+>> PO Box 351
+>>
+>> Dover, NH 03821-0351
+>>
+>>
+>>
+>> Phone (office): (603) 516-7900
+>>
+>> Phone (cell): (857) 234-2474
+>>
+>> Fax: (603) 516-7910
+>>
+>>
+>>
+>> dbetebenner at nciea.org
+>>
+>> www.nciea.org
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+
+
+
+
+From caneff at gmail.com  Fri Sep  9 18:48:52 2011
+From: caneff at gmail.com (Chris Neff)
+Date: Fri, 9 Sep 2011 12:48:52 -0400
+Subject: [datatable-help] Over-writing factors
+In-Reply-To: <j4dflv$f1k$1@dough.gmane.org>
+References: <8AD9137B75B37049AA711A4B64CEDB694BF2FE5C70@AUSP01VMBX05.collaborationhost.net>
+	<1315520154.2522.55.camel@netbook>
+	<CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A@mail.gmail.com>
+	<j4dflv$f1k$1@dough.gmane.org>
+Message-ID: <CAAuY0RVcdNqi06uPGgQUXvyLo1BTWN9_NBkWk8jR2TA1_XKo5A@mail.gmail.com>
+
+Once again forgive my ignorance, but why can't whole column
+replacements using $ <- just redirect to ":="?
+
+On 9 September 2011 12:42, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Oops, I missed that the question was about whole column replacements.
+>
+> I'm generally using := now. ?Will have a think about this ...
+>
+> "Chris Neff" <caneff at gmail.com> wrote in message
+> news:CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A at mail.gmail.com...
+> This was surprising to me. I would've thought test.dt$X <- "foo" and
+> test.dt[["X"]] <- "foo" should do the exact same thing because the
+> entire column is being overwritten, no? I would understand the issue
+> if it was test.dt$X[i] <- "foo", but it isn't.
+>
+> In a related note, I'm surprised this doesn't work either:
+>
+>> DT=data.table(x=1:10,y=1:10,key="x")
+>> DT$x="foo"
+> Warning message:
+> In `[<-.data.table`(x, j = name, value = value) :
+> ?NAs introduced by coercion
+>> DT[["x"]]="foo" # Works fine and sets DT$x to be a character vector with
+>> "foo" repeated.
+>
+> DT$x is allowed to be overwritten by other classes (i.e. DT$x <-
+> rnorm(10) when DT$x starts as an integer), why not a character, or
+> change "foo" to a factor and assign it if that is what must be done?
+> This is also true with a non-key variable, like DT$y.
+>
+>
+> On 8 September 2011 18:15, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> It's intended. data.table requires sorted factor levels. If the levels
+>> somehow become unsorted then binary search joins don't work. We might
+>> be able to allow it and make data.table maintain things (with a speed
+>> penalty due to the resort of levels and re-write of the entire integer
+>> column), but, allowing character columns is (hopefully) not far away
+>> which should be much better solution.
+>>
+>> Or, in the meantime, you can go 'under the hood'. Add "something
+>> different" to the end of the factor levels using levels()<-, then the
+>> assignment to the column should work. If that column is part of a key
+>> then make sure to recall setkey() which will check and resort the levels
+>> for you (with a warning message). If an existing level is changing name,
+>> then it's faster to assign (once) directly to the levels(). But again,
+>> careful to maintain sorted levels if that column is to be used in joins.
+>>
+>> Matthew
+>>
+>>
+>> On Thu, 2011-09-08 at 14:27 -0500, Damian Betebenner wrote:
+>>> Not sure whether the following is an intended behavior with
+>>> data.table. Perhaps it is something idiosyncratic with factors.
+>>>
+>>> It is different than what one gets with data.frame
+>>>
+>>>
+>>>
+>>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+>>>
+>>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+>>>
+>>>
+>>>
+>>> test.df$X <- "Something Different"
+>>>
+>>> test.dt$X <- "Something Different"
+>>>
+>>> Error in `[<-.data.table`(x, j = name, value = value) :
+>>>
+>>> Some or all RHS not present in factor column levels
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+>>>
+>>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+>>>
+>>>
+>>>
+>>> test.df[["X"]] <- "Something Different"
+>>>
+>>> test.dt[["X"]] <- "Something Different"
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> Damian Betebenner
+>>>
+>>> Center for Assessment
+>>>
+>>> PO Box 351
+>>>
+>>> Dover, NH 03821-0351
+>>>
+>>>
+>>>
+>>> Phone (office): (603) 516-7900
+>>>
+>>> Phone (cell): (857) 234-2474
+>>>
+>>> Fax: (603) 516-7910
+>>>
+>>>
+>>>
+>>> dbetebenner at nciea.org
+>>>
+>>> www.nciea.org
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+From do-not-reply at stackexchange.com  Sat Sep 10 00:18:08 2011
+From: do-not-reply at stackexchange.com (Stack Exchange)
+Date: Fri, 09 Sep 2011 22:18:08 +0000
+Subject: [datatable-help] New data.table questions for Sep 9 - Stack Exchange
+Message-ID: <2.046b9abd531413aca9c3@NY-WEB04>
+
+1 new question in [data.table filter](http://stackexchange.com/filters/7853/data-table) on stackexchange.com
+
+[Tabulations and insertions with data\.table](http://stackoverflow.com/questions/7367965/tabulations-and-insertions-with-data-table)
+I am trying to take a very large set of records with multiple indices, calculate an aggregate statistic on groups determined by a subset of the indices, and then insert that into every row in the ...
+Tagged:? r? data.table   by [Iterator](http://stackoverflow.com/users/805808/iterator) on [stackoverflow.com](http://stackoverflow.com)
+
+
+
+
+**[Unsubscribe from this filter](http://stackexchange.com/email/unsubscribe-filter/46499/1553612417?code=sLu%2bnabss4JOGgiRpohiMXEmFU6A%2b%2fNOUsaLvwh9lzo%3d) or change your email preferences by visiting your [filter subscriptions page on stackexchange.com](http://stackexchange.com/users/44512d26-f3c9-4c8d-9f4b-9e5035a76ba1?tab=subscriptions).**
+
+_________________________________________________________________________
+Questions? Comments? Let us know on our [feedback site][9]. If you no longer want to receive mail from Stack Exchange, [unsubscribe from all stackexchange.com emails][7].
+
+Stack Exchange, Inc. One Exchange Plaza, 26th Floor, NY NY 10006 <3
+
+[7]: http://stackexchange.com/email/manage/32179/50c7b797e95587cf7a3fe93ea9f9f3c7c01ca47b809ac13d6452ad1f766b38c4
+[8]: http://stackexchange.com
+[9]: http://meta.stackoverflow.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110909/349c0674/attachment.htm>
+
+From mdowle at mdowle.plus.com  Sat Sep 10 17:17:58 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 10 Sep 2011 16:17:58 +0100
+Subject: [datatable-help] Over-writing factors
+In-Reply-To: <CAAuY0RVcdNqi06uPGgQUXvyLo1BTWN9_NBkWk8jR2TA1_XKo5A@mail.gmail.com>
+References: <8AD9137B75B37049AA711A4B64CEDB694BF2FE5C70@AUSP01VMBX05.collaborationhost.net>
+	<1315520154.2522.55.camel@netbook>
+	<CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A@mail.gmail.com>
+	<j4dflv$f1k$1@dough.gmane.org>
+	<CAAuY0RVcdNqi06uPGgQUXvyLo1BTWN9_NBkWk8jR2TA1_XKo5A@mail.gmail.com>
+Message-ID: <1315667878.2522.69.camel@netbook>
+
+$<- and [<- already do redirect to := (or rather, the internal C
+function that := uses), but it can never (unless a change in R happens)
+be as fast as using := directly because the copy of the whole table
+comes from <- itself (dispatch via `*tmp*`). That is most of the very
+reason := was needed, to avoid <-'s copy. It's been quite an adventure!
+
+I've had a look now, and yes there's a bug or two here, and more tests
+needed ...
+
+On Fri, 2011-09-09 at 12:48 -0400, Chris Neff wrote:
+> Once again forgive my ignorance, but why can't whole column
+> replacements using $ <- just redirect to ":="?
+> 
+> On 9 September 2011 12:42, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > Oops, I missed that the question was about whole column replacements.
+> >
+> > I'm generally using := now.  Will have a think about this ...
+> >
+> > "Chris Neff" <caneff at gmail.com> wrote in message
+> > news:CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A at mail.gmail.com...
+> > This was surprising to me. I would've thought test.dt$X <- "foo" and
+> > test.dt[["X"]] <- "foo" should do the exact same thing because the
+> > entire column is being overwritten, no? I would understand the issue
+> > if it was test.dt$X[i] <- "foo", but it isn't.
+> >
+> > In a related note, I'm surprised this doesn't work either:
+> >
+> >> DT=data.table(x=1:10,y=1:10,key="x")
+> >> DT$x="foo"
+> > Warning message:
+> > In `[<-.data.table`(x, j = name, value = value) :
+> >  NAs introduced by coercion
+> >> DT[["x"]]="foo" # Works fine and sets DT$x to be a character vector with
+> >> "foo" repeated.
+> >
+> > DT$x is allowed to be overwritten by other classes (i.e. DT$x <-
+> > rnorm(10) when DT$x starts as an integer), why not a character, or
+> > change "foo" to a factor and assign it if that is what must be done?
+> > This is also true with a non-key variable, like DT$y.
+> >
+> >
+> > On 8 September 2011 18:15, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> >> It's intended. data.table requires sorted factor levels. If the levels
+> >> somehow become unsorted then binary search joins don't work. We might
+> >> be able to allow it and make data.table maintain things (with a speed
+> >> penalty due to the resort of levels and re-write of the entire integer
+> >> column), but, allowing character columns is (hopefully) not far away
+> >> which should be much better solution.
+> >>
+> >> Or, in the meantime, you can go 'under the hood'. Add "something
+> >> different" to the end of the factor levels using levels()<-, then the
+> >> assignment to the column should work. If that column is part of a key
+> >> then make sure to recall setkey() which will check and resort the levels
+> >> for you (with a warning message). If an existing level is changing name,
+> >> then it's faster to assign (once) directly to the levels(). But again,
+> >> careful to maintain sorted levels if that column is to be used in joins.
+> >>
+> >> Matthew
+> >>
+> >>
+> >> On Thu, 2011-09-08 at 14:27 -0500, Damian Betebenner wrote:
+> >>> Not sure whether the following is an intended behavior with
+> >>> data.table. Perhaps it is something idiosyncratic with factors.
+> >>>
+> >>> It is different than what one gets with data.frame
+> >>>
+> >>>
+> >>>
+> >>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+> >>>
+> >>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+> >>>
+> >>>
+> >>>
+> >>> test.df$X <- "Something Different"
+> >>>
+> >>> test.dt$X <- "Something Different"
+> >>>
+> >>> Error in `[<-.data.table`(x, j = name, value = value) :
+> >>>
+> >>> Some or all RHS not present in factor column levels
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+> >>>
+> >>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+> >>>
+> >>>
+> >>>
+> >>> test.df[["X"]] <- "Something Different"
+> >>>
+> >>> test.dt[["X"]] <- "Something Different"
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>> Damian Betebenner
+> >>>
+> >>> Center for Assessment
+> >>>
+> >>> PO Box 351
+> >>>
+> >>> Dover, NH 03821-0351
+> >>>
+> >>>
+> >>>
+> >>> Phone (office): (603) 516-7900
+> >>>
+> >>> Phone (cell): (857) 234-2474
+> >>>
+> >>> Fax: (603) 516-7910
+> >>>
+> >>>
+> >>>
+> >>> dbetebenner at nciea.org
+> >>>
+> >>> www.nciea.org
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>> _______________________________________________
+> >>> datatable-help mailing list
+> >>> datatable-help at lists.r-forge.r-project.org
+> >>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >>
+> >>
+> >> _______________________________________________
+> >> datatable-help mailing list
+> >> datatable-help at lists.r-forge.r-project.org
+> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >>
+> >
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+
+
+
+From leonbaum2 at gmail.com  Tue Sep 13 01:55:18 2011
+From: leonbaum2 at gmail.com (Leon Baum)
+Date: Mon, 12 Sep 2011 19:55:18 -0400
+Subject: [datatable-help] Inconsistent [<- behavior
+Message-ID: <87sjo1nwnt.fsf@gmail.com>
+
+
+Hello,
+
+I believe that all of the following should result in the same data.table
+(ignoring different orderings), but some of them give me errors:
+
+
+> dt <- data.table(x=letters[1:2], y=rnorm(4))
+> dt[c(1, 3), ]$y <- 0
+> dt
+     x         y
+[1,] a  0.000000
+[2,] b -1.645834
+[3,] a  0.000000
+[4,] b -1.311856
+# correct
+
+> dt <- data.table(x=letters[1:2], y=rnorm(4))
+> dt[x == "a", ]$y <- 0
+Error in `[<-.data.frame`(x, i, j, value) : object 'x' not found
+# bad
+
+> dt <- data.table(x=letters[1:2], y=rnorm(4))
+> dt[x == "a", y:=0]
+     x          y
+[1,] a  0.0000000
+[2,] b -0.1028541
+[3,] a  0.0000000
+[4,] b  0.3569112
+# correct
+
+> dt <- data.table(x=letters[1:2], y=rnorm(4), key="x")
+> dt["a", ]$y <- 0
+Warning messages:
+1: In `[<-.data.frame`(x, i, j, value) :
+  replacement element 1 has 2 rows to replace 1 rows
+2: In `[<-.data.frame`(x, i, j, value) :
+  replacement element 2 has 2 rows to replace 1 rows
+> dt
+     x          y
+[1,] a -0.4444458
+[2,] a -2.1279203
+[3,] b -1.9065767
+[4,] b  0.5903236
+[5,] a  0.0000000
+# bad
+
+> dt <- data.table(x=letters[1:2], y=rnorm(4), key="x")
+> dt["a", y:=0]
+     x           y
+[1,] a  0.00000000
+[2,] a  0.00000000
+[3,] b  1.05028739
+[4,] b -0.02362426
+# correct
+
+I am using R-2.13.1 and data.table 1.6.6.
+
+-Leon
+
+From mdowle at mdowle.plus.com  Tue Sep 13 10:26:53 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 13 Sep 2011 09:26:53 +0100
+Subject: [datatable-help] Inconsistent [<- behavior
+References: <87sjo1nwnt.fsf@gmail.com>
+Message-ID: <j4n44f$36p$1@dough.gmane.org>
+
+
+Hi. Thanks for reporting. The 'correct' ways that work using := are the best 
+ways going forward. But agreed, will fix so that all ways work.
+
+"Leon Baum" <leonbaum2 at gmail.com> wrote in message 
+news:87sjo1nwnt.fsf at gmail.com...
+>
+> Hello,
+>
+> I believe that all of the following should result in the same data.table
+> (ignoring different orderings), but some of them give me errors:
+>
+>
+>> dt <- data.table(x=letters[1:2], y=rnorm(4))
+>> dt[c(1, 3), ]$y <- 0
+>> dt
+>     x         y
+> [1,] a  0.000000
+> [2,] b -1.645834
+> [3,] a  0.000000
+> [4,] b -1.311856
+> # correct
+>
+>> dt <- data.table(x=letters[1:2], y=rnorm(4))
+>> dt[x == "a", ]$y <- 0
+> Error in `[<-.data.frame`(x, i, j, value) : object 'x' not found
+> # bad
+>
+>> dt <- data.table(x=letters[1:2], y=rnorm(4))
+>> dt[x == "a", y:=0]
+>     x          y
+> [1,] a  0.0000000
+> [2,] b -0.1028541
+> [3,] a  0.0000000
+> [4,] b  0.3569112
+> # correct
+>
+>> dt <- data.table(x=letters[1:2], y=rnorm(4), key="x")
+>> dt["a", ]$y <- 0
+> Warning messages:
+> 1: In `[<-.data.frame`(x, i, j, value) :
+>  replacement element 1 has 2 rows to replace 1 rows
+> 2: In `[<-.data.frame`(x, i, j, value) :
+>  replacement element 2 has 2 rows to replace 1 rows
+>> dt
+>     x          y
+> [1,] a -0.4444458
+> [2,] a -2.1279203
+> [3,] b -1.9065767
+> [4,] b  0.5903236
+> [5,] a  0.0000000
+> # bad
+>
+>> dt <- data.table(x=letters[1:2], y=rnorm(4), key="x")
+>> dt["a", y:=0]
+>     x           y
+> [1,] a  0.00000000
+> [2,] a  0.00000000
+> [3,] b  1.05028739
+> [4,] b -0.02362426
+> # correct
+>
+> I am using R-2.13.1 and data.table 1.6.6.
+>
+> -Leon 
+
+
+
+
+From mdowle at mdowle.plus.com  Tue Sep 13 10:31:38 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 13 Sep 2011 09:31:38 +0100
+Subject: [datatable-help] Inconsistent [<- behavior
+References: <87sjo1nwnt.fsf@gmail.com> <j4n44f$36p$1@dough.gmane.org>
+Message-ID: <j4n4de$4ue$1@dough.gmane.org>
+
+Forgot to say, please add a bug.report(package="data.table") for the errors. 
+Thanks.
+
+"Matthew Dowle" <mdowle at mdowle.plus.com> wrote in message 
+news:j4n44f$36p$1 at dough.gmane.org...
+>
+> Hi. Thanks for reporting. The 'correct' ways that work using := are the 
+> best ways going forward. But agreed, will fix so that all ways work.
+>
+> "Leon Baum" <leonbaum2 at gmail.com> wrote in message 
+> news:87sjo1nwnt.fsf at gmail.com...
+>>
+>> Hello,
+>>
+>> I believe that all of the following should result in the same data.table
+>> (ignoring different orderings), but some of them give me errors:
+>>
+>>
+>>> dt <- data.table(x=letters[1:2], y=rnorm(4))
+>>> dt[c(1, 3), ]$y <- 0
+>>> dt
+>>     x         y
+>> [1,] a  0.000000
+>> [2,] b -1.645834
+>> [3,] a  0.000000
+>> [4,] b -1.311856
+>> # correct
+>>
+>>> dt <- data.table(x=letters[1:2], y=rnorm(4))
+>>> dt[x == "a", ]$y <- 0
+>> Error in `[<-.data.frame`(x, i, j, value) : object 'x' not found
+>> # bad
+>>
+>>> dt <- data.table(x=letters[1:2], y=rnorm(4))
+>>> dt[x == "a", y:=0]
+>>     x          y
+>> [1,] a  0.0000000
+>> [2,] b -0.1028541
+>> [3,] a  0.0000000
+>> [4,] b  0.3569112
+>> # correct
+>>
+>>> dt <- data.table(x=letters[1:2], y=rnorm(4), key="x")
+>>> dt["a", ]$y <- 0
+>> Warning messages:
+>> 1: In `[<-.data.frame`(x, i, j, value) :
+>>  replacement element 1 has 2 rows to replace 1 rows
+>> 2: In `[<-.data.frame`(x, i, j, value) :
+>>  replacement element 2 has 2 rows to replace 1 rows
+>>> dt
+>>     x          y
+>> [1,] a -0.4444458
+>> [2,] a -2.1279203
+>> [3,] b -1.9065767
+>> [4,] b  0.5903236
+>> [5,] a  0.0000000
+>> # bad
+>>
+>>> dt <- data.table(x=letters[1:2], y=rnorm(4), key="x")
+>>> dt["a", y:=0]
+>>     x           y
+>> [1,] a  0.00000000
+>> [2,] a  0.00000000
+>> [3,] b  1.05028739
+>> [4,] b -0.02362426
+>> # correct
+>>
+>> I am using R-2.13.1 and data.table 1.6.6.
+>>
+>> -Leon 
+
+
+
+
+From caneff at gmail.com  Wed Sep 21 14:18:08 2011
+From: caneff at gmail.com (Chris Neff)
+Date: Wed, 21 Sep 2011 08:18:08 -0400
+Subject: [datatable-help] Should by=character(0) just perform as if no by
+	was called?
+Message-ID: <CAAuY0RUt2y0S87N5NOyeV_syJ3-5pYZni3cXd6UpeEhchasmLA@mail.gmail.com>
+
+I sometimes in my code have multiple possible inputs into a function,
+with some of them having more key columns than other inputs.  I will
+then often times in my code create aggregations over some of those key
+columns.  However, this has wound up with the case where sometimes I
+try to aggregate over no columns. An example:
+
+Suppose I have two data frames, one with "t" and "g" as keys and
+another with just "t" as a key.
+
+DT1 <- data.table( t=rep(1:10,10), g=rep(1:5, 20), x=rnorm(100),
+y=rnorm(100), key=c("t","g"))
+DT2 <- data.table( t=rep(1:10,10), x=rnorm(100), y=rnorm(100), key="t")
+
+
+Now I make a function that aggregates all values of "t" together
+
+F <- function(dt) {
+ dt[, list(x=sum(x), y=sum(y)), by=setdiff(key(dt), "t")]
+}
+
+
+> F(DT1)
+     g         x         y
+[1,] 1 -1.829979 -3.320561
+[2,] 2 -4.822312  5.136586
+[3,] 3  6.326729  2.298288
+[4,] 4  4.226714  3.267511
+[5,] 5 -3.277370 -3.474824
+
+> F(DT2)
+Error in l[[1]] : subscript out of bounds
+
+
+I would like F(DT2) to work. It should be the same as calling dt[,
+list(x=sum(x), y=sum(y))].  Do you see any pathologic cases where that
+wouldn't make sense as the default? As it is now, I have to check
+every time if setdiff(key(dt), "t")  is empty, and then do a dt call
+without the by. This is messy and encourages too much copy paste
+errors.
+
+Thanks!
+Chris
+
+From mdowle at mdowle.plus.com  Wed Sep 21 15:01:00 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 21 Sep 2011 14:01:00 +0100
+Subject: [datatable-help] Should by=character(0) just perform as if no
+	bywas called?
+References: <CAAuY0RUt2y0S87N5NOyeV_syJ3-5pYZni3cXd6UpeEhchasmLA@mail.gmail.com>
+Message-ID: <j5cn6e$6jr$1@dough.gmane.org>
+
+
+Yes, agreed.  Please add as a bug report.
+
+> DT = data.table(a=1:2,b=1:6)
+> DT[,sum(b),by=NULL]
+Error in bysubl[[1]] : subscript out of bounds
+
+should be same as :
+
+> DT[,sum(b)]
+[1] 21
+
+Thanks,
+Matthew
+
+"Chris Neff" <caneff at gmail.com> wrote in message 
+news:CAAuY0RUt2y0S87N5NOyeV_syJ3-5pYZni3cXd6UpeEhchasmLA at mail.gmail.com...
+>I sometimes in my code have multiple possible inputs into a function,
+> with some of them having more key columns than other inputs.  I will
+> then often times in my code create aggregations over some of those key
+> columns.  However, this has wound up with the case where sometimes I
+> try to aggregate over no columns. An example:
+>
+> Suppose I have two data frames, one with "t" and "g" as keys and
+> another with just "t" as a key.
+>
+> DT1 <- data.table( t=rep(1:10,10), g=rep(1:5, 20), x=rnorm(100),
+> y=rnorm(100), key=c("t","g"))
+> DT2 <- data.table( t=rep(1:10,10), x=rnorm(100), y=rnorm(100), key="t")
+>
+>
+> Now I make a function that aggregates all values of "t" together
+>
+> F <- function(dt) {
+> dt[, list(x=sum(x), y=sum(y)), by=setdiff(key(dt), "t")]
+> }
+>
+>
+>> F(DT1)
+>     g         x         y
+> [1,] 1 -1.829979 -3.320561
+> [2,] 2 -4.822312  5.136586
+> [3,] 3  6.326729  2.298288
+> [4,] 4  4.226714  3.267511
+> [5,] 5 -3.277370 -3.474824
+>
+>> F(DT2)
+> Error in l[[1]] : subscript out of bounds
+>
+>
+> I would like F(DT2) to work. It should be the same as calling dt[,
+> list(x=sum(x), y=sum(y))].  Do you see any pathologic cases where that
+> wouldn't make sense as the default? As it is now, I have to check
+> every time if setdiff(key(dt), "t")  is empty, and then do a dt call
+> without the by. This is messy and encourages too much copy paste
+> errors.
+>
+> Thanks!
+> Chris 
+
+
+
+
+From djmuser at gmail.com  Fri Sep 23 17:01:14 2011
+From: djmuser at gmail.com (djmuseR)
+Date: Fri, 23 Sep 2011 08:01:14 -0700 (PDT)
+Subject: [datatable-help] Curiosity with use of .SDcols
+Message-ID: <1316790074426-3837112.post@n4.nabble.com>
+
+Hi:
+
+I'm playing around with some baseball data and ran into an error whose cause
+I don't quite understand.
+A subset of the data is here, consisting of all season batting records of
+five players:
+
+tst <- 
+structure(list(playerID = c("aardsda01", "aardsda01", "aardsda01", 
+"aardsda01", "aardsda01", "aardsda01", "aaronha01", "aaronha01", 
+"aaronha01", "aaronha01", "aaronha01", "aaronha01", "aaronha01", 
+"aaronha01", "aaronha01", "aaronha01", "aaronha01", "aaronha01", 
+"aaronha01", "aaronha01", "aaronha01", "aaronha01", "aaronha01", 
+"aaronha01", "aaronha01", "aaronha01", "aaronha01", "aaronha01", 
+"aaronha01", "aaronto01", "aaronto01", "aaronto01", "aaronto01", 
+"aaronto01", "aaronto01", "aaronto01", "aasedo01", "aasedo01", 
+"aasedo01", "aasedo01", "aasedo01", "aasedo01", "aasedo01", "aasedo01", 
+"aasedo01", "aasedo01", "aasedo01", "aasedo01", "aasedo01", "abadan01", 
+"abadan01", "abadan01"), yearID = c(2004L, 2006L, 2007L, 2008L, 
+2009L, 2010L, 1954L, 1955L, 1956L, 1957L, 1958L, 1959L, 1960L, 
+1961L, 1962L, 1963L, 1964L, 1965L, 1966L, 1967L, 1968L, 1969L, 
+1970L, 1971L, 1972L, 1973L, 1974L, 1975L, 1976L, 1962L, 1963L, 
+1965L, 1968L, 1969L, 1970L, 1971L, 1977L, 1978L, 1979L, 1980L, 
+1981L, 1982L, 1984L, 1985L, 1986L, 1987L, 1988L, 1989L, 1990L, 
+2001L, 2003L, 2006L), stint = c(1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 
+1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 
+1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 
+1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L), teamID = c("SFN", 
+"CHN", "CHA", "BOS", "SEA", "SEA", "ML1", "ML1", "ML1", "ML1", 
+"ML1", "ML1", "ML1", "ML1", "ML1", "ML1", "ML1", "ML1", "ATL", 
+"ATL", "ATL", "ATL", "ATL", "ATL", "ATL", "ATL", "ATL", "ML4", 
+"ML4", "ML1", "ML1", "ML1", "ATL", "ATL", "ATL", "ATL", "BOS", 
+"CAL", "CAL", "CAL", "CAL", "CAL", "CAL", "BAL", "BAL", "BAL", 
+"BAL", "NYN", "LAN", "OAK", "BOS", "CIN"), lgID = c("NL", "NL", 
+"AL", "AL", "AL", "AL", "NL", "NL", "NL", "NL", "NL", "NL", "NL", 
+"NL", "NL", "NL", "NL", "NL", "NL", "NL", "NL", "NL", "NL", "NL", 
+"NL", "NL", "NL", "AL", "AL", "NL", "NL", "NL", "NL", "NL", "NL", 
+"NL", "AL", "AL", "AL", "AL", "AL", "AL", "AL", "AL", "AL", "AL", 
+"AL", "NL", "NL", "AL", "AL", "NL"), G = c(11L, 45L, 25L, 47L, 
+73L, 53L, 122L, 153L, 153L, 151L, 153L, 154L, 153L, 155L, 156L, 
+161L, 145L, 150L, 158L, 155L, 160L, 147L, 150L, 139L, 129L, 120L, 
+112L, 137L, 85L, 141L, 72L, 8L, 98L, 49L, 44L, 25L, 13L, 29L, 
+37L, 40L, 39L, 24L, 23L, 54L, 66L, 7L, 35L, 49L, 32L, 1L, 9L, 
+5L), G_batting = c(11L, 43L, 2L, 5L, 3L, 4L, 122L, 153L, 153L, 
+151L, 153L, 154L, 153L, 155L, 156L, 161L, 145L, 150L, 158L, 155L, 
+160L, 147L, 150L, 139L, 129L, 120L, 112L, 137L, 85L, 141L, 72L, 
+8L, 98L, 49L, 44L, 25L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 
+0L, 49L, 32L, 1L, 9L, 5L), AB = c(0L, 2L, 0L, 1L, 0L, 0L, 468L, 
+602L, 609L, 615L, 601L, 629L, 590L, 603L, 592L, 631L, 570L, 570L, 
+603L, 600L, 606L, 547L, 516L, 495L, 449L, 392L, 340L, 465L, 271L, 
+334L, 135L, 16L, 283L, 60L, 63L, 53L, NA, NA, NA, NA, NA, NA, 
+NA, NA, NA, NA, NA, 5L, 0L, 1L, 17L, 3L), R = c(0L, 0L, 0L, 0L, 
+0L, 0L, 58L, 105L, 106L, 118L, 109L, 116L, 102L, 115L, 127L, 
+121L, 103L, 109L, 117L, 113L, 84L, 100L, 103L, 95L, 75L, 84L, 
+47L, 45L, 22L, 54L, 6L, 1L, 21L, 13L, 3L, 4L, NA, NA, NA, NA, 
+NA, NA, NA, NA, NA, NA, NA, 0L, 0L, 0L, 1L, 0L), H = c(0L, 0L, 
+0L, 0L, 0L, 0L, 131L, 189L, 200L, 198L, 196L, 223L, 172L, 197L, 
+191L, 201L, 187L, 181L, 168L, 184L, 174L, 164L, 154L, 162L, 119L, 
+118L, 91L, 109L, 62L, 77L, 27L, 3L, 69L, 15L, 13L, 12L, NA, NA, 
+NA, NA, NA, NA, NA, NA, NA, NA, NA, 0L, 0L, 0L, 2L, 0L), X2B = c(0L, 
+0L, 0L, 0L, 0L, 0L, 27L, 37L, 34L, 27L, 34L, 46L, 20L, 39L, 28L, 
+29L, 30L, 40L, 23L, 37L, 33L, 30L, 26L, 22L, 10L, 12L, 16L, 16L, 
+8L, 20L, 6L, 0L, 10L, 2L, 2L, 2L, NA, NA, NA, NA, NA, NA, NA, 
+NA, NA, NA, NA, 0L, 0L, 0L, 0L, 0L), X3B = c(0L, 0L, 0L, 0L, 
+0L, 0L, 6L, 9L, 14L, 6L, 4L, 7L, 11L, 10L, 6L, 4L, 2L, 1L, 1L, 
+3L, 4L, 3L, 1L, 3L, 0L, 1L, 0L, 2L, 0L, 2L, 1L, 0L, 3L, 0L, 0L, 
+0L, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0L, 0L, 0L, 0L, 
+0L), HR = c(0L, 0L, 0L, 0L, 0L, 0L, 13L, 27L, 26L, 44L, 30L, 
+39L, 40L, 34L, 45L, 44L, 24L, 32L, 44L, 39L, 29L, 44L, 38L, 47L, 
+34L, 40L, 20L, 12L, 10L, 8L, 1L, 0L, 1L, 1L, 2L, 0L, NA, NA, 
+NA, NA, NA, NA, NA, NA, NA, NA, NA, 0L, 0L, 0L, 0L, 0L), RBI = c(0L, 
+0L, 0L, 0L, 0L, 0L, 69L, 106L, 92L, 132L, 95L, 123L, 126L, 120L, 
+128L, 130L, 95L, 89L, 127L, 109L, 86L, 97L, 118L, 118L, 77L, 
+96L, 69L, 60L, 35L, 38L, 15L, 1L, 25L, 5L, 7L, 3L, NA, NA, NA, 
+NA, NA, NA, NA, NA, NA, NA, NA, 0L, 0L, 0L, 0L, 0L), SB = c(0L, 
+0L, 0L, 0L, 0L, 0L, 2L, 3L, 2L, 1L, 4L, 8L, 16L, 21L, 15L, 31L, 
+22L, 24L, 21L, 17L, 28L, 9L, 9L, 1L, 4L, 1L, 1L, 0L, 0L, 6L, 
+0L, 0L, 3L, 0L, 0L, 0L, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 
+NA, 0L, 0L, 0L, 0L, 0L), CS = c(0L, 0L, 0L, 0L, 0L, 0L, 2L, 1L, 
+4L, 1L, 1L, 0L, 7L, 9L, 7L, 5L, 4L, 4L, 3L, 6L, 5L, 10L, 0L, 
+1L, 0L, 1L, 0L, 1L, 1L, 0L, 3L, 0L, 4L, 1L, 0L, 0L, NA, NA, NA, 
+NA, NA, NA, NA, NA, NA, NA, NA, 0L, 0L, 0L, 1L, 0L), BB = c(0L, 
+0L, 0L, 0L, 0L, 0L, 28L, 49L, 37L, 57L, 59L, 51L, 60L, 56L, 66L, 
+78L, 62L, 60L, 76L, 63L, 64L, 87L, 74L, 71L, 92L, 68L, 39L, 70L, 
+35L, 41L, 11L, 1L, 21L, 6L, 3L, 3L, NA, NA, NA, NA, NA, NA, NA, 
+NA, NA, NA, NA, 0L, 0L, 0L, 2L, 2L), SO = c(0L, 0L, 0L, 1L, 0L, 
+0L, 39L, 61L, 54L, 58L, 49L, 54L, 63L, 64L, 73L, 94L, 46L, 81L, 
+96L, 97L, 62L, 47L, 63L, 58L, 55L, 51L, 29L, 51L, 38L, 58L, 27L, 
+2L, 37L, 6L, 10L, 5L, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 
+NA, 3L, 0L, 0L, 5L, 0L), IBB = c(0L, 0L, 0L, 0L, 0L, 0L, NA, 
+5L, 6L, 15L, 16L, 17L, 13L, 20L, 14L, 18L, 9L, 10L, 15L, 19L, 
+23L, 19L, 15L, 21L, 15L, 13L, 6L, 3L, 1L, 0L, 1L, 0L, 1L, 0L, 
+0L, 1L, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0L, 0L, 0L, 
+0L, 0L), HBP = c(0L, 0L, 0L, 0L, 0L, 0L, 3L, 3L, 2L, 0L, 1L, 
+4L, 2L, 2L, 3L, 0L, 0L, 1L, 1L, 0L, 1L, 2L, 2L, 2L, 1L, 1L, 0L, 
+1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, NA, NA, NA, NA, NA, NA, NA, 
+NA, NA, NA, NA, 0L, 0L, 0L, 0L, 0L), SH = c(0L, 1L, 0L, 0L, 0L, 
+0L, 6L, 7L, 5L, 0L, 0L, 0L, 0L, 1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 
+0L, 0L, 0L, 0L, 0L, 1L, 1L, 0L, 4L, 3L, 0L, 2L, 0L, 0L, 0L, NA, 
+NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0L, 0L, 0L, 0L, 0L), 
+    SF = c(0L, 0L, 0L, 0L, 0L, 0L, 4L, 4L, 7L, 3L, 3L, 9L, 12L, 
+    9L, 6L, 5L, 2L, 8L, 8L, 6L, 5L, 3L, 6L, 5L, 2L, 4L, 2L, 6L, 
+    2L, 3L, 2L, 0L, 1L, 0L, 0L, 0L, NA, NA, NA, NA, NA, NA, NA, 
+    NA, NA, NA, NA, 0L, 0L, 0L, 0L, 0L), GIDP = c(0L, 0L, 0L, 
+    0L, 0L, 0L, 13L, 20L, 21L, 13L, 21L, 19L, 8L, 16L, 14L, 11L, 
+    22L, 15L, 14L, 11L, 21L, 14L, 13L, 9L, 17L, 7L, 6L, 15L, 
+    8L, 10L, 7L, 1L, 9L, 1L, 5L, 3L, NA, NA, NA, NA, NA, NA, 
+    NA, NA, NA, NA, NA, 0L, 0L, 0L, 1L, 0L), G_old = c(11L, 45L, 
+    2L, 5L, NA, NA, 122L, 153L, 153L, 151L, 153L, 154L, 153L, 
+    155L, 156L, 161L, 145L, 150L, 158L, 155L, 160L, 147L, 150L, 
+    139L, 129L, 120L, 112L, 137L, 85L, 141L, 72L, 8L, 98L, 49L, 
+    44L, 25L, 13L, 29L, 37L, 40L, 39L, 24L, 23L, 54L, 66L, 7L, 
+    35L, 49L, 32L, 1L, 9L, 5L)), .Names = c("playerID", "yearID", 
+"stint", "teamID", "lgID", "G", "G_batting", "AB", "R", "H", 
+"X2B", "X3B", "HR", "RBI", "SB", "CS", "BB", "SO", "IBB", "HBP", 
+"SH", "SF", "GIDP", "G_old"), row.names = c(NA, 52L), class = "data.frame")
+
+# Variables I want to sum over each player:
+vars <- c('G', 'AB', 'R', 'H', 'X2B', 'X3B',
+          'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'IBB', 'HBP',
+          'SH', 'SF', 'GIDP', 'G_old')
+
+# library('data.table')
+DTtst <- data.table(tst, key = 'playerID')
+
+The following works as I want:
+DT1 <- DTtst[, list(beginYear = min(yearID), endYear = max(yearID),
+              nyears = sum(stint == 1L), nteams = length(unique(teamID))),
+         by = 'playerID']
+DT2 <- DTtst[, lapply(.SD, sum), by = playerID, .SDcols = vars]
+DT1[DT2]
+
+# Combining the two into one call doesn't:
+
+DTtst[, list( beginYear = min(yearID),
+                                    endYear = max(yearID),
+                                    nyears = sum(stint == 1L),
+                                    nteams = length(unique(teamsID)),
+                                    lapply(.SD, sum)),
+                               by = playerID,
+                               .SDcols = vars]
+# Error in eval(expr, envir, enclos) : object 'yearID' not found
+
+What am I missing? Is it the lapply() call within list()? 
+
+Second question, more out of curiosity than anything else: is there an
+analogue in data.table to within() or plyr::mutate, where one can define new
+variables within a call and use them to create other variables? An example
+of what I have in mind is
+
+DT[, list(..., PA = AB + BB + HBP + SH + SF,
+                  OBP = ifelse(PA > 0,
+                                round((H + BB + HBP)/(PA - SH - SF), 3),
+NA)),
+       by = playerID]
+
+I have a fairly strong prior on the answer to this question, but I'll let
+others weigh in first.
+
+TIA for any help,
+Dennis
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Curiosity-with-use-of-SDcols-tp3837112p3837112.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mailinglist.honeypot at gmail.com  Fri Sep 23 17:59:11 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Fri, 23 Sep 2011 11:59:11 -0400
+Subject: [datatable-help] Curiosity with use of .SDcols
+In-Reply-To: <1316790074426-3837112.post@n4.nabble.com>
+References: <1316790074426-3837112.post@n4.nabble.com>
+Message-ID: <CAHA9McNYE1=uXOiXz0FFZW54QEEn+kWYvFi-G7=KyGQzDiKuxQ@mail.gmail.com>
+
+Hi,
+
+Comments in line
+
+On Fri, Sep 23, 2011 at 11:01 AM, djmuseR <djmuser at gmail.com> wrote:
+> Hi:
+>
+> I'm playing around with some baseball data and ran into an error whose cause
+> I don't quite understand.
+> A subset of the data is here, consisting of all season batting records of
+> five players:
+
+[cut out data]
+
+> # Variables I want to sum over each player:
+> vars <- c('G', 'AB', 'R', 'H', 'X2B', 'X3B',
+> ? ? ? ? ?'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'IBB', 'HBP',
+> ? ? ? ? ?'SH', 'SF', 'GIDP', 'G_old')
+>
+> # library('data.table')
+> DTtst <- data.table(tst, key = 'playerID')
+>
+> The following works as I want:
+> DT1 <- DTtst[, list(beginYear = min(yearID), endYear = max(yearID),
+> ? ? ? ? ? ? ?nyears = sum(stint == 1L), nteams = length(unique(teamID))),
+> ? ? ? ? by = 'playerID']
+> DT2 <- DTtst[, lapply(.SD, sum), by = playerID, .SDcols = vars]
+> DT1[DT2]
+>
+> # Combining the two into one call doesn't:
+>
+> DTtst[, list( beginYear = min(yearID),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?endYear = max(yearID),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?nyears = sum(stint == 1L),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?nteams = length(unique(teamsID)),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?lapply(.SD, sum)),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? by = playerID,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? .SDcols = vars]
+> # Error in eval(expr, envir, enclos) : object 'yearID' not found
+>
+> What am I missing? Is it the lapply() call within list()?
+
+Using .SDcols restricts the columns/vars that are injected in the
+scope of your j-statement (where your `list(...)` is) which are the
+same as the columns of .SD.
+
+yearID isn' in `vars`, and therefore isn't in .SD. To convince
+yourself, consider this:
+
+R> DTtst[, {
+  xx <- .SD
+  browser()
+}, by='playerID', .SDcols=vars]
+
+Called from: eval(expr, envir, enclos)
+Browse[1]> xx
+      G AB R H X2B X3B HR RBI SB CS BB SO IBB HBP SH SF GIDP G_old
+[1,] 11  0 0 0   0   0  0   0  0  0  0  0   0   0  0  0    0    11
+[2,] 45  2 0 0   0   0  0   0  0  0  0  0   0   0  1  0    0    45
+[3,] 25  0 0 0   0   0  0   0  0  0  0  0   0   0  0  0    0     2
+[4,] 47  1 0 0   0   0  0   0  0  0  0  1   0   0  0  0    0     5
+[5,] 73  0 0 0   0   0  0   0  0  0  0  0   0   0  0  0    0    NA
+[6,] 53  0 0 0   0   0  0   0  0  0  0  0   0   0  0  0    0    NA
+
+See? No yearID.
+
+Just make sure all the vars you reference in your j-expression are in
+your .SDcols
+
+
+> Second question, more out of curiosity than anything else: is there an
+> analogue in data.table to within() or plyr::mutate, where one can define new
+> variables within a call and use them to create other variables? An example
+> of what I have in mind is
+>
+> DT[, list(..., PA = AB + BB + HBP + SH + SF,
+> ? ? ? ? ? ? ? ? ?OBP = ifelse(PA > 0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?round((H + BB + HBP)/(PA - SH - SF), 3),
+> NA)),
+> ? ? ? by = playerID]
+>
+> I have a fairly strong prior on the answer to this question, but I'll let
+> others weigh in first.
+
+Matthew is fixing `within` in the development version (SVN from
+r-forge), but there is the recently introduced `:=` -- but this will
+add these columns to the data.table you are iterating over, which
+doesn't sound like what you want.
+
+Note that your `j-expression` isn't restricted to being a list. Look
+at the example I gave above for starters, but also you can do:
+
+DTtst[, {
+ PA <- AB + BB + HBP + SH + SF
+ list(PA=PA, OBP=ifelse(PA > 0, round((H + BB + HBP)/(PA - SH - SF), 3), NA))
+}, by='playerID']
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From djmuser at gmail.com  Sun Sep 25 04:32:32 2011
+From: djmuser at gmail.com (Dennis Murphy)
+Date: Sat, 24 Sep 2011 19:32:32 -0700
+Subject: [datatable-help] Curiosity with use of .SDcols
+In-Reply-To: <CAHA9McNYE1=uXOiXz0FFZW54QEEn+kWYvFi-G7=KyGQzDiKuxQ@mail.gmail.com>
+References: <1316790074426-3837112.post@n4.nabble.com>
+	<CAHA9McNYE1=uXOiXz0FFZW54QEEn+kWYvFi-G7=KyGQzDiKuxQ@mail.gmail.com>
+Message-ID: <CADv2QyGFr-9kXEf0v4=AJu-f9iCBCn_YrzhohPqCrE-+B6j=4A@mail.gmail.com>
+
+Thanks, Steve.
+
+The clarification about .SDcols was sufficient. In that context,
+everything else was clear.
+
+Best regards,
+Dennis
+
+On Fri, Sep 23, 2011 at 8:59 AM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Hi,
+>
+> Comments in line
+>
+> On Fri, Sep 23, 2011 at 11:01 AM, djmuseR <djmuser at gmail.com> wrote:
+>> Hi:
+>>
+>> I'm playing around with some baseball data and ran into an error whose cause
+>> I don't quite understand.
+>> A subset of the data is here, consisting of all season batting records of
+>> five players:
+>
+> [cut out data]
+>
+>> # Variables I want to sum over each player:
+>> vars <- c('G', 'AB', 'R', 'H', 'X2B', 'X3B',
+>> ? ? ? ? ?'HR', 'RBI', 'SB', 'CS', 'BB', 'SO', 'IBB', 'HBP',
+>> ? ? ? ? ?'SH', 'SF', 'GIDP', 'G_old')
+>>
+>> # library('data.table')
+>> DTtst <- data.table(tst, key = 'playerID')
+>>
+>> The following works as I want:
+>> DT1 <- DTtst[, list(beginYear = min(yearID), endYear = max(yearID),
+>> ? ? ? ? ? ? ?nyears = sum(stint == 1L), nteams = length(unique(teamID))),
+>> ? ? ? ? by = 'playerID']
+>> DT2 <- DTtst[, lapply(.SD, sum), by = playerID, .SDcols = vars]
+>> DT1[DT2]
+>>
+>> # Combining the two into one call doesn't:
+>>
+>> DTtst[, list( beginYear = min(yearID),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?endYear = max(yearID),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?nyears = sum(stint == 1L),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?nteams = length(unique(teamsID)),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?lapply(.SD, sum)),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? by = playerID,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? .SDcols = vars]
+>> # Error in eval(expr, envir, enclos) : object 'yearID' not found
+>>
+>> What am I missing? Is it the lapply() call within list()?
+>
+> Using .SDcols restricts the columns/vars that are injected in the
+> scope of your j-statement (where your `list(...)` is) which are the
+> same as the columns of .SD.
+>
+> yearID isn' in `vars`, and therefore isn't in .SD. To convince
+> yourself, consider this:
+>
+> R> DTtst[, {
+> ?xx <- .SD
+> ?browser()
+> }, by='playerID', .SDcols=vars]
+>
+> Called from: eval(expr, envir, enclos)
+> Browse[1]> xx
+> ? ? ?G AB R H X2B X3B HR RBI SB CS BB SO IBB HBP SH SF GIDP G_old
+> [1,] 11 ?0 0 0 ? 0 ? 0 ?0 ? 0 ?0 ?0 ?0 ?0 ? 0 ? 0 ?0 ?0 ? ?0 ? ?11
+> [2,] 45 ?2 0 0 ? 0 ? 0 ?0 ? 0 ?0 ?0 ?0 ?0 ? 0 ? 0 ?1 ?0 ? ?0 ? ?45
+> [3,] 25 ?0 0 0 ? 0 ? 0 ?0 ? 0 ?0 ?0 ?0 ?0 ? 0 ? 0 ?0 ?0 ? ?0 ? ? 2
+> [4,] 47 ?1 0 0 ? 0 ? 0 ?0 ? 0 ?0 ?0 ?0 ?1 ? 0 ? 0 ?0 ?0 ? ?0 ? ? 5
+> [5,] 73 ?0 0 0 ? 0 ? 0 ?0 ? 0 ?0 ?0 ?0 ?0 ? 0 ? 0 ?0 ?0 ? ?0 ? ?NA
+> [6,] 53 ?0 0 0 ? 0 ? 0 ?0 ? 0 ?0 ?0 ?0 ?0 ? 0 ? 0 ?0 ?0 ? ?0 ? ?NA
+>
+> See? No yearID.
+>
+> Just make sure all the vars you reference in your j-expression are in
+> your .SDcols
+>
+>
+>> Second question, more out of curiosity than anything else: is there an
+>> analogue in data.table to within() or plyr::mutate, where one can define new
+>> variables within a call and use them to create other variables? An example
+>> of what I have in mind is
+>>
+>> DT[, list(..., PA = AB + BB + HBP + SH + SF,
+>> ? ? ? ? ? ? ? ? ?OBP = ifelse(PA > 0,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?round((H + BB + HBP)/(PA - SH - SF), 3),
+>> NA)),
+>> ? ? ? by = playerID]
+>>
+>> I have a fairly strong prior on the answer to this question, but I'll let
+>> others weigh in first.
+>
+> Matthew is fixing `within` in the development version (SVN from
+> r-forge), but there is the recently introduced `:=` -- but this will
+> add these columns to the data.table you are iterating over, which
+> doesn't sound like what you want.
+>
+> Note that your `j-expression` isn't restricted to being a list. Look
+> at the example I gave above for starters, but also you can do:
+>
+> DTtst[, {
+> ?PA <- AB + BB + HBP + SH + SF
+> ?list(PA=PA, OBP=ifelse(PA > 0, round((H + BB + HBP)/(PA - SH - SF), 3), NA))
+> }, by='playerID']
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+From mdowle at mdowle.plus.com  Tue Sep 27 00:46:05 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 26 Sep 2011 23:46:05 +0100
+Subject: [datatable-help] Over-writing factors
+In-Reply-To: <1315667878.2522.69.camel@netbook>
+References: <8AD9137B75B37049AA711A4B64CEDB694BF2FE5C70@AUSP01VMBX05.collaborationhost.net>
+	<1315520154.2522.55.camel@netbook>
+	<CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A@mail.gmail.com>
+	<j4dflv$f1k$1@dough.gmane.org>
+	<CAAuY0RVcdNqi06uPGgQUXvyLo1BTWN9_NBkWk8jR2TA1_XKo5A@mail.gmail.com>
+	<1315667878.2522.69.camel@netbook>
+Message-ID: <1317077165.3194.105.camel@netbook>
+
+Just committed. Hope this fixes this thread.
+
+o   Factor columns on LHS of :=, [<- and $<- can now be assigned
+    new levels; e.g.,
+        DT = data.table(A=c("a","b"))
+        DT[2,"A"] <- "c"  # adds new level automatically
+        DT[2,A:="c"]      # same (faster)
+        DT$A = "newlevel" # adds new level and recycles it through A
+    Thanks to Damian Betebenner and Chris Neff for highlighting.
+    To change the type of a column, provide a full length RHS (i.e.
+    'replace' column syntax).
+
+
+On Sat, 2011-09-10 at 16:17 +0100, Matthew Dowle wrote:
+> $<- and [<- already do redirect to := (or rather, the internal C
+> function that := uses), but it can never (unless a change in R happens)
+> be as fast as using := directly because the copy of the whole table
+> comes from <- itself (dispatch via `*tmp*`). That is most of the very
+> reason := was needed, to avoid <-'s copy. It's been quite an adventure!
+> 
+> I've had a look now, and yes there's a bug or two here, and more tests
+> needed ...
+> 
+> On Fri, 2011-09-09 at 12:48 -0400, Chris Neff wrote:
+> > Once again forgive my ignorance, but why can't whole column
+> > replacements using $ <- just redirect to ":="?
+> > 
+> > On 9 September 2011 12:42, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > > Oops, I missed that the question was about whole column replacements.
+> > >
+> > > I'm generally using := now.  Will have a think about this ...
+> > >
+> > > "Chris Neff" <caneff at gmail.com> wrote in message
+> > > news:CAAuY0RUusbcvsfTyQBg4m+cwa3ZhwRJMwpL-Q0fBLaQ+EGn6+A at mail.gmail.com...
+> > > This was surprising to me. I would've thought test.dt$X <- "foo" and
+> > > test.dt[["X"]] <- "foo" should do the exact same thing because the
+> > > entire column is being overwritten, no? I would understand the issue
+> > > if it was test.dt$X[i] <- "foo", but it isn't.
+> > >
+> > > In a related note, I'm surprised this doesn't work either:
+> > >
+> > >> DT=data.table(x=1:10,y=1:10,key="x")
+> > >> DT$x="foo"
+> > > Warning message:
+> > > In `[<-.data.table`(x, j = name, value = value) :
+> > >  NAs introduced by coercion
+> > >> DT[["x"]]="foo" # Works fine and sets DT$x to be a character vector with
+> > >> "foo" repeated.
+> > >
+> > > DT$x is allowed to be overwritten by other classes (i.e. DT$x <-
+> > > rnorm(10) when DT$x starts as an integer), why not a character, or
+> > > change "foo" to a factor and assign it if that is what must be done?
+> > > This is also true with a non-key variable, like DT$y.
+> > >
+> > >
+> > > On 8 September 2011 18:15, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > >> It's intended. data.table requires sorted factor levels. If the levels
+> > >> somehow become unsorted then binary search joins don't work. We might
+> > >> be able to allow it and make data.table maintain things (with a speed
+> > >> penalty due to the resort of levels and re-write of the entire integer
+> > >> column), but, allowing character columns is (hopefully) not far away
+> > >> which should be much better solution.
+> > >>
+> > >> Or, in the meantime, you can go 'under the hood'. Add "something
+> > >> different" to the end of the factor levels using levels()<-, then the
+> > >> assignment to the column should work. If that column is part of a key
+> > >> then make sure to recall setkey() which will check and resort the levels
+> > >> for you (with a warning message). If an existing level is changing name,
+> > >> then it's faster to assign (once) directly to the levels(). But again,
+> > >> careful to maintain sorted levels if that column is to be used in joins.
+> > >>
+> > >> Matthew
+> > >>
+> > >>
+> > >> On Thu, 2011-09-08 at 14:27 -0500, Damian Betebenner wrote:
+> > >>> Not sure whether the following is an intended behavior with
+> > >>> data.table. Perhaps it is something idiosyncratic with factors.
+> > >>>
+> > >>> It is different than what one gets with data.frame
+> > >>>
+> > >>>
+> > >>>
+> > >>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+> > >>>
+> > >>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+> > >>>
+> > >>>
+> > >>>
+> > >>> test.df$X <- "Something Different"
+> > >>>
+> > >>> test.dt$X <- "Something Different"
+> > >>>
+> > >>> Error in `[<-.data.table`(x, j = name, value = value) :
+> > >>>
+> > >>> Some or all RHS not present in factor column levels
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>> test.df <- data.frame(X=letters[1:10], Y=rnorm(10))
+> > >>>
+> > >>> test.dt <- data.table(X=letters[1:10], Y=rnorm(10))
+> > >>>
+> > >>>
+> > >>>
+> > >>> test.df[["X"]] <- "Something Different"
+> > >>>
+> > >>> test.dt[["X"]] <- "Something Different"
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>> Damian Betebenner
+> > >>>
+> > >>> Center for Assessment
+> > >>>
+> > >>> PO Box 351
+> > >>>
+> > >>> Dover, NH 03821-0351
+> > >>>
+> > >>>
+> > >>>
+> > >>> Phone (office): (603) 516-7900
+> > >>>
+> > >>> Phone (cell): (857) 234-2474
+> > >>>
+> > >>> Fax: (603) 516-7910
+> > >>>
+> > >>>
+> > >>>
+> > >>> dbetebenner at nciea.org
+> > >>>
+> > >>> www.nciea.org
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>>
+> > >>> _______________________________________________
+> > >>> datatable-help mailing list
+> > >>> datatable-help at lists.r-forge.r-project.org
+> > >>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > >>
+> > >>
+> > >> _______________________________________________
+> > >> datatable-help mailing list
+> > >> datatable-help at lists.r-forge.r-project.org
+> > >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > >>
+> > >
+> > >
+> > >
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > >
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From erikriverson at gmail.com  Wed Sep 28 16:30:00 2011
+From: erikriverson at gmail.com (Erik Iverson)
+Date: Wed, 28 Sep 2011 09:30:00 -0500
+Subject: [datatable-help] constructing expressions for the j argument from
+	character vectors
+Message-ID: <CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ@mail.gmail.com>
+
+Hello,
+
+Thank you for providing the data.table package, I think it will be
+very useful to me going forward.  I have a question about passing
+around expressions, and have come up with an example to show what I'm
+after.
+
+library(data.table)
+## test data
+N <- 500000
+set.seed(100)
+testData <- data.frame(id ? ? = c(sample(1:10000, N, replace = TRUE)),
+? ? ? ? ? ? ? ? ? ? ? clinic = c(sample(1:10, ? ?N, replace = TRUE)),
+? ? ? ? ? ? ? ? ? ? ? dx ? ? = c(sample(1:200, ? ?N, replace = TRUE)),
+? ? ? ? ? ? ? ? ? ? ? rx ? ? = c(sample(1:1000, ? ?N, replace = TRUE)))
+
+## want to know mean number of dx per ID
+mean(tapply(testData$dx, testData$id,
+? ? ? ? ? ?function(x) length(unique(x)))) ## 44.2212
+
+## in my real use case, I want to run this with different 'by'
+## variables, so let's write a function and try to use data.table,
+## call the function uniqueSummary1
+
+uniqueSummary1 <- function(df, key) {
+?DT <- data.table(df)
+?key(DT) <- key
+
+?summaryDT <- DT[, list(length(unique(dx)),
+? ? ? ? ? ? ? ? ? ? ? ? length(unique(rx))), by = key]
+
+?mean(summaryDT[,list(V1, V2)])
+
+}
+
+## agrees with tapply
+uniqueSummary1(df ?= testData, key = c("id"))
+
+## The above works great, but isn't general, since in my real use
+## case, I won't know dx and rx are the variables of interest. I want
+## to be able to pass them in as arguments. This is exactly what FAQ
+## 1.6 is, so let's use that solution to define uniqueSummary2
+
+uniqueSummary2 <- function(df, key, vars) {
+?DT <- data.table(df)
+?key(DT) <- key
+
+?sList <- substitute(vars)
+?summaryDT <- DT[, eval(sList), by = key]
+?ncols <- ncol(summaryDT)
+
+?mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+}
+
+uniqueSummary2(df = testData, key = c("id"),
+? ? ? ? ? ? ? vars = list(length(unique(dx)),
+? ? ? ? ? ? ? ? length(unique(rx)),
+? ? ? ? ? ? ? ? length(unique(clinic))))
+
+## uniqueSummary2 is better, but relies on me repeating the
+## "length(unique())" bit several times. ?Ideally, I'd just like to
+## pass in a list of QUOTED vars to summarize, like the following
+## hypothetical call to my yet-unwritten uniqueSummary3 function:
+
+uniqueSummary3(df = testData, key = c("id"),
+? ? ? ? ? ? ? vars = c("dx", "rx", "clinic"))
+
+I assume I can somehow construct the expression for the j index inside
+my function, based on the 'vars' character vector, but am stuck on
+how.  Any ideas?
+
+Thanks so much,
+Erik
+
+From caneff at gmail.com  Wed Sep 28 17:04:34 2011
+From: caneff at gmail.com (Chris Neff)
+Date: Wed, 28 Sep 2011 11:04:34 -0400
+Subject: [datatable-help] constructing expressions for the j argument
+ from character vectors
+In-Reply-To: <CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ@mail.gmail.com>
+References: <CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ@mail.gmail.com>
+Message-ID: <CAAuY0RU5is071DMKSYnmX05Tqks-Pzd_W1B75F2gr5AYxcbqgw@mail.gmail.com>
+
+Use the paste command to make the whole list as a character vector,
+then use parse(text=var.list) to turn var.list into an expression that
+you can call in data.table?
+
+On 28 September 2011 10:30, Erik Iverson <erikriverson at gmail.com> wrote:
+> Hello,
+>
+> Thank you for providing the data.table package, I think it will be
+> very useful to me going forward. ?I have a question about passing
+> around expressions, and have come up with an example to show what I'm
+> after.
+>
+> library(data.table)
+> ## test data
+> N <- 500000
+> set.seed(100)
+> testData <- data.frame(id ? ? = c(sample(1:10000, N, replace = TRUE)),
+> ? ? ? ? ? ? ? ? ? ? ? clinic = c(sample(1:10, ? ?N, replace = TRUE)),
+> ? ? ? ? ? ? ? ? ? ? ? dx ? ? = c(sample(1:200, ? ?N, replace = TRUE)),
+> ? ? ? ? ? ? ? ? ? ? ? rx ? ? = c(sample(1:1000, ? ?N, replace = TRUE)))
+>
+> ## want to know mean number of dx per ID
+> mean(tapply(testData$dx, testData$id,
+> ? ? ? ? ? ?function(x) length(unique(x)))) ## 44.2212
+>
+> ## in my real use case, I want to run this with different 'by'
+> ## variables, so let's write a function and try to use data.table,
+> ## call the function uniqueSummary1
+>
+> uniqueSummary1 <- function(df, key) {
+> ?DT <- data.table(df)
+> ?key(DT) <- key
+>
+> ?summaryDT <- DT[, list(length(unique(dx)),
+> ? ? ? ? ? ? ? ? ? ? ? ? length(unique(rx))), by = key]
+>
+> ?mean(summaryDT[,list(V1, V2)])
+>
+> }
+>
+> ## agrees with tapply
+> uniqueSummary1(df ?= testData, key = c("id"))
+>
+> ## The above works great, but isn't general, since in my real use
+> ## case, I won't know dx and rx are the variables of interest. I want
+> ## to be able to pass them in as arguments. This is exactly what FAQ
+> ## 1.6 is, so let's use that solution to define uniqueSummary2
+>
+> uniqueSummary2 <- function(df, key, vars) {
+> ?DT <- data.table(df)
+> ?key(DT) <- key
+>
+> ?sList <- substitute(vars)
+> ?summaryDT <- DT[, eval(sList), by = key]
+> ?ncols <- ncol(summaryDT)
+>
+> ?mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+> }
+>
+> uniqueSummary2(df = testData, key = c("id"),
+> ? ? ? ? ? ? ? vars = list(length(unique(dx)),
+> ? ? ? ? ? ? ? ? length(unique(rx)),
+> ? ? ? ? ? ? ? ? length(unique(clinic))))
+>
+> ## uniqueSummary2 is better, but relies on me repeating the
+> ## "length(unique())" bit several times. ?Ideally, I'd just like to
+> ## pass in a list of QUOTED vars to summarize, like the following
+> ## hypothetical call to my yet-unwritten uniqueSummary3 function:
+>
+> uniqueSummary3(df = testData, key = c("id"),
+> ? ? ? ? ? ? ? vars = c("dx", "rx", "clinic"))
+>
+> I assume I can somehow construct the expression for the j index inside
+> my function, based on the 'vars' character vector, but am stuck on
+> how. ?Any ideas?
+>
+> Thanks so much,
+> Erik
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+From mdowle at mdowle.plus.com  Wed Sep 28 17:16:40 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 28 Sep 2011 16:16:40 +0100
+Subject: [datatable-help] constructing expressions for the j argument
+	fromcharacter vectors
+References: <CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ@mail.gmail.com>
+Message-ID: <j5vdoq$epb$1@dough.gmane.org>
+
+Hi,
+
+Welcome.
+Just to check you've found .SD,  [,lapply(.SD,sum),by=...], and .SDcols?
+.SD consist of all columns other than the grouping columns, which seems 
+similar
+to what this line is doing? :
+> mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+
+Matthew
+
+
+"Erik Iverson" <erikriverson at gmail.com> wrote in message 
+news:CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ at mail.gmail.com...
+Hello,
+
+Thank you for providing the data.table package, I think it will be
+very useful to me going forward.  I have a question about passing
+around expressions, and have come up with an example to show what I'm
+after.
+
+library(data.table)
+## test data
+N <- 500000
+set.seed(100)
+testData <- data.frame(id = c(sample(1:10000, N, replace = TRUE)),
+clinic = c(sample(1:10, N, replace = TRUE)),
+dx = c(sample(1:200, N, replace = TRUE)),
+rx = c(sample(1:1000, N, replace = TRUE)))
+
+## want to know mean number of dx per ID
+mean(tapply(testData$dx, testData$id,
+function(x) length(unique(x)))) ## 44.2212
+
+## in my real use case, I want to run this with different 'by'
+## variables, so let's write a function and try to use data.table,
+## call the function uniqueSummary1
+
+uniqueSummary1 <- function(df, key) {
+DT <- data.table(df)
+key(DT) <- key
+
+summaryDT <- DT[, list(length(unique(dx)),
+length(unique(rx))), by = key]
+
+mean(summaryDT[,list(V1, V2)])
+
+}
+
+## agrees with tapply
+uniqueSummary1(df = testData, key = c("id"))
+
+## The above works great, but isn't general, since in my real use
+## case, I won't know dx and rx are the variables of interest. I want
+## to be able to pass them in as arguments. This is exactly what FAQ
+## 1.6 is, so let's use that solution to define uniqueSummary2
+
+uniqueSummary2 <- function(df, key, vars) {
+DT <- data.table(df)
+key(DT) <- key
+
+sList <- substitute(vars)
+summaryDT <- DT[, eval(sList), by = key]
+ncols <- ncol(summaryDT)
+
+mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+}
+
+uniqueSummary2(df = testData, key = c("id"),
+vars = list(length(unique(dx)),
+length(unique(rx)),
+length(unique(clinic))))
+
+## uniqueSummary2 is better, but relies on me repeating the
+## "length(unique())" bit several times. Ideally, I'd just like to
+## pass in a list of QUOTED vars to summarize, like the following
+## hypothetical call to my yet-unwritten uniqueSummary3 function:
+
+uniqueSummary3(df = testData, key = c("id"),
+vars = c("dx", "rx", "clinic"))
+
+I assume I can somehow construct the expression for the j index inside
+my function, based on the 'vars' character vector, but am stuck on
+how.  Any ideas?
+
+Thanks so much,
+Erik 
+
+
+
+
+From mdowle at mdowle.plus.com  Wed Sep 28 17:55:13 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 28 Sep 2011 16:55:13 +0100
+Subject: [datatable-help] constructing expressions for the j
+	argumentfromcharacter vectors
+References: <CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ@mail.gmail.com>
+	<j5vdoq$epb$1@dough.gmane.org>
+Message-ID: <j5vg13$9l$1@dough.gmane.org>
+
+
+Something like this :
+
+> DT = as.data.table(testData)
+> f = function(x)length(unique(x))
+> vars = "dx"
+> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1]
+     dx
+44.2212
+> vars = c("dx","rx")
+> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1]  # same again, just 
+> different vars
+     dx      rx
+44.2212 48.7814
+> vars = c("dx","rx","clinic")
+> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1]  # same again, just 
+> different vars
+     dx      rx  clinic
+44.2212 48.7814  9.9331
+>
+
+Chris' suggestion of parse(text=paste(...)) is another way you could do it 
+(and may be more efficient).
+
+Matthew
+
+
+"Matthew Dowle" <mdowle at mdowle.plus.com> wrote in message 
+news:j5vdoq$epb$1 at dough.gmane.org...
+> Hi,
+>
+> Welcome.
+> Just to check you've found .SD,  [,lapply(.SD,sum),by=...], and .SDcols?
+> .SD consist of all columns other than the grouping columns, which seems 
+> similar
+> to what this line is doing? :
+>> mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+>
+> Matthew
+>
+>
+> "Erik Iverson" <erikriverson at gmail.com> wrote in message 
+> news:CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ at mail.gmail.com...
+> Hello,
+>
+> Thank you for providing the data.table package, I think it will be
+> very useful to me going forward.  I have a question about passing
+> around expressions, and have come up with an example to show what I'm
+> after.
+>
+> library(data.table)
+> ## test data
+> N <- 500000
+> set.seed(100)
+> testData <- data.frame(id = c(sample(1:10000, N, replace = TRUE)),
+> clinic = c(sample(1:10, N, replace = TRUE)),
+> dx = c(sample(1:200, N, replace = TRUE)),
+> rx = c(sample(1:1000, N, replace = TRUE)))
+>
+> ## want to know mean number of dx per ID
+> mean(tapply(testData$dx, testData$id,
+> function(x) length(unique(x)))) ## 44.2212
+>
+> ## in my real use case, I want to run this with different 'by'
+> ## variables, so let's write a function and try to use data.table,
+> ## call the function uniqueSummary1
+>
+> uniqueSummary1 <- function(df, key) {
+> DT <- data.table(df)
+> key(DT) <- key
+>
+> summaryDT <- DT[, list(length(unique(dx)),
+> length(unique(rx))), by = key]
+>
+> mean(summaryDT[,list(V1, V2)])
+>
+> }
+>
+> ## agrees with tapply
+> uniqueSummary1(df = testData, key = c("id"))
+>
+> ## The above works great, but isn't general, since in my real use
+> ## case, I won't know dx and rx are the variables of interest. I want
+> ## to be able to pass them in as arguments. This is exactly what FAQ
+> ## 1.6 is, so let's use that solution to define uniqueSummary2
+>
+> uniqueSummary2 <- function(df, key, vars) {
+> DT <- data.table(df)
+> key(DT) <- key
+>
+> sList <- substitute(vars)
+> summaryDT <- DT[, eval(sList), by = key]
+> ncols <- ncol(summaryDT)
+>
+> mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+> }
+>
+> uniqueSummary2(df = testData, key = c("id"),
+> vars = list(length(unique(dx)),
+> length(unique(rx)),
+> length(unique(clinic))))
+>
+> ## uniqueSummary2 is better, but relies on me repeating the
+> ## "length(unique())" bit several times. Ideally, I'd just like to
+> ## pass in a list of QUOTED vars to summarize, like the following
+> ## hypothetical call to my yet-unwritten uniqueSummary3 function:
+>
+> uniqueSummary3(df = testData, key = c("id"),
+> vars = c("dx", "rx", "clinic"))
+>
+> I assume I can somehow construct the expression for the j index inside
+> my function, based on the 'vars' character vector, but am stuck on
+> how.  Any ideas?
+>
+> Thanks so much,
+> Erik 
+
+
+
+
+From mdowle at mdowle.plus.com  Wed Sep 28 18:58:26 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 28 Sep 2011 17:58:26 +0100
+Subject: [datatable-help] constructing expressions for the
+	jargumentfromcharacter vectors
+References: <CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ@mail.gmail.com><j5vdoq$epb$1@dough.gmane.org>
+	<j5vg13$9l$1@dough.gmane.org>
+Message-ID: <j5vjnm$sb9$1@dough.gmane.org>
+
+items 1 and 5 on the wiki are relevant here, for speed comparisons :
+http://rwiki.sciviews.org/doku.php?id=packages:cran:data.table
+
+"Matthew Dowle" <mdowle at mdowle.plus.com> wrote in message 
+news:j5vg13$9l$1 at dough.gmane.org...
+>
+> Something like this :
+>
+>> DT = as.data.table(testData)
+>> f = function(x)length(unique(x))
+>> vars = "dx"
+>> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1]
+>     dx
+> 44.2212
+>> vars = c("dx","rx")
+>> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1]  # same again, just 
+>> different vars
+>     dx      rx
+> 44.2212 48.7814
+>> vars = c("dx","rx","clinic")
+>> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1]  # same again, just 
+>> different vars
+>     dx      rx  clinic
+> 44.2212 48.7814  9.9331
+>>
+>
+> Chris' suggestion of parse(text=paste(...)) is another way you could do it 
+> (and may be more efficient).
+>
+> Matthew
+>
+>
+> "Matthew Dowle" <mdowle at mdowle.plus.com> wrote in message 
+> news:j5vdoq$epb$1 at dough.gmane.org...
+>> Hi,
+>>
+>> Welcome.
+>> Just to check you've found .SD,  [,lapply(.SD,sum),by=...], and .SDcols?
+>> .SD consist of all columns other than the grouping columns, which seems 
+>> similar
+>> to what this line is doing? :
+>>> mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+>>
+>> Matthew
+>>
+>>
+>> "Erik Iverson" <erikriverson at gmail.com> wrote in message 
+>> news:CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ at mail.gmail.com...
+>> Hello,
+>>
+>> Thank you for providing the data.table package, I think it will be
+>> very useful to me going forward.  I have a question about passing
+>> around expressions, and have come up with an example to show what I'm
+>> after.
+>>
+>> library(data.table)
+>> ## test data
+>> N <- 500000
+>> set.seed(100)
+>> testData <- data.frame(id = c(sample(1:10000, N, replace = TRUE)),
+>> clinic = c(sample(1:10, N, replace = TRUE)),
+>> dx = c(sample(1:200, N, replace = TRUE)),
+>> rx = c(sample(1:1000, N, replace = TRUE)))
+>>
+>> ## want to know mean number of dx per ID
+>> mean(tapply(testData$dx, testData$id,
+>> function(x) length(unique(x)))) ## 44.2212
+>>
+>> ## in my real use case, I want to run this with different 'by'
+>> ## variables, so let's write a function and try to use data.table,
+>> ## call the function uniqueSummary1
+>>
+>> uniqueSummary1 <- function(df, key) {
+>> DT <- data.table(df)
+>> key(DT) <- key
+>>
+>> summaryDT <- DT[, list(length(unique(dx)),
+>> length(unique(rx))), by = key]
+>>
+>> mean(summaryDT[,list(V1, V2)])
+>>
+>> }
+>>
+>> ## agrees with tapply
+>> uniqueSummary1(df = testData, key = c("id"))
+>>
+>> ## The above works great, but isn't general, since in my real use
+>> ## case, I won't know dx and rx are the variables of interest. I want
+>> ## to be able to pass them in as arguments. This is exactly what FAQ
+>> ## 1.6 is, so let's use that solution to define uniqueSummary2
+>>
+>> uniqueSummary2 <- function(df, key, vars) {
+>> DT <- data.table(df)
+>> key(DT) <- key
+>>
+>> sList <- substitute(vars)
+>> summaryDT <- DT[, eval(sList), by = key]
+>> ncols <- ncol(summaryDT)
+>>
+>> mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+>> }
+>>
+>> uniqueSummary2(df = testData, key = c("id"),
+>> vars = list(length(unique(dx)),
+>> length(unique(rx)),
+>> length(unique(clinic))))
+>>
+>> ## uniqueSummary2 is better, but relies on me repeating the
+>> ## "length(unique())" bit several times. Ideally, I'd just like to
+>> ## pass in a list of QUOTED vars to summarize, like the following
+>> ## hypothetical call to my yet-unwritten uniqueSummary3 function:
+>>
+>> uniqueSummary3(df = testData, key = c("id"),
+>> vars = c("dx", "rx", "clinic"))
+>>
+>> I assume I can somehow construct the expression for the j index inside
+>> my function, based on the 'vars' character vector, but am stuck on
+>> how.  Any ideas?
+>>
+>> Thanks so much,
+>> Erik 
+
+
+
+
+From erikriverson at gmail.com  Thu Sep 29 04:51:14 2011
+From: erikriverson at gmail.com (Erik Iverson)
+Date: Wed, 28 Sep 2011 21:51:14 -0500
+Subject: [datatable-help] constructing expressions for the
+ jargumentfromcharacter vectors
+In-Reply-To: <j5vjnm$sb9$1@dough.gmane.org>
+References: <CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ@mail.gmail.com>
+	<j5vdoq$epb$1@dough.gmane.org> <j5vg13$9l$1@dough.gmane.org>
+	<j5vjnm$sb9$1@dough.gmane.org>
+Message-ID: <CAKzGw118JAf-=nkq1K_hATAVmURZN95fqXtSaawtjJbHg2=syw@mail.gmail.com>
+
+Excellent everyone, thanks so much.  .SD was the feature I did not
+know about that makes it easy to pass in strings like I wanted,
+thanks.  I was also able to get a large speedup by implementing the
+function f using an idea from the wiki, as:
+
+f <- function(x) length(.Internal(unique(x, FALSE, FALSE)))
+
+Thanks again; very useful package!
+
+On Wed, Sep 28, 2011 at 11:58 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> items 1 and 5 on the wiki are relevant here, for speed comparisons :
+> http://rwiki.sciviews.org/doku.php?id=packages:cran:data.table
+>
+> "Matthew Dowle" <mdowle at mdowle.plus.com> wrote in message
+> news:j5vg13$9l$1 at dough.gmane.org...
+>>
+>> Something like this :
+>>
+>>> DT = as.data.table(testData)
+>>> f = function(x)length(unique(x))
+>>> vars = "dx"
+>>> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1]
+>> ? ? dx
+>> 44.2212
+>>> vars = c("dx","rx")
+>>> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1] ?# same again, just
+>>> different vars
+>> ? ? dx ? ? ?rx
+>> 44.2212 48.7814
+>>> vars = c("dx","rx","clinic")
+>>> mean(DT[,lapply(.SD,f),by="id",.SDcols=vars])[-1] ?# same again, just
+>>> different vars
+>> ? ? dx ? ? ?rx ?clinic
+>> 44.2212 48.7814 ?9.9331
+>>>
+>>
+>> Chris' suggestion of parse(text=paste(...)) is another way you could do it
+>> (and may be more efficient).
+>>
+>> Matthew
+>>
+>>
+>> "Matthew Dowle" <mdowle at mdowle.plus.com> wrote in message
+>> news:j5vdoq$epb$1 at dough.gmane.org...
+>>> Hi,
+>>>
+>>> Welcome.
+>>> Just to check you've found .SD, ?[,lapply(.SD,sum),by=...], and .SDcols?
+>>> .SD consist of all columns other than the grouping columns, which seems
+>>> similar
+>>> to what this line is doing? :
+>>>> mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+>>>
+>>> Matthew
+>>>
+>>>
+>>> "Erik Iverson" <erikriverson at gmail.com> wrote in message
+>>> news:CAKzGw12zWpPt3pSqJCDH_SmDOQOLAjRUV7cV64UYWb8pXK13uQ at mail.gmail.com...
+>>> Hello,
+>>>
+>>> Thank you for providing the data.table package, I think it will be
+>>> very useful to me going forward. ?I have a question about passing
+>>> around expressions, and have come up with an example to show what I'm
+>>> after.
+>>>
+>>> library(data.table)
+>>> ## test data
+>>> N <- 500000
+>>> set.seed(100)
+>>> testData <- data.frame(id = c(sample(1:10000, N, replace = TRUE)),
+>>> clinic = c(sample(1:10, N, replace = TRUE)),
+>>> dx = c(sample(1:200, N, replace = TRUE)),
+>>> rx = c(sample(1:1000, N, replace = TRUE)))
+>>>
+>>> ## want to know mean number of dx per ID
+>>> mean(tapply(testData$dx, testData$id,
+>>> function(x) length(unique(x)))) ## 44.2212
+>>>
+>>> ## in my real use case, I want to run this with different 'by'
+>>> ## variables, so let's write a function and try to use data.table,
+>>> ## call the function uniqueSummary1
+>>>
+>>> uniqueSummary1 <- function(df, key) {
+>>> DT <- data.table(df)
+>>> key(DT) <- key
+>>>
+>>> summaryDT <- DT[, list(length(unique(dx)),
+>>> length(unique(rx))), by = key]
+>>>
+>>> mean(summaryDT[,list(V1, V2)])
+>>>
+>>> }
+>>>
+>>> ## agrees with tapply
+>>> uniqueSummary1(df = testData, key = c("id"))
+>>>
+>>> ## The above works great, but isn't general, since in my real use
+>>> ## case, I won't know dx and rx are the variables of interest. I want
+>>> ## to be able to pass them in as arguments. This is exactly what FAQ
+>>> ## 1.6 is, so let's use that solution to define uniqueSummary2
+>>>
+>>> uniqueSummary2 <- function(df, key, vars) {
+>>> DT <- data.table(df)
+>>> key(DT) <- key
+>>>
+>>> sList <- substitute(vars)
+>>> summaryDT <- DT[, eval(sList), by = key]
+>>> ncols <- ncol(summaryDT)
+>>>
+>>> mean(summaryDT[,(ncols-length(sList) + 2):ncols, with = FALSE])
+>>> }
+>>>
+>>> uniqueSummary2(df = testData, key = c("id"),
+>>> vars = list(length(unique(dx)),
+>>> length(unique(rx)),
+>>> length(unique(clinic))))
+>>>
+>>> ## uniqueSummary2 is better, but relies on me repeating the
+>>> ## "length(unique())" bit several times. Ideally, I'd just like to
+>>> ## pass in a list of QUOTED vars to summarize, like the following
+>>> ## hypothetical call to my yet-unwritten uniqueSummary3 function:
+>>>
+>>> uniqueSummary3(df = testData, key = c("id"),
+>>> vars = c("dx", "rx", "clinic"))
+>>>
+>>> I assume I can somehow construct the expression for the j index inside
+>>> my function, based on the 'vars' character vector, but am stuck on
+>>> how. ?Any ideas?
+>>>
+>>> Thanks so much,
+>>> Erik
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+From branson.owen at gmail.com  Thu Sep 29 20:33:25 2011
+From: branson.owen at gmail.com (Branson Owen)
+Date: Thu, 29 Sep 2011 13:33:25 -0500
+Subject: [datatable-help] A new package multitable (data.list) remind me of
+ a long existing feature request #202 and discussion thread
+Message-ID: <CAANRF0A8k-GSu=d0xB-X5RJ=EzMLJ=5W1PP_9xWHFtd9cRo10Q@mail.gmail.com>
+
+Dear all,
+
+I just saw a new package '*multitable*' (*data.list*) published today. Here
+is the selected description:
+
+"Many data sets do not easily fit into a single data frame, such as
+inherently multiple-table data (e.g. fourth-corner problem and other
+trait-based data sets). Storing such data in a single data frame results in
+either large numbers of meaningless missing values or storage of redundant
+information. The multitable package *introduces new data storage objects
+called data.lists, which are extensions of data.frames*. As data.lists can
+be coerced to data.frames, they can be used with all R functions that accept
+an object that is coercible to a data.frame (e.g. lm; plot; lme; and many
+more). The multitable package also provides several mechanisms for
+simplifying the manipulation of data.list objects."
+
+[data.list] http://cran.r-project.org/web/packages/multitable/index.html
+
+[Feature Request #202]
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=202&group_id=240&atid=978
+
+[Discussion]
+http://r.789695.n4.nabble.com/Suggest-a-cool-feature-Use-data-table-like-a-sorted-indexed-data-list-td2544213.html
+
+[Idea] I am very excited when I see this package, and can't help imagining
+the possibility of data.table and data.list mutually leveraging each other,
+i.e. data.list can leverage data.table's beautiful syntax and extremely high
+performance; while data.table can leverage data.list's flexible object model
+(the long existing feature request #202).
+
+To data.table core team, will multitable (data.list) package make it easy to
+implement feature #202?
+
+I don't know whether the multitable's author is aware of data.table. I will
+write to make suggestions to the multitable author: at least, I think it
+should be an easy change for him to make data.list an extension of
+data.table instead of data.frame, and will make multitable package directly
+inherit data.table's power. Any thoughts before I approach Steve? or it
+would be better to let data.table team raise this idea to him? :)
+
+Best regards,
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110929/2cf00eb9/attachment.htm>
+

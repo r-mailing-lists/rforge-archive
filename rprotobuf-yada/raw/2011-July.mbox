@@ -1,0 +1,431 @@
+From mstokely at google.com  Sat Jul 16 10:16:08 2011
+From: mstokely at google.com (Murray Stokely)
+Date: Sat, 16 Jul 2011 01:16:08 -0700
+Subject: [Rprotobuf-yada] [PATCH] Add missing readASCIIFromConnection
+	function, examples, and test
+Message-ID: <CADiBzwRY-MXnzeTEn3FzxPiHJ+NREUykQ3xcjnPo6xY0pnft_A@mail.gmail.com>
+
+A minor patch for your consideration..
+
+Add missing readASCIIFromConnection C++ function that was called in read.R
+but not defined.
+Add examples to the readASCII.Rd help file and tests of ascii export/import
+of messages.
+Remove an _ in the readASCII C++ functions to match the naming convention of
+the other nearby functions.
+
+----
+
+Index: R/read.R
+===================================================================
+--- R/read.R (revision 424)
++++ R/read.R (working copy)
+@@ -35,7 +35,7 @@
+
+ setMethod( "readASCII", c( descriptor = "Descriptor" , input = "character"
+),
+ function(descriptor, input ){
+- .Call( "Descriptor__readASCII_FromString", descriptor at pointer, input,
+PACKAGE = "RProtoBuf" )
++ .Call( "Descriptor__readASCIIFromString", descriptor at pointer, input,
+PACKAGE = "RProtoBuf" )
+ } )
+
+ setMethod( "readASCII", c( descriptor = "Descriptor" ),
+@@ -46,8 +46,7 @@
+  sc <- summary( input )
+  wasopen <- identical( sc[["opened"]], "opened" )
+  if( !wasopen ) open( input )
+- message <- .Call( "Descriptor__readASCII_FromConnection",
+descriptor at pointer, input, PACKAGE = "RProtoBuf" )
++ message <- .Call( "Descriptor__readASCIIFromConnection",
+descriptor at pointer, input, PACKAGE = "RProtoBuf" )
+  if( !wasopen ) close( input )
+  message
+ } )
+-
+Index: src/wrapper_Descriptor.cpp
+===================================================================
+--- src/wrapper_Descriptor.cpp (revision 424)
++++ src/wrapper_Descriptor.cpp (working copy)
+@@ -164,12 +164,25 @@
+  return( S4_Message( message ) ) ;
+ }
+
+-RCPP_FUNCTION_2( S4_Message, METHOD(readASCII_FromString),
+Rcpp::XPtr<GPB::Descriptor> desc, std::string input){
++RCPP_FUNCTION_2( S4_Message, METHOD(readASCIIFromString),
+Rcpp::XPtr<GPB::Descriptor> desc, std::string input){
+  GPB::Message* message = PROTOTYPE( desc ) ;
+  GPB::TextFormat::ParseFromString( input, message ) ;
+  return( S4_Message( message ) ) ;
+ }
+
++RCPP_FUNCTION_2( S4_Message, METHOD(readASCIIFromConnection),
+Rcpp::XPtr<GPB::Descriptor> desc, int conn_id){
++ RconnectionCopyingInputStream wrapper( conn_id ) ;
++ GPB::io::CopyingInputStreamAdaptor stream( &wrapper ) ;
++
++ /* create a prototype of the message we are going to read */
++ GPB::Message* message = PROTOTYPE( desc ) ;
++ if( !message ){
++ throw std::range_error( "could not call
+factory->GetPrototype(desc)->New()" ) ;
++ }
++ GPB::TextFormat::Parse( &stream, message ) ;
++ return( S4_Message( message ) ) ;
++}
++
+ #undef METHOD
+
+ } // namespace rprotobuf
+Index: man/readASCII.Rd
+===================================================================
+--- man/readASCII.Rd (revision 424)
++++ man/readASCII.Rd (working copy)
+@@ -20,4 +20,21 @@
+ }
+ }}
+ \keyword{methods}
++\examples{
++# example file that contains a "tutorial.AddressBook" message
++book <- system.file( "examples", "addressbook.pb", package = "RProtoBuf" )
+
++# read the message
++message <- read( tutorial.AddressBook, book )
++
++# Output in text format to a temporary file
++out.file <- tempfile()
++writeLines( as.character(message), file(out.file))
++
++# Verify we can read back in the message from a text file.
++message2 <- readASCII( tutorial.AddressBook, file(out.file, "rb"))
++
++\dontshow{
++stopifnot( identical( message, message2) )
++}
++}
+Index: inst/unitTests/runit.addressbook.R
+===================================================================
+--- inst/unitTests/runit.addressbook.R (revision 424)
++++ inst/unitTests/runit.addressbook.R (working copy)
+@@ -29,3 +29,13 @@
+     checkEquals(book$person[[2]]$phone[[1]]$number, "+01...",
+ msg="Second person phone number")
+     checkEquals(book$person[[2]]$phone[[1]]$type,   0,
+msg="Second person phone number")
+ }
++
++test.ascii <- function() {
++    # Output in text format to a temporary file
++    out.file <- tempfile()
++    writeLines( as.character(book), file(out.file))
++
++    # Verify we can read back in the message from a text file.
++    book2 <- readASCII( tutorial.AddressBook, file(out.file, "rb"))
++    checkEquals(book, book2)
++}
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rprotobuf-yada/attachments/20110716/055aa77f/attachment.htm>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ascii.patch
+Type: text/x-patch
+Size: 3650 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/rprotobuf-yada/attachments/20110716/055aa77f/attachment.bin>
+
+From edd at debian.org  Mon Jul 18 00:22:33 2011
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sun, 17 Jul 2011 17:22:33 -0500
+Subject: [Rprotobuf-yada] [PATCH] Add missing
+	readASCIIFromConnection	function, examples, and test
+In-Reply-To: <CADiBzwRY-MXnzeTEn3FzxPiHJ+NREUykQ3xcjnPo6xY0pnft_A@mail.gmail.com>
+References: <CADiBzwRY-MXnzeTEn3FzxPiHJ+NREUykQ3xcjnPo6xY0pnft_A@mail.gmail.com>
+Message-ID: <20003.24745.780204.141870@max.nulle.part>
+
+
+Hi Murray,
+
+On 16 July 2011 at 01:16, Murray Stokely wrote:
+| A minor patch for your consideration..
+
+Really sorry but can you send it from a non-gmail account?  There is
+something gmail does to whitespace:
+
+edd at max:~/svn/rprotobuf/pkg$ patch --dry-run < /tmp/murray.patch 
+patching file read.R
+patch: **** malformed patch at line 6: ?
+
+edd at max:~/svn/rprotobuf/pkg$ 
+
+and line 6 merely is what I have here as
+
+| ----
+| 
+| Index: R/read.R
+| ===================================================================
+| --- R/read.R (revision 424)
+| +++ R/read.R (working copy)
+| @@ -35,7 +35,7 @@
+| ?
+
+this 'underscore' character. Do we need to base64 encode or something? Else
+put the diff into a zipfile or something?
+
+Besides the _ (which I fixed by search & replace), I also get bad linebreaks
+I am now editing by hand ...
+
+And even then, I end up with this:
+edd at max:~/svn/rprotobuf/pkg$ patch --dry-run < /tmp/murray.patch 
+patching file read.R
+Hunk #1 FAILED at 35.
+Hunk #2 FAILED at 46.
+2 out of 2 hunks FAILED -- saving rejects to file read.R.rej
+patching file wrapper_Descriptor.cpp
+Hunk #1 FAILED at 164.
+1 out of 1 hunk FAILED -- saving rejects to file wrapper_Descriptor.cpp.rej
+patching file readASCII.Rd
+Hunk #1 FAILED at 20.
+1 out of 1 hunk FAILED -- saving rejects to file readASCII.Rd.rej
+patching file runit.addressbook.R
+Hunk #1 FAILED at 29.
+1 out of 1 hunk FAILED -- saving rejects to file runit.addressbook.R.rej
+patching file read.R
+Hunk #1 FAILED at 35.
+Hunk #2 FAILED at 46.
+2 out of 2 hunks FAILED -- saving rejects to file read.R.rej
+patching file wrapper_Descriptor.cpp
+Hunk #1 FAILED at 164.
+1 out of 1 hunk FAILED -- saving rejects to file wrapper_Descriptor.cpp.rej
+patching file readASCII.Rd
+Hunk #1 FAILED at 20.
+1 out of 1 hunk FAILED -- saving rejects to file readASCII.Rd.rej
+patching file runit.addressbook.R
+Hunk #1 FAILED at 29.
+1 out of 1 hunk FAILED -- saving rejects to file runit.addressbook.R.rej
+edd at max:~/svn/rprotobuf/pkg$ 
+
+
+This cannot possibly be that hard.  Suggestions?
+
+Dirk
+
+
+
+| ?setMethod( "readASCII", c( descriptor = "Descriptor" , input = "character"
+| ),?
+| ?function(descriptor, input ){
+| - .Call( "Descriptor__readASCII_FromString", descriptor at pointer, input, PACKAGE
+| = "RProtoBuf" )?
+| + .Call( "Descriptor__readASCIIFromString", descriptor at pointer, input, PACKAGE
+| = "RProtoBuf" )?
+| ?} )
+| ?
+| ?setMethod( "readASCII", c( descriptor = "Descriptor" ),?
+| @@ -46,8 +46,7 @@
+| ? sc <- summary( input )
+| ? wasopen <- identical( sc[["opened"]], "opened" )
+| ? if( !wasopen ) open( input )
+| - message <- .Call( "Descriptor__readASCII_FromConnection", descriptor at pointer,
+| input, PACKAGE = "RProtoBuf" )
+| + message <- .Call( "Descriptor__readASCIIFromConnection", descriptor at pointer,
+| input, PACKAGE = "RProtoBuf" )
+| ? if( !wasopen ) close( input )
+| ? message
+| ?} )
+| -
+| Index: src/wrapper_Descriptor.cpp
+| ===================================================================
+| --- src/wrapper_Descriptor.cpp (revision 424)
+| +++ src/wrapper_Descriptor.cpp (working copy)
+| @@ -164,12 +164,25 @@
+| ? return( S4_Message( message ) ) ;
+| ?}
+| ?
+| -RCPP_FUNCTION_2( S4_Message, METHOD(readASCII_FromString), Rcpp::XPtr
+| <GPB::Descriptor> desc, std::string input){
+| +RCPP_FUNCTION_2( S4_Message, METHOD(readASCIIFromString), Rcpp::XPtr
+| <GPB::Descriptor> desc, std::string input){
+| ? GPB::Message* message = PROTOTYPE( desc ) ;?
+| ? GPB::TextFormat::ParseFromString( input, message ) ;
+| ? return( S4_Message( message ) ) ;
+| ?}
+| ?
+| +RCPP_FUNCTION_2( S4_Message, METHOD(readASCIIFromConnection), Rcpp::XPtr
+| <GPB::Descriptor> desc, int conn_id){
+| + RconnectionCopyingInputStream wrapper( conn_id ) ;
+| + GPB::io::CopyingInputStreamAdaptor stream( &wrapper ) ;
+| +
+| + /* create a prototype of the message we are going to read */
+| + GPB::Message* message = PROTOTYPE( desc ) ;
+| + if( !message ){
+| + throw std::range_error( "could not call factory->GetPrototype(desc)->New()" )
+| ;?
+| + }
+| + GPB::TextFormat::Parse( &stream, message ) ;
+| + return( S4_Message( message ) ) ;
+| +}
+| +
+| ?#undef METHOD
+| ?
+| ?} // namespace rprotobuf
+| Index: man/readASCII.Rd
+| ===================================================================
+| --- man/readASCII.Rd (revision 424)
+| +++ man/readASCII.Rd (working copy)
+| @@ -20,4 +20,21 @@
+| ?}
+| ?}}
+| ?\keyword{methods}
+| +\examples{
+| +# example file that contains a "tutorial.AddressBook" message
+| +book <- system.file( "examples", "addressbook.pb", package = "RProtoBuf" )
+| ?
+| +# read the message
+| +message <- read( tutorial.AddressBook, book )
+| +
+| +# Output in text format to a temporary file
+| +out.file <- tempfile()
+| +writeLines( as.character(message), file(out.file))
+| +
+| +# Verify we can read back in the message from a text file.
+| +message2 <- readASCII( tutorial.AddressBook, file(out.file, "rb"))
+| +
+| +\dontshow{
+| +stopifnot( identical( message, message2) )
+| +}
+| +}
+| Index: inst/unitTests/runit.addressbook.R
+| ===================================================================
+| --- inst/unitTests/runit.addressbook.R (revision 424)
+| +++ inst/unitTests/runit.addressbook.R (working copy)
+| @@ -29,3 +29,13 @@
+| ? ? ?checkEquals(book$person[[2]]$phone[[1]]$number, "+01...", ? ? ? ?
+| ? ?msg="Second person phone number")
+| ? ? ?checkEquals(book$person[[2]]$phone[[1]]$type, ? 0, ? ? ? ? ? ?
+| ? ? ? msg="Second person phone number")
+| ?}
+| +
+| +test.ascii <- function() {
+| + ? ?# Output in text format to a temporary file
+| + ? ?out.file <- tempfile()
+| + ? ?writeLines( as.character(book), file(out.file))
+| +
+| + ? ?# Verify we can read back in the message from a text file.
+| + ? ?book2 <- readASCII( tutorial.AddressBook, file(out.file, "rb"))
+| + ? ?checkEquals(book, book2)
+| +}
+| 
+| 
+| ----------------------------------------------------------------------
+| Index: R/read.R
+| ===================================================================
+| --- R/read.R	(revision 424)
+| +++ R/read.R	(working copy)
+| @@ -35,7 +35,7 @@
+|  
+|  setMethod( "readASCII", c( descriptor = "Descriptor" , input = "character" ), 
+|  function(descriptor, input ){
+| -	.Call( "Descriptor__readASCII_FromString", descriptor at pointer, input, PACKAGE = "RProtoBuf" ) 
+| +	.Call( "Descriptor__readASCIIFromString", descriptor at pointer, input, PACKAGE = "RProtoBuf" ) 
+|  } )
+|  
+|  setMethod( "readASCII", c( descriptor = "Descriptor" ), 
+| @@ -46,8 +46,7 @@
+|  	sc <- summary( input )
+|  	wasopen <- identical( sc[["opened"]], "opened" )
+|  	if( !wasopen ) open( input )
+| -	message <- .Call( "Descriptor__readASCII_FromConnection", descriptor at pointer, input, PACKAGE = "RProtoBuf" )
+| +	message <- .Call( "Descriptor__readASCIIFromConnection", descriptor at pointer, input, PACKAGE = "RProtoBuf" )
+|  	if( !wasopen ) close( input )
+|  	message
+|  } )
+| -
+| Index: src/wrapper_Descriptor.cpp
+| ===================================================================
+| --- src/wrapper_Descriptor.cpp	(revision 424)
+| +++ src/wrapper_Descriptor.cpp	(working copy)
+| @@ -164,12 +164,25 @@
+|  	return( S4_Message( message ) ) ;
+|  }
+|  
+| -RCPP_FUNCTION_2( S4_Message, METHOD(readASCII_FromString), Rcpp::XPtr<GPB::Descriptor> desc, std::string input){
+| +RCPP_FUNCTION_2( S4_Message, METHOD(readASCIIFromString), Rcpp::XPtr<GPB::Descriptor> desc, std::string input){
+|  	GPB::Message* message = PROTOTYPE( desc ) ; 
+|  	GPB::TextFormat::ParseFromString( input, message ) ;
+|  	return( S4_Message( message ) ) ;
+|  }
+|  
+| +RCPP_FUNCTION_2( S4_Message, METHOD(readASCIIFromConnection), Rcpp::XPtr<GPB::Descriptor> desc, int conn_id){
+| +	RconnectionCopyingInputStream wrapper( conn_id ) ;
+| +	GPB::io::CopyingInputStreamAdaptor stream( &wrapper ) ;
+| +
+| +	/* create a prototype of the message we are going to read */
+| +	GPB::Message* message = PROTOTYPE( desc ) ;
+| +	if( !message ){
+| +		throw std::range_error( "could not call factory->GetPrototype(desc)->New()" ) ; 
+| +	}
+| +	GPB::TextFormat::Parse( &stream, message ) ;
+| +	return( S4_Message( message ) ) ;
+| +}
+| +
+|  #undef METHOD
+|  
+|  } // namespace rprotobuf
+| Index: man/readASCII.Rd
+| ===================================================================
+| --- man/readASCII.Rd	(revision 424)
+| +++ man/readASCII.Rd	(working copy)
+| @@ -20,4 +20,21 @@
+|  }
+|  }}
+|  \keyword{methods}
+| +\examples{
+| +# example file that contains a "tutorial.AddressBook" message
+| +book <- system.file( "examples", "addressbook.pb", package = "RProtoBuf" )
+|  
+| +# read the message
+| +message <- read( tutorial.AddressBook, book )
+| +
+| +# Output in text format to a temporary file
+| +out.file <- tempfile()
+| +writeLines( as.character(message), file(out.file))
+| +
+| +# Verify we can read back in the message from a text file.
+| +message2 <- readASCII( tutorial.AddressBook, file(out.file, "rb"))
+| +
+| +\dontshow{
+| +stopifnot( identical( message, message2) )
+| +}
+| +}
+| Index: inst/unitTests/runit.addressbook.R
+| ===================================================================
+| --- inst/unitTests/runit.addressbook.R	(revision 424)
+| +++ inst/unitTests/runit.addressbook.R	(working copy)
+| @@ -29,3 +29,13 @@
+|      checkEquals(book$person[[2]]$phone[[1]]$number, "+01...",            msg="Second person phone number")
+|      checkEquals(book$person[[2]]$phone[[1]]$type,   0,                   msg="Second person phone number")
+|  }
+| +
+| +test.ascii <- function() {
+| +    # Output in text format to a temporary file
+| +    out.file <- tempfile()
+| +    writeLines( as.character(book), file(out.file))
+| +
+| +    # Verify we can read back in the message from a text file.
+| +    book2 <- readASCII( tutorial.AddressBook, file(out.file, "rb"))
+| +    checkEquals(book, book2)
+| +}
+| 
+| ----------------------------------------------------------------------
+| _______________________________________________
+| Rprotobuf-yada mailing list
+| Rprotobuf-yada at lists.r-forge.r-project.org
+| https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rprotobuf-yada
+
+-- 
+Gauss once played himself in a zero-sum game and won $50.
+                      -- #11 at http://www.gaussfacts.com
+

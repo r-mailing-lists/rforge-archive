@@ -1,0 +1,357 @@
+From pcd at roxygen.org  Sun Aug  1 08:06:18 2010
+From: pcd at roxygen.org (Peter Danenberg)
+Date: Sun, 1 Aug 2010 01:06:18 -0500
+Subject: [Roxygen-devel] Bug and patch for the collate roclet
+In-Reply-To: <AANLkTi=h-GLSs9q3Z7jpfOwi_e1850ubeNacV9ZpeBnS@mail.gmail.com>
+References: <AANLkTi=h-GLSs9q3Z7jpfOwi_e1850ubeNacV9ZpeBnS@mail.gmail.com>
+Message-ID: <20100801060618.GE12576@klutometis.wikitex.org>
+
+> The following tiny patch to make.collate.roclet() alters the parse function
+> to only include *.R or *.r files in the directory.
+
+Thanks, Arnold; applied!
+
+From B.J.Janssen at tue.nl  Wed Aug  4 13:39:16 2010
+From: B.J.Janssen at tue.nl (Janssen, B.J.)
+Date: Wed, 4 Aug 2010 13:39:16 +0200
+Subject: [Roxygen-devel] roxygen script
+Message-ID: <943CD83D-821B-41EC-8909-BFF6534A738C@tue.nl>
+
+Hi,
+
+I added the "-s" option to the roxygen script in pkg/src/ . A svn diff to revision 249 is given below.
+If the option is set then use.Rd2=TRUE will be used in the call to roxygenize.
+
+So for example:
+	R CMD roxygen -d -s basedir
+now works and enables Rd2 instead of Rd.
+
+I chose the letter 's' because use.Rd2 effectively means it is able to parse S4 classes.
+
+Regards,
+Bart Janssen
+
+Index: roxygen
+===================================================================
+--- roxygen	(revision 249)
++++ roxygen	(working copy)
+@@ -19,13 +19,14 @@
+ Options:
+   -d  (Destructive) operate in place on SOURCE
+   -u       (Unlink) clean TARGET first
++  -s  (Rd2) enable parsing of S4 tags
+ 
+   -h         (Help) print short help message and exit
+   -v      (Version) print roxygen version info and exit
+ 
+ Report bugs to <roxygen-devel at lists.r-forge.r-project.org>."
+ 
+-while getopts duhv OPT; do
++while getopts dushv OPT; do
+     case $OPT in
+         d|+d)
+             destructive="TRUE"
+@@ -33,6 +34,9 @@
+         u|+u)
+             unlink="TRUE"
+             ;;
++        s|+s)
++            rd2="TRUE"
++            ;;
+         h|+h)
+             echo ${usage}
+             exit 0
+@@ -95,15 +99,18 @@
+ 
+ : ${unlink:="FALSE"}
+ : ${copy:="TRUE"}
++: ${rd2:="FALSE"}
+ 
+ debug () {
+-    echo source: "${source}"\; target: "${target}"\; copy: "${copy}"\; unlink: "${unlink}"
++    echo source: "${source}"\; target: "${target}"\; copy: "${copy}"\; unlink: "${unlink}"\; rd2: "${rd2}"
+ }
+ 
++
+ R_EXE="${R_HOME}/bin/R"
+ echo "library(roxygen)
+       roxygenize(package.dir=${source},
+                  roxygen.dir=${target},
+                  copy.package=${copy},
+-                 unlink.target=${unlink})" | \
++                 unlink.target=${unlink},
++                 use.Rd2=${rd2})" | \
+     "${R_EXE}" --no-restore --slave
+
+
+
+
+From pcd at roxygen.org  Wed Aug  4 18:28:32 2010
+From: pcd at roxygen.org (Peter Danenberg)
+Date: Wed, 4 Aug 2010 11:28:32 -0500
+Subject: [Roxygen-devel] roxygen script
+In-Reply-To: <943CD83D-821B-41EC-8909-BFF6534A738C@tue.nl>
+References: <943CD83D-821B-41EC-8909-BFF6534A738C@tue.nl>
+Message-ID: <20100804162832.GA18437@klutometis.wikitex.org>
+
+Thanks, Bart; Manuel and I were trying to come up with a general
+mechanism for modifying the behavior of roxygenize by e.g. specifying
+options, adding roclets, etc.
+
+use.Rd2=TRUE could be specified by a more general mechanism; or do you
+think it warrants its own option?
+
+> Hi,
+> 
+> I added the "-s" option to the roxygen script in pkg/src/ . A svn diff to revision 249 is given below.
+> If the option is set then use.Rd2=TRUE will be used in the call to roxygenize.
+> 
+> So for example:
+> 	R CMD roxygen -d -s basedir
+> now works and enables Rd2 instead of Rd.
+> 
+> I chose the letter 's' because use.Rd2 effectively means it is able to parse S4 classes.
+> 
+> Regards,
+> Bart Janssen
+> 
+> Index: roxygen
+> ===================================================================
+> --- roxygen	(revision 249)
+> +++ roxygen	(working copy)
+> @@ -19,13 +19,14 @@
+>  Options:
+>    -d  (Destructive) operate in place on SOURCE
+>    -u       (Unlink) clean TARGET first
+> +  -s  (Rd2) enable parsing of S4 tags
+>  
+>    -h         (Help) print short help message and exit
+>    -v      (Version) print roxygen version info and exit
+>  
+>  Report bugs to <roxygen-devel at lists.r-forge.r-project.org>."
+>  
+> -while getopts duhv OPT; do
+> +while getopts dushv OPT; do
+>      case $OPT in
+>          d|+d)
+>              destructive="TRUE"
+> @@ -33,6 +34,9 @@
+>          u|+u)
+>              unlink="TRUE"
+>              ;;
+> +        s|+s)
+> +            rd2="TRUE"
+> +            ;;
+>          h|+h)
+>              echo ${usage}
+>              exit 0
+> @@ -95,15 +99,18 @@
+>  
+>  : ${unlink:="FALSE"}
+>  : ${copy:="TRUE"}
+> +: ${rd2:="FALSE"}
+>  
+>  debug () {
+> -    echo source: "${source}"\; target: "${target}"\; copy: "${copy}"\; unlink: "${unlink}"
+> +    echo source: "${source}"\; target: "${target}"\; copy: "${copy}"\; unlink: "${unlink}"\; rd2: "${rd2}"
+>  }
+>  
+> +
+>  R_EXE="${R_HOME}/bin/R"
+>  echo "library(roxygen)
+>        roxygenize(package.dir=${source},
+>                   roxygen.dir=${target},
+>                   copy.package=${copy},
+> -                 unlink.target=${unlink})" | \
+> +                 unlink.target=${unlink},
+> +                 use.Rd2=${rd2})" | \
+>      "${R_EXE}" --no-restore --slave
+> 
+> 
+> 
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+> 
+
+From tobias.verbeke at gmail.com  Wed Aug  4 21:43:59 2010
+From: tobias.verbeke at gmail.com (Tobias Verbeke)
+Date: Wed, 04 Aug 2010 21:43:59 +0200
+Subject: [Roxygen-devel] roxygen script
+In-Reply-To: <20100804162832.GA18437@klutometis.wikitex.org>
+References: <943CD83D-821B-41EC-8909-BFF6534A738C@tue.nl>
+	<20100804162832.GA18437@klutometis.wikitex.org>
+Message-ID: <4C59C2FF.8050609@gmail.com>
+
+L.S.
+
+On 08/04/2010 06:28 PM, Peter Danenberg wrote:
+
+> Thanks, Bart; Manuel and I were trying to come up with a general
+> mechanism for modifying the behavior of roxygenize by e.g. specifying
+> options, adding roclets, etc.
+>
+> use.Rd2=TRUE could be specified by a more general mechanism; or do you
+> think it warrants its own option?
+
+As far as I understand Rd2 only extends Rd. Wouldn't it make sense
+to merge Rd2 and Rd, and drop Rd2 alltogether ? Support of S4 seems
+too fundamental to make it optional, for example.
+
+Great to hear BTW you're preparing further work on roxygen.
+This is a beautiful project and really deserves active
+development and bug fixing!
+
+Best,
+Tobias
+
+>> I added the "-s" option to the roxygen script in pkg/src/ . A svn diff to revision 249 is given below.
+>> If the option is set then use.Rd2=TRUE will be used in the call to roxygenize.
+>>
+>> So for example:
+>> 	R CMD roxygen -d -s basedir
+>> now works and enables Rd2 instead of Rd.
+>>
+>> I chose the letter 's' because use.Rd2 effectively means it is able to parse S4 classes.
+>>
+>> Regards,
+>> Bart Janssen
+>>
+>> Index: roxygen
+>> ===================================================================
+>> --- roxygen	(revision 249)
+>> +++ roxygen	(working copy)
+>> @@ -19,13 +19,14 @@
+>>   Options:
+>>     -d  (Destructive) operate in place on SOURCE
+>>     -u       (Unlink) clean TARGET first
+>> +  -s  (Rd2) enable parsing of S4 tags
+>>
+>>     -h         (Help) print short help message and exit
+>>     -v      (Version) print roxygen version info and exit
+>>
+>>   Report bugs to<roxygen-devel at lists.r-forge.r-project.org>."
+>>
+>> -while getopts duhv OPT; do
+>> +while getopts dushv OPT; do
+>>       case $OPT in
+>>           d|+d)
+>>               destructive="TRUE"
+>> @@ -33,6 +34,9 @@
+>>           u|+u)
+>>               unlink="TRUE"
+>>               ;;
+>> +        s|+s)
+>> +            rd2="TRUE"
+>> +            ;;
+>>           h|+h)
+>>               echo ${usage}
+>>               exit 0
+>> @@ -95,15 +99,18 @@
+>>
+>>   : ${unlink:="FALSE"}
+>>   : ${copy:="TRUE"}
+>> +: ${rd2:="FALSE"}
+>>
+>>   debug () {
+>> -    echo source: "${source}"\; target: "${target}"\; copy: "${copy}"\; unlink: "${unlink}"
+>> +    echo source: "${source}"\; target: "${target}"\; copy: "${copy}"\; unlink: "${unlink}"\; rd2: "${rd2}"
+>>   }
+>>
+>> +
+>>   R_EXE="${R_HOME}/bin/R"
+>>   echo "library(roxygen)
+>>         roxygenize(package.dir=${source},
+>>                    roxygen.dir=${target},
+>>                    copy.package=${copy},
+>> -                 unlink.target=${unlink})" | \
+>> +                 unlink.target=${unlink},
+>> +                 use.Rd2=${rd2})" | \
+>>       "${R_EXE}" --no-restore --slave
+>>
+>>
+>>
+>> _______________________________________________
+>> Roxygen-devel mailing list
+>> Roxygen-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>>
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>
+
+
+From B.J.Janssen at tue.nl  Thu Aug  5 08:52:05 2010
+From: B.J.Janssen at tue.nl (Janssen, B.J.)
+Date: Thu, 5 Aug 2010 08:52:05 +0200
+Subject: [Roxygen-devel] roxygen script
+In-Reply-To: <4C59C2FF.8050609@gmail.com>
+References: <943CD83D-821B-41EC-8909-BFF6534A738C@tue.nl>
+	<20100804162832.GA18437@klutometis.wikitex.org>
+	<4C59C2FF.8050609@gmail.com>
+Message-ID: <E85FA81C-03A2-43F2-AA6F-D048A990E9EF@tue.nl>
+
+Hello,
+
+Thanks, Bart; Manuel and I were trying to come up with a general
+mechanism for modifying the behavior of roxygenize by e.g. specifying
+options, adding roclets, etc.
+
+use.Rd2=TRUE could be specified by a more general mechanism; or do you
+think it warrants its own option?
+
+As far as I understand Rd2 only extends Rd. Wouldn't it make sense
+to merge Rd2 and Rd, and drop Rd2 alltogether ? Support of S4 seems
+too fundamental to make it optional, for example.
+
+
+From B.J.Janssen at tue.nl  Thu Aug  5 09:01:15 2010
+From: B.J.Janssen at tue.nl (Janssen, B.J.)
+Date: Thu, 5 Aug 2010 09:01:15 +0200
+Subject: [Roxygen-devel] roxygen script
+In-Reply-To: <E85FA81C-03A2-43F2-AA6F-D048A990E9EF@tue.nl>
+References: <943CD83D-821B-41EC-8909-BFF6534A738C@tue.nl>
+	<20100804162832.GA18437@klutometis.wikitex.org>	<4C59C2FF.8050609@gmail.com>
+	<E85FA81C-03A2-43F2-AA6F-D048A990E9EF@tue.nl>
+Message-ID: <7A609127-B901-439F-8582-69A84C8E68A6@tue.nl>
+
+Something went wrong with the quote level - retry
+Hello,
+
+> Thanks, Bart; Manuel and I were trying to come up with a general
+> mechanism for modifying the behavior of roxygenize by e.g. specifying
+> options, adding roclets, etc.
+> 
+>> use.Rd2=TRUE could be specified by a more general mechanism; or do you
+>> think it warrants its own option?
+>> 
+>> As far as I understand Rd2 only extends Rd. Wouldn't it make sense
+>> to merge Rd2 and Rd, and drop Rd2 alltogether ? Support of S4 seems
+>> too fundamental to make it optional, for example.
+
+
+From pcd at roxygen.org  Thu Aug  5 19:16:13 2010
+From: pcd at roxygen.org (Peter Danenberg)
+Date: Thu, 5 Aug 2010 12:16:13 -0500
+Subject: [Roxygen-devel] roxygen script
+In-Reply-To: <7A609127-B901-439F-8582-69A84C8E68A6@tue.nl>
+References: <943CD83D-821B-41EC-8909-BFF6534A738C@tue.nl>
+	<20100804162832.GA18437@klutometis.wikitex.org>
+	<4C59C2FF.8050609@gmail.com>
+	<E85FA81C-03A2-43F2-AA6F-D048A990E9EF@tue.nl>
+	<7A609127-B901-439F-8582-69A84C8E68A6@tue.nl>
+Message-ID: <20100805171613.GB9443@klutometis.wikitex.org>
+
+> The way I understood this is that the use.Rd2 option is a temporary
+> fix until Rd2 is fully functional and able to replace Rd. Probably I
+> am missing something here :).
+
+No, you're exactly right; in that sense, maybe a temporary ad-hoc
+option makes sense.
+
+Committed and applied; it will disappear, though, once we merge Rd2
+and Rd.
+

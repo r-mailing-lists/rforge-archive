@@ -1,0 +1,220 @@
+From bogus@does.not.exist.com  Wed Sep 16 13:15:16 2009
+From: bogus@does.not.exist.com ()
+Date: Wed, 16 Sep 2009 11:15:16 -0000
+Subject: No subject
+Message-ID: <mailman.0.1264014685.1551.qtinterfaces-devel@lists.r-forge.r-project.org>
+
+given the choice of an opaque pointer or a native R type, I think the user
+would choose the latter. However, I agree with you that there is not always
+such an obvious mapping. QImage is a good example. Would the user really
+expect a huge matrix of pixels? The primary use of a QImage is to display
+it, not to manipulate its pixels, but the same is not true for a QMatrix, or
+QRect, etc. For those classes, the primary interest is in the values (the
+parameters of QMatrix, the coordinates of the rectangle). There it may be
+convenient to perform the conversion up-front, and thus making the interface
+tighter between R and Qt.
+
+That said, there may be cases where one does not want to perform the
+conversion. The collection types (QMap, QList, QVector, etc) have fairly
+obvious analogs in R vectors. The problem is that there is overhead to the
+conversions. If the collection is large, the user may wish to pass opaque
+pointers.
+
+In theory, it's possible to make this optional. That is, the user could as
+part of a MethodCall request that high-level conversion be avoided. This
+would not be that hard to implement. The qinvoke() function could take an
+extra parameter (.convert or something) that would tell the MethodCall
+object to avoid special type handlers for the return value.
+
+I will say that I've never encountered a case with RGtk2 where the
+collections are too large to convert. But this Qt interface is more general
+and so it might come up more often. I think I'll wait for a use-case.
+
+Michael
+
+On Wed, Jan 20, 2010 at 7:43 AM, Michael Lawrence <michafla at gene.com> wrote:
+
+> Potentially interesting paper attached. Haven't read it yet.
+>
+>
+> On Wed, Jan 20, 2010 at 6:54 AM, Michael Lawrence <michafla at gene.com>wrote:
+>
+>>
+>>
+>> On Wed, Jan 20, 2010 at 1:39 AM, Deepayan Sarkar <
+>> deepayan.sarkar at gmail.com> wrote:
+>>
+>>> On Mon, Jan 18, 2010 at 12:11 AM, Michael Lawrence
+>>> <lawrence.michael at gene.com> wrote:
+>>>
+>>> > Ok, this looks interesting. After we fix this bug though, I think we
+>>> need to
+>>> > make qtbase convert QColor to the high-level integer matrix as returned
+>>> by
+>>> > qcolor(). And QPen might belong as an R list, as I think you were doing
+>>> > before. In general, I think the value types like QColor, QMatrix, etc,
+>>> > should be converted to native R structures, instead of opaque external
+>>> > pointers. The functions already exist for this; they just need to
+>>> integrated
+>>> > better into the smoke stuff.
+>>>
+>>> Sure, but could you outline the advantages? What I mean is that even
+>>> for things with obvious analogs, the Qt pointer representation may
+>>> give some useful freebies; let's say QImage::invertPixels(). I see the
+>>> point in making it into a native R structure, but wouldn't it be
+>>> better to have access to both at the user level? So I'm thinking of
+>>>
+>>> im <- Qt$QImage("foo.png")
+>>>
+>>> returning a "QImage", and have user-level as.raster() and as.QImage()
+>>> methods for conversion.
+>>>
+>>>
+>> There's nothing preventing us in general from calling Qt methods on
+>> R-level structures. Take QMatrix for example. It maps to a 3x2 R matrix with
+>> a special class c("QMatrix", "RQtValue", "RQtObject"). Then the code will be
+>> smart enough to allow:
+>>
+>> mat <- QMatrix()
+>> mat[1,2] <- 2
+>> mat <- mat$invert()
+>>
+>> Where 'invert' is implemented by Qt.
+>>
+>>
+>>> Is there a technical advantage (like more stability) to not allowing
+>>> something like this for the value types? What about things that don't
+>>> have an obvious analog?
+>>>
+>>>
+>> Well, there are certainly cases like QImage that should probably remain
+>> external. There's too much data there to be copied around. Basically, except
+>> for QString and maybe QByteArray, any class that uses the shared pointers
+>> should probably remain as a pointer.
+>>
+>>
+>>> -Deepayan
+>>>
+>>
+>>
+>
+
+--001636417d13c89264047d9d592e
+Content-Type: text/html; charset=ISO-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+Well, the paper was a little tough for me to grok. But anyway, I think we n=
+eed a consistent type conversion policy. When Qt always treats a class as a=
+ pointer (e.g. QObjects), it&#39;s pretty clear that we need to do the same=
+. For value types, it&#39;s more complicated. Qt uses values to avoid the c=
+omplications of memory management (as with QImage) or to avoid memory alloc=
+ation overhead for small types (like QPen). <br>
+<br>From the R user&#39;s perspective, memory management is largely irrelev=
+ant. But given the choice of an opaque pointer or a native R type, I think =
+the user would choose the latter. However, I agree with you that there is n=
+ot always such an obvious mapping. QImage is a good example. Would the user=
+ really expect a huge matrix of pixels? The primary use of a QImage is to d=
+isplay it, not to manipulate its pixels, but the same is not true for a QMa=
+trix, or QRect, etc. For those classes, the primary interest is in the valu=
+es (the parameters of QMatrix, the coordinates of the rectangle). There it =
+may be convenient to perform the conversion up-front, and thus making the i=
+nterface tighter between R and Qt.<br>
+<br>That said, there may be cases where one does not want to perform the co=
+nversion. The collection types (QMap, QList, QVector, etc) have fairly obvi=
+ous analogs in R vectors. The problem is that there is overhead to the conv=
+ersions. If the collection is large, the user may wish to pass opaque point=
+ers.<br>
+<br>In theory, it&#39;s possible to make this optional. That is, the user c=
+ould as part of a MethodCall request that high-level conversion be avoided.=
+ This would not be that hard to implement. The qinvoke() function could tak=
+e an extra parameter (.convert or something) that would tell the MethodCall=
+ object to avoid special type handlers for the return value. <br>
+<br>I will say that I&#39;ve never encountered a case with RGtk2 where the =
+collections are too large to convert. But this Qt interface is more general=
+ and so it might come up more often. I think I&#39;ll wait for a use-case.<=
+br>
+<br>Michael<br><br><div class=3D"gmail_quote">On Wed, Jan 20, 2010 at 7:43 =
+AM, Michael Lawrence <span dir=3D"ltr">&lt;<a href=3D"mailto:michafla at gene.=
+com">michafla at gene.com</a>&gt;</span> wrote:<br><blockquote class=3D"gmail_=
+quote" style=3D"border-left: 1px solid rgb(204, 204, 204); margin: 0pt 0pt =
+0pt 0.8ex; padding-left: 1ex;">
+Potentially interesting paper attached. Haven&#39;t read it yet.<div><div><=
+/div><div class=3D"h5"><br><br><div class=3D"gmail_quote">On Wed, Jan 20, 2=
+010 at 6:54 AM, Michael Lawrence <span dir=3D"ltr">&lt;<a href=3D"mailto:mi=
+chafla at gene.com" target=3D"_blank">michafla at gene.com</a>&gt;</span> wrote:<=
+br>
+
+<blockquote class=3D"gmail_quote" style=3D"border-left: 1px solid rgb(204, =
+204, 204); margin: 0pt 0pt 0pt 0.8ex; padding-left: 1ex;"><br><br><div clas=
+s=3D"gmail_quote"><div>On Wed, Jan 20, 2010 at 1:39 AM, Deepayan Sarkar <sp=
+an dir=3D"ltr">&lt;<a href=3D"mailto:deepayan.sarkar at gmail.com" target=3D"_=
+blank">deepayan.sarkar at gmail.com</a>&gt;</span> wrote:<br>
+
+<blockquote class=3D"gmail_quote" style=3D"border-left: 1px solid rgb(204, =
+204, 204); margin: 0pt 0pt 0pt 0.8ex; padding-left: 1ex;">
+On Mon, Jan 18, 2010 at 12:11 AM, Michael Lawrence<br>
+<div>&lt;<a href=3D"mailto:lawrence.michael at gene.com" target=3D"_blank">law=
+rence.michael at gene.com</a>&gt; wrote:<br>
+<br>
+</div><div>&gt; Ok, this looks interesting. After we fix this bug though, I=
+ think we need to<br>
+&gt; make qtbase convert QColor to the high-level integer matrix as returne=
+d by<br>
+&gt; qcolor(). And QPen might belong as an R list, as I think you were doin=
+g<br>
+&gt; before. In general, I think the value types like QColor, QMatrix, etc,=
+<br>
+&gt; should be converted to native R structures, instead of opaque external=
+<br>
+&gt; pointers. The functions already exist for this; they just need to inte=
+grated<br>
+&gt; better into the smoke stuff.<br>
+<br>
+</div>Sure, but could you outline the advantages? What I mean is that even<=
+br>
+for things with obvious analogs, the Qt pointer representation may<br>
+give some useful freebies; let&#39;s say QImage::invertPixels(). I see the<=
+br>
+point in making it into a native R structure, but wouldn&#39;t it be<br>
+better to have access to both at the user level? So I&#39;m thinking of<br>
+<br>
+im &lt;- Qt$QImage(&quot;foo.png&quot;)<br>
+<br>
+returning a &quot;QImage&quot;, and have user-level as.raster() and as.QIma=
+ge()<br>
+methods for conversion.<br>
+<br></blockquote></div><div><br>There&#39;s nothing preventing us in genera=
+l from calling Qt methods on R-level structures. Take QMatrix for example. =
+It maps to a 3x2 R matrix with a special class c(&quot;QMatrix&quot;, &quot=
+;RQtValue&quot;, &quot;RQtObject&quot;). Then the code will be smart enough=
+ to allow:<br>
+
+
+<br>mat &lt;- QMatrix()<br>mat[1,2] &lt;- 2<br>mat &lt;- mat$invert()<br><b=
+r>Where &#39;invert&#39; is implemented by Qt.<br>=A0 <br></div><div><block=
+quote class=3D"gmail_quote" style=3D"border-left: 1px solid rgb(204, 204, 2=
+04); margin: 0pt 0pt 0pt 0.8ex; padding-left: 1ex;">
+
+
+
+Is there a technical advantage (like more stability) to not allowing<br>
+something like this for the value types? What about things that don&#39;t<b=
+r>
+have an obvious analog?<br>
+<font color=3D"#888888"><br></font></blockquote></div><div><br>Well, there =
+are certainly cases like QImage that should probably remain external. There=
+&#39;s too much data there to be copied around. Basically, except for QStri=
+ng and maybe QByteArray, any class that uses the shared pointers should pro=
+bably remain as a pointer.<br>
+
+
+=A0<br></div><blockquote class=3D"gmail_quote" style=3D"border-left: 1px so=
+lid rgb(204, 204, 204); margin: 0pt 0pt 0pt 0.8ex; padding-left: 1ex;"><fon=
+t color=3D"#888888">
+-Deepayan<br>
+</font></blockquote></div><br>
+</blockquote></div><br>
+</div></div></blockquote></div><br>
+
+--001636417d13c89264047d9d592e--
+

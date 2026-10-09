@@ -1,0 +1,271 @@
+From reyno113 at purdue.edu  Fri Feb  7 19:05:01 2020
+From: reyno113 at purdue.edu (Reynolds, Jeremy E)
+Date: Fri, 7 Feb 2020 18:05:01 +0000
+Subject: [Traminer-users] within dyad distances
+Message-ID: <BN6PR2201MB10129F3D9A89442ECADCBF68FF1C0@BN6PR2201MB1012.namprd22.prod.outlook.com>
+
+Dear Traminer Users,
+
+I would like to compute distances between sequences that belong to the same person for every person in my data.
+The code below seems to work: it calculates the distances between the expected and actual work schedule for each of the 10 people in the data.
+
+My code, however, is terribly inefficient.  For instance, it calculates the entire pairwise distance matrix and then overwrites most of it with NA.
+This leaves me with two questions:
+
+
+1)      Does Traminer have a way to calculate just the distances between sequences that below to the same person?
+
+ (e.g., with clever use of the refseq option in the seqdist command or with the seqdistmc command for multi-channel sequence analysis)
+
+
+
+2)      Is there a way to extract the elements just below the diagonal without overwriting all the other values with NA?
+
+Thanks,
+
+Jeremy
+
+
+mymat <- rbind(
+    c(1,1,0,0,1,1,1,1,1,0,0,0),c(1,2,0,0,1,1,1,1,1,1,0,0),
+    c(2,1,0,0,1,1,1,1,1,0,0,0),c(2,2,0,0,1,1,1,1,1,1,1,0),
+    c(3,1,0,0,1,1,1,1,1,0,0,0),c(3,2,0,0,1,1,1,1,1,1,1,1),
+    c(4,1,0,0,1,1,1,1,1,0,0,0),c(4,2,0,1,1,1,1,1,1,0,0,0),
+    c(5,1,0,0,1,1,1,1,1,0,0,0),c(5,2,1,1,1,1,1,1,1,0,0,0),
+    c(6,1,0,0,1,1,1,1,1,0,0,0),c(6,2,0,0,0,1,1,1,1,0,0,0),
+    c(7,1,0,0,1,1,1,1,1,0,0,0),c(7,2,0,0,0,0,1,1,1,0,0,0),
+    c(8,1,0,0,1,1,1,1,1,0,0,0),c(8,2,0,0,0,0,0,1,1,0,0,0),
+    c(9,1,0,0,1,1,1,1,1,0,0,0),c(9,2,0,0,0,0,0,0,1,0,0,0),
+    c(10,1,0,0,1,1,1,1,1,0,0,0),c(10,2,0,0,0,0,0,0,0,0,0,0)
+    )
+
+colnames(mymat) <- c("ID", "sched", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10")
+mymat <- as.data.frame(mymat)
+mymat$sched <- factor(mymat$sched,levels = c(1,2), labels = c("Expected", "Actual"))
+
+library(TraMineR)
+
+# make sequence object
+labels <- c("working", "not working")
+scode <- c("W", "N")
+seq <- seqdef(mymat, 3:12, states = scode, labels = labels)
+
+# sequence index plot
+seqIplot(seq, with.legend = T, main = "Expected and Actual Work Schedules of 5 People",border = NA)
+
+# calculate dynamic hamming distances for every possible pair
+distmat <- seqdist(seq, method = "DHD", indel = 1, sm = NULL)
+
+# extract the elements just below the main diagonal
+low <- 1
+high <- 1
+delta <- row(distmat) - col(distmat)
+distmat[delta < low | delta > high] <- NA
+distvec <- na.omit(as.data.frame(distmat[delta >= low | delta <= high]))
+#repeat the last entry
+distvec <- rbind(distvec,tail(distvec, n=1))
+
+#attach the off diagonal to the data frame
+colnames(distvec) <- "dist"
+mymat <- cbind(mymat,distvec)
+
+
+Dr. Jeremy Reynolds
+Professor
+307 Stone Hall
+Department of Sociology
+700 W. State Street
+Purdue University
+West Lafayette, IN 47907
+Phone: (765) 496-3348
+https://cla.purdue.edu/directory/profiles/jeremy-reynolds.html
+Pronouns: he/him/his
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20200207/43d3f8cb/attachment.html>
+
+From hcommenges at parisgeo.cnrs.fr  Sun Feb  9 18:00:00 2020
+From: hcommenges at parisgeo.cnrs.fr (Hadrien Commenges)
+Date: Sun, 9 Feb 2020 18:00:00 +0100 (CET)
+Subject: [Traminer-users] within dyad distances
+In-Reply-To: <BN6PR2201MB10129F3D9A89442ECADCBF68FF1C0@BN6PR2201MB1012.namprd22.prod.outlook.com>
+References: <BN6PR2201MB10129F3D9A89442ECADCBF68FF1C0@BN6PR2201MB1012.namprd22.prod.outlook.com>
+Message-ID: <1261550400.290916.1581267600616.JavaMail.zimbra@parisgeo.cnrs.fr>
+
+I don't know if there is an easier way, already implemented in the Traminer package, but a base-R solution would be: 
+
+1. splitting your data - split() - and get the results in a list, each slot of the list storing one individual's sequences 
+2. applying a function to each slot of the list with lapply() to compute the distances for each individual 
+
+If you do that, it is also very easy to compute with multiple cores using mclapply() instead of lapply(). 
+
+Regards, 
+
+Hadrien 
+
+
+De: "Reynolds, Jeremy E" <reyno113 at purdue.edu> 
+À: "traminer-users" <traminer-users at lists.r-forge.r-project.org> 
+Envoyé: Vendredi 7 Février 2020 19:05:01 
+Objet: [Traminer-users] within dyad distances 
+
+
+
+Dear Traminer Users, 
+
+
+
+I would like to compute distances between sequences that belong to the same person for every person in my data. 
+
+The code below seems to work: it calculates the distances between the expected and actual work schedule for each of the 10 people in the data. 
+
+
+
+My code, however, is terribly inefficient. For instance, it calculates the entire pairwise distance matrix and then overwrites most of it with NA. 
+
+This leaves me with two questions: 
+
+
+
+1) Does Traminer have a way to calculate just the distances between sequences that below to the same person? 
+
+(e.g., with clever use of the refseq option in the seqdist command or with the seqdistmc command for multi-channel sequence analysis) 
+
+
+
+2) Is there a way to extract the elements just below the diagonal without overwriting all the other values with NA? 
+
+
+
+Thanks, 
+
+
+
+Jeremy 
+
+
+
+
+
+mymat <- rbind( 
+
+c(1,1,0,0,1,1,1,1,1,0,0,0),c(1,2,0,0,1,1,1,1,1,1,0,0), 
+
+c(2,1,0,0,1,1,1,1,1,0,0,0),c(2,2,0,0,1,1,1,1,1,1,1,0), 
+
+c(3,1,0,0,1,1,1,1,1,0,0,0),c(3,2,0,0,1,1,1,1,1,1,1,1), 
+
+c(4,1,0,0,1,1,1,1,1,0,0,0),c(4,2,0,1,1,1,1,1,1,0,0,0), 
+
+c(5,1,0,0,1,1,1,1,1,0,0,0),c(5,2,1,1,1,1,1,1,1,0,0,0), 
+
+c(6,1,0,0,1,1,1,1,1,0,0,0),c(6,2,0,0,0,1,1,1,1,0,0,0), 
+
+c(7,1,0,0,1,1,1,1,1,0,0,0),c(7,2,0,0,0,0,1,1,1,0,0,0), 
+
+c(8,1,0,0,1,1,1,1,1,0,0,0),c(8,2,0,0,0,0,0,1,1,0,0,0), 
+
+c(9,1,0,0,1,1,1,1,1,0,0,0),c(9,2,0,0,0,0,0,0,1,0,0,0), 
+
+c(10,1,0,0,1,1,1,1,1,0,0,0),c(10,2,0,0,0,0,0,0,0,0,0,0) 
+
+) 
+
+
+
+colnames(mymat) <- c("ID", "sched", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10") 
+
+mymat <- as.data.frame(mymat) 
+
+mymat$sched <- factor(mymat$sched,levels = c(1,2), labels = c("Expected", "Actual")) 
+
+
+
+library(TraMineR) 
+
+
+
+# make sequence object 
+
+labels <- c("working", "not working") 
+
+scode <- c("W", "N") 
+
+seq <- seqdef(mymat, 3:12, states = scode, labels = labels) 
+
+
+
+# sequence index plot 
+
+seqIplot(seq, with.legend = T, main = "Expected and Actual Work Schedules of 5 People",border = NA) 
+
+
+
+# calculate dynamic hamming distances for every possible pair 
+
+distmat <- seqdist(seq, method = "DHD", indel = 1, sm = NULL) 
+
+
+
+# extract the elements just below the main diagonal 
+
+low <- 1 
+
+high <- 1 
+
+delta <- row(distmat) - col(distmat) 
+
+distmat[delta < low | delta > high] <- NA 
+
+distvec <- na.omit(as.data.frame(distmat[delta >= low | delta <= high])) 
+
+#repeat the last entry 
+
+distvec <- rbind(distvec,tail(distvec, n=1)) 
+
+
+
+#attach the off diagonal to the data frame 
+
+colnames(distvec) <- "dist" 
+
+mymat <- cbind(mymat,distvec) 
+
+
+
+
+
+
+
+Dr. Jeremy Reynolds 
+
+Professor 
+
+307 Stone Hall 
+
+Department of Sociology 
+
+700 W. State Street 
+
+Purdue University 
+
+West Lafayette, IN 47907 
+
+Phone: (765) 496-3348 
+
+[ https://cla.purdue.edu/directory/profiles/jeremy-reynolds.html | https://cla.purdue.edu/directory/profiles/jeremy-reynolds.html ] 
+
+
+Pronouns: he/him/his 
+
+
+
+_______________________________________________ 
+Traminer-users mailing list 
+Traminer-users at lists.r-forge.r-project.org 
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20200209/0396ac14/attachment.html>
+

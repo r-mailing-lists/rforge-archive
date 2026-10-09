@@ -1,0 +1,171 @@
+{
+  "list": "monetr-users",
+  "description": "",
+  "month": "2013-07",
+  "messages": [
+    {
+      "id": "msg-c7d227f3febf",
+      "message_id": "<B3AB9E6A-3BD1-4CF5-A962-AB16FFFE9536@cwi.nl>",
+      "from_name": "Hannes Mühleisen",
+      "from_email_hash": "d3122d45e9aa5c38f673c9db837160d2fdd304cd87e3fe84d7d8c67466af3258",
+      "date": "2013-07-11T16:43:32Z",
+      "subject": "[Monetr-users] MonetDB.R v. 0.7 now on CRAN",
+      "subject_clean": "[Monetr-users] MonetDB.R v. 0.7 now on CRAN",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hello MonetDB.R enthusiasts (Thomas and Anthony),\n\nI just published version 0.7 of the connector on CRAN.\n\nBest,\n\nHannes\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: smime.p7s\nType: application/pkcs7-signature\nSize: 4154 bytes\nDesc: not available\nURL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20130711/fd6388d7/attachment.bin>",
+      "body_snippet": "Hello MonetDB.R enthusiasts (Thomas and Anthony),\n\nI just published version 0.7 of the connector on CRAN.\n\nBest,\n\nHannes\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\n",
+      "thread_id": "thread-c7d227f3febf",
+      "thread_depth": 0,
+      "month": "2013-07"
+    },
+    {
+      "id": "msg-280fb7f31be1",
+      "message_id": "<20130723122427.B3C61183B43@r-forge.r-project.org>",
+      "from_name": "noreply at r-forge.r-project.org",
+      "from_email_hash": "117f9a174fb9d2abc5fc8b691e4b85e4b2352ada0cc1b10a86ecc7e642613027",
+      "date": "2013-07-23T12:24:27Z",
+      "subject": "[Monetr-users] r87 - in pkg/MonetDB.R: . R",
+      "subject_clean": "[Monetr-users] r87 - in pkg/MonetDB.R: . R",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Author: hannes\nDate: 2013-07-23 14:24:27 +0200 (Tue, 23 Jul 2013)\nNew Revision: 87\n\nModified:\n   pkg/MonetDB.R/DESCRIPTION\n   pkg/MonetDB.R/NEWS\n   pkg/MonetDB.R/R/monetdb.R\nLog:\nanother fetch() bugfix\n\nModified: pkg/MonetDB.R/DESCRIPTION\n===================================================================\n--- pkg/MonetDB.R/DESCRIPTION\t2013-07-23 08:06:42 UTC (rev 86)\n+++ pkg/MonetDB.R/DESCRIPTION\t2013-07-23 12:24:27 UTC (rev 87)\n@@ -1,5 +1,5 @@\n Package: MonetDB.R\n-Version: 0.7.4\n+Version: 0.7.5\n Date: 2013-07-23\n Title: Connect MonetDB to R\n Authors at R: c(person(\"Hannes Muehleisen\", \"Developer\", role = c(\"aut\", \"cre\"),email = \"hannes at cwi.nl\"),\n\nModified: pkg/MonetDB.R/NEWS\n===================================================================\n--- pkg/MonetDB.R/NEWS\t2013-07-23 08:06:42 UTC (rev 86)\n+++ pkg/MonetDB.R/NEWS\t2013-07-23 12:24:27 UTC (rev 87)\n@@ -1,3 +1,6 @@\n+0.7.5\n+- more fetch() fixes\n+\n 0.7.4\n - string to line splitting to c, NA handling to C as well\n \n\nModified: pkg/MonetDB.R/R/monetdb.R\n===================================================================\n--- pkg/MonetDB.R/R/monetdb.R\t2013-07-23 08:06:42 UTC (rev 86)\n+++ pkg/MonetDB.R/R/monetdb.R\t2013-07-23 12:24:27 UTC (rev 87)\n@@ -382,8 +382,8 @@\n   }\n   \n   # now, if our tuple cache in res at env$data does not contain n rows, we have to fetch from server until it does\n-  while (length(res at env$data) < n) {\n-    cresp <- .mapiParseResponse(.mapiRequest(res at env$conn,paste0(\"Xexport \",.mapiLongInt(info$id),\" \", .mapiLongInt(info$index), \" \", .mapiLongInt(max(n,PREFERRED_FETCH_SIZE)))))\n+  if (length(res at env$data) < n) {\n+    cresp <- .mapiParseResponse(.mapiRequest(res at env$conn,paste0(\"Xexport \",.mapiLongInt(info$id),\" \", .mapiLongInt(info$index), \" \", .mapiLongInt(n-length(res at env$data)))))\n \tstopifnot(cresp$type == Q_BLOCK && cresp$rows > 0)\n \t\n \tres at env$data <- c(res at env$data,cresp$tuples)\n@@ -473,8 +473,6 @@\n PROTOCOL_v9 <- 9\n MAX_PACKET_SIZE <- 8192 # determined by fair guessing, haha\n \n-PREFERRED_FETCH_SIZE <- 100\n-\n HASH_ALGOS <- c(\"md5\", \"sha1\", \"crc32\", \"sha256\",\"sha512\")\n \n MSG_REDIRECT <- \"^\"\n@@ -652,9 +650,7 @@\n       env$types\t<- env$dbtypes <- toupper(.mapiParseTableHeader(lines[4]))\n       env$lengths\t<- .mapiParseTableHeader(lines[5])\n \n-\tenv$tuples <-lines[6:length(lines)]\n-\t\t\t\n-\t\t\t  \n+\t  env$tuples <-lines[6:length(lines)]\n       \n       return(env)\n     }\n@@ -668,10 +664,8 @@\n       env$rows\t<- header$rows\n       env$cols\t<- header$cols\n       env$index\t<- header$index\n-\t\tenv$tuples <- lines[2:length(lines)]\n-\t\t\n-\t\t\t  \n-      \n+\t  env$tuples <- lines[2:length(lines)]\n+\n       return(env)\n     }",
+      "body_snippet": "Author: hannes\nDate: 2013-07-23 14:24:27 +0200 (Tue, 23 Jul 2013)\nNew Revision: 87\n\nModified:\n   pkg/MonetDB.R/DESCRIPTION\n   pkg/MonetDB.R/NEWS\n   pkg/MonetDB.R/R/monetdb.R\nLog:\nanother fetch() bugfi",
+      "thread_id": "thread-280fb7f31be1",
+      "thread_depth": 0,
+      "month": "2013-07"
+    },
+    {
+      "id": "msg-fdbacfbb0258",
+      "message_id": "<20130723143946.62688183B35@r-forge.r-project.org>",
+      "from_name": "noreply at r-forge.r-project.org",
+      "from_email_hash": "117f9a174fb9d2abc5fc8b691e4b85e4b2352ada0cc1b10a86ecc7e642613027",
+      "date": "2013-07-23T14:39:46Z",
+      "subject": "[Monetr-users] r88 - pkg/MonetDB.R/src",
+      "subject_clean": "[Monetr-users] r88 - pkg/MonetDB.R/src",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Author: hannes\nDate: 2013-07-23 16:39:45 +0200 (Tue, 23 Jul 2013)\nNew Revision: 88\n\nModified:\n   pkg/MonetDB.R/src/mapisplit.c\nLog:\nchecking if malloc fails\n\nModified: pkg/MonetDB.R/src/mapisplit.c\n===================================================================\n--- pkg/MonetDB.R/src/mapisplit.c\t2013-07-23 12:24:27 UTC (rev 87)\n+++ pkg/MonetDB.R/src/mapisplit.c\t2013-07-23 14:39:45 UTC (rev 88)\n@@ -2,7 +2,9 @@\n #include <Rdefines.h>\n #include <assert.h>\n #include <string.h>\n+#include <errno.h>\n \n+\n typedef enum {\n \tINQUOTES, ESCAPED, NORMAL\n } chrstate;\n@@ -57,7 +59,9 @@\n \t\t\t\tif (chr == ',' || curPos == linelen - 2) {\n \t\t\t\t\tint tokenLen = curPos - tokenStart + 1 - endQuote;\n \t\t\t\t\tchar *valPtr = (char*) malloc(tokenLen * sizeof(char));\n-\n+\t\t\t\t\tif (valPtr == NULL) {\n+\t\t\t\t\t\tprintf(\"malloc() failed. Are you running out of memory? [%s]\\n\", strerror(errno));\n+\t\t\t\t\t}\n \t\t\t\t\tstrncpy(valPtr, val + tokenStart, tokenLen);\n \t\t\t\t\tvalPtr[tokenLen - 1] = '\\0';\n \t\t\t\t\tSEXP colV = VECTOR_ELT(colVec, cCol);\n@@ -69,8 +73,6 @@\n \t\t\t\t\t\tSET_STRING_ELT(colV, cRow, mkChar(valPtr));\n \t\t\t\t\t}\n \n-\n-\n \t\t\t\t\tfree(valPtr);\n \n \t\t\t\t\tcCol++;",
+      "body_snippet": "Author: hannes\nDate: 2013-07-23 16:39:45 +0200 (Tue, 23 Jul 2013)\nNew Revision: 88\n\nModified:\n   pkg/MonetDB.R/src/mapisplit.c\nLog:\nchecking if malloc fails\n\nModified: pkg/MonetDB.R/src/mapisplit.c\n==",
+      "thread_id": "thread-fdbacfbb0258",
+      "thread_depth": 0,
+      "month": "2013-07"
+    },
+    {
+      "id": "msg-95c1262c9b30",
+      "message_id": "<20130723145639.31D45185AE1@r-forge.r-project.org>",
+      "from_name": "noreply at r-forge.r-project.org",
+      "from_email_hash": "117f9a174fb9d2abc5fc8b691e4b85e4b2352ada0cc1b10a86ecc7e642613027",
+      "date": "2013-07-23T14:56:39Z",
+      "subject": "[Monetr-users] r89 - pkg/MonetDB.R/R",
+      "subject_clean": "[Monetr-users] r89 - pkg/MonetDB.R/R",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Author: hannes\nDate: 2013-07-23 16:56:38 +0200 (Tue, 23 Jul 2013)\nNew Revision: 89\n\nModified:\n   pkg/MonetDB.R/R/monetdb.R\nLog:\nrevert one of the c moves due to very little effect\n\nModified: pkg/MonetDB.R/R/monetdb.R\n===================================================================\n--- pkg/MonetDB.R/R/monetdb.R\t2013-07-23 14:39:45 UTC (rev 88)\n+++ pkg/MonetDB.R/R/monetdb.R\t2013-07-23 14:56:38 UTC (rev 89)\n@@ -618,8 +618,8 @@\n \n # determines and partially parses the answer from the server in response to a query\n .mapiParseResponse <- function(response) {\n-  lines <- .Call(\"mapiSplitLines\", response,PACKAGE=\"MonetDB.R\")\n-  #lines <- strsplit(response,\"\\n\",fixed=TRUE,useBytes=TRUE)[[1]]\n+  #lines <- .Call(\"mapiSplitLines\", response,PACKAGE=\"MonetDB.R\")\n+  lines <- strsplit(response,\"\\n\",fixed=TRUE,useBytes=TRUE)[[1]]\n \t\n   \n   typeLine <- lines[[1]]",
+      "body_snippet": "Author: hannes\nDate: 2013-07-23 16:56:38 +0200 (Tue, 23 Jul 2013)\nNew Revision: 89\n\nModified:\n   pkg/MonetDB.R/R/monetdb.R\nLog:\nrevert one of the c moves due to very little effect\n\nModified: pkg/Monet",
+      "thread_id": "thread-95c1262c9b30",
+      "thread_depth": 0,
+      "month": "2013-07"
+    },
+    {
+      "id": "msg-26c29b943c78",
+      "message_id": "<20130723151610.D6DFF185692@r-forge.r-project.org>",
+      "from_name": "noreply at r-forge.r-project.org",
+      "from_email_hash": "117f9a174fb9d2abc5fc8b691e4b85e4b2352ada0cc1b10a86ecc7e642613027",
+      "date": "2013-07-23T15:16:10Z",
+      "subject": "[Monetr-users] r90 - in pkg/MonetDB.R: R src",
+      "subject_clean": "[Monetr-users] r90 - in pkg/MonetDB.R: R src",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Author: hannes\nDate: 2013-07-23 17:16:10 +0200 (Tue, 23 Jul 2013)\nNew Revision: 90\n\nModified:\n   pkg/MonetDB.R/R/monetdb.R\n   pkg/MonetDB.R/src/mapisplit.c\nLog:\nmc\n\nModified: pkg/MonetDB.R/R/monetdb.R\n===================================================================\n--- pkg/MonetDB.R/R/monetdb.R\t2013-07-23 14:56:38 UTC (rev 89)\n+++ pkg/MonetDB.R/R/monetdb.R\t2013-07-23 15:16:10 UTC (rev 90)\n@@ -618,8 +618,8 @@\n \n # determines and partially parses the answer from the server in response to a query\n .mapiParseResponse <- function(response) {\n-  #lines <- .Call(\"mapiSplitLines\", response,PACKAGE=\"MonetDB.R\")\n-  lines <- strsplit(response,\"\\n\",fixed=TRUE,useBytes=TRUE)[[1]]\n+  lines <- .Call(\"mapiSplitLines\", response,PACKAGE=\"MonetDB.R\")\n+  #lines <- strsplit(response,\"\\n\",fixed=TRUE,useBytes=TRUE)[[1]]\n \t\n   \n   typeLine <- lines[[1]]\n\nModified: pkg/MonetDB.R/src/mapisplit.c\n===================================================================\n--- pkg/MonetDB.R/src/mapisplit.c\t2013-07-23 14:56:38 UTC (rev 89)\n+++ pkg/MonetDB.R/src/mapisplit.c\t2013-07-23 15:16:10 UTC (rev 90)\n@@ -4,14 +4,12 @@\n #include <string.h>\n #include <errno.h>\n \n-\n typedef enum {\n \tINQUOTES, ESCAPED, NORMAL\n } chrstate;\n \n char nullstr[] = \"NULL\";\n \n-\n SEXP mapiSplit(SEXP mapiLinesVector, SEXP numCols) {\n \tPROTECT(mapiLinesVector = AS_CHARACTER(mapiLinesVector));\n \n@@ -58,15 +56,22 @@\n \t\t\t\t}\n \t\t\t\tif (chr == ',' || curPos == linelen - 2) {\n \t\t\t\t\tint tokenLen = curPos - tokenStart + 1 - endQuote;\n+\t\t\t\t\tif (tokenLen < 1) {\n+\t\t\t\t\t\tprintf(\"parsing error in '%s'\\n\", val);\n+\t\t\t\t\t\treturn colVec;\n+\t\t\t\t\t}\n \t\t\t\t\tchar *valPtr = (char*) malloc(tokenLen * sizeof(char));\n \t\t\t\t\tif (valPtr == NULL) {\n-\t\t\t\t\t\tprintf(\"malloc() failed. Are you running out of memory? [%s]\\n\", strerror(errno));\n+\t\t\t\t\t\tprintf(\n+\t\t\t\t\t\t\t\t\"malloc() failed. Are you running out of memory? [%s]\\n\",\n+\t\t\t\t\t\t\t\tstrerror(errno));\n+\t\t\t\t\t\treturn colVec;\n \t\t\t\t\t}\n \t\t\t\t\tstrncpy(valPtr, val + tokenStart, tokenLen);\n \t\t\t\t\tvalPtr[tokenLen - 1] = '\\0';\n \t\t\t\t\tSEXP colV = VECTOR_ELT(colVec, cCol);\n \n-\t\t\t\t\tif (strcmp(valPtr,nullstr) == 0) {\n+\t\t\t\t\tif (strcmp(valPtr, nullstr) == 0) {\n \t\t\t\t\t\tSET_STRING_ELT(colV, cRow, NA_STRING);\n \n \t\t\t\t\t} else {",
+      "body_snippet": "Author: hannes\nDate: 2013-07-23 17:16:10 +0200 (Tue, 23 Jul 2013)\nNew Revision: 90\n\nModified:\n   pkg/MonetDB.R/R/monetdb.R\n   pkg/MonetDB.R/src/mapisplit.c\nLog:\nmc\n\nModified: pkg/MonetDB.R/R/monetdb.R",
+      "thread_id": "thread-26c29b943c78",
+      "thread_depth": 0,
+      "month": "2013-07"
+    },
+    {
+      "id": "msg-ee367ddc26d5",
+      "message_id": "<CAFm_RRZH6ud5t=_pfGdxN4nw68Vmu60yBRnnKegAy20_6xv4fQ@mail.gmail.com>",
+      "from_name": "Enzo Martoglio",
+      "from_email_hash": "a3f6958a8cd62f644cff2f79940a365ef00ac431b50d2120e4630abf8c7fd2e9",
+      "date": "2013-07-31T22:02:26Z",
+      "subject": "[Monetr-users] Problems with MonetDB.R",
+      "subject_clean": "[Monetr-users] Problems with MonetDB.R",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi\nI've an Apple mac and I've installed monetdb with homebrew.\n\nHomebrew install monetdb in /usr/local/Cellar/monetdb, then a symlink is\ncreated in /usr/local/bin\n\nBecause of this, monetdb.server.setup fails, because /usr/local/bin/monetdb\n connects to /usr/local/Cellar/monetdb/11.15.11/bin/monetdb but you further\nadd bin to it, which do not exist.\nThis is in\nmcl <- file.path( monetdb.program.path , \"bin\" )\n\nAs a matter of fact, I've modified the above line and executed\nserver.setup, but then things get complex when the sh file is created with\nwrong addresses etc...\n\nA solution compatible with homebrew would be very welcome.\n\nThanks\n\nEnzo\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20130731/2854ef21/attachment.html>",
+      "body_snippet": "Hi\nI've an Apple mac and I've installed monetdb with homebrew.\n\nHomebrew install monetdb in /usr/local/Cellar/monetdb, then a symlink is\ncreated in /usr/local/bin\n\nBecause of this, monetdb.server.setu",
+      "thread_id": "thread-ee367ddc26d5",
+      "thread_depth": 0,
+      "month": "2013-07"
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-c7d227f3febf",
+      "subject": "[Monetr-users] MonetDB.R v. 0.7 now on CRAN",
+      "message_count": 1,
+      "participants": [
+        "Hannes Mühleisen"
+      ],
+      "started": "2013-07-11T16:43:32Z",
+      "last_reply": "2013-07-11T16:43:32Z",
+      "root_message_id": "msg-c7d227f3febf"
+    },
+    {
+      "id": "thread-280fb7f31be1",
+      "subject": "[Monetr-users] r87 - in pkg/MonetDB.R: . R",
+      "message_count": 1,
+      "participants": [
+        "noreply at r-forge.r-project.org"
+      ],
+      "started": "2013-07-23T12:24:27Z",
+      "last_reply": "2013-07-23T12:24:27Z",
+      "root_message_id": "msg-280fb7f31be1"
+    },
+    {
+      "id": "thread-fdbacfbb0258",
+      "subject": "[Monetr-users] r88 - pkg/MonetDB.R/src",
+      "message_count": 1,
+      "participants": [
+        "noreply at r-forge.r-project.org"
+      ],
+      "started": "2013-07-23T14:39:46Z",
+      "last_reply": "2013-07-23T14:39:46Z",
+      "root_message_id": "msg-fdbacfbb0258"
+    },
+    {
+      "id": "thread-95c1262c9b30",
+      "subject": "[Monetr-users] r89 - pkg/MonetDB.R/R",
+      "message_count": 1,
+      "participants": [
+        "noreply at r-forge.r-project.org"
+      ],
+      "started": "2013-07-23T14:56:39Z",
+      "last_reply": "2013-07-23T14:56:39Z",
+      "root_message_id": "msg-95c1262c9b30"
+    },
+    {
+      "id": "thread-26c29b943c78",
+      "subject": "[Monetr-users] r90 - in pkg/MonetDB.R: R src",
+      "message_count": 1,
+      "participants": [
+        "noreply at r-forge.r-project.org"
+      ],
+      "started": "2013-07-23T15:16:10Z",
+      "last_reply": "2013-07-23T15:16:10Z",
+      "root_message_id": "msg-26c29b943c78"
+    },
+    {
+      "id": "thread-ee367ddc26d5",
+      "subject": "[Monetr-users] Problems with MonetDB.R",
+      "message_count": 1,
+      "participants": [
+        "Enzo Martoglio"
+      ],
+      "started": "2013-07-31T22:02:26Z",
+      "last_reply": "2013-07-31T22:02:26Z",
+      "root_message_id": "msg-ee367ddc26d5"
+    }
+  ]
+}

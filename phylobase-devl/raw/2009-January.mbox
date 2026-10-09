@@ -1,0 +1,738 @@
+From hlapp at duke.edu  Thu Jan  1 19:15:08 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Thu, 1 Jan 2009 13:15:08 -0500
+Subject: [Phylobase-devl] where are we??
+In-Reply-To: <A3DE9B78-FD0B-4D6C-BBA0-919E2A726B6D@berkeley.edu>
+References: <A3DE9B78-FD0B-4D6C-BBA0-919E2A726B6D@berkeley.edu>
+Message-ID: <C8E56A0F-BC99-47A0-9F78-31F97E9F1968@duke.edu>
+
+
+On Dec 30, 2008, at 10:27 PM, Peter Cowan wrote:
+
+>
+> On Dec 30, 2008, at 4:18 PM, Marguerite Butler wrote:
+>> [...]
+>> On Dec 30, 2008, at 10:29 AM, Ben Bolker wrote:
+>> [...]
+>
+> [...]
+> My attitude is that users will interact with the package through
+> accessors.  We can write accessors to get the data out in anyway users
+> want.  I see that as a key advantage of the package
+
+I would fully agree with that.
+
+> [...]
+> However, I see phylobase as intended for more than just comparative
+> methods, rather for any R programming involving phylogenetic trees.
+> For that reason, I think it's worth the effort to support unrooted
+> trees.
+
+Fully agree with this viewpoint, too. There are more uses of R in  
+phylogenetic analysis than comparative methods, and it'd be really  
+nice if phylobase could provide a useful basis for those too.
+
+As for deferring or voting, I don't think I should (be entitled to)  
+vote here. So I'm just throwing in my $0.02 from the sidelines.  
+Generally speaking, don't be afraid to make decisions even if there  
+isn't clear consensus. Making the "wrong" decision, if it turns out  
+that way later when it needs to be revised, can still (at least  
+eventually) make the code better than making no decision.
+
+	-hilmar
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+
+From Emmanuel.Paradis at mpl.ird.fr  Mon Jan  5 15:53:49 2009
+From: Emmanuel.Paradis at mpl.ird.fr (Emmanuel Paradis)
+Date: Mon, 05 Jan 2009 15:53:49 +0100
+Subject: [Phylobase-devl] edge matrix ordering in phylobase and ape
+In-Reply-To: <495A8727.1040501@ufl.edu>
+References: <495A8727.1040501@ufl.edu>
+Message-ID: <49621EFD.6000704@mpl.ird.fr>
+
+Ben,
+
+I suggest solution "a." in all cases.
+
+Currently the attr(, "order") is not enforced in ape, but in practice I 
+found only "cladewise" and "pruningwise" to be useful. Thus the likely 
+evolution is that this attribute will be generalised and set whenever 
+possible, but still leaving the possibility of it being NULL or another 
+value.
+
+Yes, "pruningwise" order is not postorder but 'bottom-up order'; it 
+seems that both orders are suitable for pruning calculations. It's not 
+excluded to change in the future, but bottom-up order works well for the 
+moment. So if "postorder" in "phylo4" is a genuine postorder, then 
+setting "unknown" when importing an object of class "phylo" in 
+"pruningwise" order seems safer.
+
+About the bug you mention below, it's because the code of reorder.phylo 
+needs to be improved. reorder(x, "cladewise") seems pretty robust, but 
+not so for "pruningwise" (which is called by plot.phylo). So you may fix 
+your permtree() with:
+
+permtree <- function(phy) {
+   phy$edge <- phy$edge[sample(nrow(phy$edge)),]
+   reorder(phy)
+}
+
+AFAIK, this is not much a problem in practice, but I'll fix the problem 
+in reorder.phylo().
+
+Best wishes for 2009.
+
+Emmanuel
+
+Le 30.12.2008 21:40, Ben Bolker a ?crit :
+>   Emmanuel, [cc'd to phylobase devel list]
+> 
+>   we (the phylobase group) are having some discussions about
+> edge matrix ordering.  The parts about what is safe (and not
+> safe) to import from/export to ape would benefit from your
+> input.
+> 
+>    At the moment our rules for edge matrix ordering
+> in phylobase are that any order is allowed (nominally the
+> same as in ape, although see below).  Node ID numbers must
+> follow the same rule as in ape (1:m are tips, m+1 is the
+> root if there is one, m+2 ... m+n are internal).
+> The phylo4[d] object also has an additional slot describing
+> the order, which (at the moment) can be "unknown" (default),
+> "preorder" (="cladewise" in ape) or "postorder" (almost="pruningwise"
+> in ape).  We are somewhat divided about what to do on import from/
+> export to ape.
+> 
+>   import:
+>    if $order is NULL in the phylo object (i.e., not explicitly
+> specified):
+>      a. set @order to "unknown" (most conservative)
+>      b. set @order to "cladewise" (probably true by default
+>           since things break in ape otherwise?  see below)
+> 
+>   if $order=="cladewise"
+>      set @order to "preorder" (a no-brainer)
+> 
+>   if $order=="pruningwise"
+>      a. set to "unknown" (at the moment we don't allow "pruningwise")
+>         [this loses information]
+>      b. set to "postorder" (not really true!)
+>      c. allow "pruningwise" as an option in phylobase
+> 
+>   export:
+>     if @order is "unknown"
+>      a. don't rearrange edge matrix (allows flexibility in edge matrix
+> ordering  -- e.g. some packages other than ape might explicitly want
+> non-cladewise ordering -- but dangerous since such trees can crash
+> plot.tree).  Leave $order NULL
+>      b. enforce preorder/cladewise ordering (safer -- but makes
+> it hard to export trees in any other order
+>         b1. set $order to "cladewise"
+>         b2. leave $order NULL
+> 
+>   b1 will break round-trip capability
+> (i.e.  identical(phy,as(as(phy,"phylo4"),"phylo")) will be FALSE) even
+> for trees that start out cladewise ordering but with $order NULL
+> 
+>   What do you think??
+> 
+> ---------------
+>    The ape nodeId rules (which we do follow) are (tips, int.nodes); the
+> ape API <ape.mpl.ird.fr/misc/FormatTreeR_28July2008.pdf> says
+> "There is no mandatory order for the rows of edge, but they may be
+> arranged in a way that is efficient for computation and manipulation.",
+> but I have some reason to suspect that's not true.  For example, this code
+> 
+> library(ape)
+> example("read.tree")
+> set.seed(1001)
+> tt <- tree.owls
+> 
+> permtree <- function(phy) {
+>   phy$edge <- phy$edge[sample(nrow(phy$edge)),]
+>   phy
+> }
+> 
+> for (i in 1:40) {
+>   cat(i,"\n")
+>   ttp <- permtree(tt)
+>   plot(ttp)
+> }
+> 
+>   hangs R in an infinite loop on the second try ...
+>   I don't know whether pruningwise (or anything other
+> than cladewise will do it) ...
+> 
+
+-- 
+Emmanuel Paradis
+IRD, Montpellier, France
+   ph: +33 (0)4 67 16 64 47
+  fax: +33 (0)4 67 16 64 40
+http://ape.mpl.ird.fr/
+
+From bolker at ufl.edu  Wed Jan 14 21:58:16 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Wed, 14 Jan 2009 15:58:16 -0500
+Subject: [Phylobase-devl] stalled ...
+Message-ID: <496E51E8.7090707@ufl.edu>
+
+
+  So -- where are we?
+
+  From before:
+
+> 1. merge my branch (with the aforementioned controversial
+> ordering)  {Peter, can you help with this if/when we
+> decide to go for it?}
+
+  DONE.
+
+> 2. see what we can do to detect & fix problems with unrooted trees:
+> this includes a lot of Steve's "to do" list (sorting out nodeId,
+> nNode, etc.)
+
+  ???
+>
+> 3. fix problems in node labeling on plots that stem from
+> the change in edge matrix format (Peter may already have a fix
+> for this but was waiting on other changes)
+
+   DONE.
+>
+> 4.  PDC proposes that we change the NA in the root-node-row
+> to (-1) instead; I propose that we add a "dropRoot" function
+> (which just operates on a raw edge matrix, not on a phylo4
+> object) to abstract the operation of dropping the appropriate
+> row (essentially substituting for places where we have na.omit
+> or edge[!is.na(edge[,1]),] in the code now
+
+  NA to -1 switch not made.
+  edges now has a drop.root argument (default = FALSE) that
+should do this.
+
+>
+> 5. make the naming-convention changes as recommended
+
+  NOT DONE.  Volunteers?  Francois wanted some plurals to
+be kept ...
+
+>
+> 6. with some input from Emmanuel, implement SOME form of
+> checking/consistency rule for ordering when importing/exporting
+> from/to ape
+
+   NOT DONE. Volunteers?
+>
+>   I propose that we DELAY:
+>
+> 1. updating ncl to the newer version (unless Brian has this
+> all ready to go)
+
+  AGREED.
+
+>
+> 2. adding metadata/annotation slots, although if we know
+> their GENERAL form it would be nice to add them to phylo4[d]
+> objects now because adding slots later breaks backward compatibility
+> of saved objects (but we may just have to bite the bullet and
+> do it later).  In particular if these were slots of type list()
+> we could be vague about what we were going to put in (at the
+> cost of less-strong typing of the objects)
+
+  Could add as list() if we can agree on names for the slots,
+how many.
+
+  PS: if someone wants to take a look at the "hard way" simulator
+code in section 9 of the vignette and suggest ways that this could
+be done more easily (possibly by adding convenience functions and/or
+accessors that do the hard work), please feel free ...
+
+From steve.kembel at gmail.com  Thu Jan 15 20:54:40 2009
+From: steve.kembel at gmail.com (Steven Kembel)
+Date: Thu, 15 Jan 2009 11:54:40 -0800
+Subject: [Phylobase-devl] stalled ...
+In-Reply-To: <496E51E8.7090707@ufl.edu>
+References: <496E51E8.7090707@ufl.edu>
+Message-ID: <44434E22-4910-48F4-B485-BBCCEBB1615F@gmail.com>
+
+Hi Ben,
+
+>> 2. see what we can do to detect & fix problems with unrooted trees:
+>> this includes a lot of Steve's "to do" list (sorting out nodeId,
+>> nNode, etc.)
+>
+>  ???
+
+I can look at this but probably won't get a chance to do so for a week  
+if anyone else wants to tackle it. If we've settled on the nodeId/edge  
+order question it should just be a matter of checking things like  
+nNode in construction and print methods to make sure they work with  
+unrooted trees.
+
+>> 6. with some input from Emmanuel, implement SOME form of
+>> checking/consistency rule for ordering when importing/exporting
+>> from/to ape
+>
+>   NOT DONE. Volunteers?
+
+It sounded like pruningwise is maybe subtly different than preorder so  
+not sure what to do on import from ape but for export to ape can we  
+simply reorder the tree preorder?
+
+>> 2. adding metadata/annotation slots, although if we know
+>> their GENERAL form it would be nice to add them to phylo4[d]
+>> objects now because adding slots later breaks backward compatibility
+>> of saved objects (but we may just have to bite the bullet and
+>> do it later).  In particular if these were slots of type list()
+>> we could be vague about what we were going to put in (at the
+>> cost of less-strong typing of the objects)
+>
+>  Could add as list() if we can agree on names for the slots,
+> how many.
+
+I think a single @metadata slot should be enough, if it's a list we  
+can put whatever else we want in there in the future. An annotation  
+slot is tricky, if annotations are going to be attached to nodes/edges  
+they can be phylo4d data, but if they apply to the whole tree they can  
+be metadata, so just a @metadata slot may be enough?
+
+
+From hlapp at duke.edu  Thu Jan 15 21:43:44 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Thu, 15 Jan 2009 15:43:44 -0500
+Subject: [Phylobase-devl] stalled ...
+In-Reply-To: <44434E22-4910-48F4-B485-BBCCEBB1615F@gmail.com>
+References: <496E51E8.7090707@ufl.edu>
+	<44434E22-4910-48F4-B485-BBCCEBB1615F@gmail.com>
+Message-ID: <5D542605-7057-457E-95B9-A2AE13B41140@duke.edu>
+
+
+On Jan 15, 2009, at 2:54 PM, Steven Kembel wrote:
+
+> I think a single @metadata slot should be enough, if it's a list we
+> can put whatever else we want in there in the future. An annotation
+> slot is tricky, if annotations are going to be attached to nodes/edges
+> they can be phylo4d data, but if they apply to the whole tree they can
+> be metadata, so just a @metadata slot may be enough?
+
+
+Would you propose to do the same for none and edge metadata? (Hmm -  
+but there are no node and edge objects, right? So would these need to  
+be indexed in an array of lists?)
+
+	-hilmar
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+
+From bolker at ufl.edu  Thu Jan 15 22:39:04 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Thu, 15 Jan 2009 16:39:04 -0500
+Subject: [Phylobase-devl] stalled ...
+In-Reply-To: <5D542605-7057-457E-95B9-A2AE13B41140@duke.edu>
+References: <496E51E8.7090707@ufl.edu>
+	<44434E22-4910-48F4-B485-BBCCEBB1615F@gmail.com>
+	<5D542605-7057-457E-95B9-A2AE13B41140@duke.edu>
+Message-ID: <496FACF8.80507@ufl.edu>
+
+Hilmar Lapp wrote:
+> On Jan 15, 2009, at 2:54 PM, Steven Kembel wrote:
+> 
+>> I think a single @metadata slot should be enough, if it's a list we
+>> can put whatever else we want in there in the future. An annotation
+>> slot is tricky, if annotations are going to be attached to nodes/edges
+>> they can be phylo4d data, but if they apply to the whole tree they can
+>> be metadata, so just a @metadata slot may be enough?
+> 
+> 
+> Would you propose to do the same for none and edge metadata? (Hmm -  
+> but there are no node and edge objects, right? So would these need to  
+> be indexed in an array of lists?)
+> 
+> 	-hilmar
+
+  Annotation for nodes/edges won't work as phylo4d data (at present)
+if it is in a form that can't be squeezed in as a column of a data
+frame.  All the metadata would have to be hiding in the @metadata list.
+Within that list, though, we can be as creative as we want because S4
+doesn't check anything other than the type of the slot by default.
+
+    Ben
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 260 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090115/e53774ca/attachment.pgp 
+
+From pdc at berkeley.edu  Thu Jan 15 23:34:18 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Thu, 15 Jan 2009 14:34:18 -0800
+Subject: [Phylobase-devl] stalled ...
+In-Reply-To: <496E51E8.7090707@ufl.edu>
+References: <496E51E8.7090707@ufl.edu>
+Message-ID: <679EE082-2AB7-48B0-B1CF-7E06DA70D410@berkeley.edu>
+
+
+On Jan 14, 2009, at 12:58 PM, Ben Bolker wrote:
+
+>
+>  So -- where are we?
+
+At this point, I think we should make all the backwards incompatible  
+changes we've been discussing.  Everything else can be deferred as far  
+as I'm concerned.
+
+>  From before:
+>
+>> 1. merge my branch (with the aforementioned controversial
+>> ordering)  {Peter, can you help with this if/when we
+>> decide to go for it?}
+>
+>  DONE.
+>
+>> 2. see what we can do to detect & fix problems with unrooted trees:
+>> this includes a lot of Steve's "to do" list (sorting out nodeId,
+>> nNode, etc.)
+>
+>  ???
+>>
+>> 3. fix problems in node labeling on plots that stem from
+>> the change in edge matrix format (Peter may already have a fix
+>> for this but was waiting on other changes)
+>
+>   DONE.
+>>
+>> 4.  PDC proposes that we change the NA in the root-node-row
+>> to (-1) instead; I propose that we add a "dropRoot" function
+>> (which just operates on a raw edge matrix, not on a phylo4
+>> object) to abstract the operation of dropping the appropriate
+>> row (essentially substituting for places where we have na.omit
+>> or edge[!is.na(edge[,1]),] in the code now
+>
+>  NA to -1 switch not made.
+>  edges now has a drop.root argument (default = FALSE) that
+> should do this.
+
+I'd still rather have -1 than NA, there are cases when have the NA is  
+a problem but it's useful to have an nrow(edge) == nNodes().  Is there  
+a reason for keeping NA aside from inertia?
+
+>>
+>> 5. make the naming-convention changes as recommended
+>
+>  NOT DONE.  Volunteers?  Francois wanted some plurals to
+> be kept ...
+
+I think this should be a priority.  Nothing is worse than having  
+commands "disappear" when updating to a new version.  So before we  
+release an 'official' version we should pick final names.
+
+>> 6. with some input from Emmanuel, implement SOME form of
+>> checking/consistency rule for ordering when importing/exporting
+>> from/to ape
+>
+>   NOT DONE. Volunteers?
+
+I'd be okay with deferring this.  It won't be surprising to users if  
+we make this better in the future right?
+
+>>  I propose that we DELAY:
+>>
+>> 1. updating ncl to the newer version (unless Brian has this
+>> all ready to go)
+>
+>  AGREED.
+
+Also agreed
+
+>>
+>> 2. adding metadata/annotation slots, although if we know
+>> their GENERAL form it would be nice to add them to phylo4[d]
+>> objects now because adding slots later breaks backward compatibility
+>> of saved objects (but we may just have to bite the bullet and
+>> do it later).  In particular if these were slots of type list()
+>> we could be vague about what we were going to put in (at the
+>> cost of less-strong typing of the objects)
+>
+>  Could add as list() if we can agree on names for the slots,
+> how many.
+>
+
+I'd be okay with deferring this as well.  This is an enhancement that  
+won't break older code right?
+
+>  PS: if someone wants to take a look at the "hard way" simulator
+> code in section 9 of the vignette and suggest ways that this could
+> be done more easily (possibly by adding convenience functions and/or
+> accessors that do the hard work), please feel free ...
+
+I can take a look at this, sometime next week probably.  We should  
+also decide how we are going to handle newlines for the vignette.  I  
+think that I've been soft wrapping and Ben has been hard wrapping,  
+which causes havoc with svn.  Do you have a preference Ben?
+
+Cheers
+
+Peter
+>
+
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From bolker at ufl.edu  Fri Jan 16 04:30:34 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Thu, 15 Jan 2009 22:30:34 -0500
+Subject: [Phylobase-devl] stalled ...
+In-Reply-To: <679EE082-2AB7-48B0-B1CF-7E06DA70D410@berkeley.edu>
+References: <496E51E8.7090707@ufl.edu>
+	<679EE082-2AB7-48B0-B1CF-7E06DA70D410@berkeley.edu>
+Message-ID: <496FFF5A.3060302@ufl.edu>
+
+Peter Cowan wrote:
+> On Jan 14, 2009, at 12:58 PM, Ben Bolker wrote:
+> 
+>>  So -- where are we?
+> 
+> At this point, I think we should make all the backwards incompatible  
+> changes we've been discussing.  Everything else can be deferred as far  
+> as I'm concerned.
+> 
+>>  From before:
+>>
+>>> 1. merge my branch (with the aforementioned controversial
+>>> ordering)  {Peter, can you help with this if/when we
+>>> decide to go for it?}
+>>  DONE.
+>>
+>>> 2. see what we can do to detect & fix problems with unrooted trees:
+>>> this includes a lot of Steve's "to do" list (sorting out nodeId,
+>>> nNode, etc.)
+>>  ???
+>>> 3. fix problems in node labeling on plots that stem from
+>>> the change in edge matrix format (Peter may already have a fix
+>>> for this but was waiting on other changes)
+>>   DONE.
+>>> 4.  PDC proposes that we change the NA in the root-node-row
+>>> to (-1) instead; I propose that we add a "dropRoot" function
+>>> (which just operates on a raw edge matrix, not on a phylo4
+>>> object) to abstract the operation of dropping the appropriate
+>>> row (essentially substituting for places where we have na.omit
+>>> or edge[!is.na(edge[,1]),] in the code now
+>>  NA to -1 switch not made.
+>>  edges now has a drop.root argument (default = FALSE) that
+>> should do this.
+> 
+> I'd still rather have -1 than NA, there are cases when have the NA is  
+> a problem but it's useful to have an nrow(edge) == nNodes().  Is there  
+> a reason for keeping NA aside from inertia?
+
+  What are the cases when the NA is a problem?  When you want to
+make comparisons on the whole first column of the matrix?
+
+
+> 
+>>> 5. make the naming-convention changes as recommended
+>>  NOT DONE.  Volunteers?  Francois wanted some plurals to
+>> be kept ...
+> 
+> I think this should be a priority.  Nothing is worse than having  
+> commands "disappear" when updating to a new version.  So before we  
+> release an 'official' version we should pick final names.
+> 
+>>> 6. with some input from Emmanuel, implement SOME form of
+>>> checking/consistency rule for ordering when importing/exporting
+>>> from/to ape
+>>   NOT DONE. Volunteers?
+> 
+> I'd be okay with deferring this.  It won't be surprising to users if  
+> we make this better in the future right?
+
+  On the other hand, it's also pretty easy to do.
+> 
+>>>  I propose that we DELAY:
+>>>
+>>> 1. updating ncl to the newer version (unless Brian has this
+>>> all ready to go)
+>>  AGREED.
+> 
+> Also agreed
+> 
+>>> 2. adding metadata/annotation slots, although if we know
+>>> their GENERAL form it would be nice to add them to phylo4[d]
+>>> objects now because adding slots later breaks backward compatibility
+>>> of saved objects (but we may just have to bite the bullet and
+>>> do it later).  In particular if these were slots of type list()
+>>> we could be vague about what we were going to put in (at the
+>>> cost of less-strong typing of the objects)
+>>  Could add as list() if we can agree on names for the slots,
+>> how many.
+>>
+> 
+> I'd be okay with deferring this as well.  This is an enhancement that  
+> won't break older code right?
+
+  This *will* break older objects (not code) if we add a slot to
+the class definitions.
+
+
+> 
+>>  PS: if someone wants to take a look at the "hard way" simulator
+>> code in section 9 of the vignette and suggest ways that this could
+>> be done more easily (possibly by adding convenience functions and/or
+>> accessors that do the hard work), please feel free ...
+> 
+> I can take a look at this, sometime next week probably.  We should  
+> also decide how we are going to handle newlines for the vignette.  I  
+> think that I've been soft wrapping and Ben has been hard wrapping,  
+> which causes havoc with svn.  Do you have a preference Ben?
+
+  Soft wrapping is fine with me.
+
+  Ben
+
+> 
+> Cheers
+> 
+> Peter
+> 
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 260 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090115/7a14433c/attachment.pgp 
+
+From bolker at ufl.edu  Fri Jan 16 04:31:41 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Thu, 15 Jan 2009 22:31:41 -0500
+Subject: [Phylobase-devl] stalled ...
+In-Reply-To: <44434E22-4910-48F4-B485-BBCCEBB1615F@gmail.com>
+References: <496E51E8.7090707@ufl.edu>
+	<44434E22-4910-48F4-B485-BBCCEBB1615F@gmail.com>
+Message-ID: <496FFF9D.2060704@ufl.edu>
+
+Steven Kembel wrote:
+> Hi Ben,
+> 
+>>> 2. see what we can do to detect & fix problems with unrooted trees:
+>>> this includes a lot of Steve's "to do" list (sorting out nodeId,
+>>> nNode, etc.)
+>>  ???
+> 
+> I can look at this but probably won't get a chance to do so for a week  
+> if anyone else wants to tackle it. If we've settled on the nodeId/edge  
+> order question it should just be a matter of checking things like  
+> nNode in construction and print methods to make sure they work with  
+> unrooted trees.
+
+  You might end up doing it ...
+> 
+>>> 6. with some input from Emmanuel, implement SOME form of
+>>> checking/consistency rule for ordering when importing/exporting
+>>> from/to ape
+>>   NOT DONE. Volunteers?
+> 
+> It sounded like pruningwise is maybe subtly different than preorder so  
+> not sure what to do on import from ape but for export to ape can we  
+> simply reorder the tree preorder?
+> 
+
+  We could choose to allow "pruningwise" as an option (not one we
+generate, but one we allow).
+
+>>> 2. adding metadata/annotation slots, although if we know
+>>> their GENERAL form it would be nice to add them to phylo4[d]
+>>> objects now because adding slots later breaks backward compatibility
+>>> of saved objects (but we may just have to bite the bullet and
+>>> do it later).  In particular if these were slots of type list()
+>>> we could be vague about what we were going to put in (at the
+>>> cost of less-strong typing of the objects)
+>>  Could add as list() if we can agree on names for the slots,
+>> how many.
+> 
+> I think a single @metadata slot should be enough, if it's a list we  
+> can put whatever else we want in there in the future. An annotation  
+> slot is tricky, if annotations are going to be attached to nodes/edges  
+> they can be phylo4d data, but if they apply to the whole tree they can  
+> be metadata, so just a @metadata slot may be enough?
+> 
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+From t.jombart at imperial.ac.uk  Sun Jan 18 20:31:18 2009
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut J X)
+Date: Sun, 18 Jan 2009 19:31:18 -0000
+Subject: [Phylobase-devl] stalled ...
+Message-ID: <E8DD08F33547E54CBE7C124E5C4BAD5003D66691@icex1.ic.ac.uk>
+
+Hi list,
+
+though I have been out for a while, and therefore disconnected from all current concerns, I have found (with the help of Ben) some dumb task that needed attention.
+
+I renamed functions in phylobase (just in /pkg, not in branches) as follows:
+from  ->  to
+attach_data    attachData
+check_data    checkData
+check_phylo4    checkPhylo4
+check_tree    checkTree
+getedges    getEdge
+hasSingles    hasSingle
+
+There are other items in the tracker submitted by Ben:
+http://r-forge.r-project.org/tracker/index.php?func=detail&aid=275&group_id=111&atid=491
+
+As Fran?ois, I prefer nNodes, nTips and nEdges to stay plurial, so I leaved these as they were. Same thing for all 'labels' stuff (e.g. hasNodeLabels).
+
+If there are other renaming to do, please let me know.
+
+Best,
+
+Thibaut.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090118/4a126609/attachment.htm 
+

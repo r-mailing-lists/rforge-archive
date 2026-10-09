@@ -1,0 +1,293 @@
+From anand.chirag at gmail.com  Sat Aug  2 16:07:29 2014
+From: anand.chirag at gmail.com (Chirag Anand)
+Date: Sat, 2 Aug 2014 19:37:29 +0530
+Subject: [Eventstudies-discussion] Class for event time
+Message-ID: <CAOS9=_94eKOWomo0N4WMG=52kqag8GGazsrfL2_+ykFUQaNxhg@mail.gmail.com>
+
+Hello,
+
+The current development version (1.2) deals with event time by taking
+in a data.frame of event (say) dates in the column "when" and the unit
+of observation in "unit". One, this creates a confusion for the user,
+and secondly, it makes harder for the phys2eventtime function to match
+the dates specially when the exact event time is missing from the
+observations.
+
+In my opinion, having event time (event.list object) as a 'zoo' object
+solves the matching problem. The index() of both the zoo objects, the
+actual observations and event list can be used to match using
+findInterval(). Since the class of the event time will be defined,
+there won't be an issue dealing with say intraday or monthly data.
+
+For this, I have thought of two solutions:
+
+1. We keep the current API and ask the users to give us the "when"
+column in the time-based class which defines the index of the main
+object. phy2eventtime converts this to a zoo index directly, thus
+maintaining the original time-based class.
+2. We ask the user to give event.list as a zoo object directly.
+
+The second solution, in my opinion will also eliminate the problem of
+defining "unit" and "when" in the event.list object.
+
+Thanks,
+
+-- 
+Chirag Anand
+http://atvariance.in/chiraganand
+
+From vimsaa at gmail.com  Mon Aug 11 18:49:44 2014
+From: vimsaa at gmail.com (Vimal Balasubramaniam)
+Date: Mon, 11 Aug 2014 17:49:44 +0100
+Subject: [Eventstudies-discussion] Class for event time
+In-Reply-To: <CAOS9=_94eKOWomo0N4WMG=52kqag8GGazsrfL2_+ykFUQaNxhg@mail.gmail.com>
+References: <CAOS9=_94eKOWomo0N4WMG=52kqag8GGazsrfL2_+ykFUQaNxhg@mail.gmail.com>
+Message-ID: <CALeYXtpws8M+0FwpEhLTczk23mqHK9QoEOGP3uMavWMGY=6HLg@mail.gmail.com>
+
+On 2 August 2014 15:07, Chirag Anand <anand.chirag at gmail.com> wrote:
+
+> Hello,
+>
+> The current development version (1.2) deals with event time by taking
+> in a data.frame of event (say) dates in the column "when" and the unit
+> of observation in "unit". One, this creates a confusion for the user,
+> and secondly, it makes harder for the phys2eventtime function to match
+> the dates specially when the exact event time is missing from the
+> observations.
+>
+>
+1. What confusion does this create? Is it confusion because of the column
+name of the events data frame? If so, we could generalise it and let people
+choose whatever they want it to be. Let's just name it 'x' and 'y' where
+'x' refers to a timestamp or the dimension along which an event analysis
+must happen and 'y' being the subject of such analysis. If more users have
+a concern with this, am happy to go along and take suggestions in modifying
+this.
+
+2. When exact event time is missing, the function (as far as I can tell)
+takes the nearest date to match. Perhaps of relevance would be a warning to
+the user at that point when the function takes the nearest match? This has
+been documented appropriately.
+
+
+> In my opinion, having event time (event.list object) as a 'zoo' object
+> solves the matching problem. The index() of both the zoo objects, the
+> actual observations and event list can be used to match using
+> findInterval(). Since the class of the event time will be defined,
+> there won't be an issue dealing with say intraday or monthly data.
+>
+>
+If the trouble is to ensure that class(event.list$when) == class(index(d))
+(the data set), then we could just throw that as a warning? I don't think
+it making it a zoo object helps (if users choose to keep strange class for
+the underlying index(), then there's anyway little we can do) here. We just
+need bells and whistles when such things happen?
+
+
+
+> For this, I have thought of two solutions:
+>
+> 1. We keep the current API and ask the users to give us the "when"
+> column in the time-based class which defines the index of the main
+> object. phy2eventtime converts this to a zoo index directly, thus
+> maintaining the original time-based class.
+>
+
+Sure. Adding a line of code like:
+
+if(class(d)!= class(event.list$when)) stop("Date/Time class for 'd' and
+'event.list$when' do not match.")
+
+will be easier?
+
+
+> 2. We ask the user to give event.list as a zoo object directly.
+>
+> The second solution, in my opinion will also eliminate the problem of
+> defining "unit" and "when" in the event.list object.
+>
+
+Users will have to provide that, no? In some form or the other. While I
+agree that users may find it initially troublesome to work this through, I
+think bells and whistles as to why they may be going to wrong is better
+than making the code more complex in terms of the API.
+
+Just my two cents.
+
+Vimal
+
+
+-- 
+
+Vimal Balasubramaniam
+
++44 755 750 4880
++91 981 829 8975
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/eventstudies-discussion/attachments/20140811/549e8c7c/attachment.html>
+
+From anand.chirag at gmail.com  Sat Aug 16 13:40:14 2014
+From: anand.chirag at gmail.com (Chirag Anand)
+Date: Sat, 16 Aug 2014 17:10:14 +0530
+Subject: [Eventstudies-discussion] Class for event time
+In-Reply-To: <CALeYXtpws8M+0FwpEhLTczk23mqHK9QoEOGP3uMavWMGY=6HLg@mail.gmail.com>
+References: <CAOS9=_94eKOWomo0N4WMG=52kqag8GGazsrfL2_+ykFUQaNxhg@mail.gmail.com>
+ <CALeYXtpws8M+0FwpEhLTczk23mqHK9QoEOGP3uMavWMGY=6HLg@mail.gmail.com>
+Message-ID: <CAOS9=_9TdqoHHfzw3qD5tfaL6RQ8TY0vPO9ukP2uw4YoqKqWZQ@mail.gmail.com>
+
+On 11 August 2014 22:19, Vimal Balasubramaniam <vimsaa at gmail.com> wrote:
+> 1. What confusion does this create? Is it confusion because of the column
+> name of the events data frame? If so, we could generalise it and let people
+> choose whatever they want it to be. Let's just name it 'x' and 'y' where 'x'
+> refers to a timestamp or the dimension along which an event analysis must
+> happen and 'y' being the subject of such analysis. If more users have a
+> concern with this, am happy to go along and take suggestions in modifying
+> this.
+
+A couple of users do have issues with the "when" and "unit" way of
+creating the data frame, they find it confusing. If we do follow "x"
+and "y" way, then we'll have to add another argument to the main
+eventstudy() function and to phys2eventtime(). eventstudy() already
+has a quite a lot of arguments.
+
+Keeping event.list in zoo makes it consistent with the data user is
+supplying, and is in my opinion more intuitive.
+
+> If the trouble is to ensure that class(event.list$when) == class(index(d))
+> (the data set), then we could just throw that as a warning? I don't think it
+> making it a zoo object helps (if users choose to keep strange class for the
+> underlying index(), then there's anyway little we can do) here. We just need
+> bells and whistles when such things happen?
+
+Yes, checking for argument time class makes sense. Throwing a
+warning() in case of no exact match of event time too. Yes, zoo won't
+help much in this case.
+
+>> For this, I have thought of two solutions:
+>>
+>> 1. We keep the current API and ask the users to give us the "when"
+>> column in the time-based class which defines the index of the main
+>> object. phy2eventtime converts this to a zoo index directly, thus
+>> maintaining the original time-based class.
+>
+>
+> Sure. Adding a line of code like:
+>
+> if(class(d)!= class(event.list$when)) stop("Date/Time class for 'd' and
+> 'event.list$when' do not match.")
+>
+> will be easier?
+
+Yes.
+
+>> 2. We ask the user to give event.list as a zoo object directly.
+>>
+>> The second solution, in my opinion will also eliminate the problem of
+>> defining "unit" and "when" in the event.list object.
+>
+>
+> Users will have to provide that, no? In some form or the other. While I
+> agree that users may find it initially troublesome to work this through, I
+> think bells and whistles as to why they may be going to wrong is better than
+> making the code more complex in terms of the API.
+
+Though I agree but I don't think making event.list a zoo object will
+create make API more complex. On the other hand, the way I see it, it
+will help to have event.list object the same class as firm.returns,
+since one can directly index firm.returns to pick out event times.
+
+-- 
+Chirag Anand
+http://atvariance.in/chiraganand
+
+From vimsaa at gmail.com  Sat Aug 16 13:44:48 2014
+From: vimsaa at gmail.com (Vimal Balasubramaniam)
+Date: Sat, 16 Aug 2014 12:44:48 +0100
+Subject: [Eventstudies-discussion] Class for event time
+In-Reply-To: <CAOS9=_9TdqoHHfzw3qD5tfaL6RQ8TY0vPO9ukP2uw4YoqKqWZQ@mail.gmail.com>
+References: <CAOS9=_94eKOWomo0N4WMG=52kqag8GGazsrfL2_+ykFUQaNxhg@mail.gmail.com>
+ <CALeYXtpws8M+0FwpEhLTczk23mqHK9QoEOGP3uMavWMGY=6HLg@mail.gmail.com>
+ <CAOS9=_9TdqoHHfzw3qD5tfaL6RQ8TY0vPO9ukP2uw4YoqKqWZQ@mail.gmail.com>
+Message-ID: <CALeYXtoTjkcmUSCZ3tA0Aygkmr-B5jn53dcxcdWtZiWQfd5hzw@mail.gmail.com>
+
+Sure, I think this sounds good.
+On 16 Aug 2014 12:40, "Chirag Anand" <anand.chirag at gmail.com> wrote:
+
+> On 11 August 2014 22:19, Vimal Balasubramaniam <vimsaa at gmail.com> wrote:
+> > 1. What confusion does this create? Is it confusion because of the column
+> > name of the events data frame? If so, we could generalise it and let
+> people
+> > choose whatever they want it to be. Let's just name it 'x' and 'y' where
+> 'x'
+> > refers to a timestamp or the dimension along which an event analysis must
+> > happen and 'y' being the subject of such analysis. If more users have a
+> > concern with this, am happy to go along and take suggestions in modifying
+> > this.
+>
+> A couple of users do have issues with the "when" and "unit" way of
+> creating the data frame, they find it confusing. If we do follow "x"
+> and "y" way, then we'll have to add another argument to the main
+> eventstudy() function and to phys2eventtime(). eventstudy() already
+> has a quite a lot of arguments.
+>
+> Keeping event.list in zoo makes it consistent with the data user is
+> supplying, and is in my opinion more intuitive.
+>
+> > If the trouble is to ensure that class(event.list$when) ==
+> class(index(d))
+> > (the data set), then we could just throw that as a warning? I don't
+> think it
+> > making it a zoo object helps (if users choose to keep strange class for
+> the
+> > underlying index(), then there's anyway little we can do) here. We just
+> need
+> > bells and whistles when such things happen?
+>
+> Yes, checking for argument time class makes sense. Throwing a
+> warning() in case of no exact match of event time too. Yes, zoo won't
+> help much in this case.
+>
+> >> For this, I have thought of two solutions:
+> >>
+> >> 1. We keep the current API and ask the users to give us the "when"
+> >> column in the time-based class which defines the index of the main
+> >> object. phy2eventtime converts this to a zoo index directly, thus
+> >> maintaining the original time-based class.
+> >
+> >
+> > Sure. Adding a line of code like:
+> >
+> > if(class(d)!= class(event.list$when)) stop("Date/Time class for 'd' and
+> > 'event.list$when' do not match.")
+> >
+> > will be easier?
+>
+> Yes.
+>
+> >> 2. We ask the user to give event.list as a zoo object directly.
+> >>
+> >> The second solution, in my opinion will also eliminate the problem of
+> >> defining "unit" and "when" in the event.list object.
+> >
+> >
+> > Users will have to provide that, no? In some form or the other. While I
+> > agree that users may find it initially troublesome to work this through,
+> I
+> > think bells and whistles as to why they may be going to wrong is better
+> than
+> > making the code more complex in terms of the API.
+>
+> Though I agree but I don't think making event.list a zoo object will
+> create make API more complex. On the other hand, the way I see it, it
+> will help to have event.list object the same class as firm.returns,
+> since one can directly index firm.returns to pick out event times.
+>
+> --
+> Chirag Anand
+> http://atvariance.in/chiraganand
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/eventstudies-discussion/attachments/20140816/dd12c393/attachment.html>
+

@@ -1,0 +1,2408 @@
+From lawrence.michael at gene.com  Tue Oct  5 20:07:23 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 5 Oct 2010 11:07:23 -0700
+Subject: [RQt-devel] layout issues
+Message-ID: <AANLkTi=uB76rFQEJQk8k6WZ8ETkAbuVKpj_VfHRu5WUW@mail.gmail.com>
+
+Looked a bit into the layout issues. I've found that the following script
+gives a fairly desirable result. Forget about the stretch factor stuff for
+now, because unless a maximum or fixed size is set for a row/column, there
+is no guarantee that the row/column will not expand.
+
+library(qtpaint)
+
+fill_painter <- function(color) {
+  function(item, painter) qdrawRect(painter, 0, 0, 1, 1, fill = color)
+}
+
+layout_layer <- function(Color, ...) {
+  qlayer(figLayer, fill_painter(Color), limits = qrect(0, 0, 1, 1), ...)
+}
+
+scene <- qscene()
+figLayer <- qlayer(scene)
+layout <- figLayer$gridLayout()
+
+titleLayer <- layout_layer("red", colSpan = 2)
+yaxisLayer <- layout_layer("blue", row = 1)
+plotLayer <- layout_layer("green", row = 1, col = 1)
+xaxisLayer <- layout_layer("yellow", row = 2, col = 1)
+
+## Set the maximum widths/heights:
+
+layout$setRowMaximumHeight(0, 50)
+layout$setColumnMaximumWidth(0, 50)
+layout$setRowMaximumHeight(2, 50)
+
+## Could use Preferred here, with stretch factor set to zero, but this
+## breaks when a layer spans multiple cells. It is hard to say if this
+## is a bug in Qt, since QGraphicsGridLayout is largely
+## undocumented. QGridLayout says a stretch-zero row/column can grow
+## when no other row/column can grow. Setting a fixed or minimum
+## width/height probably sets undue restrictions on the layout. The
+## user should be able to shrink the window down, even if it is not
+## longer possible to draw the data effectively. Thus, it's probably
+## best to set the maximum.
+
+## It is probably cleaner to set the dimensions directly on the layer:
+## titleLayer$setMaximumHeight(50)
+## xaxisLayer$setMaximumHeight(50)
+## yaxisLayer$setMaximumWidth(50)
+## But this currently crashes due to a (reported) bug in Smoke.
+
+qplotView(scene)
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101005/7969a192/attachment.htm>
+
+From hadley at rice.edu  Tue Oct  5 20:49:24 2010
+From: hadley at rice.edu (Hadley Wickham)
+Date: Tue, 5 Oct 2010 13:49:24 -0500
+Subject: [RQt-devel] layout issues
+In-Reply-To: <AANLkTi=uB76rFQEJQk8k6WZ8ETkAbuVKpj_VfHRu5WUW@mail.gmail.com>
+References: <AANLkTi=uB76rFQEJQk8k6WZ8ETkAbuVKpj_VfHRu5WUW@mail.gmail.com>
+Message-ID: <AANLkTikYEOEY-xGy0F0uXo_QdPs4mpjMn8536f2wK5Av@mail.gmail.com>
+
+Looks good.  Will you add that example to the vignette?
+
+What do you think about moving the currently intro pdf to the wiki?
+
+Hadley
+
+On Tue, Oct 5, 2010 at 1:07 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Looked a bit into the layout issues. I've found that the following script
+> gives a fairly desirable result. Forget about the stretch factor stuff for
+> now, because unless a maximum or fixed size is set for a row/column, there
+> is no guarantee that the row/column will not expand.
+>
+> library(qtpaint)
+>
+> fill_painter <- function(color) {
+> ? function(item, painter) qdrawRect(painter, 0, 0, 1, 1, fill = color)
+> }
+>
+> layout_layer <- function(Color, ...) {
+> ? qlayer(figLayer, fill_painter(Color), limits = qrect(0, 0, 1, 1), ...)
+> }
+>
+> scene <- qscene()
+> figLayer <- qlayer(scene)
+> layout <- figLayer$gridLayout()
+>
+> titleLayer <- layout_layer("red", colSpan = 2)
+> yaxisLayer <- layout_layer("blue", row = 1)
+> plotLayer <- layout_layer("green", row = 1, col = 1)
+> xaxisLayer <- layout_layer("yellow", row = 2, col = 1)
+>
+> ## Set the maximum widths/heights:
+>
+> layout$setRowMaximumHeight(0, 50)
+> layout$setColumnMaximumWidth(0, 50)
+> layout$setRowMaximumHeight(2, 50)
+>
+> ## Could use Preferred here, with stretch factor set to zero, but this
+> ## breaks when a layer spans multiple cells. It is hard to say if this
+> ## is a bug in Qt, since QGraphicsGridLayout is largely
+> ## undocumented. QGridLayout says a stretch-zero row/column can grow
+> ## when no other row/column can grow. Setting a fixed or minimum
+> ## width/height probably sets undue restrictions on the layout. The
+> ## user should be able to shrink the window down, even if it is not
+> ## longer possible to draw the data effectively. Thus, it's probably
+> ## best to set the maximum.
+>
+> ## It is probably cleaner to set the dimensions directly on the layer:
+> ## titleLayer$setMaximumHeight(50)
+> ## xaxisLayer$setMaximumHeight(50)
+> ## yaxisLayer$setMaximumWidth(50)
+> ## But this currently crashes due to a (reported) bug in Smoke.
+>
+> qplotView(scene)
+>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From lawrence.michael at gene.com  Tue Oct  5 20:52:34 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 5 Oct 2010 11:52:34 -0700
+Subject: [RQt-devel] layout issues
+In-Reply-To: <AANLkTikYEOEY-xGy0F0uXo_QdPs4mpjMn8536f2wK5Av@mail.gmail.com>
+References: <AANLkTi=uB76rFQEJQk8k6WZ8ETkAbuVKpj_VfHRu5WUW@mail.gmail.com>
+	<AANLkTikYEOEY-xGy0F0uXo_QdPs4mpjMn8536f2wK5Av@mail.gmail.com>
+Message-ID: <AANLkTikqaLO9OLWJxr9+0nYdeb-NOeCuKuAV35wcwt9j@mail.gmail.com>
+
+On Tue, Oct 5, 2010 at 11:49 AM, Hadley Wickham <hadley at rice.edu> wrote:
+
+> Looks good.  Will you add that example to the vignette?
+>
+>
+The vignette has already been updated with the new understanding.
+
+
+> What do you think about moving the currently intro pdf to the wiki?
+>
+>
+That's fine with me if you know of some clean, automated way of doing it.
+Might be tricky keeping it in sync.
+
+Michael
+
+
+> Hadley
+>
+> On Tue, Oct 5, 2010 at 1:07 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > Looked a bit into the layout issues. I've found that the following script
+> > gives a fairly desirable result. Forget about the stretch factor stuff
+> for
+> > now, because unless a maximum or fixed size is set for a row/column,
+> there
+> > is no guarantee that the row/column will not expand.
+> >
+> > library(qtpaint)
+> >
+> > fill_painter <- function(color) {
+> >   function(item, painter) qdrawRect(painter, 0, 0, 1, 1, fill = color)
+> > }
+> >
+> > layout_layer <- function(Color, ...) {
+> >   qlayer(figLayer, fill_painter(Color), limits = qrect(0, 0, 1, 1), ...)
+> > }
+> >
+> > scene <- qscene()
+> > figLayer <- qlayer(scene)
+> > layout <- figLayer$gridLayout()
+> >
+> > titleLayer <- layout_layer("red", colSpan = 2)
+> > yaxisLayer <- layout_layer("blue", row = 1)
+> > plotLayer <- layout_layer("green", row = 1, col = 1)
+> > xaxisLayer <- layout_layer("yellow", row = 2, col = 1)
+> >
+> > ## Set the maximum widths/heights:
+> >
+> > layout$setRowMaximumHeight(0, 50)
+> > layout$setColumnMaximumWidth(0, 50)
+> > layout$setRowMaximumHeight(2, 50)
+> >
+> > ## Could use Preferred here, with stretch factor set to zero, but this
+> > ## breaks when a layer spans multiple cells. It is hard to say if this
+> > ## is a bug in Qt, since QGraphicsGridLayout is largely
+> > ## undocumented. QGridLayout says a stretch-zero row/column can grow
+> > ## when no other row/column can grow. Setting a fixed or minimum
+> > ## width/height probably sets undue restrictions on the layout. The
+> > ## user should be able to shrink the window down, even if it is not
+> > ## longer possible to draw the data effectively. Thus, it's probably
+> > ## best to set the maximum.
+> >
+> > ## It is probably cleaner to set the dimensions directly on the layer:
+> > ## titleLayer$setMaximumHeight(50)
+> > ## xaxisLayer$setMaximumHeight(50)
+> > ## yaxisLayer$setMaximumWidth(50)
+> > ## But this currently crashes due to a (reported) bug in Smoke.
+> >
+> > qplotView(scene)
+> >
+> >
+> >
+> > _______________________________________________
+> > Qtinterfaces-devel mailing list
+> > Qtinterfaces-devel at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+> >
+> >
+>
+>
+>
+> --
+> Assistant Professor / Dobelman Family Junior Chair
+> Department of Statistics / Rice University
+> http://had.co.nz/
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101005/0317ca07/attachment.htm>
+
+From hadley at rice.edu  Tue Oct  5 20:53:50 2010
+From: hadley at rice.edu (Hadley Wickham)
+Date: Tue, 5 Oct 2010 13:53:50 -0500
+Subject: [RQt-devel] layout issues
+In-Reply-To: <AANLkTikqaLO9OLWJxr9+0nYdeb-NOeCuKuAV35wcwt9j@mail.gmail.com>
+References: <AANLkTi=uB76rFQEJQk8k6WZ8ETkAbuVKpj_VfHRu5WUW@mail.gmail.com>
+	<AANLkTikYEOEY-xGy0F0uXo_QdPs4mpjMn8536f2wK5Av@mail.gmail.com>
+	<AANLkTikqaLO9OLWJxr9+0nYdeb-NOeCuKuAV35wcwt9j@mail.gmail.com>
+Message-ID: <AANLkTikb0fBzyRtMH3zqMg+aNgQCriuXsRwMey3vY17=@mail.gmail.com>
+
+>> What do you think about moving the currently intro pdf to the wiki?
+>
+> That's fine with me if you know of some clean, automated way of doing it.
+> Might be tricky keeping it in sync.
+
+I meant to move to the wiki as the primary source.  The github wikis
+are pretty nice - you can edit them online, or offline through git.
+
+Hadley
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From lawrence.michael at gene.com  Tue Oct  5 22:22:27 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 5 Oct 2010 13:22:27 -0700
+Subject: [RQt-devel] mosaiq
+In-Reply-To: <AANLkTim8CMNSC856SAn1DjWu28hm-LmB0zTdKc5oOsFZ@mail.gmail.com>
+References: <AANLkTinA-crWwvso6F2GOOghJCkbeX5ME5x3eAG4JctP@mail.gmail.com>
+	<AANLkTin5D97iB9sKwsfmoqJppJ0UyChqHgu=yUeFAiB_@mail.gmail.com>
+	<AANLkTim8CMNSC856SAn1DjWu28hm-LmB0zTdKc5oOsFZ@mail.gmail.com>
+Message-ID: <AANLkTi=jrH-0AyCo3c6T_aKUfFqyCYLbLFx_XTUkuw=N@mail.gmail.com>
+
+On Tue, Sep 28, 2010 at 2:37 AM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> On Mon, Sep 27, 2010 at 1:48 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+>
+> > I've not had enough time to play around with the layout. There have been
+> > many examples from others where the layout behaves strangely, and I don't
+> > really have an explanation.
+> >
+> > The row/col stretch factors are the most obvious way to control the
+> packing
+> > of the rows and columns. In theory, the grid layout is considering the
+> size
+> > request of the widget, but in some simple attempts I did not have much
+> luck
+> > playing with that.
+>
+> OK, I will try to see if I can come up with anything.
+>
+> [...]
+>
+> > There is a cache mode, just pass cache=TRUE to qlayer(). Note that this
+> will
+> > basically require clip=TRUE, since the cache surface will be maximally
+> > allocated to the size of the layer. Clipping can cause issues.
+>
+> No, I already have cache=TRUE set in qlayer(). Here is a nice simple
+> example showing the problem:
+>
+> -------
+>
+> library(qtpaint)
+>
+> scene <- qscene()
+> root <- qlayer(scene)
+>
+> points1 <-
+>    qlayer(root,
+>           paintFun = function(item, painter, exposed) {
+>               qdrawGlyph(painter, qglyphCircle(10),
+>                          runif(10), runif(10), stroke = NA,
+>                          fill = sample(colors(), 1))
+>           },
+>           row = 1L, col = 0L,
+>           cache = TRUE,
+>           limits = qrect(c(0, 1), c(0, 1)))
+>
+> v <- qplotView(scene, opengl = FALSE)
+>
+> w <- Qt$QTabWidget()
+> w$addTab(v, "view")
+> w$addTab((ted <- Qt$QTextEdit()), "text")
+> w
+>
+> -------
+>
+> If I now switch between the two tabs (either using mouse or keyboard),
+> I see the paint function being called every time v becomes visible.
+>
+> The following is even more interesting. Start this infinite loop:
+>
+> while (TRUE) {
+>    w$currentIndex <- 1
+>    w$update()
+>    Sys.sleep(0.2)
+>    w$currentIndex <- 0
+>    w$update()
+>    Sys.sleep(0.2)
+> }
+>
+> Then while the window with w
+>
+>  - does not have focus, there is no repaint,
+>
+>  - does have focus, there's a repaint on every run.
+>
+> This is fairly convincing evidence that this is a focus issue, but I
+> haven't been able to find anything more specific.
+>
+>
+I looked into this a bit. Even if one disables focusing of the view, e.g:
+v$focusPolicy <- Qt$Qt$NoFocus
+before adding it to the container, it still repaints when the parent window
+has focus.
+
+Who knows..
+
+
+-Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101005/85e20556/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Tue Oct  5 22:24:47 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 5 Oct 2010 13:24:47 -0700
+Subject: [RQt-devel] layout issues
+In-Reply-To: <AANLkTikb0fBzyRtMH3zqMg+aNgQCriuXsRwMey3vY17=@mail.gmail.com>
+References: <AANLkTi=uB76rFQEJQk8k6WZ8ETkAbuVKpj_VfHRu5WUW@mail.gmail.com>
+	<AANLkTikYEOEY-xGy0F0uXo_QdPs4mpjMn8536f2wK5Av@mail.gmail.com>
+	<AANLkTikqaLO9OLWJxr9+0nYdeb-NOeCuKuAV35wcwt9j@mail.gmail.com>
+	<AANLkTikb0fBzyRtMH3zqMg+aNgQCriuXsRwMey3vY17=@mail.gmail.com>
+Message-ID: <AANLkTin=y+v6L+qPj4A3CzCMbDvrQ1O5+zPp9r9sGh7G@mail.gmail.com>
+
+On Tue, Oct 5, 2010 at 11:53 AM, Hadley Wickham <hadley at rice.edu> wrote:
+
+> >> What do you think about moving the currently intro pdf to the wiki?
+> >
+> > That's fine with me if you know of some clean, automated way of doing it.
+> > Might be tricky keeping it in sync.
+>
+> I meant to move to the wiki as the primary source.  The github wikis
+> are pretty nice - you can edit them online, or offline through git.
+>
+>
+I think the vignette should be the primary source. Vignettes are easy to
+access from within R, and there's the tangling, etc. Also, I'd prefer not to
+become too dependent on one particular web site.
+
+Michael
+
+Hadley
+>
+> --
+> Assistant Professor / Dobelman Family Junior Chair
+> Department of Statistics / Rice University
+> http://had.co.nz/
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101005/77c5e606/attachment.htm>
+
+From xieyihui at gmail.com  Thu Oct 14 21:28:22 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Thu, 14 Oct 2010 14:28:22 -0500
+Subject: [RQt-devel] layout issues
+In-Reply-To: <AANLkTi=uB76rFQEJQk8k6WZ8ETkAbuVKpj_VfHRu5WUW@mail.gmail.com>
+References: <AANLkTi=uB76rFQEJQk8k6WZ8ETkAbuVKpj_VfHRu5WUW@mail.gmail.com>
+Message-ID: <AANLkTinT9N+TKnLJGq2_ArpRR9WfoMP71EghBNcO0U2i@mail.gmail.com>
+
+Perfect! The maximum width/height works very well in my par-coords
+plots. Thanks!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Tue, Oct 5, 2010 at 1:07 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Looked a bit into the layout issues. I've found that the following script
+> gives a fairly desirable result. Forget about the stretch factor stuff for
+> now, because unless a maximum or fixed size is set for a row/column, there
+> is no guarantee that the row/column will not expand.
+>
+> library(qtpaint)
+>
+> fill_painter <- function(color) {
+> ? function(item, painter) qdrawRect(painter, 0, 0, 1, 1, fill = color)
+> }
+>
+> layout_layer <- function(Color, ...) {
+> ? qlayer(figLayer, fill_painter(Color), limits = qrect(0, 0, 1, 1), ...)
+> }
+>
+> scene <- qscene()
+> figLayer <- qlayer(scene)
+> layout <- figLayer$gridLayout()
+>
+> titleLayer <- layout_layer("red", colSpan = 2)
+> yaxisLayer <- layout_layer("blue", row = 1)
+> plotLayer <- layout_layer("green", row = 1, col = 1)
+> xaxisLayer <- layout_layer("yellow", row = 2, col = 1)
+>
+> ## Set the maximum widths/heights:
+>
+> layout$setRowMaximumHeight(0, 50)
+> layout$setColumnMaximumWidth(0, 50)
+> layout$setRowMaximumHeight(2, 50)
+>
+> ## Could use Preferred here, with stretch factor set to zero, but this
+> ## breaks when a layer spans multiple cells. It is hard to say if this
+> ## is a bug in Qt, since QGraphicsGridLayout is largely
+> ## undocumented. QGridLayout says a stretch-zero row/column can grow
+> ## when no other row/column can grow. Setting a fixed or minimum
+> ## width/height probably sets undue restrictions on the layout. The
+> ## user should be able to shrink the window down, even if it is not
+> ## longer possible to draw the data effectively. Thus, it's probably
+> ## best to set the maximum.
+>
+> ## It is probably cleaner to set the dimensions directly on the layer:
+> ## titleLayer$setMaximumHeight(50)
+> ## xaxisLayer$setMaximumHeight(50)
+> ## yaxisLayer$setMaximumWidth(50)
+> ## But this currently crashes due to a (reported) bug in Smoke.
+>
+> qplotView(scene)
+>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+From xieyihui at gmail.com  Fri Oct 15 00:31:35 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Thu, 14 Oct 2010 17:31:35 -0500
+Subject: [RQt-devel] qstrWidth() outside the paintFun()
+In-Reply-To: <AANLkTim--ryYLJb9Zj3M0eD79Z4=uGm=BZFY_grtG=FA@mail.gmail.com>
+References: <AANLkTim--ryYLJb9Zj3M0eD79Z4=uGm=BZFY_grtG=FA@mail.gmail.com>
+Message-ID: <AANLkTinJc-QdKO5pOR7YQbmHBgmeEegyRSmRspPVzHPw@mail.gmail.com>
+
+And can we just put an approximate solution for qstrHeight() for the time being?
+
+qstrHeight <- function(p, text) {
+  extents <- qtextExtents(p, text)
+  nlines <- sapply(gregexpr('\\n', text), function(xx) ifelse(any(xx <
+0), 0, length(xx)) + 1)
+  nlines * (extents[,4] - extents[,2])
+}
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Thu, Oct 14, 2010 at 11:49 AM, Yihui Xie <xieyihui at gmail.com> wrote:
+> Hi,
+>
+> We can calculate the width of a string inside the paintFun(layer,
+> painter) since qstrWIdth() needs the 'painter' argument. I wonder if
+> we can calculate the width when we only have the layer object, e.g.
+>
+> s <- qscene()
+> test_layer <- qlayer(s, function(layer, painter) {
+> ? ?qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+> ? ?qstrWidth(painter, 'this is a string')
+> }, limits=qrect(0,0,100,100))
+> ## what if we are outside?
+> qstrWidth(??, 'this is a string')
+>
+> I want to automatically adjust the plot margins according to the width
+> and height of axis labels. Is there any way to calculate the height of
+> a string?
+>
+> Thanks!
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+
+From lawrence.michael at gene.com  Fri Oct 15 03:51:36 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 14 Oct 2010 18:51:36 -0700
+Subject: [RQt-devel] qstrWidth() outside the paintFun()
+In-Reply-To: <AANLkTinJc-QdKO5pOR7YQbmHBgmeEegyRSmRspPVzHPw@mail.gmail.com>
+References: <AANLkTim--ryYLJb9Zj3M0eD79Z4=uGm=BZFY_grtG=FA@mail.gmail.com>
+	<AANLkTinJc-QdKO5pOR7YQbmHBgmeEegyRSmRspPVzHPw@mail.gmail.com>
+Message-ID: <AANLkTin1QGAcMHYO5yumbmAQuLtEztpdji1W9btTy8ws@mail.gmail.com>
+
+On Thu, Oct 14, 2010 at 3:31 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> And can we just put an approximate solution for qstrHeight() for the time
+> being?
+>
+> qstrHeight <- function(p, text) {
+>  extents <- qtextExtents(p, text)
+>  nlines <- sapply(gregexpr('\\n', text), function(xx) ifelse(any(xx <
+> 0), 0, length(xx)) + 1)
+>  nlines * (extents[,4] - extents[,2])
+> }
+>
+>
+Do you really need to multiply by the nlines here? If so, that's a bug, as
+QFontMetrics is supposed to figure that out.
+
+
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Thu, Oct 14, 2010 at 11:49 AM, Yihui Xie <xieyihui at gmail.com> wrote:
+> > Hi,
+> >
+> > We can calculate the width of a string inside the paintFun(layer,
+> > painter) since qstrWIdth() needs the 'painter' argument. I wonder if
+> > we can calculate the width when we only have the layer object, e.g.
+> >
+> > s <- qscene()
+> > test_layer <- qlayer(s, function(layer, painter) {
+> >    qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+> >    qstrWidth(painter, 'this is a string')
+> > }, limits=qrect(0,0,100,100))
+> > ## what if we are outside?
+> > qstrWidth(??, 'this is a string')
+> >
+> > I want to automatically adjust the plot margins according to the width
+> > and height of axis labels. Is there any way to calculate the height of
+> > a string?
+> >
+>
+
+In which coordinate system? The painter is used for transforming from pixels
+(how QFontMetrics returns the dimensions) to the data coordinates.
+
+Most likely what you want are scene coordinates though, for sizing the
+layer. Perhaps you could come up with a function for mapping the text bounds
+through a transform from the view coordinates (pixels, as provided by
+QFontMetrics) to scene coordinates.
+
+That will break down when multiple views are involved, but then again, so
+would the concept of having a plot with axes, etc.
+
+In the long term, it would be best for there to be a Layer that
+automatically requests enough space to show its text contents. The
+sizeHintFun is meant for this. The interpretation of the size hint depends
+on the size policy. With the correct policy, it can communicate the minimum
+width/height needed by the layer, which the grid layout *should* satisfy.
+But who knows.
+
+Anyway, let me know if you need more information. The Qt docs are helpful.
+
+Michael
+
+
+
+
+> > Thanks!
+> >
+> > Regards,
+> > Yihui
+> > --
+> > Yihui Xie <xieyihui at gmail.com>
+> > Phone: 515-294-2465 Web: http://yihui.name
+> > Department of Statistics, Iowa State University
+> > 2215 Snedecor Hall, Ames, IA
+> >
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101014/0c96c4b8/attachment.htm>
+
+From xieyihui at gmail.com  Fri Oct 15 05:00:50 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Thu, 14 Oct 2010 22:00:50 -0500
+Subject: [RQt-devel] qstrWidth() outside the paintFun()
+In-Reply-To: <AANLkTin1QGAcMHYO5yumbmAQuLtEztpdji1W9btTy8ws@mail.gmail.com>
+References: <AANLkTim--ryYLJb9Zj3M0eD79Z4=uGm=BZFY_grtG=FA@mail.gmail.com>
+	<AANLkTinJc-QdKO5pOR7YQbmHBgmeEegyRSmRspPVzHPw@mail.gmail.com>
+	<AANLkTin1QGAcMHYO5yumbmAQuLtEztpdji1W9btTy8ws@mail.gmail.com>
+Message-ID: <AANLkTinWKWzDnPf_55T-O3-0v4=sDJL4yhG2=dPNrWUK@mail.gmail.com>
+
+Yes, I found the height calculated from qtextExtents() is only a
+height for one line, and that's why I especially dealt with '\n'.
+
+I often feel drowned in Qt docs, partly because I know little about
+C++, and there are too many unfamiliar concepts. I even thought
+sizeHint is something like tooltips (hints?)...
+
+So which way do you recommend to adjust the spacing of axis layers?
+Currently it seems only maximum height/width work well.
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Thu, Oct 14, 2010 at 8:51 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Thu, Oct 14, 2010 at 3:31 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>>
+>> And can we just put an approximate solution for qstrHeight() for the time
+>> being?
+>>
+>> qstrHeight <- function(p, text) {
+>> ?extents <- qtextExtents(p, text)
+>> ?nlines <- sapply(gregexpr('\\n', text), function(xx) ifelse(any(xx <
+>> 0), 0, length(xx)) + 1)
+>> ?nlines * (extents[,4] - extents[,2])
+>> }
+>>
+>
+> Do you really need to multiply by the nlines here? If so, that's a bug, as
+> QFontMetrics is supposed to figure that out.
+>
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>>
+>>
+>>
+>> On Thu, Oct 14, 2010 at 11:49 AM, Yihui Xie <xieyihui at gmail.com> wrote:
+>> > Hi,
+>> >
+>> > We can calculate the width of a string inside the paintFun(layer,
+>> > painter) since qstrWIdth() needs the 'painter' argument. I wonder if
+>> > we can calculate the width when we only have the layer object, e.g.
+>> >
+>> > s <- qscene()
+>> > test_layer <- qlayer(s, function(layer, painter) {
+>> > ? ?qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+>> > ? ?qstrWidth(painter, 'this is a string')
+>> > }, limits=qrect(0,0,100,100))
+>> > ## what if we are outside?
+>> > qstrWidth(??, 'this is a string')
+>> >
+>> > I want to automatically adjust the plot margins according to the width
+>> > and height of axis labels. Is there any way to calculate the height of
+>> > a string?
+>> >
+>
+> In which coordinate system? The painter is used for transforming from pixels
+> (how QFontMetrics returns the dimensions) to the data coordinates.
+>
+> Most likely what you want are scene coordinates though, for sizing the
+> layer. Perhaps you could come up with a function for mapping the text bounds
+> through a transform from the view coordinates (pixels, as provided by
+> QFontMetrics) to scene coordinates.
+>
+> That will break down when multiple views are involved, but then again, so
+> would the concept of having a plot with axes, etc.
+>
+> In the long term, it would be best for there to be a Layer that
+> automatically requests enough space to show its text contents. The
+> sizeHintFun is meant for this. The interpretation of the size hint depends
+> on the size policy. With the correct policy, it can communicate the minimum
+> width/height needed by the layer, which the grid layout *should* satisfy.
+> But who knows.
+>
+> Anyway, let me know if you need more information. The Qt docs are helpful.
+>
+> Michael
+>
+>
+>
+>>
+>> > Thanks!
+>> >
+>> > Regards,
+>> > Yihui
+>> > --
+>> > Yihui Xie <xieyihui at gmail.com>
+>> > Phone: 515-294-2465 Web: http://yihui.name
+>> > Department of Statistics, Iowa State University
+>> > 2215 Snedecor Hall, Ames, IA
+>> >
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+From lawrence.michael at gene.com  Fri Oct 15 06:37:08 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 14 Oct 2010 21:37:08 -0700
+Subject: [RQt-devel] qstrWidth() outside the paintFun()
+In-Reply-To: <AANLkTinWKWzDnPf_55T-O3-0v4=sDJL4yhG2=dPNrWUK@mail.gmail.com>
+References: <AANLkTim--ryYLJb9Zj3M0eD79Z4=uGm=BZFY_grtG=FA@mail.gmail.com>
+	<AANLkTinJc-QdKO5pOR7YQbmHBgmeEegyRSmRspPVzHPw@mail.gmail.com>
+	<AANLkTin1QGAcMHYO5yumbmAQuLtEztpdji1W9btTy8ws@mail.gmail.com>
+	<AANLkTinWKWzDnPf_55T-O3-0v4=sDJL4yhG2=dPNrWUK@mail.gmail.com>
+Message-ID: <AANLkTinhxB5F0LCkoj6inRfnqyLZ_7T6u4hYhtJw5CrF@mail.gmail.com>
+
+On Thu, Oct 14, 2010 at 8:00 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> Yes, I found the height calculated from qtextExtents() is only a
+> height for one line, and that's why I especially dealt with '\n'.
+>
+>
+I will need to look into that. In my quick tests, QFontMetrics::boundingRect
+seems to work fine with \n, and that's what the Painter uses.
+
+
+> I often feel drowned in Qt docs, partly because I know little about
+> C++, and there are too many unfamiliar concepts. I even thought
+> sizeHint is something like tooltips (hints?)...
+>
+>
+But it's got to be a lot more accessible than say R's docs.
+
+
+> So which way do you recommend to adjust the spacing of axis layers?
+> Currently it seems only maximum height/width work well.
+>
+>
+I will look into the effect of sizeHint. In the meantime, you could just set
+the maximum dimensions to what you get from QFontMetrics::boundingRect,
+since at least in your case there is no view transform (and thus the scene
+and screen coordinates are the same).
+
+Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Thu, Oct 14, 2010 at 8:51 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> >
+> >
+> > On Thu, Oct 14, 2010 at 3:31 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+> >>
+> >> And can we just put an approximate solution for qstrHeight() for the
+> time
+> >> being?
+> >>
+> >> qstrHeight <- function(p, text) {
+> >>  extents <- qtextExtents(p, text)
+> >>  nlines <- sapply(gregexpr('\\n', text), function(xx) ifelse(any(xx <
+> >> 0), 0, length(xx)) + 1)
+> >>  nlines * (extents[,4] - extents[,2])
+> >> }
+> >>
+> >
+> > Do you really need to multiply by the nlines here? If so, that's a bug,
+> as
+> > QFontMetrics is supposed to figure that out.
+> >
+> >>
+> >> Regards,
+> >> Yihui
+> >> --
+> >> Yihui Xie <xieyihui at gmail.com>
+> >> Phone: 515-294-2465 Web: http://yihui.name
+> >> Department of Statistics, Iowa State University
+> >> 2215 Snedecor Hall, Ames, IA
+> >>
+> >>
+> >>
+> >> On Thu, Oct 14, 2010 at 11:49 AM, Yihui Xie <xieyihui at gmail.com> wrote:
+> >> > Hi,
+> >> >
+> >> > We can calculate the width of a string inside the paintFun(layer,
+> >> > painter) since qstrWIdth() needs the 'painter' argument. I wonder if
+> >> > we can calculate the width when we only have the layer object, e.g.
+> >> >
+> >> > s <- qscene()
+> >> > test_layer <- qlayer(s, function(layer, painter) {
+> >> >    qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+> >> >    qstrWidth(painter, 'this is a string')
+> >> > }, limits=qrect(0,0,100,100))
+> >> > ## what if we are outside?
+> >> > qstrWidth(??, 'this is a string')
+> >> >
+> >> > I want to automatically adjust the plot margins according to the width
+> >> > and height of axis labels. Is there any way to calculate the height of
+> >> > a string?
+> >> >
+> >
+> > In which coordinate system? The painter is used for transforming from
+> pixels
+> > (how QFontMetrics returns the dimensions) to the data coordinates.
+> >
+> > Most likely what you want are scene coordinates though, for sizing the
+> > layer. Perhaps you could come up with a function for mapping the text
+> bounds
+> > through a transform from the view coordinates (pixels, as provided by
+> > QFontMetrics) to scene coordinates.
+> >
+> > That will break down when multiple views are involved, but then again, so
+> > would the concept of having a plot with axes, etc.
+> >
+> > In the long term, it would be best for there to be a Layer that
+> > automatically requests enough space to show its text contents. The
+> > sizeHintFun is meant for this. The interpretation of the size hint
+> depends
+> > on the size policy. With the correct policy, it can communicate the
+> minimum
+> > width/height needed by the layer, which the grid layout *should* satisfy.
+> > But who knows.
+> >
+> > Anyway, let me know if you need more information. The Qt docs are
+> helpful.
+> >
+> > Michael
+> >
+> >
+> >
+> >>
+> >> > Thanks!
+> >> >
+> >> > Regards,
+> >> > Yihui
+> >> > --
+> >> > Yihui Xie <xieyihui at gmail.com>
+> >> > Phone: 515-294-2465 Web: http://yihui.name
+> >> > Department of Statistics, Iowa State University
+> >> > 2215 Snedecor Hall, Ames, IA
+> >> >
+> >> _______________________________________________
+> >> Qtinterfaces-devel mailing list
+> >> Qtinterfaces-devel at lists.r-forge.r-project.org
+> >>
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+> >
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101014/be24f547/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Fri Oct 15 15:17:20 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 15 Oct 2010 06:17:20 -0700
+Subject: [RQt-devel] qstrWidth() outside the paintFun()
+In-Reply-To: <AANLkTinhxB5F0LCkoj6inRfnqyLZ_7T6u4hYhtJw5CrF@mail.gmail.com>
+References: <AANLkTim--ryYLJb9Zj3M0eD79Z4=uGm=BZFY_grtG=FA@mail.gmail.com>
+	<AANLkTinJc-QdKO5pOR7YQbmHBgmeEegyRSmRspPVzHPw@mail.gmail.com>
+	<AANLkTin1QGAcMHYO5yumbmAQuLtEztpdji1W9btTy8ws@mail.gmail.com>
+	<AANLkTinWKWzDnPf_55T-O3-0v4=sDJL4yhG2=dPNrWUK@mail.gmail.com>
+	<AANLkTinhxB5F0LCkoj6inRfnqyLZ_7T6u4hYhtJw5CrF@mail.gmail.com>
+Message-ID: <AANLkTi=U+P-Ci_PdGvqK34GiDbwjB64A8AV7=JUsND6U@mail.gmail.com>
+
+On Thu, Oct 14, 2010 at 9:37 PM, Michael Lawrence <michafla at gene.com> wrote:
+
+>
+>
+> On Thu, Oct 14, 2010 at 8:00 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>
+>> Yes, I found the height calculated from qtextExtents() is only a
+>> height for one line, and that's why I especially dealt with '\n'.
+>>
+>>
+> I will need to look into that. In my quick tests,
+> QFontMetrics::boundingRect seems to work fine with \n, and that's what the
+> Painter uses.
+>
+
+I checked in a fix for this, so you won't have to count new lines in R
+anymore. Please go ahead and push your (updated) qstrHeight function.
+
+
+>
+>
+>> I often feel drowned in Qt docs, partly because I know little about
+>> C++, and there are too many unfamiliar concepts. I even thought
+>> sizeHint is something like tooltips (hints?)...
+>>
+>>
+> But it's got to be a lot more accessible than say R's docs.
+>
+>
+>> So which way do you recommend to adjust the spacing of axis layers?
+>> Currently it seems only maximum height/width work well.
+>>
+>>
+> I will look into the effect of sizeHint.
+>
+
+Currently I'm unable to get Qt to call the sizeHint function. I think the
+sizeHint is only useful when one is considering constraints, i.e., Qt might
+ask what is the best vertical size given that I can only allocate so much
+horizontally? Most obvious application of this is text in an editor. There
+is a fixed width and only the text layout/wrapper knows how much vertical
+space it needs.
+
+So unless you want the axis to behave in such a fancy way, setting the
+min/max dimensions may be all that's needed in this case. The main issue
+then is that ideally one would be setting the dimensions on the layer
+itself, not the column or row. If there are multiple plots, it could get
+tricky. Unfortunately, setting the layer dimensions is not possible until
+the Smoke bug is fixed; according to the maintainer that will not happen any
+time soon. I could add some wrappers if we really needed this though.
+
+In the meantime, you could just set the maximum dimensions to what you get
+> from QFontMetrics::boundingRect, since at least in your case there is no
+> view transform (and thus the scene and screen coordinates are the same).
+>
+> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>>
+>>
+>>
+>> On Thu, Oct 14, 2010 at 8:51 PM, Michael Lawrence
+>> <lawrence.michael at gene.com> wrote:
+>> >
+>> >
+>> > On Thu, Oct 14, 2010 at 3:31 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>> >>
+>> >> And can we just put an approximate solution for qstrHeight() for the
+>> time
+>> >> being?
+>> >>
+>> >> qstrHeight <- function(p, text) {
+>> >>  extents <- qtextExtents(p, text)
+>> >>  nlines <- sapply(gregexpr('\\n', text), function(xx) ifelse(any(xx <
+>> >> 0), 0, length(xx)) + 1)
+>> >>  nlines * (extents[,4] - extents[,2])
+>> >> }
+>> >>
+>> >
+>> > Do you really need to multiply by the nlines here? If so, that's a bug,
+>> as
+>> > QFontMetrics is supposed to figure that out.
+>> >
+>> >>
+>> >> Regards,
+>> >> Yihui
+>> >> --
+>> >> Yihui Xie <xieyihui at gmail.com>
+>> >> Phone: 515-294-2465 Web: http://yihui.name
+>> >> Department of Statistics, Iowa State University
+>> >> 2215 Snedecor Hall, Ames, IA
+>> >>
+>> >>
+>> >>
+>> >> On Thu, Oct 14, 2010 at 11:49 AM, Yihui Xie <xieyihui at gmail.com>
+>> wrote:
+>> >> > Hi,
+>> >> >
+>> >> > We can calculate the width of a string inside the paintFun(layer,
+>> >> > painter) since qstrWIdth() needs the 'painter' argument. I wonder if
+>> >> > we can calculate the width when we only have the layer object, e.g.
+>> >> >
+>> >> > s <- qscene()
+>> >> > test_layer <- qlayer(s, function(layer, painter) {
+>> >> >    qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+>> >> >    qstrWidth(painter, 'this is a string')
+>> >> > }, limits=qrect(0,0,100,100))
+>> >> > ## what if we are outside?
+>> >> > qstrWidth(??, 'this is a string')
+>> >> >
+>> >> > I want to automatically adjust the plot margins according to the
+>> width
+>> >> > and height of axis labels. Is there any way to calculate the height
+>> of
+>> >> > a string?
+>> >> >
+>> >
+>> > In which coordinate system? The painter is used for transforming from
+>> pixels
+>> > (how QFontMetrics returns the dimensions) to the data coordinates.
+>> >
+>> > Most likely what you want are scene coordinates though, for sizing the
+>> > layer. Perhaps you could come up with a function for mapping the text
+>> bounds
+>> > through a transform from the view coordinates (pixels, as provided by
+>> > QFontMetrics) to scene coordinates.
+>> >
+>> > That will break down when multiple views are involved, but then again,
+>> so
+>> > would the concept of having a plot with axes, etc.
+>> >
+>> > In the long term, it would be best for there to be a Layer that
+>> > automatically requests enough space to show its text contents. The
+>> > sizeHintFun is meant for this. The interpretation of the size hint
+>> depends
+>> > on the size policy. With the correct policy, it can communicate the
+>> minimum
+>> > width/height needed by the layer, which the grid layout *should*
+>> satisfy.
+>> > But who knows.
+>> >
+>> > Anyway, let me know if you need more information. The Qt docs are
+>> helpful.
+>> >
+>> > Michael
+>> >
+>> >
+>> >
+>> >>
+>> >> > Thanks!
+>> >> >
+>> >> > Regards,
+>> >> > Yihui
+>> >> > --
+>> >> > Yihui Xie <xieyihui at gmail.com>
+>> >> > Phone: 515-294-2465 Web: http://yihui.name
+>> >> > Department of Statistics, Iowa State University
+>> >> > 2215 Snedecor Hall, Ames, IA
+>> >> >
+>> >> _______________________________________________
+>> >> Qtinterfaces-devel mailing list
+>> >> Qtinterfaces-devel at lists.r-forge.r-project.org
+>> >>
+>> >>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>> >
+>> >
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101015/a0ea0d09/attachment.htm>
+
+From xieyihui at gmail.com  Fri Oct 15 16:14:56 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Fri, 15 Oct 2010 09:14:56 -0500
+Subject: [RQt-devel] qstrWidth() outside the paintFun()
+In-Reply-To: <AANLkTi=U+P-Ci_PdGvqK34GiDbwjB64A8AV7=JUsND6U@mail.gmail.com>
+References: <AANLkTim--ryYLJb9Zj3M0eD79Z4=uGm=BZFY_grtG=FA@mail.gmail.com>
+	<AANLkTinJc-QdKO5pOR7YQbmHBgmeEegyRSmRspPVzHPw@mail.gmail.com>
+	<AANLkTin1QGAcMHYO5yumbmAQuLtEztpdji1W9btTy8ws@mail.gmail.com>
+	<AANLkTinWKWzDnPf_55T-O3-0v4=sDJL4yhG2=dPNrWUK@mail.gmail.com>
+	<AANLkTinhxB5F0LCkoj6inRfnqyLZ_7T6u4hYhtJw5CrF@mail.gmail.com>
+	<AANLkTi=U+P-Ci_PdGvqK34GiDbwjB64A8AV7=JUsND6U@mail.gmail.com>
+Message-ID: <AANLkTimgdQpU01GexSAgVRuLyPQmGFn8sUL6e2=0BHw6@mail.gmail.com>
+
+qstrHeight() is there now.
+
+Currently I'm using a brutal way (nearly hard coded) to specify the
+width of the y-axis layer:
+http://github.com/bigbear/cranvas/blob/master/Yihui/qparallel.R#L390
+
+It looks silly but it works for strings of various lengths (at least for me).
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Fri, Oct 15, 2010 at 8:17 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> I checked in a fix for this, so you won't have to count new lines in R
+> anymore. Please go ahead and push your (updated) qstrHeight function.
+>
+>
+> Currently I'm unable to get Qt to call the sizeHint function. I think the
+> sizeHint is only useful when one is considering constraints, i.e., Qt might
+> ask what is the best vertical size given that I can only allocate so much
+> horizontally? Most obvious application of this is text in an editor. There
+> is a fixed width and only the text layout/wrapper knows how much vertical
+> space it needs.
+>
+> So unless you want the axis to behave in such a fancy way, setting the
+> min/max dimensions may be all that's needed in this case. The main issue
+> then is that ideally one would be setting the dimensions on the layer
+> itself, not the column or row. If there are multiple plots, it could get
+> tricky. Unfortunately, setting the layer dimensions is not possible until
+> the Smoke bug is fixed; according to the maintainer that will not happen any
+> time soon. I could add some wrappers if we really needed this though.
+>
+>> In the meantime, you could just set the maximum dimensions to what you get
+>> from QFontMetrics::boundingRect, since at least in your case there is no
+>> view transform (and thus the scene and screen coordinates are the same).
+>>
+
+From xieyihui at gmail.com  Thu Oct 14 18:49:16 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Thu, 14 Oct 2010 11:49:16 -0500
+Subject: [RQt-devel] qstrWidth() outside the paintFun()
+Message-ID: <AANLkTim--ryYLJb9Zj3M0eD79Z4=uGm=BZFY_grtG=FA@mail.gmail.com>
+
+Hi,
+
+We can calculate the width of a string inside the paintFun(layer,
+painter) since qstrWIdth() needs the 'painter' argument. I wonder if
+we can calculate the width when we only have the layer object, e.g.
+
+s <- qscene()
+test_layer <- qlayer(s, function(layer, painter) {
+    qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+    qstrWidth(painter, 'this is a string')
+}, limits=qrect(0,0,100,100))
+## what if we are outside?
+qstrWidth(??, 'this is a string')
+
+I want to automatically adjust the plot margins according to the width
+and height of axis labels. Is there any way to calculate the height of
+a string?
+
+Thanks!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+From lawrence.michael at gene.com  Tue Oct 19 14:55:17 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 19 Oct 2010 05:55:17 -0700
+Subject: [RQt-devel] qdrawText() in Qt 4.7.0
+In-Reply-To: <AANLkTimvqG8YU4VvsfheE7E9XHNpZL084RJU4r_6OTBu@mail.gmail.com>
+References: <AANLkTimvqG8YU4VvsfheE7E9XHNpZL084RJU4r_6OTBu@mail.gmail.com>
+Message-ID: <AANLkTi=yc0GphCJKc4WjM9HbZuhawBvkK=6x8TCHR++P@mail.gmail.com>
+
+Moved this over to the more appropriate qtinterfaces-devel list. I am
+installing Qt 4.7 now and will work towards compatibility. For this
+particular issue, it would be helpful if you could send a simple
+reproducible example.
+
+Thanks,
+Michael
+
+On Mon, Oct 18, 2010 at 8:50 AM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> Hi (Michael),
+>
+> Last Friday I tried Qt 4.7.0 under Ubuntu 10.10 (installed from
+> Synaptic); everything worked well except the qdrawText() function. See
+> the attachments: it always draws y=0 at the top most of the canvas
+> when I draw the y-axis tickmark labels, while there are no problems
+> with qdrawSegment(). I've spent several hours on this problem but
+> cannot find out the reason...
+>
+> > sessionInfo()
+> R version 2.12.0 (2010-10-15)
+> Platform: x86_64-unknown-linux-gnu (64-bit)
+>
+> locale:
+> [1] en_US.utf8
+>
+> attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods   base
+>
+> other attached packages:
+> [1] RColorBrewer_1.0-2 plumbr_0.0-1       qtpaint_0.7.11
+>
+> loaded via a namespace (and not attached):
+> [1] qtbase_0.8-7
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+> --
+> You received this message because you are subscribed to the Google Groups
+> "GGobi core" group.
+> To post to this group, send email to ggobi-core at googlegroups.com.
+> To unsubscribe from this group, send email to
+> ggobi-core+unsubscribe at googlegroups.com<ggobi-core%2Bunsubscribe at googlegroups.com>
+> .
+> For more options, visit this group at
+> http://groups.google.com/group/ggobi-core?hl=en.
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101019/0766bce1/attachment.htm>
+
+From xieyihui at gmail.com  Tue Oct 19 20:36:49 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Tue, 19 Oct 2010 13:36:49 -0500
+Subject: [RQt-devel] qdrawText() in Qt 4.7.0
+In-Reply-To: <AANLkTi=yc0GphCJKc4WjM9HbZuhawBvkK=6x8TCHR++P@mail.gmail.com>
+References: <AANLkTimvqG8YU4VvsfheE7E9XHNpZL084RJU4r_6OTBu@mail.gmail.com>
+	<AANLkTi=yc0GphCJKc4WjM9HbZuhawBvkK=6x8TCHR++P@mail.gmail.com>
+Message-ID: <AANLkTikc0Jgx-DEHbfpUb3zk6LRyodKkK+m1ijKYKPaU@mail.gmail.com>
+
+Here comes a minimal example (with screenshots attached):
+
+library(qtpaint)
+s <- qscene()
+test_layer <- qlayer(s, function(layer, painter) {
+    qlineWidth(painter) = 2
+    qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+    ## origin of y is incorrect (at the top of the canvas; should be
+at the center)
+    for(y in c(-50,-30,0,30,50)) {
+        qdrawText(painter, paste('y =',y), 50,y)
+    }
+    ## but x is correct
+    for(x in c(0,30,50,80,100)) {
+        qdrawText(painter, paste('x =',x), x, -60)
+    }
+}, limits=qrect(0,0,100,100))
+qplotView(s)
+
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Tue, Oct 19, 2010 at 7:55 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Moved this over to the more appropriate qtinterfaces-devel list. I am
+> installing Qt 4.7 now and will work towards compatibility. For this
+> particular issue, it would be helpful if you could send a simple
+> reproducible example.
+>
+> Thanks,
+> Michael
+>
+> On Mon, Oct 18, 2010 at 8:50 AM, Yihui Xie <xieyihui at gmail.com> wrote:
+>>
+>> Hi (Michael),
+>>
+>> Last Friday I tried Qt 4.7.0 under Ubuntu 10.10 (installed from
+>> Synaptic); everything worked well except the qdrawText() function. See
+>> the attachments: it always draws y=0 at the top most of the canvas
+>> when I draw the y-axis tickmark labels, while there are no problems
+>> with qdrawSegment(). I've spent several hours on this problem but
+>> cannot find out the reason...
+>>
+>> > sessionInfo()
+>> R version 2.12.0 (2010-10-15)
+>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>
+>> locale:
+>> [1] en_US.utf8
+>>
+>> attached base packages:
+>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>
+>> other attached packages:
+>> [1] RColorBrewer_1.0-2 plumbr_0.0-1 ? ? ? qtpaint_0.7.11
+>>
+>> loaded via a namespace (and not attached):
+>> [1] qtbase_0.8-7
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups
+>> "GGobi core" group.
+>> To post to this group, send email to ggobi-core at googlegroups.com.
+>> To unsubscribe from this group, send email to
+>> ggobi-core+unsubscribe at googlegroups.com.
+>> For more options, visit this group at
+>> http://groups.google.com/group/ggobi-core?hl=en.
+>>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: qdrawText-y.png
+Type: image/png
+Size: 4726 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101019/d8b005db/attachment.png>
+
+From lawrence.michael at gene.com  Wed Oct 20 01:15:00 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 19 Oct 2010 16:15:00 -0700
+Subject: [RQt-devel] an easy way to rotate a layer?
+In-Reply-To: <AANLkTimveJaqi3JiQ73kmus0yGwkusnAWy6W7Oy7VEwT@mail.gmail.com>
+References: <AANLkTimveJaqi3JiQ73kmus0yGwkusnAWy6W7Oy7VEwT@mail.gmail.com>
+Message-ID: <AANLkTin7SsGBN8sWt9EdRcv+3nx3Yc04kmm3OGVUiwAP@mail.gmail.com>
+
+Again, moved this over to qtinterfaces-devel.
+
+There are basically two transforms involved: one from item (layer) to scene
+and one from scene to view (which might be translated by a third transform
+to screen coordinates if there is a scrolled viewport). To rotate the entire
+plot, axes layers included, it's probably best to modify the view transform.
+
+Unfortunately, the view transform basically must be identity if you're using
+the geometry rescale mode in the plot view (the plot view is then making
+sure that the plot fits in the viewport by changing the geometry of the
+layer in the scene). I might be able to improve that if necessary though. I
+guess I had not anticipated this use-case. It doesn't make sense to zoom
+with the geometry rescale mode but rotations might make sense.
+
+Thanks for this suggestion,
+Michael
+
+On Tue, Oct 19, 2010 at 2:31 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> Hi everyone,
+>
+> I still feel lost in the Qt sea, but I believe it should be very easy
+> to rotate a layer by 90 degrees, and I feel it is something like
+> qdeviceTransform(), but I just don't know how to use this function.
+> Can anyone give me an example? e.g. switch x and y in a scatter plot
+> (without really switching the values of x and y)
+>
+> This can reduce the efforts on considering the direction of a plot,
+> being horizontal or vertical; in my par-coords plots, I did this on
+> the R level long ago. Maybe that is a waste of time.
+>
+> Thanks!
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+> --
+> You received this message because you are subscribed to the Google Groups
+> "GGobi core" group.
+> To post to this group, send email to ggobi-core at googlegroups.com.
+> To unsubscribe from this group, send email to
+> ggobi-core+unsubscribe at googlegroups.com<ggobi-core%2Bunsubscribe at googlegroups.com>
+> .
+> For more options, visit this group at
+> http://groups.google.com/group/ggobi-core?hl=en.
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101019/e9107e96/attachment.htm>
+
+From xieyihui at gmail.com  Wed Oct 20 05:43:55 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Tue, 19 Oct 2010 22:43:55 -0500
+Subject: [RQt-devel] qdrawText() in Qt 4.7.0
+In-Reply-To: <AANLkTikc0Jgx-DEHbfpUb3zk6LRyodKkK+m1ijKYKPaU@mail.gmail.com>
+References: <AANLkTimvqG8YU4VvsfheE7E9XHNpZL084RJU4r_6OTBu@mail.gmail.com>
+	<AANLkTi=yc0GphCJKc4WjM9HbZuhawBvkK=6x8TCHR++P@mail.gmail.com>
+	<AANLkTikc0Jgx-DEHbfpUb3zk6LRyodKkK+m1ijKYKPaU@mail.gmail.com>
+Message-ID: <AANLkTi=Z5o3gujw_+UCX+wWRL=HJ4s05-6U6km98c8rJ@mail.gmail.com>
+
+After struggling with this problem for another few hours, I finally
+figured out the reason:
+http://github.com/ggobi/qtpaint/commit/dba9fdefdab125e3013e69f582b3a03825080e5a
+There is something wrong in this commit. The texts can be correctly
+drawn with earlier qtpaint revisions.
+
+Fortunately it is not a compatibility issue...
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Tue, Oct 19, 2010 at 1:36 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+> Here comes a minimal example (with screenshots attached):
+>
+> library(qtpaint)
+> s <- qscene()
+> test_layer <- qlayer(s, function(layer, painter) {
+> ? ?qlineWidth(painter) = 2
+> ? ?qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+> ? ?## origin of y is incorrect (at the top of the canvas; should be
+> at the center)
+> ? ?for(y in c(-50,-30,0,30,50)) {
+> ? ? ? ?qdrawText(painter, paste('y =',y), 50,y)
+> ? ?}
+> ? ?## but x is correct
+> ? ?for(x in c(0,30,50,80,100)) {
+> ? ? ? ?qdrawText(painter, paste('x =',x), x, -60)
+> ? ?}
+> }, limits=qrect(0,0,100,100))
+> qplotView(s)
+>
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Tue, Oct 19, 2010 at 7:55 AM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+>> Moved this over to the more appropriate qtinterfaces-devel list. I am
+>> installing Qt 4.7 now and will work towards compatibility. For this
+>> particular issue, it would be helpful if you could send a simple
+>> reproducible example.
+>>
+>> Thanks,
+>> Michael
+>>
+>> On Mon, Oct 18, 2010 at 8:50 AM, Yihui Xie <xieyihui at gmail.com> wrote:
+>>>
+>>> Hi (Michael),
+>>>
+>>> Last Friday I tried Qt 4.7.0 under Ubuntu 10.10 (installed from
+>>> Synaptic); everything worked well except the qdrawText() function. See
+>>> the attachments: it always draws y=0 at the top most of the canvas
+>>> when I draw the y-axis tickmark labels, while there are no problems
+>>> with qdrawSegment(). I've spent several hours on this problem but
+>>> cannot find out the reason...
+>>>
+>>> > sessionInfo()
+>>> R version 2.12.0 (2010-10-15)
+>>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>>
+>>> locale:
+>>> [1] en_US.utf8
+>>>
+>>> attached base packages:
+>>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>>
+>>> other attached packages:
+>>> [1] RColorBrewer_1.0-2 plumbr_0.0-1 ? ? ? qtpaint_0.7.11
+>>>
+>>> loaded via a namespace (and not attached):
+>>> [1] qtbase_0.8-7
+>>>
+>>> Regards,
+>>> Yihui
+>>> --
+>>> Yihui Xie <xieyihui at gmail.com>
+>>> Phone: 515-294-2465 Web: http://yihui.name
+>>> Department of Statistics, Iowa State University
+>>> 2215 Snedecor Hall, Ames, IA
+>>>
+>>> --
+>>> You received this message because you are subscribed to the Google Groups
+>>> "GGobi core" group.
+>>> To post to this group, send email to ggobi-core at googlegroups.com.
+>>> To unsubscribe from this group, send email to
+>>> ggobi-core+unsubscribe at googlegroups.com.
+>>> For more options, visit this group at
+>>> http://groups.google.com/group/ggobi-core?hl=en.
+>>>
+>>
+>>
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>>
+>
+
+From lawrence.michael at gene.com  Wed Oct 20 17:00:45 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Oct 2010 08:00:45 -0700
+Subject: [RQt-devel] qdrawText() in Qt 4.7.0
+In-Reply-To: <AANLkTi=Z5o3gujw_+UCX+wWRL=HJ4s05-6U6km98c8rJ@mail.gmail.com>
+References: <AANLkTimvqG8YU4VvsfheE7E9XHNpZL084RJU4r_6OTBu@mail.gmail.com>
+	<AANLkTi=yc0GphCJKc4WjM9HbZuhawBvkK=6x8TCHR++P@mail.gmail.com>
+	<AANLkTikc0Jgx-DEHbfpUb3zk6LRyodKkK+m1ijKYKPaU@mail.gmail.com>
+	<AANLkTi=Z5o3gujw_+UCX+wWRL=HJ4s05-6U6km98c8rJ@mail.gmail.com>
+Message-ID: <AANLkTikUQQ25KfQ4XTD-e5QhjtCHF1_iwRXVt-VA8YfQ@mail.gmail.com>
+
+On Tue, Oct 19, 2010 at 8:43 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> After struggling with this problem for another few hours, I finally
+> figured out the reason:
+>
+> http://github.com/ggobi/qtpaint/commit/dba9fdefdab125e3013e69f582b3a03825080e5a
+> There is something wrong in this commit. The texts can be correctly
+> drawn with earlier qtpaint revisions.
+>
+> Fortunately it is not a compatibility issue...
+>
+>
+You shouldn't have spent so much time on it. Please give me at least a day
+or so to take care of these. I committed what I hope to be a fix. Still
+working on the rotation.
+
+Michael
+
+
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Tue, Oct 19, 2010 at 1:36 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+> > Here comes a minimal example (with screenshots attached):
+> >
+> > library(qtpaint)
+> > s <- qscene()
+> > test_layer <- qlayer(s, function(layer, painter) {
+> >    qlineWidth(painter) = 2
+> >    qdrawRect(painter, 10, 10, 90, 90, stroke = 'blue')
+> >    ## origin of y is incorrect (at the top of the canvas; should be
+> > at the center)
+> >    for(y in c(-50,-30,0,30,50)) {
+> >        qdrawText(painter, paste('y =',y), 50,y)
+> >    }
+> >    ## but x is correct
+> >    for(x in c(0,30,50,80,100)) {
+> >        qdrawText(painter, paste('x =',x), x, -60)
+> >    }
+> > }, limits=qrect(0,0,100,100))
+> > qplotView(s)
+> >
+> >
+> > Regards,
+> > Yihui
+> > --
+> > Yihui Xie <xieyihui at gmail.com>
+> > Phone: 515-294-2465 Web: http://yihui.name
+> > Department of Statistics, Iowa State University
+> > 2215 Snedecor Hall, Ames, IA
+> >
+> >
+> >
+> > On Tue, Oct 19, 2010 at 7:55 AM, Michael Lawrence
+> > <lawrence.michael at gene.com> wrote:
+> >> Moved this over to the more appropriate qtinterfaces-devel list. I am
+> >> installing Qt 4.7 now and will work towards compatibility. For this
+> >> particular issue, it would be helpful if you could send a simple
+> >> reproducible example.
+> >>
+> >> Thanks,
+> >> Michael
+> >>
+> >> On Mon, Oct 18, 2010 at 8:50 AM, Yihui Xie <xieyihui at gmail.com> wrote:
+> >>>
+> >>> Hi (Michael),
+> >>>
+> >>> Last Friday I tried Qt 4.7.0 under Ubuntu 10.10 (installed from
+> >>> Synaptic); everything worked well except the qdrawText() function. See
+> >>> the attachments: it always draws y=0 at the top most of the canvas
+> >>> when I draw the y-axis tickmark labels, while there are no problems
+> >>> with qdrawSegment(). I've spent several hours on this problem but
+> >>> cannot find out the reason...
+> >>>
+> >>> > sessionInfo()
+> >>> R version 2.12.0 (2010-10-15)
+> >>> Platform: x86_64-unknown-linux-gnu (64-bit)
+> >>>
+> >>> locale:
+> >>> [1] en_US.utf8
+> >>>
+> >>> attached base packages:
+> >>> [1] stats     graphics  grDevices utils     datasets  methods   base
+> >>>
+> >>> other attached packages:
+> >>> [1] RColorBrewer_1.0-2 plumbr_0.0-1       qtpaint_0.7.11
+> >>>
+> >>> loaded via a namespace (and not attached):
+> >>> [1] qtbase_0.8-7
+> >>>
+> >>> Regards,
+> >>> Yihui
+> >>> --
+> >>> Yihui Xie <xieyihui at gmail.com>
+> >>> Phone: 515-294-2465 Web: http://yihui.name
+> >>> Department of Statistics, Iowa State University
+> >>> 2215 Snedecor Hall, Ames, IA
+> >>>
+> >>> --
+> >>> You received this message because you are subscribed to the Google
+> Groups
+> >>> "GGobi core" group.
+> >>> To post to this group, send email to ggobi-core at googlegroups.com.
+> >>> To unsubscribe from this group, send email to
+> >>> ggobi-core+unsubscribe at googlegroups.com<ggobi-core%2Bunsubscribe at googlegroups.com>
+> .
+> >>> For more options, visit this group at
+> >>> http://groups.google.com/group/ggobi-core?hl=en.
+> >>>
+> >>
+> >>
+> >> _______________________________________________
+> >> Qtinterfaces-devel mailing list
+> >> Qtinterfaces-devel at lists.r-forge.r-project.org
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+> >>
+> >>
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101020/e7cb7c39/attachment.htm>
+
+From xieyihui at gmail.com  Wed Oct 20 17:50:49 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Wed, 20 Oct 2010 10:50:49 -0500
+Subject: [RQt-devel] qdrawText() in Qt 4.7.0
+In-Reply-To: <AANLkTikUQQ25KfQ4XTD-e5QhjtCHF1_iwRXVt-VA8YfQ@mail.gmail.com>
+References: <AANLkTimvqG8YU4VvsfheE7E9XHNpZL084RJU4r_6OTBu@mail.gmail.com>
+	<AANLkTi=yc0GphCJKc4WjM9HbZuhawBvkK=6x8TCHR++P@mail.gmail.com>
+	<AANLkTikc0Jgx-DEHbfpUb3zk6LRyodKkK+m1ijKYKPaU@mail.gmail.com>
+	<AANLkTi=Z5o3gujw_+UCX+wWRL=HJ4s05-6U6km98c8rJ@mail.gmail.com>
+	<AANLkTikUQQ25KfQ4XTD-e5QhjtCHF1_iwRXVt-VA8YfQ@mail.gmail.com>
+Message-ID: <AANLkTimG-aSGfQwECcqPDy+PWHYjczDpaqNsGReBV+v2@mail.gmail.com>
+
+I did not know whether this problem was due to R or Qt or other
+dependent packages (or even Ubuntu 10.10)...
+
+Now the problem has been fixed. Thanks a lot!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Oct 20, 2010 at 10:00 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Tue, Oct 19, 2010 at 8:43 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>>
+>> After struggling with this problem for another few hours, I finally
+>> figured out the reason:
+>>
+>> http://github.com/ggobi/qtpaint/commit/dba9fdefdab125e3013e69f582b3a03825080e5a
+>> There is something wrong in this commit. The texts can be correctly
+>> drawn with earlier qtpaint revisions.
+>>
+>> Fortunately it is not a compatibility issue...
+>>
+>
+> You shouldn't have spent so much time on it. Please give me at least a day
+> or so to take care of these. I committed what I hope to be a fix. Still
+> working on the rotation.
+>
+> Michael
+>
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>>
+
+From hadley at rice.edu  Wed Oct 20 18:18:13 2010
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 20 Oct 2010 11:18:13 -0500
+Subject: [RQt-devel] qdrawText() in Qt 4.7.0
+In-Reply-To: <AANLkTi=Z5o3gujw_+UCX+wWRL=HJ4s05-6U6km98c8rJ@mail.gmail.com>
+References: <AANLkTimvqG8YU4VvsfheE7E9XHNpZL084RJU4r_6OTBu@mail.gmail.com>
+	<AANLkTi=yc0GphCJKc4WjM9HbZuhawBvkK=6x8TCHR++P@mail.gmail.com>
+	<AANLkTikc0Jgx-DEHbfpUb3zk6LRyodKkK+m1ijKYKPaU@mail.gmail.com>
+	<AANLkTi=Z5o3gujw_+UCX+wWRL=HJ4s05-6U6km98c8rJ@mail.gmail.com>
+Message-ID: <AANLkTimhYhoLu9GBsW8sEyNhMN-dr3jxN0CWCnQ1NMGT@mail.gmail.com>
+
+> After struggling with this problem for another few hours, I finally
+> figured out the reason:
+> http://github.com/ggobi/qtpaint/commit/dba9fdefdab125e3013e69f582b3a03825080e5a
+> There is something wrong in this commit. The texts can be correctly
+> drawn with earlier qtpaint revisions.
+
+Checkout git bisect to make this sort of search easier.
+
+Hadley
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From xieyihui at gmail.com  Thu Oct 21 00:18:42 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Wed, 20 Oct 2010 17:18:42 -0500
+Subject: [RQt-devel] segment glyph
+Message-ID: <AANLkTi=isqym+KA1yGfAWXQWgsuDC86GyM+-_pE+zTRc@mail.gmail.com>
+
+Hi,
+
+I want to define a glyph which is a short segment as follows, but when
+the slope b=0, the glyph looks weird on screen (it is a filled
+square); other slopes are fine. I don't know what's going on:
+
+library(qtpaint)
+## x: length; b: slope
+qglyphSegment <- function(x = 5, b = 0) {
+  glyph <- Qt$QPainterPath()
+  x0 <- x * cos(atan(b))
+  y0 <- x * sin(atan(b))
+  glyph$moveTo(-x0, -y0)
+  glyph$lineTo(x0, y0)
+#  glyph$closeSubpath()
+  glyph
+}
+
+s <- qscene()
+test_layer <- qlayer(s, function(layer, painter) {
+    qdrawGlyph(painter, qglyphSegment(), 1:10, .5, stroke = 'black')
+    qdrawGlyph(painter, qglyphSegment(10, 1), 1:10, .7, stroke = 'black')
+    qdrawGlyph(painter, qglyphSegment(10, -1), 1:10, .3, stroke = 'black')
+}, limits=qrect(0,0,11,1))
+qplotView(s)
+## see the screenshot attached
+
+
+Thanks!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: glyphSegment.png
+Type: image/png
+Size: 2777 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101020/d878c5e0/attachment.png>
+
+From lawrence.michael at gene.com  Thu Oct 21 05:03:22 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Oct 2010 20:03:22 -0700
+Subject: [RQt-devel] an easy way to rotate a layer?
+In-Reply-To: <AANLkTin7SsGBN8sWt9EdRcv+3nx3Yc04kmm3OGVUiwAP@mail.gmail.com>
+References: <AANLkTimveJaqi3JiQ73kmus0yGwkusnAWy6W7Oy7VEwT@mail.gmail.com>
+	<AANLkTin7SsGBN8sWt9EdRcv+3nx3Yc04kmm3OGVUiwAP@mail.gmail.com>
+Message-ID: <AANLkTin+H6sTvFdLyz444inRbGhc4JRwnyKaodyEVXjo@mail.gmail.com>
+
+This should be supported now.
+
+Qt supports rotations at the view using methods like scale, rotate, etc.
+Most of the work was supporting this in conjunction with the rescaling
+performed by our special PlotView class. When using geometry rescale mode
+(the default, and desirable for your use-case) you'll need to tell the
+PlotView to update the scene geometry by calling the updateSceneGeometry()
+method.
+
+So it's like:
+
+v$rotate(90)
+v$updateSceneGeometry()
+
+Michael
+
+On Tue, Oct 19, 2010 at 4:15 PM, Michael Lawrence <michafla at gene.com> wrote:
+
+> Again, moved this over to qtinterfaces-devel.
+>
+> There are basically two transforms involved: one from item (layer) to scene
+> and one from scene to view (which might be translated by a third transform
+> to screen coordinates if there is a scrolled viewport). To rotate the entire
+> plot, axes layers included, it's probably best to modify the view transform.
+>
+> Unfortunately, the view transform basically must be identity if you're
+> using the geometry rescale mode in the plot view (the plot view is then
+> making sure that the plot fits in the viewport by changing the geometry of
+> the layer in the scene). I might be able to improve that if necessary
+> though. I guess I had not anticipated this use-case. It doesn't make sense
+> to zoom with the geometry rescale mode but rotations might make sense.
+>
+> Thanks for this suggestion,
+> Michael
+>
+>
+> On Tue, Oct 19, 2010 at 2:31 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>
+>> Hi everyone,
+>>
+>> I still feel lost in the Qt sea, but I believe it should be very easy
+>> to rotate a layer by 90 degrees, and I feel it is something like
+>> qdeviceTransform(), but I just don't know how to use this function.
+>> Can anyone give me an example? e.g. switch x and y in a scatter plot
+>> (without really switching the values of x and y)
+>>
+>> This can reduce the efforts on considering the direction of a plot,
+>> being horizontal or vertical; in my par-coords plots, I did this on
+>> the R level long ago. Maybe that is a waste of time.
+>>
+>> Thanks!
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups
+>> "GGobi core" group.
+>> To post to this group, send email to ggobi-core at googlegroups.com.
+>> To unsubscribe from this group, send email to
+>> ggobi-core+unsubscribe at googlegroups.com<ggobi-core%2Bunsubscribe at googlegroups.com>
+>> .
+>> For more options, visit this group at
+>> http://groups.google.com/group/ggobi-core?hl=en.
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101020/20200f98/attachment-0001.htm>
+
+From xieyihui at gmail.com  Thu Oct 21 05:50:26 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Wed, 20 Oct 2010 22:50:26 -0500
+Subject: [RQt-devel] an easy way to rotate a layer?
+In-Reply-To: <AANLkTin+H6sTvFdLyz444inRbGhc4JRwnyKaodyEVXjo@mail.gmail.com>
+References: <AANLkTimveJaqi3JiQ73kmus0yGwkusnAWy6W7Oy7VEwT@mail.gmail.com>
+	<AANLkTin7SsGBN8sWt9EdRcv+3nx3Yc04kmm3OGVUiwAP@mail.gmail.com>
+	<AANLkTin+H6sTvFdLyz444inRbGhc4JRwnyKaodyEVXjo@mail.gmail.com>
+Message-ID: <AANLkTi=uD_ezBuJ6NsFxhe_3DSt_nNBqVvvt5KJ7hAC7@mail.gmail.com>
+
+Perfect! Thanks so much!
+
+I didn't find the updateSceneGeometry() method, instead, there are
+update() and updateGeometry() methods which work as well.
+
+BTW, when there are texts in a layer, I will get this warning:
+
+Painter::setTransform: rotating matrices not supported
+
+To reproduce, run the code in this page:
+http://github.com/bigbear/cranvas/wiki/How-to-rotate-a-view
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Oct 20, 2010 at 10:03 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> This should be supported now.
+>
+> Qt supports rotations at the view using methods like scale, rotate, etc.
+> Most of the work was supporting this in conjunction with the rescaling
+> performed by our special PlotView class. When using geometry rescale mode
+> (the default, and desirable for your use-case) you'll need to tell the
+> PlotView to update the scene geometry by calling the updateSceneGeometry()
+> method.
+>
+> So it's like:
+>
+> v$rotate(90)
+> v$updateSceneGeometry()
+>
+> Michael
+>
+> On Tue, Oct 19, 2010 at 4:15 PM, Michael Lawrence <michafla at gene.com> wrote:
+>>
+>> Again, moved this over to qtinterfaces-devel.
+>>
+>> There are basically two transforms involved: one from item (layer) to
+>> scene and one from scene to view (which might be translated by a third
+>> transform to screen coordinates if there is a scrolled viewport). To rotate
+>> the entire plot, axes layers included, it's probably best to modify the view
+>> transform.
+>>
+>> Unfortunately, the view transform basically must be identity if you're
+>> using the geometry rescale mode in the plot view (the plot view is then
+>> making sure that the plot fits in the viewport by changing the geometry of
+>> the layer in the scene). I might be able to improve that if necessary
+>> though. I guess I had not anticipated this use-case. It doesn't make sense
+>> to zoom with the geometry rescale mode but rotations might make sense.
+>>
+>> Thanks for this suggestion,
+>> Michael
+>>
+>> On Tue, Oct 19, 2010 at 2:31 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>>>
+>>> Hi everyone,
+>>>
+>>> I still feel lost in the Qt sea, but I believe it should be very easy
+>>> to rotate a layer by 90 degrees, and I feel it is something like
+>>> qdeviceTransform(), but I just don't know how to use this function.
+>>> Can anyone give me an example? e.g. switch x and y in a scatter plot
+>>> (without really switching the values of x and y)
+>>>
+>>> This can reduce the efforts on considering the direction of a plot,
+>>> being horizontal or vertical; in my par-coords plots, I did this on
+>>> the R level long ago. Maybe that is a waste of time.
+>>>
+>>> Thanks!
+>>>
+>>> Regards,
+>>> Yihui
+>>> --
+>>> Yihui Xie <xieyihui at gmail.com>
+>>> Phone: 515-294-2465 Web: http://yihui.name
+>>> Department of Statistics, Iowa State University
+>>> 2215 Snedecor Hall, Ames, IA
+>>>
+>>> --
+>>> You received this message because you are subscribed to the Google Groups
+>>> "GGobi core" group.
+>>> To post to this group, send email to ggobi-core at googlegroups.com.
+>>> To unsubscribe from this group, send email to
+>>> ggobi-core+unsubscribe at googlegroups.com.
+>>> For more options, visit this group at
+>>> http://groups.google.com/group/ggobi-core?hl=en.
+>>>
+>>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+From lawrence.michael at gene.com  Thu Oct 21 06:27:38 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Oct 2010 21:27:38 -0700
+Subject: [RQt-devel] an easy way to rotate a layer?
+In-Reply-To: <AANLkTi=uD_ezBuJ6NsFxhe_3DSt_nNBqVvvt5KJ7hAC7@mail.gmail.com>
+References: <AANLkTimveJaqi3JiQ73kmus0yGwkusnAWy6W7Oy7VEwT@mail.gmail.com>
+	<AANLkTin7SsGBN8sWt9EdRcv+3nx3Yc04kmm3OGVUiwAP@mail.gmail.com>
+	<AANLkTin+H6sTvFdLyz444inRbGhc4JRwnyKaodyEVXjo@mail.gmail.com>
+	<AANLkTi=uD_ezBuJ6NsFxhe_3DSt_nNBqVvvt5KJ7hAC7@mail.gmail.com>
+Message-ID: <AANLkTi=6a7bm3JpGoRwmwtvLTjZSzU+KKMHEHPkZ=7jo@mail.gmail.com>
+
+I'm pretty sure either (1) you do not have the latest revision or (2) you
+need to clean out your source tree, e.g., R CMD INSTALL --preclean.
+
+
+On Wed, Oct 20, 2010 at 8:50 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> Perfect! Thanks so much!
+>
+> I didn't find the updateSceneGeometry() method, instead, there are
+> update() and updateGeometry() methods which work as well.
+>
+> BTW, when there are texts in a layer, I will get this warning:
+>
+> Painter::setTransform: rotating matrices not supported
+>
+> To reproduce, run the code in this page:
+> http://github.com/bigbear/cranvas/wiki/How-to-rotate-a-view
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Wed, Oct 20, 2010 at 10:03 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > This should be supported now.
+> >
+> > Qt supports rotations at the view using methods like scale, rotate, etc.
+> > Most of the work was supporting this in conjunction with the rescaling
+> > performed by our special PlotView class. When using geometry rescale mode
+> > (the default, and desirable for your use-case) you'll need to tell the
+> > PlotView to update the scene geometry by calling the
+> updateSceneGeometry()
+> > method.
+> >
+> > So it's like:
+> >
+> > v$rotate(90)
+> > v$updateSceneGeometry()
+> >
+> > Michael
+> >
+> > On Tue, Oct 19, 2010 at 4:15 PM, Michael Lawrence <michafla at gene.com>
+> wrote:
+> >>
+> >> Again, moved this over to qtinterfaces-devel.
+> >>
+> >> There are basically two transforms involved: one from item (layer) to
+> >> scene and one from scene to view (which might be translated by a third
+> >> transform to screen coordinates if there is a scrolled viewport). To
+> rotate
+> >> the entire plot, axes layers included, it's probably best to modify the
+> view
+> >> transform.
+> >>
+> >> Unfortunately, the view transform basically must be identity if you're
+> >> using the geometry rescale mode in the plot view (the plot view is then
+> >> making sure that the plot fits in the viewport by changing the geometry
+> of
+> >> the layer in the scene). I might be able to improve that if necessary
+> >> though. I guess I had not anticipated this use-case. It doesn't make
+> sense
+> >> to zoom with the geometry rescale mode but rotations might make sense.
+> >>
+> >> Thanks for this suggestion,
+> >> Michael
+> >>
+> >> On Tue, Oct 19, 2010 at 2:31 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+> >>>
+> >>> Hi everyone,
+> >>>
+> >>> I still feel lost in the Qt sea, but I believe it should be very easy
+> >>> to rotate a layer by 90 degrees, and I feel it is something like
+> >>> qdeviceTransform(), but I just don't know how to use this function.
+> >>> Can anyone give me an example? e.g. switch x and y in a scatter plot
+> >>> (without really switching the values of x and y)
+> >>>
+> >>> This can reduce the efforts on considering the direction of a plot,
+> >>> being horizontal or vertical; in my par-coords plots, I did this on
+> >>> the R level long ago. Maybe that is a waste of time.
+> >>>
+> >>> Thanks!
+> >>>
+> >>> Regards,
+> >>> Yihui
+> >>> --
+> >>> Yihui Xie <xieyihui at gmail.com>
+> >>> Phone: 515-294-2465 Web: http://yihui.name
+> >>> Department of Statistics, Iowa State University
+> >>> 2215 Snedecor Hall, Ames, IA
+> >>>
+> >>> --
+> >>> You received this message because you are subscribed to the Google
+> Groups
+> >>> "GGobi core" group.
+> >>> To post to this group, send email to ggobi-core at googlegroups.com.
+> >>> To unsubscribe from this group, send email to
+> >>> ggobi-core+unsubscribe at googlegroups.com<ggobi-core%2Bunsubscribe at googlegroups.com>
+> .
+> >>> For more options, visit this group at
+> >>> http://groups.google.com/group/ggobi-core?hl=en.
+> >>>
+> >>
+> >
+> >
+> > _______________________________________________
+> > Qtinterfaces-devel mailing list
+> > Qtinterfaces-devel at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+> >
+> >
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101020/053f5dfa/attachment.htm>
+
+From lawrence.michael at gene.com  Thu Oct 21 07:23:19 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Oct 2010 22:23:19 -0700
+Subject: [RQt-devel] segment glyph
+In-Reply-To: <AANLkTi=isqym+KA1yGfAWXQWgsuDC86GyM+-_pE+zTRc@mail.gmail.com>
+References: <AANLkTi=isqym+KA1yGfAWXQWgsuDC86GyM+-_pE+zTRc@mail.gmail.com>
+Message-ID: <AANLkTikqtBXKZFiR=75OUdhv3KKWQbeMpn7SbwdqWjuw@mail.gmail.com>
+
+I'll look into this. Just FYI, this works fine when OpenGL is disabled by
+passing opengl=FALSE to qplotView(). Need to get this working with GL.
+
+Michael
+
+On Wed, Oct 20, 2010 at 3:18 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> Hi,
+>
+> I want to define a glyph which is a short segment as follows, but when
+> the slope b=0, the glyph looks weird on screen (it is a filled
+> square); other slopes are fine. I don't know what's going on:
+>
+> library(qtpaint)
+> ## x: length; b: slope
+> qglyphSegment <- function(x = 5, b = 0) {
+>  glyph <- Qt$QPainterPath()
+>  x0 <- x * cos(atan(b))
+>  y0 <- x * sin(atan(b))
+>  glyph$moveTo(-x0, -y0)
+>  glyph$lineTo(x0, y0)
+> #  glyph$closeSubpath()
+>  glyph
+> }
+>
+> s <- qscene()
+> test_layer <- qlayer(s, function(layer, painter) {
+>    qdrawGlyph(painter, qglyphSegment(), 1:10, .5, stroke = 'black')
+>    qdrawGlyph(painter, qglyphSegment(10, 1), 1:10, .7, stroke = 'black')
+>    qdrawGlyph(painter, qglyphSegment(10, -1), 1:10, .3, stroke = 'black')
+> }, limits=qrect(0,0,11,1))
+> qplotView(s)
+> ## see the screenshot attached
+>
+>
+> Thanks!
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101020/f760b55f/attachment.htm>
+
+From lawrence.michael at gene.com  Fri Oct 22 06:53:06 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 21 Oct 2010 21:53:06 -0700
+Subject: [RQt-devel] segment glyph
+In-Reply-To: <AANLkTikqtBXKZFiR=75OUdhv3KKWQbeMpn7SbwdqWjuw@mail.gmail.com>
+References: <AANLkTi=isqym+KA1yGfAWXQWgsuDC86GyM+-_pE+zTRc@mail.gmail.com>
+	<AANLkTikqtBXKZFiR=75OUdhv3KKWQbeMpn7SbwdqWjuw@mail.gmail.com>
+Message-ID: <AANLkTi=hBRCZWfJgkpjS=WfxJm0HWRECYOt=smrCZiau@mail.gmail.com>
+
+I tried to fix this. Please let me know.
+
+Michael
+
+On Wed, Oct 20, 2010 at 10:23 PM, Michael Lawrence <michafla at gene.com>wrote:
+
+> I'll look into this. Just FYI, this works fine when OpenGL is disabled by
+> passing opengl=FALSE to qplotView(). Need to get this working with GL.
+>
+> Michael
+>
+> On Wed, Oct 20, 2010 at 3:18 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>
+>> Hi,
+>>
+>> I want to define a glyph which is a short segment as follows, but when
+>> the slope b=0, the glyph looks weird on screen (it is a filled
+>> square); other slopes are fine. I don't know what's going on:
+>>
+>> library(qtpaint)
+>> ## x: length; b: slope
+>> qglyphSegment <- function(x = 5, b = 0) {
+>>  glyph <- Qt$QPainterPath()
+>>  x0 <- x * cos(atan(b))
+>>  y0 <- x * sin(atan(b))
+>>  glyph$moveTo(-x0, -y0)
+>>  glyph$lineTo(x0, y0)
+>> #  glyph$closeSubpath()
+>>  glyph
+>> }
+>>
+>> s <- qscene()
+>> test_layer <- qlayer(s, function(layer, painter) {
+>>    qdrawGlyph(painter, qglyphSegment(), 1:10, .5, stroke = 'black')
+>>    qdrawGlyph(painter, qglyphSegment(10, 1), 1:10, .7, stroke = 'black')
+>>    qdrawGlyph(painter, qglyphSegment(10, -1), 1:10, .3, stroke = 'black')
+>> }, limits=qrect(0,0,11,1))
+>> qplotView(s)
+>> ## see the screenshot attached
+>>
+>>
+>> Thanks!
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>>
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101021/547c3022/attachment.htm>
+
+From xieyihui at gmail.com  Fri Oct 22 21:45:39 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Fri, 22 Oct 2010 14:45:39 -0500
+Subject: [RQt-devel] segment glyph
+In-Reply-To: <AANLkTi=hBRCZWfJgkpjS=WfxJm0HWRECYOt=smrCZiau@mail.gmail.com>
+References: <AANLkTi=isqym+KA1yGfAWXQWgsuDC86GyM+-_pE+zTRc@mail.gmail.com>
+	<AANLkTikqtBXKZFiR=75OUdhv3KKWQbeMpn7SbwdqWjuw@mail.gmail.com>
+	<AANLkTi=hBRCZWfJgkpjS=WfxJm0HWRECYOt=smrCZiau@mail.gmail.com>
+Message-ID: <AANLkTikneNbf9NeuN_rUMs4jR8fHcLX7QcRskeM24Pk6@mail.gmail.com>
+
+It works great now. See the last two pictures:
+http://github.com/bigbear/cranvas/wiki/Parallel-coordinates-plot
+
+Thanks a lot!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Thu, Oct 21, 2010 at 11:53 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> I tried to fix this. Please let me know.
+>
+> Michael
+>
+> On Wed, Oct 20, 2010 at 10:23 PM, Michael Lawrence <michafla at gene.com>
+> wrote:
+>>
+>> I'll look into this. Just FYI, this works fine when OpenGL is disabled by
+>> passing opengl=FALSE to qplotView(). Need to get this working with GL.
+>>
+>> Michael
+>>
+>> On Wed, Oct 20, 2010 at 3:18 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>>>
+>>> Hi,
+>>>
+>>> I want to define a glyph which is a short segment as follows, but when
+>>> the slope b=0, the glyph looks weird on screen (it is a filled
+>>> square); other slopes are fine. I don't know what's going on:
+>>>
+>>> library(qtpaint)
+>>> ## x: length; b: slope
+>>> qglyphSegment <- function(x = 5, b = 0) {
+>>> ?glyph <- Qt$QPainterPath()
+>>> ?x0 <- x * cos(atan(b))
+>>> ?y0 <- x * sin(atan(b))
+>>> ?glyph$moveTo(-x0, -y0)
+>>> ?glyph$lineTo(x0, y0)
+>>> # ?glyph$closeSubpath()
+>>> ?glyph
+>>> }
+>>>
+>>> s <- qscene()
+>>> test_layer <- qlayer(s, function(layer, painter) {
+>>> ? ?qdrawGlyph(painter, qglyphSegment(), 1:10, .5, stroke = 'black')
+>>> ? ?qdrawGlyph(painter, qglyphSegment(10, 1), 1:10, .7, stroke = 'black')
+>>> ? ?qdrawGlyph(painter, qglyphSegment(10, -1), 1:10, .3, stroke = 'black')
+>>> }, limits=qrect(0,0,11,1))
+>>> qplotView(s)
+>>> ## see the screenshot attached
+>>>
+>>>
+>>> Thanks!
+>>>
+>>> Regards,
+>>> Yihui
+>>> --
+>>> Yihui Xie <xieyihui at gmail.com>
+>>> Phone: 515-294-2465 Web: http://yihui.name
+>>> Department of Statistics, Iowa State University
+>>> 2215 Snedecor Hall, Ames, IA
+>>>
+>>> _______________________________________________
+>>> Qtinterfaces-devel mailing list
+>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>
+>>
+>
+>
+

@@ -1,0 +1,49 @@
+From pasi.haapakorva at thl.fi  Fri Jan 29 11:00:26 2016
+From: pasi.haapakorva at thl.fi (Haapakorva Pasi)
+Date: Fri, 29 Jan 2016 10:00:26 +0000
+Subject: [Traminer-users] Limit on cases due to 32bit vector
+Message-ID: <BCB8ADC546D6234C950F5441D00F7F1D3BB1159E@HELW040.stakes.fi>
+
+Hi all,
+
+I've discovered a 32bit limit on cases (even on a 64bit system). This is due to the vector size limit in R (3.2.3, 64bit, Windows x64), which is 2^31-1.
+
+> .Machine$integer.max
+[1] 2147483647
+> 2^31-1
+[1] 2147483647
+
+> sqrt(2^31-1)
+[1] 46340.95
+
+Regardless of full.matrix=true/false (because vector size doesn't change), seqdist() stops abruptly whenever there are more than 46341 cases. 46341 works fine, but 46342 does not. You can try this yourself (but if you change the size to anything less, you need a lot of RAM. 46341 eats about 30 gbs of RAM):
+
+----------
+library(TraMineR)
+
+id <- seq(from=1, to=46342, by=1)
+set.seed(234324)
+time1 <- sample(seq(from=1, to=3, by=1), size=46342, replace=TRUE)
+time2 <- sample(seq(from=1, to=3, by=1), size=46342, replace=TRUE)
+time3 <- sample(seq(from=1, to=3, by=1), size=46342, replace=TRUE)
+
+testdata <- data.frame(id, time1, time2, time3)
+
+testseq <- seqdef(testdata, 2:4)
+testdist <- seqdist(testseq, method="OM", indel=1, sm="TRATE", full.matrix=FALSE)
+---------
+
+This is important, because adding more RAM won't help, and neither won't renting a super computer.
+
+One might ask if a smaller sample would work, but I want to use all the cases I have (a birth cohort of 60,000) to get more reliable results later on (narrower confidence intervals). I can at least create clusters from two smaller samples and combine visually similar clusters from the two datas.
+
+Do you think we could get around the 2^31-1 limit? There has been a int64 package, which doesn't seem to be maintained anymore. Any other ideas? Input from the developers? I'm not a developer myself, so I can't do much.
+
+I haven't found many similar issues, but some have been solved with wcAggregateCases, which has happened to lower the case amount to less than 2^31-1: http://stackoverflow.com/questions/15929936/problem-with-big-data-during-computation-of-sequence-distances-using-tramine
+
+
+Pasi Haapakorva
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20160129/bc48b12e/attachment.html>
+

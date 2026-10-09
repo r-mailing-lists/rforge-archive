@@ -1,0 +1,398 @@
+From romain.francois at dbmail.com  Fri Aug 14 16:13:10 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Fri, 14 Aug 2009 16:13:10 +0200
+Subject: [Remoterengine-devel] test
+Message-ID: <4A8570F6.8050507@dbmail.com>
+
+test
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+From romain.francois at dbmail.com  Fri Aug 14 17:17:30 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Fri, 14 Aug 2009 17:17:30 +0200
+Subject: [Remoterengine-devel] wiki page for remoterengine
+Message-ID: <4A85800A.1010809@dbmail.com>
+
+Hello,
+
+I have created a wiki page to exchange thoughts on the development of 
+the engine.
+
+http://wiki.r-project.org/rwiki/doku.php?id=packages:r-forge:remoterengine
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+From romain.francois at dbmail.com  Thu Aug 20 12:28:57 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 20 Aug 2009 12:28:57 +0200
+Subject: [Remoterengine-devel] updated wiki page
+Message-ID: <4A8D2569.9040108@dbmail.com>
+
+Hello,
+
+I've updated the wiki page for the RemoteREngine to include:
+- install instructions
+- how to start the engine
+- hello world client code
+
+Enjoy,
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+From romain.francois at dbmail.com  Thu Aug 20 12:30:21 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 20 Aug 2009 12:30:21 +0200
+Subject: [Remoterengine-devel] updated wiki page
+In-Reply-To: <4A8D2569.9040108@dbmail.com>
+References: <4A8D2569.9040108@dbmail.com>
+Message-ID: <4A8D25BD.1020804@dbmail.com>
+
+And the link is :
+http://wiki.r-project.org/rwiki/doku.php?id=packages:r-forge:remoterengine
+
+On 08/20/2009 12:28 PM, Romain Francois wrote:
+> Hello,
+>
+> I've updated the wiki page for the RemoteREngine to include:
+> - install instructions
+> - how to start the engine
+> - hello world client code
+>
+> Enjoy,
+>
+> Romain
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+From romain.francois at dbmail.com  Mon Aug 24 11:16:55 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Mon, 24 Aug 2009 11:16:55 +0200
+Subject: [Remoterengine-devel] callbacks on RemoteREngine and server side
+	console
+Message-ID: <4A925A87.3010605@dbmail.com>
+
+Hello,
+
+I've finally enabled main loop callbacks on the RemoteREngine so that R 
+read eval print loop (REPL) callbacks are sent to interested parties.
+
+== callbacks ==
+
+Because of rmi, I could not have this as blocking calls, so it is done 
+by wrapping the information in a RCallback object and sending this 
+object to callback listeners, which are then supposed to handle it 
+(asynchronously).
+
+The RCallback has a needsResponse method that indicates if this callback 
+needs a response (at the moment only the ChooseFileCallback callback 
+needs a response). When the callback needs a response, the client is 
+supposed to call the sendResponse method (responses are associated with 
+the callback they originated from by a simple id mechanism).
+
+The server will keep a reference to callbacks for which it waits for a 
+response and act accordingly the first time it receives a response for a 
+given callback. it will also send another callback to indicate that no 
+further response is needed.
+
+ReadConsoleCallbacks are handled separately at the moment, clients call 
+the sendToConsole method, this adds a command to the queue of commands 
+that feed the REPL. The REPL is sent a command as soon as the queue is 
+not empty. Maybe later we can add the ability to remove queued commands, 
+etc ...
+
+== server side console ==
+
+when you start the server, at the moment you get a fairly simple console 
+that allows you to cleanly shut the server: it lets the clients know 
+about it, it unbinds the server from the rmiregistry and finally shuts 
+the jvm.
+
+I'd like to turn this console into an actual R console so that we can 
+type commands into the REPL from the server side. For that, the 
+ConsoleThread implements CallbackListener (dummy implementation atm).
+
+The problem I have is that the server side console is now implemented 
+with a BufferedRead( InputStreamReader( System.in) ) and that the 
+readLine method blocks which makes it difficult to implement the console.
+
+Also there are more capable console readers available such as jline or 
+the gnu readline bindings for java or we could make a simple swing 
+widget on the server side.
+
+What I probably need to do is write an interface for what the console is 
+supposed to do, provide a default implementation that needs only java 
+(no other libraries) and add the possibility to plug another 
+implementation (jline,...) so to get more capable readline capabilities 
+(such as completions, command history, ...)
+
+Anyone willing to help on this ?
+
+Romain
+
+http://jline.sourceforge.net/
+http://java-readline.sourceforge.net/
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+From romain.francois at dbmail.com  Mon Aug 24 12:38:52 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Mon, 24 Aug 2009 12:38:52 +0200
+Subject: [Remoterengine-devel] callbacks on RemoteREngine and server
+ side console
+In-Reply-To: <4A925A87.3010605@dbmail.com>
+References: <4A925A87.3010605@dbmail.com>
+Message-ID: <4A926DBC.7080801@dbmail.com>
+
+On 08/24/2009 11:16 AM, Romain Francois wrote:
+>
+> Hello,
+>
+> I've finally enabled main loop callbacks on the RemoteREngine so that R
+> read eval print loop (REPL) callbacks are sent to interested parties.
+>
+> == callbacks ==
+>
+> Because of rmi, I could not have this as blocking calls, so it is done
+> by wrapping the information in a RCallback object and sending this
+> object to callback listeners, which are then supposed to handle it
+> (asynchronously).
+>
+> The RCallback has a needsResponse method that indicates if this callback
+> needs a response (at the moment only the ChooseFileCallback callback
+> needs a response). When the callback needs a response, the client is
+> supposed to call the sendResponse method (responses are associated with
+> the callback they originated from by a simple id mechanism).
+>
+> The server will keep a reference to callbacks for which it waits for a
+> response and act accordingly the first time it receives a response for a
+> given callback. it will also send another callback to indicate that no
+> further response is needed.
+>
+> ReadConsoleCallbacks are handled separately at the moment, clients call
+> the sendToConsole method, this adds a command to the queue of commands
+> that feed the REPL. The REPL is sent a command as soon as the queue is
+> not empty. Maybe later we can add the ability to remove queued commands,
+> etc ...
+>
+> == server side console ==
+>
+> when you start the server, at the moment you get a fairly simple console
+> that allows you to cleanly shut the server: it lets the clients know
+> about it, it unbinds the server from the rmiregistry and finally shuts
+> the jvm.
+>
+> I'd like to turn this console into an actual R console so that we can
+> type commands into the REPL from the server side. For that, the
+> ConsoleThread implements CallbackListener (dummy implementation atm).
+>
+> The problem I have is that the server side console is now implemented
+> with a BufferedRead( InputStreamReader( System.in) ) and that the
+> readLine method blocks which makes it difficult to implement the console.
+
+It seems java.nio might help:
+http://stackoverflow.com/questions/804951/is-it-possible-to-read-from-a-java-inputstream-with-a-timeout
+
+I'll experiment with this.
+
+
+> Also there are more capable console readers available such as jline or
+> the gnu readline bindings for java or we could make a simple swing
+> widget on the server side.
+>
+> What I probably need to do is write an interface for what the console is
+> supposed to do, provide a default implementation that needs only java
+> (no other libraries) and add the possibility to plug another
+> implementation (jline,...) so to get more capable readline capabilities
+> (such as completions, command history, ...)
+>
+> Anyone willing to help on this ?
+>
+ >
+> Romain
+>
+> http://jline.sourceforge.net/
+> http://java-readline.sourceforge.net/
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+From romain.francois at dbmail.com  Thu Aug 27 11:12:09 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 27 Aug 2009 11:12:09 +0200
+Subject: [Remoterengine-devel] service mechanism
+Message-ID: <4A964DE9.60504@dbmail.com>
+
+Hi,
+
+I've commited a "simple" service mechanism in the RemoteREngine code so 
+that we can implement variations of some bahaviours. For example reading 
+a line from the console involves the ConsoleReadLine interface, which is 
+a service and the default implementation of this service is given by the 
+DefaultConsoleReadLine class.
+
+Here are the steps to take advantage of this
+- create a service interface : Service is just a marker interface, so 
+there is no more to do than declare that your interface extends Service
+- create an implementation of the service, as usual you create a class 
+that implements the service interface you described above
+- You need to annotate the class with the "ServiceImplementation" annotation
+
+Under the carpet, this happens, at compile time, the 
+ServiceImplementation annotations are processed, which creates a file 
+called services.xml that is deployed in the jar. Currently it looks like 
+this :
+
+
+<?xml version="1.0"?>
+<services>
+   <!-- this is an autogenerated file, do not change -->
+
+   <service
+      class="org.rosuda.REngine.remote.common.console.ConsoleReadLine"
+      name="default"
+ 
+implementation="org.rosuda.REngine.remote.common.console.DefaultConsoleReadLine" 
+/>
+
+</services>
+
+
+The xml file is then parsed to feed the ServiceManager class, which you 
+can then use to create instances of your services, with the getInstance 
+method :
+
+public static <T extends Service> T getInstance( Class<T> serviceClass, 
+String name) throws ServiceException
+
+(at the moment the ConsoleThread class uses it:
+
+reader = ServiceManager.getInstance(ConsoleReadLine.class, "default") ;
+
+I'm hoping that with a mechanism like this, we can keep the code light 
+but provide hooks for extended functionality. For example, I plan to use 
+jline for implementing the "ConsoleReadLine" interface to get features 
+such as completion and history in the console, but I would like to have 
+this as a separate pluggable component.
+
+One other potential use is for logging, we would create an interface 
+that declares the logging behaviour and provide a default implementation 
+using only regular java classes, and maybe an additional component 
+outside using Log4J or something.
+
+One thing I have not done yet though is a strategy for loading 
+additional jars , ... I guess I'll cross that bridge when I work on the 
+jline stuff
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+From romain.francois at dbmail.com  Thu Aug 27 15:02:16 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 27 Aug 2009 15:02:16 +0200
+Subject: [Remoterengine-devel] enabled commits mailing list
+Message-ID: <4A9683D8.2040608@dbmail.com>
+
+Just to let you know that I have enabled the automatic delivery of 
+commit messages to the "remoterengine-commits" mailing list.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+From francoisromain at free.fr  Thu Aug 27 18:01:57 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Thu, 27 Aug 2009 18:01:57 +0200
+Subject: [Remoterengine-devel] console example on the wiki
+Message-ID: <4A96ADF5.8040305@free.fr>
+
+Hi,
+
+I posted a simple example console example in the wiki;
+http://wiki.r-project.org/rwiki/doku.php?id=packages:r-forge:remoterengine:examples:console
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/w33B : Completion for java objects
+|- http://tr.im/vzip : Code Snippet : List of CRAN packages
+`- http://tr.im/vsK1 : R parser package on CRAN
+
+
+

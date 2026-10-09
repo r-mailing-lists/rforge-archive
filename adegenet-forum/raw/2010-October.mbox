@@ -1,0 +1,757 @@
+From scastillo at nrdpfc.ca  Tue Oct 19 17:20:29 2010
+From: scastillo at nrdpfc.ca (Sarrah Castillo)
+Date: Tue, 19 Oct 2010 11:20:29 -0400
+Subject: [adegenet-forum] Looking for help with a PCA using adegenet in R
+Message-ID: <9E146C5F45A3BD4B8D5EDC9D8DFB722A038B2A@fisher.nrdpfc.ca>
+
+Hello Dr. Jombart
+I was wondering if you could help me with an issue I am having with your program (Adegenet) in R.
+I am attempting to perform a PCA using a structure file. The difference is that this is based on tetraploid data.  Structure allows for multiple ploidy, however I am unsure of how to have the program read my data as tetraploid instead of diploid. The genetic information is for a single locus with between 2-4 alleles (with -9 representing missing data)
+
+Here is an example of my file (with -9 representing missing data)
+
+Ind	Reg	Al1	Al2	Al3	Al4
+271	ON	7	10	11	-9
+273	ON	2	10	13	-9
+272	ON	4	11	12	-9
+465	ON	1	2	-9	-9
+472	ON	3	6	11	19
+489	ON	2	3	4	19
+519	ON	7	12	-9	-9
+551	ON	7	14	43	-9
+466	ON	4	5	15	19
+749	ON	7	14	20	26
+111	ON	5	7	8	-9
+173	ON	4	11	21	-9
+318	ON	7	21	24	-9
+319	ON	1	20	26	49
+323	ON	7	16	20	26
+341	ON	7	25	27	49
+385	ON	3	19	25	49
+485	ON	7	9	12	-9
+
+Ind=individual
+Reg=region
+Al1= allele 1
+Al2= allele 2
+Al3= allele 3
+Al4= allele 4
+
+
+Any help would be much appreciated.
+
+Thank you
+Sarrah Castillo
+
+
+____________________
+Sarrah Castillo
+MSc Candidate
+Environmental & Life Sciences Graduate Program
+Trent University, 2140 East Bank Drive, 
+Peterborough, Ontario, K9J 7B8, Canada
+e-mail:scastillo at nrdpfc.ca
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20101019/3db72e40/attachment.htm>
+
+From t.jombart at imperial.ac.uk  Tue Oct 19 18:37:55 2010
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Tue, 19 Oct 2010 17:37:55 +0100
+Subject: [adegenet-forum] Looking for help with a PCA using adegenet in R
+In-Reply-To: <9E146C5F45A3BD4B8D5EDC9D8DFB722A038B2A@fisher.nrdpfc.ca>
+References: <9E146C5F45A3BD4B8D5EDC9D8DFB722A038B2A@fisher.nrdpfc.ca>
+Message-ID: <60AAE8805AAC4B44A8DF1888C0CBFDC404CDB5B8@ICEXM3.ic.ac.uk>
+
+Dear Sarrah, 
+
+In this case read.structure should not be used - it is designed for diploid individuals only. Fortunately, you can still read your data in adegenet using df2genind.
+
+The trick consists in merging the 4 alleles into a single character string:
+#####
+> foo=read.table("foo.txt", head=TRUE)
+> head(foo)
+  Ind Reg Al1 Al2 Al3 Al4
+1 271  ON   7  10  11  -9
+2 273  ON   2  10  13  -9
+3 272  ON   4  11  12  -9
+4 465  ON   1   2  -9  -9
+5 472  ON   3   6  11  19
+6 489  ON   2   3   4  19
+> gen=apply(foo[,3:6],1,paste,collapse="/")
+> gen
+ [1] "7/10/11/-9" "2/10/13/-9" "4/11/12/-9" "1/2/-9/-9"  "3/6/11/19" 
+ [6] "2/3/4/19"   "7/12/-9/-9" "7/14/43/-9" "4/5/15/19"  "7/14/20/26"
+[11] "5/7/8/-9"   "4/11/21/-9" "7/21/24/-9" "1/20/26/49" "7/16/20/26"
+[16] "7/25/27/49" "3/19/25/49" "7/9/12/-9" 
+#####
+
+A problem in your data is that for a single locus and individual, it happens that some but not all data are missing (expl:  "1/2/-9/-9"). Are these actual tetraploid data? Or is the actual ploidy unknown?
+For now, I consider that frequencies cannot be inferred as soon as there is at least one NA.
+
+#####
+> isNA=grep("-9",gen)
+> gen[isNA] <- NA
+> gen
+ [1] NA           NA           NA           NA           "3/6/11/19" 
+ [6] "2/3/4/19"   NA           NA           "4/5/15/19"  "7/14/20/26"
+[11] NA           NA           NA           "1/20/26/49" "7/16/20/26"
+[16] "7/25/27/49" "3/19/25/49" NA          
+##### 
+
+We can now obtain the genind object:
+
+#####
+>  x=df2genind(data.frame(gen), ind.names=foo$Ind, pop=foo$Reg, sep="/", ploidy=4)
+Warning message:
+In df2genind(data.frame(gen), ind.names = foo$Ind, pop = foo$Reg,  :
+  entirely non-type individual(s) deleted
+> truenames(x)
+$tab
+    gen.01 gen.02 gen.03 gen.04 gen.05 gen.06 gen.07 gen.11 gen.14 gen.15
+472   0.00   0.00   0.25   0.00   0.00   0.25   0.00   0.25   0.00   0.00
+489   0.00   0.25   0.25   0.25   0.00   0.00   0.00   0.00   0.00   0.00
+466   0.00   0.00   0.00   0.25   0.25   0.00   0.00   0.00   0.00   0.25
+749   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.25   0.00
+319   0.25   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+323   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.00   0.00
+341   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.00   0.00
+385   0.00   0.00   0.25   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+    gen.16 gen.19 gen.20 gen.25 gen.26 gen.27 gen.49
+472   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+489   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+466   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+749   0.00   0.00   0.25   0.00   0.25   0.00   0.00
+319   0.00   0.00   0.25   0.00   0.25   0.00   0.25
+323   0.25   0.00   0.25   0.00   0.25   0.00   0.00
+341   0.00   0.00   0.00   0.25   0.00   0.25   0.25
+385   0.00   0.25   0.00   0.25   0.00   0.00   0.25
+
+$pop
+[1] ON ON ON ON ON ON ON ON
+Levels: ON
+
+> genind2df(x, sep="/")
+    pop         gen
+472  ON 03/06/11/19
+489  ON 02/03/04/19
+466  ON 04/05/15/19
+749  ON 07/14/20/26
+319  ON 01/20/26/49
+323  ON 07/16/20/26
+341  ON 07/25/27/49
+385  ON 03/19/25/49
+#####
+
+Now you can use 'x' as any other genind object:
+#####
+> Hs(x)
+        1 
+0.9238281 
+> summary(x)
+ # Total number of genotypes:  8 
+
+ # Population sample sizes:  
+ON 
+ 8 
+
+ # Number of alleles per locus:  
+L1 
+17 
+
+[etc.]
+#####
+
+Best regards,
+
+Thibaut
+
+
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] On Behalf Of Sarrah Castillo [scastillo at nrdpfc.ca]
+Sent: 19 October 2010 16:20
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] Looking for help with a PCA using adegenet in R
+
+Hello Dr. Jombart
+I was wondering if you could help me with an issue I am having with your program (Adegenet) in R.
+I am attempting to perform a PCA using a structure file. The difference is that this is based on tetraploid data.  Structure allows for multiple ploidy, however I am unsure of how to have the program read my data as tetraploid instead of diploid. The genetic information is for a single locus with between 2-4 alleles (with -9 representing missing data)
+
+Here is an example of my file (with -9 representing missing data)
+
+Ind     Reg     Al1     Al2     Al3     Al4
+271     ON      7       10      11      -9
+273     ON      2       10      13      -9
+272     ON      4       11      12      -9
+465     ON      1       2       -9      -9
+472     ON      3       6       11      19
+489     ON      2       3       4       19
+519     ON      7       12      -9      -9
+551     ON      7       14      43      -9
+466     ON      4       5       15      19
+749     ON      7       14      20      26
+111     ON      5       7       8       -9
+173     ON      4       11      21      -9
+318     ON      7       21      24      -9
+319     ON      1       20      26      49
+323     ON      7       16      20      26
+341     ON      7       25      27      49
+385     ON      3       19      25      49
+485     ON      7       9       12      -9
+
+Ind=individual
+Reg=region
+Al1= allele 1
+Al2= allele 2
+Al3= allele 3
+Al4= allele 4
+
+
+Any help would be much appreciated.
+
+Thank you
+Sarrah Castillo
+
+
+____________________
+Sarrah Castillo
+MSc Candidate
+Environmental & Life Sciences Graduate Program
+Trent University, 2140 East Bank Drive,
+Peterborough, Ontario, K9J 7B8, Canada
+e-mail:scastillo at nrdpfc.ca
+
+
+
+From scastillo at nrdpfc.ca  Tue Oct 19 19:13:22 2010
+From: scastillo at nrdpfc.ca (Sarrah Castillo)
+Date: Tue, 19 Oct 2010 13:13:22 -0400
+Subject: [adegenet-forum] Looking for help with a PCA using adegenet in R
+References: <9E146C5F45A3BD4B8D5EDC9D8DFB722A038B2A@fisher.nrdpfc.ca>
+	<60AAE8805AAC4B44A8DF1888C0CBFDC404CDB5B8@ICEXM3.ic.ac.uk>
+Message-ID: <9E146C5F45A3BD4B8D5EDC9D8DFB722A038B2E@fisher.nrdpfc.ca>
+
+Hello again
+About the ploidy.  We are looking at MHC genes, specifically MHC DRB exon 2.  We found that it is duplication, with individuals possessing between 2-4 alleles (Castillo et al. 2010).  Individuals with 2 alleles are presumed to be homozygous at each locus (hence why genotype would be 1 2 -9 -9).
+We are having trouble running our data in the usual genetic software due to the ploidy issue, we are sure that it is duplicated therefore ploidy is up to tetraploid, but individuals range with 2, 3, and 4 alleles.
+
+I am unsure of how else to represent this other than missing data (as they are still important)
+
+Therefore, the differences in number of alleles/individual is important for the structure and should be used during the analyzes.  Any advice would be appreciated
+
+Sarrah
+
+
+____________________
+Sarrah Castillo
+MSc Candidate
+Environmental & Life Sciences Graduate Program
+Trent University, 2140 East Bank Drive, 
+Peterborough, Ontario, K9J 7B8, Canada
+e-mail:scastillo at nrdpfc.ca
+
+
+
+-----Original Message-----
+From: Jombart, Thibaut [mailto:t.jombart at imperial.ac.uk]
+Sent: Tue 19/10/2010 12:37
+To: Sarrah Castillo; adegenet-forum at lists.r-forge.r-project.org
+Subject: RE: Looking for help with a PCA using adegenet in R
+ 
+Dear Sarrah, 
+
+In this case read.structure should not be used - it is designed for diploid individuals only. Fortunately, you can still read your data in adegenet using df2genind.
+
+The trick consists in merging the 4 alleles into a single character string:
+#####
+> foo=read.table("foo.txt", head=TRUE)
+> head(foo)
+  Ind Reg Al1 Al2 Al3 Al4
+1 271  ON   7  10  11  -9
+2 273  ON   2  10  13  -9
+3 272  ON   4  11  12  -9
+4 465  ON   1   2  -9  -9
+5 472  ON   3   6  11  19
+6 489  ON   2   3   4  19
+> gen=apply(foo[,3:6],1,paste,collapse="/")
+> gen
+ [1] "7/10/11/-9" "2/10/13/-9" "4/11/12/-9" "1/2/-9/-9"  "3/6/11/19" 
+ [6] "2/3/4/19"   "7/12/-9/-9" "7/14/43/-9" "4/5/15/19"  "7/14/20/26"
+[11] "5/7/8/-9"   "4/11/21/-9" "7/21/24/-9" "1/20/26/49" "7/16/20/26"
+[16] "7/25/27/49" "3/19/25/49" "7/9/12/-9" 
+#####
+
+A problem in your data is that for a single locus and individual, it happens that some but not all data are missing (expl:  "1/2/-9/-9"). Are these actual tetraploid data? Or is the actual ploidy unknown?
+For now, I consider that frequencies cannot be inferred as soon as there is at least one NA.
+
+#####
+> isNA=grep("-9",gen)
+> gen[isNA] <- NA
+> gen
+ [1] NA           NA           NA           NA           "3/6/11/19" 
+ [6] "2/3/4/19"   NA           NA           "4/5/15/19"  "7/14/20/26"
+[11] NA           NA           NA           "1/20/26/49" "7/16/20/26"
+[16] "7/25/27/49" "3/19/25/49" NA          
+##### 
+
+We can now obtain the genind object:
+
+#####
+>  x=df2genind(data.frame(gen), ind.names=foo$Ind, pop=foo$Reg, sep="/", ploidy=4)
+Warning message:
+In df2genind(data.frame(gen), ind.names = foo$Ind, pop = foo$Reg,  :
+  entirely non-type individual(s) deleted
+> truenames(x)
+$tab
+    gen.01 gen.02 gen.03 gen.04 gen.05 gen.06 gen.07 gen.11 gen.14 gen.15
+472   0.00   0.00   0.25   0.00   0.00   0.25   0.00   0.25   0.00   0.00
+489   0.00   0.25   0.25   0.25   0.00   0.00   0.00   0.00   0.00   0.00
+466   0.00   0.00   0.00   0.25   0.25   0.00   0.00   0.00   0.00   0.25
+749   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.25   0.00
+319   0.25   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+323   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.00   0.00
+341   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.00   0.00
+385   0.00   0.00   0.25   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+    gen.16 gen.19 gen.20 gen.25 gen.26 gen.27 gen.49
+472   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+489   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+466   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+749   0.00   0.00   0.25   0.00   0.25   0.00   0.00
+319   0.00   0.00   0.25   0.00   0.25   0.00   0.25
+323   0.25   0.00   0.25   0.00   0.25   0.00   0.00
+341   0.00   0.00   0.00   0.25   0.00   0.25   0.25
+385   0.00   0.25   0.00   0.25   0.00   0.00   0.25
+
+$pop
+[1] ON ON ON ON ON ON ON ON
+Levels: ON
+
+> genind2df(x, sep="/")
+    pop         gen
+472  ON 03/06/11/19
+489  ON 02/03/04/19
+466  ON 04/05/15/19
+749  ON 07/14/20/26
+319  ON 01/20/26/49
+323  ON 07/16/20/26
+341  ON 07/25/27/49
+385  ON 03/19/25/49
+#####
+
+Now you can use 'x' as any other genind object:
+#####
+> Hs(x)
+        1 
+0.9238281 
+> summary(x)
+ # Total number of genotypes:  8 
+
+ # Population sample sizes:  
+ON 
+ 8 
+
+ # Number of alleles per locus:  
+L1 
+17 
+
+[etc.]
+#####
+
+Best regards,
+
+Thibaut
+
+
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] On Behalf Of Sarrah Castillo [scastillo at nrdpfc.ca]
+Sent: 19 October 2010 16:20
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] Looking for help with a PCA using adegenet in R
+
+Hello Dr. Jombart
+I was wondering if you could help me with an issue I am having with your program (Adegenet) in R.
+I am attempting to perform a PCA using a structure file. The difference is that this is based on tetraploid data.  Structure allows for multiple ploidy, however I am unsure of how to have the program read my data as tetraploid instead of diploid. The genetic information is for a single locus with between 2-4 alleles (with -9 representing missing data)
+
+Here is an example of my file (with -9 representing missing data)
+
+Ind     Reg     Al1     Al2     Al3     Al4
+271     ON      7       10      11      -9
+273     ON      2       10      13      -9
+272     ON      4       11      12      -9
+465     ON      1       2       -9      -9
+472     ON      3       6       11      19
+489     ON      2       3       4       19
+519     ON      7       12      -9      -9
+551     ON      7       14      43      -9
+466     ON      4       5       15      19
+749     ON      7       14      20      26
+111     ON      5       7       8       -9
+173     ON      4       11      21      -9
+318     ON      7       21      24      -9
+319     ON      1       20      26      49
+323     ON      7       16      20      26
+341     ON      7       25      27      49
+385     ON      3       19      25      49
+485     ON      7       9       12      -9
+
+Ind=individual
+Reg=region
+Al1= allele 1
+Al2= allele 2
+Al3= allele 3
+Al4= allele 4
+
+
+Any help would be much appreciated.
+
+Thank you
+Sarrah Castillo
+
+
+____________________
+Sarrah Castillo
+MSc Candidate
+Environmental & Life Sciences Graduate Program
+Trent University, 2140 East Bank Drive,
+Peterborough, Ontario, K9J 7B8, Canada
+e-mail:scastillo at nrdpfc.ca
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20101019/05b06f66/attachment-0001.htm>
+
+From t.jombart at imperial.ac.uk  Wed Oct 20 11:36:00 2010
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Wed, 20 Oct 2010 10:36:00 +0100
+Subject: [adegenet-forum] Looking for help with a PCA using adegenet in R
+In-Reply-To: <9E146C5F45A3BD4B8D5EDC9D8DFB722A038B2E@fisher.nrdpfc.ca>
+References: <9E146C5F45A3BD4B8D5EDC9D8DFB722A038B2A@fisher.nrdpfc.ca>
+	<60AAE8805AAC4B44A8DF1888C0CBFDC404CDB5B8@ICEXM3.ic.ac.uk>,
+	<9E146C5F45A3BD4B8D5EDC9D8DFB722A038B2E@fisher.nrdpfc.ca>
+Message-ID: <60AAE8805AAC4B44A8DF1888C0CBFDC409CCF7AF@ICEXM3.ic.ac.uk>
+
+Dear Sarrah, 
+
+Coding 1/2/NA/NA individuals that are actually 1/2 is a bit misleading: it suggests tetraploid individual with partially unknown genotype, while it is a fully typed diploid...
+
+So far I have rarely seen data in which different individuals had different levels of ploidy, and so no ad hoc procedure has been implemented for importing such data in adegenet. genind objects do not allow ploidy to vary between loci or individuals. However, they handle relative allele frequencies, which would be appropriate in your case. So the first solution I can think of is create a 'wrong' genind object (as the indication of ploidy will be meaningless), and use it in further procedures which only rely on allele frequencies.
+
+For this, you will need to recode your data as a matrix such that each column is a specific allele, each row is an individual, and data are frequencies, i.e. summing to 1 for each locus and individual:
+          loc1.all1   loc1.all2   loc1.all3   loc2.all1   loc2.all2   ...
+ind1  ...
+ind2 ...
+
+where loc1, loc2, ... are to be replaced by the loci names, and where all1, all2, ... are replaced by allele names.
+
+For instance, the data:
+          genA   genB
+ind1   1/2   3/1/
+ind2   1/2/3/4   1/1/1
+
+would be recoded
+          genA.1   genA.2    genA.3   genA.4   genB.1   genB.3
+ind1   0.5      0.5   0   0   0.5   0.5
+ind2   0.25   0.25   0.25   0.25   0.333   0.333   0.333
+
+(actually 0.333 should be replaced by 1/3 - exactly a third).
+
+Then, you can use the genind constructor (genind) to create your object. Multivariate analyses based on transformed allele frequencies, and other approaches based on frequencies in general will be OK. Do not convert your genind to genpop though, since the reconstruction of allele counts will be erroneous.
+
+Cheers
+
+Thibaut 
+
+________________________________________
+From: Sarrah Castillo [scastillo at nrdpfc.ca]
+Sent: 19 October 2010 18:13
+To: Jombart, Thibaut; adegenet-forum at lists.r-forge.r-project.org
+Subject: RE: Looking for help with a PCA using adegenet in R
+
+Hello again
+About the ploidy.  We are looking at MHC genes, specifically MHC DRB exon 2.  We found that it is duplication, with individuals possessing between 2-4 alleles (Castillo et al. 2010).  Individuals with 2 alleles are presumed to be homozygous at each locus (hence why genotype would be 1 2 -9 -9).
+We are having trouble running our data in the usual genetic software due to the ploidy issue, we are sure that it is duplicated therefore ploidy is up to tetraploid, but individuals range with 2, 3, and 4 alleles.
+
+I am unsure of how else to represent this other than missing data (as they are still important)
+
+Therefore, the differences in number of alleles/individual is important for the structure and should be used during the analyzes.  Any advice would be appreciated
+
+Sarrah
+
+
+____________________
+Sarrah Castillo
+MSc Candidate
+Environmental & Life Sciences Graduate Program
+Trent University, 2140 East Bank Drive,
+Peterborough, Ontario, K9J 7B8, Canada
+e-mail:scastillo at nrdpfc.ca
+
+
+
+-----Original Message-----
+From: Jombart, Thibaut [mailto:t.jombart at imperial.ac.uk]
+Sent: Tue 19/10/2010 12:37
+To: Sarrah Castillo; adegenet-forum at lists.r-forge.r-project.org
+Subject: RE: Looking for help with a PCA using adegenet in R
+
+Dear Sarrah,
+
+In this case read.structure should not be used - it is designed for diploid individuals only. Fortunately, you can still read your data in adegenet using df2genind.
+
+The trick consists in merging the 4 alleles into a single character string:
+#####
+> foo=read.table("foo.txt", head=TRUE)
+> head(foo)
+  Ind Reg Al1 Al2 Al3 Al4
+1 271  ON   7  10  11  -9
+2 273  ON   2  10  13  -9
+3 272  ON   4  11  12  -9
+4 465  ON   1   2  -9  -9
+5 472  ON   3   6  11  19
+6 489  ON   2   3   4  19
+> gen=apply(foo[,3:6],1,paste,collapse="/")
+> gen
+ [1] "7/10/11/-9" "2/10/13/-9" "4/11/12/-9" "1/2/-9/-9"  "3/6/11/19"
+ [6] "2/3/4/19"   "7/12/-9/-9" "7/14/43/-9" "4/5/15/19"  "7/14/20/26"
+[11] "5/7/8/-9"   "4/11/21/-9" "7/21/24/-9" "1/20/26/49" "7/16/20/26"
+[16] "7/25/27/49" "3/19/25/49" "7/9/12/-9"
+#####
+
+A problem in your data is that for a single locus and individual, it happens that some but not all data are missing (expl:  "1/2/-9/-9"). Are these actual tetraploid data? Or is the actual ploidy unknown?
+For now, I consider that frequencies cannot be inferred as soon as there is at least one NA.
+
+#####
+> isNA=grep("-9",gen)
+> gen[isNA] <- NA
+> gen
+ [1] NA           NA           NA           NA           "3/6/11/19"
+ [6] "2/3/4/19"   NA           NA           "4/5/15/19"  "7/14/20/26"
+[11] NA           NA           NA           "1/20/26/49" "7/16/20/26"
+[16] "7/25/27/49" "3/19/25/49" NA
+#####
+
+We can now obtain the genind object:
+
+#####
+>  x=df2genind(data.frame(gen), ind.names=foo$Ind, pop=foo$Reg, sep="/", ploidy=4)
+Warning message:
+In df2genind(data.frame(gen), ind.names = foo$Ind, pop = foo$Reg,  :
+  entirely non-type individual(s) deleted
+> truenames(x)
+$tab
+    gen.01 gen.02 gen.03 gen.04 gen.05 gen.06 gen.07 gen.11 gen.14 gen.15
+472   0.00   0.00   0.25   0.00   0.00   0.25   0.00   0.25   0.00   0.00
+489   0.00   0.25   0.25   0.25   0.00   0.00   0.00   0.00   0.00   0.00
+466   0.00   0.00   0.00   0.25   0.25   0.00   0.00   0.00   0.00   0.25
+749   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.25   0.00
+319   0.25   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+323   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.00   0.00
+341   0.00   0.00   0.00   0.00   0.00   0.00   0.25   0.00   0.00   0.00
+385   0.00   0.00   0.25   0.00   0.00   0.00   0.00   0.00   0.00   0.00
+    gen.16 gen.19 gen.20 gen.25 gen.26 gen.27 gen.49
+472   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+489   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+466   0.00   0.25   0.00   0.00   0.00   0.00   0.00
+749   0.00   0.00   0.25   0.00   0.25   0.00   0.00
+319   0.00   0.00   0.25   0.00   0.25   0.00   0.25
+323   0.25   0.00   0.25   0.00   0.25   0.00   0.00
+341   0.00   0.00   0.00   0.25   0.00   0.25   0.25
+385   0.00   0.25   0.00   0.25   0.00   0.00   0.25
+
+$pop
+[1] ON ON ON ON ON ON ON ON
+Levels: ON
+
+> genind2df(x, sep="/")
+    pop         gen
+472  ON 03/06/11/19
+489  ON 02/03/04/19
+466  ON 04/05/15/19
+749  ON 07/14/20/26
+319  ON 01/20/26/49
+323  ON 07/16/20/26
+341  ON 07/25/27/49
+385  ON 03/19/25/49
+#####
+
+Now you can use 'x' as any other genind object:
+#####
+> Hs(x)
+        1
+0.9238281
+> summary(x)
+ # Total number of genotypes:  8
+
+ # Population sample sizes:
+ON
+ 8
+
+ # Number of alleles per locus:
+L1
+17
+
+[etc.]
+#####
+
+Best regards,
+
+Thibaut
+
+
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] On Behalf Of Sarrah Castillo [scastillo at nrdpfc.ca]
+Sent: 19 October 2010 16:20
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] Looking for help with a PCA using adegenet in R
+
+Hello Dr. Jombart
+I was wondering if you could help me with an issue I am having with your program (Adegenet) in R.
+I am attempting to perform a PCA using a structure file. The difference is that this is based on tetraploid data.  Structure allows for multiple ploidy, however I am unsure of how to have the program read my data as tetraploid instead of diploid. The genetic information is for a single locus with between 2-4 alleles (with -9 representing missing data)
+
+Here is an example of my file (with -9 representing missing data)
+
+Ind     Reg     Al1     Al2     Al3     Al4
+271     ON      7       10      11      -9
+273     ON      2       10      13      -9
+272     ON      4       11      12      -9
+465     ON      1       2       -9      -9
+472     ON      3       6       11      19
+489     ON      2       3       4       19
+519     ON      7       12      -9      -9
+551     ON      7       14      43      -9
+466     ON      4       5       15      19
+749     ON      7       14      20      26
+111     ON      5       7       8       -9
+173     ON      4       11      21      -9
+318     ON      7       21      24      -9
+319     ON      1       20      26      49
+323     ON      7       16      20      26
+341     ON      7       25      27      49
+385     ON      3       19      25      49
+485     ON      7       9       12      -9
+
+Ind=individual
+Reg=region
+Al1= allele 1
+Al2= allele 2
+Al3= allele 3
+Al4= allele 4
+
+
+Any help would be much appreciated.
+
+Thank you
+Sarrah Castillo
+
+
+____________________
+Sarrah Castillo
+MSc Candidate
+Environmental & Life Sciences Graduate Program
+Trent University, 2140 East Bank Drive,
+Peterborough, Ontario, K9J 7B8, Canada
+e-mail:scastillo at nrdpfc.ca
+
+
+
+
+
+From nevil.amos at gmail.com  Tue Oct 26 15:15:58 2010
+From: nevil.amos at gmail.com (Nevil Amos)
+Date: Wed, 27 Oct 2010 00:15:58 +1100
+Subject: [adegenet-forum] installation of version 1.26 in windows
+Message-ID: <4CC6D48E.9010302@sci.monash.edu.au>
+
+I am having trouble compiling the package - should it work?
+
+* installing *source* package 'adegenet' ...
+** libs
+ERROR: compilation failed for package 'adegenet'
+* removing 'C:/PROGRA~1/R/R-212~1.0/library/adegenet'
+Warning message:
+In install.packages("D:/Documents and 
+Settings/namos/Desktop/adegenet_1.2-6.tar.gz",  :
+   installation of package 
+'D:/DOCUME~1/namos/Desktop/adegenet_1.2-6.tar.gz' had non-zero exit status
+
+From t.jombart at imperial.ac.uk  Tue Oct 26 15:24:15 2010
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Tue, 26 Oct 2010 14:24:15 +0100
+Subject: [adegenet-forum] installation of version 1.26 in windows
+In-Reply-To: <4CC6D48E.9010302@sci.monash.edu.au>
+References: <4CC6D48E.9010302@sci.monash.edu.au>
+Message-ID: <60AAE8805AAC4B44A8DF1888C0CBFDC409CCF806@ICEXM3.ic.ac.uk>
+
+Dear Nevil,
+
+there is not enough information in your report to know what is wrong. I would need to know the command you used, your platform and OS, the session info, R version, etc.
+
+To be honest, compilation of the sources on windows always scares me a bit. I would recommend installing the binaries instead. If the binaries cannot be found on CRAN (I'll post something on this right after), you should be able to find them from R-Forge:
+https://r-forge.r-project.org/R/?group_id=120
+-> R packages
+
+Best regards
+
+Thibaut 
+
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] On Behalf Of Nevil Amos [nevil.amos at gmail.com]
+Sent: 26 October 2010 14:15
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] installation of version 1.26 in windows
+
+I am having trouble compiling the package - should it work?
+
+* installing *source* package 'adegenet' ...
+** libs
+ERROR: compilation failed for package 'adegenet'
+* removing 'C:/PROGRA~1/R/R-212~1.0/library/adegenet'
+Warning message:
+In install.packages("D:/Documents and
+Settings/namos/Desktop/adegenet_1.2-6.tar.gz",  :
+   installation of package
+'D:/DOCUME~1/namos/Desktop/adegenet_1.2-6.tar.gz' had non-zero exit status
+_______________________________________________
+adegenet-forum mailing list
+adegenet-forum at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/adegenet-forum
+
+From t.jombart at imperial.ac.uk  Tue Oct 26 15:33:39 2010
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Tue, 26 Oct 2010 14:33:39 +0100
+Subject: [adegenet-forum] binaries missing on CRAN
+Message-ID: <60AAE8805AAC4B44A8DF1888C0CBFDC409CCF807@ICEXM3.ic.ac.uk>
+
+Dear list, 
+
+some of you may have noticed an issue when installing adegenet on windows and R 2.12.0. As a matter of fact, binaries for windows are currently not available. This is due to an example of seqTrack which fails when executed because of a new bug in the ape package. This bug has been corrected by Emmanuel Paradis, but we'll have to wait for a new release of ape on CRAN to get the adegenet binaries back. Alternatively, I will send a patch where the faulty example will be disabled.
+
+In the meantime, you can find the windows binaries on R-Forge:
+https://r-forge.r-project.org/R/?group_id=120
+
+Go to the section "R packages", download the .zip archive for windows, and then install the package from the zip. 
+
+Please let me know if you encounter any other problem.
+
+Best regards
+
+Thibaut
+
+-- 
+######################################
+Dr Thibaut JOMBART
+MRC Centre for Outbreak Analysis and Modelling
+Department of Infectious Disease Epidemiology
+Imperial College - Faculty of Medicine
+St Mary?s Campus
+Norfolk Place
+London W2 1PG
+United Kingdom
+Tel. : 0044 (0)20 7594 3658
+t.jombart at imperial.ac.uk
+http://sites.google.com/site/thibautjombart/
+http://adegenet.r-forge.r-project.org/
+

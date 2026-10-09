@@ -1,0 +1,271 @@
+From jzuluaga at stcloudstate.edu  Sat Nov  5 00:25:16 2011
+From: jzuluaga at stcloudstate.edu (Zuluaga, Juan)
+Date: Fri, 4 Nov 2011 23:25:16 +0000
+Subject: [Traminer-users] quantitative explanatory variables?
+References: <4B236621C4E4E943B7BB21F73014CD941F66DBA3@SCSU83A.campus.stcloudstate.edu>
+	<4EAE54D0.3080201@unige.ch> 
+Message-ID: <4B236621C4E4E943B7BB21F73014CD941F66E5D8@SCSU83A.campus.stcloudstate.edu>
+
+Say, would a Mantel (1967) test work? The quantitative covariate can be turned into a distance matrix.
+
+From: Zuluaga, Juan
+Sent: Monday, October 31, 2011 9:16 AM
+To: Users questions
+Subject: RE: [Traminer-users] quantitative explanatory variables?
+
+Mr. Studer, thank you very much for the code, it makes sense.
+However, are you implying that this is an open question?
+The fact that you are seem to be satisfied with MJ Anderson approach for categorical explanatory variables and have implement it in dissassoc(), while you have no equivalent routine for quantitative, does is it mean that you are not satisfied with existing approaches for quantitative explanatory variables?  May I ask you what have you considered (and perhaps rejected)?
+-j
+
+From: traminer-users-bounces at r-forge.wu-wien.ac.at [mailto:traminer-users-bounces at r-forge.wu-wien.ac.at] On Behalf Of Matthias Studer
+Sent: Monday, October 31, 2011 2:57 AM
+To: Users questions
+Subject: Re: [Traminer-users] quantitative explanatory variables?
+
+Dear Juan Zuluaga,
+
+I agree with you. Our example dataset lacks an example with a quantitative covariate.
+
+There are two solutions to analyse the link with a quantitative covariate. The first one is to discretize the variable before using it (an example is given below). The second solution is to use the tree procedure. This procedure automatically finds the best cutting points by testing all possible binary splits.  This will also work with ordinal covariates.
+
+An example of both solutions is given below using the biofam dataset (Swiss family life sequences between 15 and 30 years old).
+
+## Loading TraMineR
+library(TraMineR)
+## Loading the biofam dataset
+data(biofam)
+
+## States labels
+bf.labels <- c("Parent", "Left", "Married", "Left/Married",  "Child",
+                "Left/Child", "Left/Married/Child", "Divorced")
+## States short labels for the sequences
+bf.shortlab <- c("P","L","M","LM","C","LC", "LMC", "D")
+## Building the sequence object
+biofam.seq <- seqdef(biofam[,10:25], states=bf.shortlab, labels=bf.labels)
+## Computing distance using Optimal matching with transition based substitution costs.
+biodist <- seqdist(biofam.seq, method="OM", sm="TRATE", indel=1)
+
+## First solution : Use a discretized variable
+## The "cut" function creates a factor using the given cutting points
+biofam$cohort <- cut(biofam$birthyr, c(1900, 1930, 1940, 1950, 1960), right=FALSE,
+                    labels=c("1900-1929", "1930-1939", "1940-1949", "1950-1959"))
+## Compute the association with this new variable
+da <- dissassoc(biodist, biofam$cohort, R=1000)
+## Printing results
+## Differences are highly significant
+print(da)
+
+
+## Second solution : Use the tree procedure
+## It will automatically find the best binary splits
+biotree <- seqtree(biofam.seq~birthyr, data=biofam, diss=biodist)
+
+##Printing the tree
+print(biotree)
+## Displaying the tree (adjusting legend fontsize otherwise it's too big)
+## You will need to install GraphViz for this
+seqtreedisplay(biotree, type="d", legend.fontsize=2)
+
+
+## Creating a new cohort covariate according to the splitting points found with the tree procedure
+biofam$cohort2 <- cut(biofam$birthyr, c(1900, 1929, 1941, 1947, 1951, 1970), right=FALSE,
+                    labels=c("<=1928", "1929-1940", "1941-1946", "1947-1950", "1951+"))
+
+## Computing association with this new variable
+da2 <- dissassoc(biodist, biofam$cohort2, R=1000)
+## Printing results
+## Pseudo R2 is slightly higher than before
+print(da2)
+
+Hope this helps.
+
+Matthias Studer
+
+
+
+Le 30.10.2011 02:04, Zuluaga, Juan a ?crit :
+Hello Traminer people,
+I read your Sociological Methods and Research paper.  The McVicar and Anyadike-Danes (2002) dataset that you used has categorical covariates.
+How do you deal with quantitative variates?
+Thank you!
+
+-juan zuluaga
+
+
+
+
+
+_______________________________________________
+
+Traminer-users mailing list
+
+Traminer-users at lists.r-forge.r-project.org<mailto:Traminer-users at lists.r-forge.r-project.org>
+
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20111104/92a812e0/attachment.htm>
+
+From Matthias.Studer at unige.ch  Sat Nov  5 17:22:36 2011
+From: Matthias.Studer at unige.ch (Matthias Studer)
+Date: Sat, 05 Nov 2011 17:22:36 +0100
+Subject: [Traminer-users] quantitative explanatory variables?
+In-Reply-To: <4B236621C4E4E943B7BB21F73014CD941F66E5D8@SCSU83A.campus.stcloudstate.edu>
+References: <4B236621C4E4E943B7BB21F73014CD941F66DBA3@SCSU83A.campus.stcloudstate.edu>
+	<4EAE54D0.3080201@unige.ch>
+	<4B236621C4E4E943B7BB21F73014CD941F66E5D8@SCSU83A.campus.stcloudstate.edu>
+Message-ID: <4EB562CC.5020401@unige.ch>
+
+Dear Juan Zuluaga,
+
+Sorry, for the delay. Ok, I didn't understood that your question was 
+more theoretical. I do not have a good answer to your question. We did 
+not have an in-depth look at these methods or others that allow to 
+include directly a quantitative covariate. I haven't thought about it 
+before but the Mantel test may be meaningful in this context. The main 
+problem I would see is about how to interpret the results.
+
+All the best,
+Matthias Studer
+
+
+
+
+
+
+Le 05.11.2011 00:25, Zuluaga, Juan a ?crit :
+>
+> Say, would a Mantel (1967) test work? The quantitative covariate can 
+> be turned into a distance matrix.
+>
+> *From:*Zuluaga, Juan
+> *Sent:* Monday, October 31, 2011 9:16 AM
+> *To:* Users questions
+> *Subject:* RE: [Traminer-users] quantitative explanatory variables?
+>
+> Mr. Studer, thank you very much for the code, it makes sense.
+>
+> However, are you implying that this is an open question?
+>
+> The fact that you are seem to be satisfied with MJ Anderson approach 
+> for categorical explanatory variables and have implement it in 
+> dissassoc(), while you have no equivalent routine for quantitative, 
+> does is it mean that you are not satisfied with existing approaches 
+> for quantitative explanatory variables?  May I ask you what have you 
+> considered (and perhaps rejected)?
+>
+> -j
+>
+> *From:*traminer-users-bounces at r-forge.wu-wien.ac.at 
+> [mailto:traminer-users-bounces at r-forge.wu-wien.ac.at] *On Behalf Of 
+> *Matthias Studer
+> *Sent:* Monday, October 31, 2011 2:57 AM
+> *To:* Users questions
+> *Subject:* Re: [Traminer-users] quantitative explanatory variables?
+>
+> Dear Juan Zuluaga,
+>
+> I agree with you. Our example dataset lacks an example with a 
+> quantitative covariate.
+>
+> There are two solutions to analyse the link with a quantitative 
+> covariate. The first one is to discretize the variable before using it 
+> (an example is given below). The second solution is to use the tree 
+> procedure. This procedure automatically finds the best cutting points 
+> by testing all possible binary splits.  This will also work with 
+> ordinal covariates.
+>
+> An example of both solutions is given below using the biofam dataset 
+> (Swiss family life sequences between 15 and 30 years old).
+>
+> ## Loading TraMineR
+> library(TraMineR)
+> ## Loading the biofam dataset
+> data(biofam)
+>
+> ## States labels
+> bf.labels <- c("Parent", "Left", "Married", "Left/Married",  "Child",
+>                 "Left/Child", "Left/Married/Child", "Divorced")
+> ## States short labels for the sequences
+> bf.shortlab <- c("P","L","M","LM","C","LC", "LMC", "D")
+> ## Building the sequence object
+> biofam.seq <- seqdef(biofam[,10:25], states=bf.shortlab, labels=bf.labels)
+> ## Computing distance using Optimal matching with transition based 
+> substitution costs.
+> biodist <- seqdist(biofam.seq, method="OM", sm="TRATE", indel=1)
+>
+> ## First solution : Use a discretized variable
+> ## The "cut" function creates a factor using the given cutting points
+> biofam$cohort <- cut(biofam$birthyr, c(1900, 1930, 1940, 1950, 1960), 
+> right=FALSE,
+>                     labels=c("1900-1929", "1930-1939", "1940-1949", 
+> "1950-1959"))
+> ## Compute the association with this new variable
+> da <- dissassoc(biodist, biofam$cohort, R=1000)
+> ## Printing results
+> ## Differences are highly significant
+> print(da)
+>
+>
+> ## Second solution : Use the tree procedure
+> ## It will automatically find the best binary splits
+> biotree <- seqtree(biofam.seq~birthyr, data=biofam, diss=biodist)
+>
+> ##Printing the tree
+> print(biotree)
+> ## Displaying the tree (adjusting legend fontsize otherwise it's too big)
+> ## You will need to install GraphViz for this
+> seqtreedisplay(biotree, type="d", legend.fontsize=2)
+>
+>
+> ## Creating a new cohort covariate according to the splitting points 
+> found with the tree procedure
+> biofam$cohort2 <- cut(biofam$birthyr, c(1900, 1929, 1941, 1947, 1951, 
+> 1970), right=FALSE,
+>                     labels=c("<=1928", "1929-1940", "1941-1946", 
+> "1947-1950", "1951+"))
+>
+> ## Computing association with this new variable
+> da2 <- dissassoc(biodist, biofam$cohort2, R=1000)
+> ## Printing results
+> ## Pseudo R2 is slightly higher than before
+> print(da2)
+>
+> Hope this helps.
+>
+> Matthias Studer
+>
+>
+>
+> Le 30.10.2011 02:04, Zuluaga, Juan a ?crit :
+>
+> Hello Traminer people,
+>
+> I read your Sociological Methods and Research paper.  The McVicar and 
+> Anyadike-Danes (2002) dataset that you used has categorical covariates.
+>
+> How do you deal with quantitative variates?
+>
+> Thank you!
+>
+> -juan zuluaga
+>
+>
+>
+> _______________________________________________
+> Traminer-users mailing list
+> Traminer-users at lists.r-forge.r-project.org  <mailto:Traminer-users at lists.r-forge.r-project.org>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users
+>
+>
+>
+> _______________________________________________
+> Traminer-users mailing list
+> Traminer-users at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20111105/1b1de2e9/attachment.htm>
+

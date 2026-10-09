@@ -1,0 +1,527 @@
+From melaniesmontes at gmail.com  Wed Feb  8 12:14:52 2017
+From: melaniesmontes at gmail.com (Melanie Montes)
+Date: Wed, 8 Feb 2017 12:14:52 +0100
+Subject: [adegenet-forum] error in gstat.randtest
+Message-ID: <CAOaQwhiSqz6Khpb_4QvtXOa8rauM6w0YdbVSfVBqSX5TcjN08Q@mail.gmail.com>
+
+Hello all,
+I recently finished running fstat on my dataset of about 50 000 snps / 56
+individuals, and successfully got f-statistics in return. However, when I
+tried to run gstat.randtest to see if the structure was significant:
+
+fstat.sig <-gstat.randtest(nr2014, nsim=1000)
+...I got 50+ warnings like this:
+
+50: In max(y, na.rm = TRUE) : no non-missing arguments to max; returning
+-Inf
+
+and my results file looked like this:
+
+> fstat.sig
+
+Monte-Carlo test
+
+Call: gstat.randtest(x = nr2014, nsim = 1000)
+
+Observation: 0
+
+Based on 1000 replicates
+
+Simulated p-value: 1
+
+
+which leads me to suspect that it did not work. Does this have something to
+do with the missing data in my dataset? Sorry if this is a naive question,
+I am an R novice.
+
+Thanks for your time and the awesome package, I've been using it a lot!
+
+Sincerely,
+Melanie
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20170208/419f3aca/attachment.html>
+
+From thibautjombart at gmail.com  Thu Feb  9 11:53:01 2017
+From: thibautjombart at gmail.com (Thibaut Jombart)
+Date: Thu, 9 Feb 2017 10:53:01 +0000
+Subject: [adegenet-forum] error in gstat.randtest
+In-Reply-To: <CAOaQwhiSqz6Khpb_4QvtXOa8rauM6w0YdbVSfVBqSX5TcjN08Q@mail.gmail.com>
+References: <CAOaQwhiSqz6Khpb_4QvtXOa8rauM6w0YdbVSfVBqSX5TcjN08Q@mail.gmail.com>
+Message-ID: <CANPRA+pAcUTVyZtMNETCiKrO5GGq86Mc+mGeih0uNZ_A3qjEAA@mail.gmail.com>
+
+Hi Melanie,
+
+it's quite hard to tell without seeing the data, but yes, my suspicion is
+the same as yours, NAs are the culprits. Entirely non-typed loci are
+normally removed from genind objects during their construction, but it is
+still possible that for some groups in your data, some loci are entirely
+missing.
+
+Given how many SNPs you have, you can probably afford to remove loci with
+many missing data (just make sure you don't end up throwing too much away).
+propTyped(..., by = "loc") may be your friend here. Here's an example using
+microbov:
+
+
+> data(microbov)
+
+> propTyped(microbov, by = "loc")
+   INRA63     INRA5    ETH225    ILSTS5      HEL5      HEL1    INRA35
+ ETH152
+0.9914773 0.9786932 0.9914773 0.9673295 0.9786932 0.9914773 0.9829545
+0.9573864
+   INRA23     ETH10      HEL9    CSSM66    INRA32      ETH3    BM2113
+ BM1824
+0.9644886 0.9943182 0.9701705 0.9886364 0.9687500 0.9829545 0.9914773
+0.9900568
+    HEL13    INRA37    BM1818    ILSTS6      MM12    CSRM60    ETH185
+ HAUT24
+0.9772727 0.9815341 0.9588068 0.9446023 0.9744318 0.9730114 0.9275568
+0.9872159
+   HAUT27   TGLA227   TGLA126   TGLA122    TGLA53    SPS115
+0.9914773 0.9914773 0.9914773 0.9914773 0.9531250 0.9701705
+
+> to_keep <-   propTyped(microbov, by = "loc") > .99  # i.e. less 1%
+missing data
+
+> to_keep
+ INRA63   INRA5  ETH225  ILSTS5    HEL5    HEL1  INRA35  ETH152  INRA23
+ETH10
+   TRUE   FALSE    TRUE   FALSE   FALSE    TRUE   FALSE   FALSE   FALSE
+ TRUE
+   HEL9  CSSM66  INRA32    ETH3  BM2113  BM1824   HEL13  INRA37  BM1818
+ ILSTS6
+  FALSE   FALSE   FALSE   FALSE    TRUE    TRUE   FALSE   FALSE   FALSE
+FALSE
+   MM12  CSRM60  ETH185  HAUT24  HAUT27 TGLA227 TGLA126 TGLA122  TGLA53
+ SPS115
+  FALSE   FALSE   FALSE   FALSE    TRUE    TRUE    TRUE    TRUE   FALSE
+FALSE
+
+> x <- microbov[loc = to_keep]
+
+> nLoc(x)
+[1] 10
+
+> nLoc(microbov)
+[1] 30
+
+
+This is just an illustration - this dataset actually has little in terms of
+missing data. In your case you probably want to play with the threshold
+(99% non-NA is likely an overkill).
+
+Cheers
+Thibaut
+
+
+
+--
+Dr Thibaut Jombart
+Lecturer, Department of Infectious Disease Epidemiology, Imperial College
+London
+Head of RECON: repidemicsconsortium.org
+sites.google.com/site/thibautjombart/
+github.com/thibautjombart
+Twitter: @TeebzR <http://twitter.com/TeebzR>
++44(0)20 7594 3658
+
+On 8 February 2017 at 11:14, Melanie Montes <melaniesmontes at gmail.com>
+wrote:
+
+> Hello all,
+> I recently finished running fstat on my dataset of about 50 000 snps / 56
+> individuals, and successfully got f-statistics in return. However, when I
+> tried to run gstat.randtest to see if the structure was significant:
+>
+> fstat.sig <-gstat.randtest(nr2014, nsim=1000)
+> ...I got 50+ warnings like this:
+>
+> 50: In max(y, na.rm = TRUE) : no non-missing arguments to max; returning
+> -Inf
+>
+> and my results file looked like this:
+>
+> > fstat.sig
+>
+> Monte-Carlo test
+>
+> Call: gstat.randtest(x = nr2014, nsim = 1000)
+>
+> Observation: 0
+>
+> Based on 1000 replicates
+>
+> Simulated p-value: 1
+>
+>
+> which leads me to suspect that it did not work. Does this have something
+> to do with the missing data in my dataset? Sorry if this is a naive
+> question, I am an R novice.
+>
+> Thanks for your time and the awesome package, I've been using it a lot!
+>
+> Sincerely,
+> Melanie
+>
+> _______________________________________________
+> adegenet-forum mailing list
+> adegenet-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/
+> listinfo/adegenet-forum
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20170209/808e9634/attachment.html>
+
+From francois.lefevre.2 at inra.fr  Fri Feb 10 11:47:14 2017
+From: francois.lefevre.2 at inra.fr (flefevre)
+Date: Fri, 10 Feb 2017 11:47:14 +0100
+Subject: [adegenet-forum] any change in find.clusters and/or dapc functions
+ from V1.4-2 to V2.0.1 ?
+Message-ID: <942f05a0-c5c0-7bff-c583-ffbde69d9b29@inra.fr>
+
+Dear adegenet team,
+
+has something changed in the find.clusters and/or dapc functions from 
+V1.4-2 and V2.01 of adegenet?
+
+I am re-doing an analysis that was first done in 2014 (with V1.4-2) on a 
+genind object of 158 diploid individuals and 70 snp and the results are 
+quite different (synthesis of 20 analyses using CLUMPP, highly 
+consistent in each case). Exactly the same dataset and the same script. 
+The only difference I can see between the 2 analyses is the version of 
+adegenet: has something changed in these 2 functions?
+
+Actually the individuals belong to an admixed population, we look for 
+the number of components and assignment of the individuals. The 
+difference is as follows:
+2014 analysis => 3 clear groups (136 individuals out of 158 have a mean 
+assignment probability >0.95 to one of the groups), one group is more 
+"compact" and consists of very related individuals
+2017 analysis => 2 clear groups (111 individuals with assignment >0.95), 
+all individuals previously assigned to the compact group are still 
+assigned to the same new group but now associated with others, the other 
+2 previous groups do not relate well with the new ones.
+
+Any suggestion to interprete this discrepancy is welcome,
+Thank you,
+
+Fran?ois
+francois.lefevre.2 at inra.fr
+
+-- 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20170210/bf54f6c4/attachment.html>
+
+From thibautjombart at gmail.com  Wed Feb 22 13:33:51 2017
+From: thibautjombart at gmail.com (Thibaut Jombart)
+Date: Wed, 22 Feb 2017 12:33:51 +0000
+Subject: [adegenet-forum] any change in find.clusters and/or dapc
+ functions from V1.4-2 to V2.0.1 ?
+In-Reply-To: <942f05a0-c5c0-7bff-c583-ffbde69d9b29@inra.fr>
+References: <942f05a0-c5c0-7bff-c583-ffbde69d9b29@inra.fr>
+Message-ID: <CANPRA+oRxwca5C3_GYOC_dCfDS_5tByW-ofnU7pt8rLXqWr9-A@mail.gmail.com>
+
+Hello,
+
+yes, a lot has changed in between the two versions; see ChangeLog:
+https://cran.r-project.org/web/packages/adegenet/ChangeLog
+
+Besides, are you using the same version of R for both packages? Knowing if
+and what change(s) specifically could cause the results to differ is going
+to be difficult, we would have to finely compare the analyses. The first
+thing to check would be verify that the matrices of allele frequencies are
+the same. I think this would have been 'scaleGen' in the older version
+(specify scale=FALSE, center=FALSE, do not replace NA). This is 'tab' in
+the current version (use 'freq = TRUE, do not replace NA). Then check if
+the matrices are the same. A change in the default treatment of NA, or in
+scaling could explain the difference.
+
+Cheers
+Thibaut
+
+
+
+--
+Dr Thibaut Jombart
+Lecturer, Department of Infectious Disease Epidemiology, Imperial College
+London
+Head of RECON: repidemicsconsortium.org
+sites.google.com/site/thibautjombart/
+github.com/thibautjombart
+Twitter: @TeebzR <http://twitter.com/TeebzR>
++44(0)20 7594 3658
+
+On 10 February 2017 at 10:47, flefevre <francois.lefevre.2 at inra.fr> wrote:
+
+> Dear adegenet team,
+>
+> has something changed in the find.clusters and/or dapc functions from
+> V1.4-2 and V2.01 of adegenet?
+>
+> I am re-doing an analysis that was first done in 2014 (with V1.4-2) on a
+> genind object of 158 diploid individuals and 70 snp and the results are
+> quite different (synthesis of 20 analyses using CLUMPP, highly consistent
+> in each case). Exactly the same dataset and the same script. The only
+> difference I can see between the 2 analyses is the version of adegenet: has
+> something changed in these 2 functions?
+>
+> Actually the individuals belong to an admixed population, we look for the
+> number of components and assignment of the individuals. The difference is
+> as follows:
+> 2014 analysis => 3 clear groups (136 individuals out of 158 have a mean
+> assignment probability >0.95 to one of the groups), one group is more
+> "compact" and consists of very related individuals
+> 2017 analysis => 2 clear groups (111 individuals with assignment >0.95),
+> all individuals previously assigned to the compact group are still assigned
+> to the same new group but now associated with others, the other 2 previous
+> groups do not relate well with the new ones.
+>
+> Any suggestion to interprete this discrepancy is welcome,
+> Thank you,
+>
+> Fran?ois
+> francois.lefevre.2 at inra.fr
+>
+> --
+>
+> _______________________________________________
+> adegenet-forum mailing list
+> adegenet-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/
+> listinfo/adegenet-forum
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20170222/bfa7a7ac/attachment.html>
+
+From melaniesmontes at gmail.com  Thu Feb 23 15:00:01 2017
+From: melaniesmontes at gmail.com (Melanie Montes)
+Date: Thu, 23 Feb 2017 15:00:01 +0100
+Subject: [adegenet-forum] error in gstat.randtest
+In-Reply-To: <CANPRA+pAcUTVyZtMNETCiKrO5GGq86Mc+mGeih0uNZ_A3qjEAA@mail.gmail.com>
+References: <CAOaQwhiSqz6Khpb_4QvtXOa8rauM6w0YdbVSfVBqSX5TcjN08Q@mail.gmail.com>
+ <CANPRA+pAcUTVyZtMNETCiKrO5GGq86Mc+mGeih0uNZ_A3qjEAA@mail.gmail.com>
+Message-ID: <CAOaQwhj2ZJODZ3n6zPtZ229YamAn03aRX=dUhTBmVibZBY_gww@mail.gmail.com>
+
+Thanks for the tip Thibaut!
+
+In case anyone else ends up running into this error, it seems that it was
+indeed the amount of missing data that was the problem. I tried keeping
+different amounts, but found that any less that 98% missing (even 97.5%)
+led to this error. This cut my dataset down from about 50 000 snps to 2800,
+so you see how much was actually missing!
+
+Thanks again,
+Melanie
+
+
+
+On Thu, Feb 9, 2017 at 11:53 AM, Thibaut Jombart <thibautjombart at gmail.com>
+wrote:
+
+> Hi Melanie,
+>
+> it's quite hard to tell without seeing the data, but yes, my suspicion is
+> the same as yours, NAs are the culprits. Entirely non-typed loci are
+> normally removed from genind objects during their construction, but it is
+> still possible that for some groups in your data, some loci are entirely
+> missing.
+>
+> Given how many SNPs you have, you can probably afford to remove loci with
+> many missing data (just make sure you don't end up throwing too much away).
+> propTyped(..., by = "loc") may be your friend here. Here's an example using
+> microbov:
+>
+>
+> > data(microbov)
+>
+> > propTyped(microbov, by = "loc")
+>    INRA63     INRA5    ETH225    ILSTS5      HEL5      HEL1    INRA35
+>  ETH152
+> 0.9914773 0.9786932 0.9914773 0.9673295 0.9786932 0.9914773 0.9829545
+> 0.9573864
+>    INRA23     ETH10      HEL9    CSSM66    INRA32      ETH3    BM2113
+>  BM1824
+> 0.9644886 0.9943182 0.9701705 0.9886364 0.9687500 0.9829545 0.9914773
+> 0.9900568
+>     HEL13    INRA37    BM1818    ILSTS6      MM12    CSRM60    ETH185
+>  HAUT24
+> 0.9772727 0.9815341 0.9588068 0.9446023 0.9744318 0.9730114 0.9275568
+> 0.9872159
+>    HAUT27   TGLA227   TGLA126   TGLA122    TGLA53    SPS115
+> 0.9914773 0.9914773 0.9914773 0.9914773 0.9531250 0.9701705
+>
+> > to_keep <-   propTyped(microbov, by = "loc") > .99  # i.e. less 1%
+> missing data
+>
+> > to_keep
+>  INRA63   INRA5  ETH225  ILSTS5    HEL5    HEL1  INRA35  ETH152  INRA23
+> ETH10
+>    TRUE   FALSE    TRUE   FALSE   FALSE    TRUE   FALSE   FALSE   FALSE
+>  TRUE
+>    HEL9  CSSM66  INRA32    ETH3  BM2113  BM1824   HEL13  INRA37  BM1818
+>  ILSTS6
+>   FALSE   FALSE   FALSE   FALSE    TRUE    TRUE   FALSE   FALSE   FALSE
+> FALSE
+>    MM12  CSRM60  ETH185  HAUT24  HAUT27 TGLA227 TGLA126 TGLA122  TGLA53
+>  SPS115
+>   FALSE   FALSE   FALSE   FALSE    TRUE    TRUE    TRUE    TRUE   FALSE
+> FALSE
+>
+> > x <- microbov[loc = to_keep]
+>
+> > nLoc(x)
+> [1] 10
+>
+> > nLoc(microbov)
+> [1] 30
+>
+>
+> This is just an illustration - this dataset actually has little in terms
+> of missing data. In your case you probably want to play with the threshold
+> (99% non-NA is likely an overkill).
+>
+> Cheers
+> Thibaut
+>
+>
+>
+> --
+> Dr Thibaut Jombart
+> Lecturer, Department of Infectious Disease Epidemiology, Imperial College
+> London
+> Head of RECON: repidemicsconsortium.org
+> sites.google.com/site/thibautjombart/
+> github.com/thibautjombart
+> Twitter: @TeebzR <http://twitter.com/TeebzR>
+> +44(0)20 7594 3658 <+44%2020%207594%203658>
+>
+> On 8 February 2017 at 11:14, Melanie Montes <melaniesmontes at gmail.com>
+> wrote:
+>
+>> Hello all,
+>> I recently finished running fstat on my dataset of about 50 000 snps / 56
+>> individuals, and successfully got f-statistics in return. However, when I
+>> tried to run gstat.randtest to see if the structure was significant:
+>>
+>> fstat.sig <-gstat.randtest(nr2014, nsim=1000)
+>> ...I got 50+ warnings like this:
+>>
+>> 50: In max(y, na.rm = TRUE) : no non-missing arguments to max; returning
+>> -Inf
+>>
+>> and my results file looked like this:
+>>
+>> > fstat.sig
+>>
+>> Monte-Carlo test
+>>
+>> Call: gstat.randtest(x = nr2014, nsim = 1000)
+>>
+>> Observation: 0
+>>
+>> Based on 1000 replicates
+>>
+>> Simulated p-value: 1
+>>
+>>
+>> which leads me to suspect that it did not work. Does this have something
+>> to do with the missing data in my dataset? Sorry if this is a naive
+>> question, I am an R novice.
+>>
+>> Thanks for your time and the awesome package, I've been using it a lot!
+>>
+>> Sincerely,
+>> Melanie
+>>
+>> _______________________________________________
+>> adegenet-forum mailing list
+>> adegenet-forum at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo
+>> /adegenet-forum
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20170223/c872f341/attachment.html>
+
+From mahon2a at cmich.edu  Tue Feb 28 22:43:57 2017
+From: mahon2a at cmich.edu (Mahon, Andrew R)
+Date: Tue, 28 Feb 2017 21:43:57 +0000
+Subject: [adegenet-forum] scatter plot labels
+Message-ID: <6773CB2C-48AD-492C-9C78-94096F896BBB@cmich.edu>
+
+Hi all,
+New to using adegenet. Quick question (that may or may not be simple?.). Is there a way to use actual sample labels (i.e., what I named them) and plotting them in the scatter of the DAPC (i.e., when you run scatter(dapc) command)?
+
+Thanks for any help in advance.
+
+-andy
+--
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20170228/78a7cb26/attachment.html>
+
+From alangarcia87 at hotmail.com  Mon Feb 27 20:19:00 2017
+From: alangarcia87 at hotmail.com (Alan Garcia-Elfring)
+Date: Mon, 27 Feb 2017 19:19:00 +0000
+Subject: [adegenet-forum] DAPC - 3.4 Interpreting variable contributions
+ (using a genlight object)
+Message-ID: <DM5PR22MB0281FA9FC4B733D84003AB06DD570@DM5PR22MB0281.namprd22.prod.outlook.com>
+
+Hi all,
+
+
+I have a genlight object and I would like to analyze the contributions of different alleles to populations structure.
+
+
+The example on the manual is for genind objects and a previous answer indicated that the fix-around, using as.data.frame, is only good for haploid data. http://lists.r-forge.r-project.org/pipermail/adegenet-forum/2014-May/000840.html
+
+Is it yet possible to do section 3.4 (Jombart and Collins 2015) with a diploid dataset? It would be really cool if so!
+
+Thanks,
+
+Alan
+
+> pldata
+ /// GENLIGHT OBJECT /////////
+
+ // 223 genotypes,  76,288 binary SNPs, size: 9 Mb
+ 0 (0 %) missing data
+
+ // Basic content
+   @gen: list of 223 SNPbin
+   @ploidy: ploidy of each individual  (range: 2-2)
+
+ // Optional content
+   @ind.names:  223 individual labels
+   @loc.names:  76288 locus labels
+   @pop: population of each individual (group size range: 1-1)
+   @other: a list containing: sex  phenotype  pat  mat
+
+> freq399 <- tab(genind2genpop(pldata[loc=c("41837")]),freq=TRUE)
+Error in genind2genpop(pldata[loc = c("41837")]) :
+  x is not a valid genind object
+[cid:732fdd8f-ab46-46ff-97d3-0dd3b4bc8971]
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20170227/2022e53d/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Rplot.png
+Type: image/png
+Size: 41041 bytes
+Desc: Rplot.png
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20170227/2022e53d/attachment-0001.png>
+

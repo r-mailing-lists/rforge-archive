@@ -1,0 +1,1235 @@
+From edzer.pebesma at uni-muenster.de  Wed Aug 12 17:43:11 2015
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Wed, 12 Aug 2015 17:43:11 +0200
+Subject: [Rspatial-devel] SpatialMultiPoints
+Message-ID: <55CB698F.1060009@uni-muenster.de>
+
+The development version of sp, on r-forge, now provides objets with
+MultiPoint geometries, called SpatialMultiPoints and
+SpatialMultiPointsDataFrame.
+
+It can do things like:
+
+cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+
+library(sp)
+mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+plot(mp, col = 2, cex = 1, pch = 1:3)
+mp
+mp[1:2]
+
+print(mp, asWKT=TRUE, digits=3)
+
+mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3), data.frame(a = 1:3))
+mpdf
+
+plot(mpdf, col = mpdf$a, cex = 1:3)
+as(mpdf, "data.frame")
+mpdf[1:2,]
+
+Comments are welcome.
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi),  University of M?nster,
+Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+Journal of Statistical Software:   http://www.jstatsoft.org/
+Computers & Geosciences:   http://elsevier.com/locate/cageo/
+Spatial Statistics Society http://www.spatialstatistics.info
+
+From edzer.pebesma at uni-muenster.de  Thu Aug 13 18:57:17 2015
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Thu, 13 Aug 2015 18:57:17 +0200
+Subject: [Rspatial-devel] SpatialMultiPoints
+In-Reply-To: <CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>
+References: <55CB698F.1060009@uni-muenster.de>
+ <CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>
+Message-ID: <55CCCC6D.7030901@uni-muenster.de>
+
+
+On 08/13/2015 06:17 PM, Robert J. Hijmans wrote:
+> Edzer, That's great. But why not make it more consistent with the
+> other classes by modifying SpatialPoints* such that it can have
+> multiple points per record; just like for SpatialLines and
+> SpatialPolygons? Would that guarantee to break too much; or perhaps be
+> too much work to avoid that?  Robert
+
+That is a clever idea; the match to the data slot would then be done by
+the rownames of the coords slot, and allow for many-to-one, in which
+case the number of rows in the coords slot gets larger than the number
+of attribute records.
+
+Would users understand this?
+
+I was looking at support by rgeos, but it seems we (nearly) have this
+already when rownames of the coords slot are present, and indicate group
+(not sure if this is documented at all!):
+
+> m = matrix(1:8,4,2, dimnames = list(c(1,1,2,2)))
+> m
+  [,1] [,2]
+1    1    5
+1    2    6
+2    3    7
+2    4    8
+
+> library(rgeos)
+rgeos version: 0.3-11, (SVN revision 479)
+ GEOS runtime version: 3.4.2-CAPI-1.8.2 r3921
+ Linking to sp version: 1.1-1
+ Polygon checking: TRUE
+
+> gIntersects(SpatialPoints(m), byid=T) # NOT 4x4!!!
+      1     2
+1  TRUE FALSE
+2 FALSE  TRUE
+
+> m2 = matrix(1:8,4,2)
+> gIntersects(SpatialPoints(m2), byid=T)
+      1     2     3     4
+1  TRUE FALSE FALSE FALSE
+2 FALSE  TRUE FALSE FALSE
+3 FALSE FALSE  TRUE FALSE
+4 FALSE FALSE FALSE  TRUE
+> gIntersects(SpatialPoints(m), SpatialPoints(m2), byid=T)
+      1     2
+1  TRUE FALSE
+2  TRUE FALSE
+3 FALSE  TRUE
+4 FALSE  TRUE
+
+
+> 
+> On Wed, Aug 12, 2015 at 8:43 AM, Edzer Pebesma
+> <edzer.pebesma at uni-muenster.de> wrote:
+>> The development version of sp, on r-forge, now provides objets with
+>> MultiPoint geometries, called SpatialMultiPoints and
+>> SpatialMultiPointsDataFrame.
+>>
+>> It can do things like:
+>>
+>> cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+>> cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+>> cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+>>
+>> library(sp)
+>> mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+>> plot(mp, col = 2, cex = 1, pch = 1:3)
+>> mp
+>> mp[1:2]
+>>
+>> print(mp, asWKT=TRUE, digits=3)
+>>
+>> mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3), data.frame(a = 1:3))
+>> mpdf
+>>
+>> plot(mpdf, col = mpdf$a, cex = 1:3)
+>> as(mpdf, "data.frame")
+>> mpdf[1:2,]
+>>
+>> Comments are welcome.
+>> --
+>> Edzer Pebesma
+>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>> Spatial Statistics Society http://www.spatialstatistics.info
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi),  University of M?nster,
+Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+Journal of Statistical Software:   http://www.jstatsoft.org/
+Computers & Geosciences:   http://elsevier.com/locate/cageo/
+Spatial Statistics Society http://www.spatialstatistics.info
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20150813/474bb59a/attachment.sig>
+
+From edzer.pebesma at uni-muenster.de  Thu Aug 13 19:11:33 2015
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Thu, 13 Aug 2015 19:11:33 +0200
+Subject: [Rspatial-devel] SpatialMultiPoints
+In-Reply-To: <CANtt_hyPvB1KR8TZzAFKUmJZbqEQrpcU9aEBDrE=9VwQryeraQ@mail.gmail.com>
+References: <55CB698F.1060009@uni-muenster.de>	<CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>	<55CCCC6D.7030901@uni-muenster.de>
+ <CANtt_hyPvB1KR8TZzAFKUmJZbqEQrpcU9aEBDrE=9VwQryeraQ@mail.gmail.com>
+Message-ID: <55CCCFC5.2070208@uni-muenster.de>
+
+
+
+On 08/13/2015 07:07 PM, Robert J. Hijmans wrote:
+> Or use a third column for the coordinates, that, when present, serves
+> as the key to the attributes? Perhaps that is, in the long run, easier
+> than row names as row names cannot be directly operated on, and are
+> characters.
+
+good point; that would however directly break every downstream package
+that uses x at coords directly.
+
+> 
+> On Thu, Aug 13, 2015 at 9:57 AM, Edzer Pebesma
+> <edzer.pebesma at uni-muenster.de> wrote:
+>>
+>> On 08/13/2015 06:17 PM, Robert J. Hijmans wrote:
+>>> Edzer, That's great. But why not make it more consistent with the
+>>> other classes by modifying SpatialPoints* such that it can have
+>>> multiple points per record; just like for SpatialLines and
+>>> SpatialPolygons? Would that guarantee to break too much; or perhaps be
+>>> too much work to avoid that?  Robert
+>>
+>> That is a clever idea; the match to the data slot would then be done by
+>> the rownames of the coords slot, and allow for many-to-one, in which
+>> case the number of rows in the coords slot gets larger than the number
+>> of attribute records.
+>>
+>> Would users understand this?
+>>
+>> I was looking at support by rgeos, but it seems we (nearly) have this
+>> already when rownames of the coords slot are present, and indicate group
+>> (not sure if this is documented at all!):
+>>
+>>> m = matrix(1:8,4,2, dimnames = list(c(1,1,2,2)))
+>>> m
+>>   [,1] [,2]
+>> 1    1    5
+>> 1    2    6
+>> 2    3    7
+>> 2    4    8
+>>
+>>> library(rgeos)
+>> rgeos version: 0.3-11, (SVN revision 479)
+>>  GEOS runtime version: 3.4.2-CAPI-1.8.2 r3921
+>>  Linking to sp version: 1.1-1
+>>  Polygon checking: TRUE
+>>
+>>> gIntersects(SpatialPoints(m), byid=T) # NOT 4x4!!!
+>>       1     2
+>> 1  TRUE FALSE
+>> 2 FALSE  TRUE
+>>
+>>> m2 = matrix(1:8,4,2)
+>>> gIntersects(SpatialPoints(m2), byid=T)
+>>       1     2     3     4
+>> 1  TRUE FALSE FALSE FALSE
+>> 2 FALSE  TRUE FALSE FALSE
+>> 3 FALSE FALSE  TRUE FALSE
+>> 4 FALSE FALSE FALSE  TRUE
+>>> gIntersects(SpatialPoints(m), SpatialPoints(m2), byid=T)
+>>       1     2
+>> 1  TRUE FALSE
+>> 2  TRUE FALSE
+>> 3 FALSE  TRUE
+>> 4 FALSE  TRUE
+>>
+>>
+>>>
+>>> On Wed, Aug 12, 2015 at 8:43 AM, Edzer Pebesma
+>>> <edzer.pebesma at uni-muenster.de> wrote:
+>>>> The development version of sp, on r-forge, now provides objets with
+>>>> MultiPoint geometries, called SpatialMultiPoints and
+>>>> SpatialMultiPointsDataFrame.
+>>>>
+>>>> It can do things like:
+>>>>
+>>>> cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+>>>> cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+>>>> cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+>>>>
+>>>> library(sp)
+>>>> mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+>>>> plot(mp, col = 2, cex = 1, pch = 1:3)
+>>>> mp
+>>>> mp[1:2]
+>>>>
+>>>> print(mp, asWKT=TRUE, digits=3)
+>>>>
+>>>> mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3), data.frame(a = 1:3))
+>>>> mpdf
+>>>>
+>>>> plot(mpdf, col = mpdf$a, cex = 1:3)
+>>>> as(mpdf, "data.frame")
+>>>> mpdf[1:2,]
+>>>>
+>>>> Comments are welcome.
+>>>> --
+>>>> Edzer Pebesma
+>>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>>> Spatial Statistics Society http://www.spatialstatistics.info
+>>
+>> --
+>> Edzer Pebesma
+>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>> Spatial Statistics Society http://www.spatialstatistics.info
+>>
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi),  University of M?nster,
+Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+Journal of Statistical Software:   http://www.jstatsoft.org/
+Computers & Geosciences:   http://elsevier.com/locate/cageo/
+Spatial Statistics Society http://www.spatialstatistics.info
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20150813/71f55a95/attachment.sig>
+
+From r.hijmans at gmail.com  Thu Aug 13 18:17:31 2015
+From: r.hijmans at gmail.com (Robert J. Hijmans)
+Date: Thu, 13 Aug 2015 09:17:31 -0700
+Subject: [Rspatial-devel] SpatialMultiPoints
+In-Reply-To: <55CB698F.1060009@uni-muenster.de>
+References: <55CB698F.1060009@uni-muenster.de>
+Message-ID: <CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>
+
+Edzer, That's great. But why not make it more consistent with the
+other classes by modifying SpatialPoints* such that it can have
+multiple points per record; just like for SpatialLines and
+SpatialPolygons? Would that guarantee to break too much; or perhaps be
+too much work to avoid that?  Robert
+
+On Wed, Aug 12, 2015 at 8:43 AM, Edzer Pebesma
+<edzer.pebesma at uni-muenster.de> wrote:
+> The development version of sp, on r-forge, now provides objets with
+> MultiPoint geometries, called SpatialMultiPoints and
+> SpatialMultiPointsDataFrame.
+>
+> It can do things like:
+>
+> cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+> cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+> cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+>
+> library(sp)
+> mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+> plot(mp, col = 2, cex = 1, pch = 1:3)
+> mp
+> mp[1:2]
+>
+> print(mp, asWKT=TRUE, digits=3)
+>
+> mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3), data.frame(a = 1:3))
+> mpdf
+>
+> plot(mpdf, col = mpdf$a, cex = 1:3)
+> as(mpdf, "data.frame")
+> mpdf[1:2,]
+>
+> Comments are welcome.
+> --
+> Edzer Pebesma
+> Institute for Geoinformatics (ifgi),  University of M?nster,
+> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+> Journal of Statistical Software:   http://www.jstatsoft.org/
+> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+> Spatial Statistics Society http://www.spatialstatistics.info
+
+From r.hijmans at gmail.com  Thu Aug 13 19:07:26 2015
+From: r.hijmans at gmail.com (Robert J. Hijmans)
+Date: Thu, 13 Aug 2015 10:07:26 -0700
+Subject: [Rspatial-devel] SpatialMultiPoints
+In-Reply-To: <55CCCC6D.7030901@uni-muenster.de>
+References: <55CB698F.1060009@uni-muenster.de>
+ <CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>
+ <55CCCC6D.7030901@uni-muenster.de>
+Message-ID: <CANtt_hyPvB1KR8TZzAFKUmJZbqEQrpcU9aEBDrE=9VwQryeraQ@mail.gmail.com>
+
+Or use a third column for the coordinates, that, when present, serves
+as the key to the attributes? Perhaps that is, in the long run, easier
+than row names as row names cannot be directly operated on, and are
+characters.
+
+On Thu, Aug 13, 2015 at 9:57 AM, Edzer Pebesma
+<edzer.pebesma at uni-muenster.de> wrote:
+>
+> On 08/13/2015 06:17 PM, Robert J. Hijmans wrote:
+>> Edzer, That's great. But why not make it more consistent with the
+>> other classes by modifying SpatialPoints* such that it can have
+>> multiple points per record; just like for SpatialLines and
+>> SpatialPolygons? Would that guarantee to break too much; or perhaps be
+>> too much work to avoid that?  Robert
+>
+> That is a clever idea; the match to the data slot would then be done by
+> the rownames of the coords slot, and allow for many-to-one, in which
+> case the number of rows in the coords slot gets larger than the number
+> of attribute records.
+>
+> Would users understand this?
+>
+> I was looking at support by rgeos, but it seems we (nearly) have this
+> already when rownames of the coords slot are present, and indicate group
+> (not sure if this is documented at all!):
+>
+>> m = matrix(1:8,4,2, dimnames = list(c(1,1,2,2)))
+>> m
+>   [,1] [,2]
+> 1    1    5
+> 1    2    6
+> 2    3    7
+> 2    4    8
+>
+>> library(rgeos)
+> rgeos version: 0.3-11, (SVN revision 479)
+>  GEOS runtime version: 3.4.2-CAPI-1.8.2 r3921
+>  Linking to sp version: 1.1-1
+>  Polygon checking: TRUE
+>
+>> gIntersects(SpatialPoints(m), byid=T) # NOT 4x4!!!
+>       1     2
+> 1  TRUE FALSE
+> 2 FALSE  TRUE
+>
+>> m2 = matrix(1:8,4,2)
+>> gIntersects(SpatialPoints(m2), byid=T)
+>       1     2     3     4
+> 1  TRUE FALSE FALSE FALSE
+> 2 FALSE  TRUE FALSE FALSE
+> 3 FALSE FALSE  TRUE FALSE
+> 4 FALSE FALSE FALSE  TRUE
+>> gIntersects(SpatialPoints(m), SpatialPoints(m2), byid=T)
+>       1     2
+> 1  TRUE FALSE
+> 2  TRUE FALSE
+> 3 FALSE  TRUE
+> 4 FALSE  TRUE
+>
+>
+>>
+>> On Wed, Aug 12, 2015 at 8:43 AM, Edzer Pebesma
+>> <edzer.pebesma at uni-muenster.de> wrote:
+>>> The development version of sp, on r-forge, now provides objets with
+>>> MultiPoint geometries, called SpatialMultiPoints and
+>>> SpatialMultiPointsDataFrame.
+>>>
+>>> It can do things like:
+>>>
+>>> cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+>>> cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+>>> cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+>>>
+>>> library(sp)
+>>> mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+>>> plot(mp, col = 2, cex = 1, pch = 1:3)
+>>> mp
+>>> mp[1:2]
+>>>
+>>> print(mp, asWKT=TRUE, digits=3)
+>>>
+>>> mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3), data.frame(a = 1:3))
+>>> mpdf
+>>>
+>>> plot(mpdf, col = mpdf$a, cex = 1:3)
+>>> as(mpdf, "data.frame")
+>>> mpdf[1:2,]
+>>>
+>>> Comments are welcome.
+>>> --
+>>> Edzer Pebesma
+>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>> Spatial Statistics Society http://www.spatialstatistics.info
+>
+> --
+> Edzer Pebesma
+> Institute for Geoinformatics (ifgi),  University of M?nster,
+> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+> Journal of Statistical Software:   http://www.jstatsoft.org/
+> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+> Spatial Statistics Society http://www.spatialstatistics.info
+>
+
+From Roger.Bivand at nhh.no  Thu Aug 13 20:36:17 2015
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Thu, 13 Aug 2015 20:36:17 +0200
+Subject: [Rspatial-devel] SpatialMultiPoints
+In-Reply-To: <CANtt_hyPvB1KR8TZzAFKUmJZbqEQrpcU9aEBDrE=9VwQryeraQ@mail.gmail.com>
+References: <55CB698F.1060009@uni-muenster.de>
+ <CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>
+ <55CCCC6D.7030901@uni-muenster.de>
+ <CANtt_hyPvB1KR8TZzAFKUmJZbqEQrpcU9aEBDrE=9VwQryeraQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1508132030410.19530@reclus.nhh.no>
+
+On Thu, 13 Aug 2015, Robert J. Hijmans wrote:
+
+> Or use a third column for the coordinates, that, when present, serves
+> as the key to the attributes? Perhaps that is, in the long run, easier
+> than row names as row names cannot be directly operated on, and are
+> characters.
+
+All unique strings are hashed internally in base R, so string lookup in 
+R is cheap - this applies to the strings used for row.names:
+
+https://cran.r-project.org/doc/manuals/r-devel/R-ints.html#The-CHARSXP-cache
+
+Bets would be off in C/C++, unless going through SEXP (which we could 
+check that we do?).
+
+Roger
+
+>
+> On Thu, Aug 13, 2015 at 9:57 AM, Edzer Pebesma
+> <edzer.pebesma at uni-muenster.de> wrote:
+>>
+>> On 08/13/2015 06:17 PM, Robert J. Hijmans wrote:
+>>> Edzer, That's great. But why not make it more consistent with the
+>>> other classes by modifying SpatialPoints* such that it can have
+>>> multiple points per record; just like for SpatialLines and
+>>> SpatialPolygons? Would that guarantee to break too much; or perhaps be
+>>> too much work to avoid that?  Robert
+>>
+>> That is a clever idea; the match to the data slot would then be done by
+>> the rownames of the coords slot, and allow for many-to-one, in which
+>> case the number of rows in the coords slot gets larger than the number
+>> of attribute records.
+>>
+>> Would users understand this?
+>>
+>> I was looking at support by rgeos, but it seems we (nearly) have this
+>> already when rownames of the coords slot are present, and indicate group
+>> (not sure if this is documented at all!):
+>>
+>>> m = matrix(1:8,4,2, dimnames = list(c(1,1,2,2)))
+>>> m
+>>   [,1] [,2]
+>> 1    1    5
+>> 1    2    6
+>> 2    3    7
+>> 2    4    8
+>>
+>>> library(rgeos)
+>> rgeos version: 0.3-11, (SVN revision 479)
+>>  GEOS runtime version: 3.4.2-CAPI-1.8.2 r3921
+>>  Linking to sp version: 1.1-1
+>>  Polygon checking: TRUE
+>>
+>>> gIntersects(SpatialPoints(m), byid=T) # NOT 4x4!!!
+>>       1     2
+>> 1  TRUE FALSE
+>> 2 FALSE  TRUE
+>>
+>>> m2 = matrix(1:8,4,2)
+>>> gIntersects(SpatialPoints(m2), byid=T)
+>>       1     2     3     4
+>> 1  TRUE FALSE FALSE FALSE
+>> 2 FALSE  TRUE FALSE FALSE
+>> 3 FALSE FALSE  TRUE FALSE
+>> 4 FALSE FALSE FALSE  TRUE
+>>> gIntersects(SpatialPoints(m), SpatialPoints(m2), byid=T)
+>>       1     2
+>> 1  TRUE FALSE
+>> 2  TRUE FALSE
+>> 3 FALSE  TRUE
+>> 4 FALSE  TRUE
+>>
+>>
+>>>
+>>> On Wed, Aug 12, 2015 at 8:43 AM, Edzer Pebesma
+>>> <edzer.pebesma at uni-muenster.de> wrote:
+>>>> The development version of sp, on r-forge, now provides objets with
+>>>> MultiPoint geometries, called SpatialMultiPoints and
+>>>> SpatialMultiPointsDataFrame.
+>>>>
+>>>> It can do things like:
+>>>>
+>>>> cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+>>>> cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+>>>> cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+>>>>
+>>>> library(sp)
+>>>> mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+>>>> plot(mp, col = 2, cex = 1, pch = 1:3)
+>>>> mp
+>>>> mp[1:2]
+>>>>
+>>>> print(mp, asWKT=TRUE, digits=3)
+>>>>
+>>>> mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3), data.frame(a = 1:3))
+>>>> mpdf
+>>>>
+>>>> plot(mpdf, col = mpdf$a, cex = 1:3)
+>>>> as(mpdf, "data.frame")
+>>>> mpdf[1:2,]
+>>>>
+>>>> Comments are welcome.
+>>>> --
+>>>> Edzer Pebesma
+>>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>>> Spatial Statistics Society http://www.spatialstatistics.info
+>>
+>> --
+>> Edzer Pebesma
+>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>> Spatial Statistics Society http://www.spatialstatistics.info
+>>
+> _______________________________________________
+> Rspatial-devel mailing list
+> Rspatial-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rspatial-devel
+
+-- 
+Roger Bivand
+Department of Economics, Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 91 00
+e-mail: Roger.Bivand at nhh.no
+
+From edzer.pebesma at uni-muenster.de  Fri Aug 14 11:41:46 2015
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Fri, 14 Aug 2015 11:41:46 +0200
+Subject: [Rspatial-devel] SpatialMultiPoints
+In-Reply-To: <alpine.LFD.2.20.1508132030410.19530@reclus.nhh.no>
+References: <55CB698F.1060009@uni-muenster.de>
+ <CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>
+ <55CCCC6D.7030901@uni-muenster.de>
+ <CANtt_hyPvB1KR8TZzAFKUmJZbqEQrpcU9aEBDrE=9VwQryeraQ@mail.gmail.com>
+ <alpine.LFD.2.20.1508132030410.19530@reclus.nhh.no>
+Message-ID: <55CDB7DA.3030702@uni-muenster.de>
+
+In an early stage of sp we decided first against, later in favour of
+using data.frame for attribute data, the reason being character
+row.names (which were first compulsory, but abandoned later on): they
+are overhead in memory and computation, and cause bad scaling if you go
+in the direction of 1e6 - 1e9 points. Allowing for multi points as
+special case of SpatialPoints* would introduce this scaling problem
+again, unless we allow for absence of rownames in @coords, which leads
+to complex code.
+
+I still wonder whether users will be helped by having one class that
+represents both simple points and multi points.
+
+I tend to make students believe that data.frames are lists with equal
+length column vectors. They're not:
+
+> data.frame(a = 1:2, b = list(1:3, 2:1))
+Error in data.frame(1:3, c(2L, 1L), check.names = FALSE,
+stringsAsFactors = TRUE) :
+  arguments imply differing number of rows: 3, 2 # OF COURSE!
+> d = data.frame(a = 1:2)
+> d$b = list(1:3, 2:1) # ???
+> d
+  a       b
+1 1 1, 2, 3
+2 2    2, 1
+> d$c = data.frame(d = 4:3) # ????
+> d
+  a       b d
+1 1 1, 2, 3 4
+2 2    2, 1 3
+> class(d$c)
+[1] "data.frame"
+> d$c
+  d
+1 4
+2 3
+
+and people actually use this ability for sp objects.
+
+Just read in your google location history dump with jsonlite to see how
+messy things can get.
+
+On 08/13/2015 08:36 PM, Roger Bivand wrote:
+> On Thu, 13 Aug 2015, Robert J. Hijmans wrote:
+> 
+>> Or use a third column for the coordinates, that, when present, serves
+>> as the key to the attributes? Perhaps that is, in the long run, easier
+>> than row names as row names cannot be directly operated on, and are
+>> characters.
+> 
+> All unique strings are hashed internally in base R, so string lookup in
+> R is cheap - this applies to the strings used for row.names:
+> 
+> https://cran.r-project.org/doc/manuals/r-devel/R-ints.html#The-CHARSXP-cache
+> 
+> 
+> Bets would be off in C/C++, unless going through SEXP (which we could
+> check that we do?).
+> 
+> Roger
+> 
+>>
+>> On Thu, Aug 13, 2015 at 9:57 AM, Edzer Pebesma
+>> <edzer.pebesma at uni-muenster.de> wrote:
+>>>
+>>> On 08/13/2015 06:17 PM, Robert J. Hijmans wrote:
+>>>> Edzer, That's great. But why not make it more consistent with the
+>>>> other classes by modifying SpatialPoints* such that it can have
+>>>> multiple points per record; just like for SpatialLines and
+>>>> SpatialPolygons? Would that guarantee to break too much; or perhaps be
+>>>> too much work to avoid that?  Robert
+>>>
+>>> That is a clever idea; the match to the data slot would then be done by
+>>> the rownames of the coords slot, and allow for many-to-one, in which
+>>> case the number of rows in the coords slot gets larger than the number
+>>> of attribute records.
+>>>
+>>> Would users understand this?
+>>>
+>>> I was looking at support by rgeos, but it seems we (nearly) have this
+>>> already when rownames of the coords slot are present, and indicate group
+>>> (not sure if this is documented at all!):
+>>>
+>>>> m = matrix(1:8,4,2, dimnames = list(c(1,1,2,2)))
+>>>> m
+>>>   [,1] [,2]
+>>> 1    1    5
+>>> 1    2    6
+>>> 2    3    7
+>>> 2    4    8
+>>>
+>>>> library(rgeos)
+>>> rgeos version: 0.3-11, (SVN revision 479)
+>>>  GEOS runtime version: 3.4.2-CAPI-1.8.2 r3921
+>>>  Linking to sp version: 1.1-1
+>>>  Polygon checking: TRUE
+>>>
+>>>> gIntersects(SpatialPoints(m), byid=T) # NOT 4x4!!!
+>>>       1     2
+>>> 1  TRUE FALSE
+>>> 2 FALSE  TRUE
+>>>
+>>>> m2 = matrix(1:8,4,2)
+>>>> gIntersects(SpatialPoints(m2), byid=T)
+>>>       1     2     3     4
+>>> 1  TRUE FALSE FALSE FALSE
+>>> 2 FALSE  TRUE FALSE FALSE
+>>> 3 FALSE FALSE  TRUE FALSE
+>>> 4 FALSE FALSE FALSE  TRUE
+>>>> gIntersects(SpatialPoints(m), SpatialPoints(m2), byid=T)
+>>>       1     2
+>>> 1  TRUE FALSE
+>>> 2  TRUE FALSE
+>>> 3 FALSE  TRUE
+>>> 4 FALSE  TRUE
+>>>
+>>>
+>>>>
+>>>> On Wed, Aug 12, 2015 at 8:43 AM, Edzer Pebesma
+>>>> <edzer.pebesma at uni-muenster.de> wrote:
+>>>>> The development version of sp, on r-forge, now provides objets with
+>>>>> MultiPoint geometries, called SpatialMultiPoints and
+>>>>> SpatialMultiPointsDataFrame.
+>>>>>
+>>>>> It can do things like:
+>>>>>
+>>>>> cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+>>>>> cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+>>>>> cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+>>>>>
+>>>>> library(sp)
+>>>>> mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+>>>>> plot(mp, col = 2, cex = 1, pch = 1:3)
+>>>>> mp
+>>>>> mp[1:2]
+>>>>>
+>>>>> print(mp, asWKT=TRUE, digits=3)
+>>>>>
+>>>>> mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3),
+>>>>> data.frame(a = 1:3))
+>>>>> mpdf
+>>>>>
+>>>>> plot(mpdf, col = mpdf$a, cex = 1:3)
+>>>>> as(mpdf, "data.frame")
+>>>>> mpdf[1:2,]
+>>>>>
+>>>>> Comments are welcome.
+>>>>> -- 
+>>>>> Edzer Pebesma
+>>>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>>>> Spatial Statistics Society http://www.spatialstatistics.info
+>>>
+>>> -- 
+>>> Edzer Pebesma
+>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>> Spatial Statistics Society http://www.spatialstatistics.info
+>>>
+>> _______________________________________________
+>> Rspatial-devel mailing list
+>> Rspatial-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rspatial-devel
+>>
+> 
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi),  University of M?nster,
+Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+Journal of Statistical Software:   http://www.jstatsoft.org/
+Computers & Geosciences:   http://elsevier.com/locate/cageo/
+Spatial Statistics Society http://www.spatialstatistics.info
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20150814/fcbd7273/attachment.sig>
+
+From Roger.Bivand at nhh.no  Fri Aug 14 11:47:47 2015
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Fri, 14 Aug 2015 11:47:47 +0200
+Subject: [Rspatial-devel] SpatialMultiPoints
+In-Reply-To: <55CDB7DA.3030702@uni-muenster.de>
+References: <55CB698F.1060009@uni-muenster.de>
+ <CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>
+ <55CCCC6D.7030901@uni-muenster.de>
+ <CANtt_hyPvB1KR8TZzAFKUmJZbqEQrpcU9aEBDrE=9VwQryeraQ@mail.gmail.com>
+ <alpine.LFD.2.20.1508132030410.19530@reclus.nhh.no>
+ <55CDB7DA.3030702@uni-muenster.de>
+Message-ID: <alpine.LFD.2.20.1508141142020.13461@reclus.nhh.no>
+
+On Fri, 14 Aug 2015, Edzer Pebesma wrote:
+
+> In an early stage of sp we decided first against, later in favour of
+> using data.frame for attribute data, the reason being character
+> row.names (which were first compulsory, but abandoned later on): they
+> are overhead in memory and computation, and cause bad scaling if you go
+> in the direction of 1e6 - 1e9 points. Allowing for multi points as
+> special case of SpatialPoints* would introduce this scaling problem
+> again, unless we allow for absence of rownames in @coords, which leads
+> to complex code.
+
+My tendency would be to keep SpatialPoints (and its inheritors 
+SpatialPixels and SpatialPixelsDataFrame) as they are. It makes, arguably, 
+more sense to have SpatialLines depend on SpatialMultiPoints, with one (or 
+more) MultiPoint object in each observation (MultiPoints object), and if 
+it is a Line/Lines, the sequencing of the coordinates means something, 
+otherwise not. Doesn't this feed forward to trajectories?
+
+Roger
+
+>
+> I still wonder whether users will be helped by having one class that
+> represents both simple points and multi points.
+>
+> I tend to make students believe that data.frames are lists with equal
+> length column vectors. They're not:
+>
+>> data.frame(a = 1:2, b = list(1:3, 2:1))
+> Error in data.frame(1:3, c(2L, 1L), check.names = FALSE,
+> stringsAsFactors = TRUE) :
+>  arguments imply differing number of rows: 3, 2 # OF COURSE!
+>> d = data.frame(a = 1:2)
+>> d$b = list(1:3, 2:1) # ???
+>> d
+>  a       b
+> 1 1 1, 2, 3
+> 2 2    2, 1
+>> d$c = data.frame(d = 4:3) # ????
+>> d
+>  a       b d
+> 1 1 1, 2, 3 4
+> 2 2    2, 1 3
+>> class(d$c)
+> [1] "data.frame"
+>> d$c
+>  d
+> 1 4
+> 2 3
+>
+> and people actually use this ability for sp objects.
+>
+> Just read in your google location history dump with jsonlite to see how
+> messy things can get.
+>
+> On 08/13/2015 08:36 PM, Roger Bivand wrote:
+>> On Thu, 13 Aug 2015, Robert J. Hijmans wrote:
+>>
+>>> Or use a third column for the coordinates, that, when present, serves
+>>> as the key to the attributes? Perhaps that is, in the long run, easier
+>>> than row names as row names cannot be directly operated on, and are
+>>> characters.
+>>
+>> All unique strings are hashed internally in base R, so string lookup in
+>> R is cheap - this applies to the strings used for row.names:
+>>
+>> https://cran.r-project.org/doc/manuals/r-devel/R-ints.html#The-CHARSXP-cache
+>>
+>>
+>> Bets would be off in C/C++, unless going through SEXP (which we could
+>> check that we do?).
+>>
+>> Roger
+>>
+>>>
+>>> On Thu, Aug 13, 2015 at 9:57 AM, Edzer Pebesma
+>>> <edzer.pebesma at uni-muenster.de> wrote:
+>>>>
+>>>> On 08/13/2015 06:17 PM, Robert J. Hijmans wrote:
+>>>>> Edzer, That's great. But why not make it more consistent with the
+>>>>> other classes by modifying SpatialPoints* such that it can have
+>>>>> multiple points per record; just like for SpatialLines and
+>>>>> SpatialPolygons? Would that guarantee to break too much; or perhaps be
+>>>>> too much work to avoid that?  Robert
+>>>>
+>>>> That is a clever idea; the match to the data slot would then be done by
+>>>> the rownames of the coords slot, and allow for many-to-one, in which
+>>>> case the number of rows in the coords slot gets larger than the number
+>>>> of attribute records.
+>>>>
+>>>> Would users understand this?
+>>>>
+>>>> I was looking at support by rgeos, but it seems we (nearly) have this
+>>>> already when rownames of the coords slot are present, and indicate group
+>>>> (not sure if this is documented at all!):
+>>>>
+>>>>> m = matrix(1:8,4,2, dimnames = list(c(1,1,2,2)))
+>>>>> m
+>>>>   [,1] [,2]
+>>>> 1    1    5
+>>>> 1    2    6
+>>>> 2    3    7
+>>>> 2    4    8
+>>>>
+>>>>> library(rgeos)
+>>>> rgeos version: 0.3-11, (SVN revision 479)
+>>>>  GEOS runtime version: 3.4.2-CAPI-1.8.2 r3921
+>>>>  Linking to sp version: 1.1-1
+>>>>  Polygon checking: TRUE
+>>>>
+>>>>> gIntersects(SpatialPoints(m), byid=T) # NOT 4x4!!!
+>>>>       1     2
+>>>> 1  TRUE FALSE
+>>>> 2 FALSE  TRUE
+>>>>
+>>>>> m2 = matrix(1:8,4,2)
+>>>>> gIntersects(SpatialPoints(m2), byid=T)
+>>>>       1     2     3     4
+>>>> 1  TRUE FALSE FALSE FALSE
+>>>> 2 FALSE  TRUE FALSE FALSE
+>>>> 3 FALSE FALSE  TRUE FALSE
+>>>> 4 FALSE FALSE FALSE  TRUE
+>>>>> gIntersects(SpatialPoints(m), SpatialPoints(m2), byid=T)
+>>>>       1     2
+>>>> 1  TRUE FALSE
+>>>> 2  TRUE FALSE
+>>>> 3 FALSE  TRUE
+>>>> 4 FALSE  TRUE
+>>>>
+>>>>
+>>>>>
+>>>>> On Wed, Aug 12, 2015 at 8:43 AM, Edzer Pebesma
+>>>>> <edzer.pebesma at uni-muenster.de> wrote:
+>>>>>> The development version of sp, on r-forge, now provides objets with
+>>>>>> MultiPoint geometries, called SpatialMultiPoints and
+>>>>>> SpatialMultiPointsDataFrame.
+>>>>>>
+>>>>>> It can do things like:
+>>>>>>
+>>>>>> cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+>>>>>> cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+>>>>>> cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+>>>>>>
+>>>>>> library(sp)
+>>>>>> mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+>>>>>> plot(mp, col = 2, cex = 1, pch = 1:3)
+>>>>>> mp
+>>>>>> mp[1:2]
+>>>>>>
+>>>>>> print(mp, asWKT=TRUE, digits=3)
+>>>>>>
+>>>>>> mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3),
+>>>>>> data.frame(a = 1:3))
+>>>>>> mpdf
+>>>>>>
+>>>>>> plot(mpdf, col = mpdf$a, cex = 1:3)
+>>>>>> as(mpdf, "data.frame")
+>>>>>> mpdf[1:2,]
+>>>>>>
+>>>>>> Comments are welcome.
+>>>>>> --
+>>>>>> Edzer Pebesma
+>>>>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>>>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>>>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>>>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>>>>> Spatial Statistics Society http://www.spatialstatistics.info
+>>>>
+>>>> --
+>>>> Edzer Pebesma
+>>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>>> Spatial Statistics Society http://www.spatialstatistics.info
+>>>>
+>>> _______________________________________________
+>>> Rspatial-devel mailing list
+>>> Rspatial-devel at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rspatial-devel
+>>>
+>>
+>
+>
+
+-- 
+Roger Bivand
+Department of Economics, Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 91 00
+e-mail: Roger.Bivand at nhh.no
+
+From edzer.pebesma at uni-muenster.de  Fri Aug 14 13:18:19 2015
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Fri, 14 Aug 2015 13:18:19 +0200
+Subject: [Rspatial-devel] SpatialMultiPoints
+In-Reply-To: <alpine.LFD.2.20.1508141142020.13461@reclus.nhh.no>
+References: <55CB698F.1060009@uni-muenster.de>
+ <CANtt_hxDWC55CYAETraXC0gEB8OAUF4eXPV+wqwtKvSq87cPJA@mail.gmail.com>
+ <55CCCC6D.7030901@uni-muenster.de>
+ <CANtt_hyPvB1KR8TZzAFKUmJZbqEQrpcU9aEBDrE=9VwQryeraQ@mail.gmail.com>
+ <alpine.LFD.2.20.1508132030410.19530@reclus.nhh.no>
+ <55CDB7DA.3030702@uni-muenster.de>
+ <alpine.LFD.2.20.1508141142020.13461@reclus.nhh.no>
+Message-ID: <55CDCE7B.10203@uni-muenster.de>
+
+
+
+On 08/14/2015 11:47 AM, Roger Bivand wrote:
+> On Fri, 14 Aug 2015, Edzer Pebesma wrote:
+> 
+>> In an early stage of sp we decided first against, later in favour of
+>> using data.frame for attribute data, the reason being character
+>> row.names (which were first compulsory, but abandoned later on): they
+>> are overhead in memory and computation, and cause bad scaling if you go
+>> in the direction of 1e6 - 1e9 points. Allowing for multi points as
+>> special case of SpatialPoints* would introduce this scaling problem
+>> again, unless we allow for absence of rownames in @coords, which leads
+>> to complex code.
+> 
+> My tendency would be to keep SpatialPoints (and its inheritors
+> SpatialPixels and SpatialPixelsDataFrame) as they are. It makes,
+> arguably, more sense to have SpatialLines depend on SpatialMultiPoints,
+> with one (or more) MultiPoint object in each observation (MultiPoints
+> object), and if it is a Line/Lines, the sequencing of the coordinates
+> means something, otherwise not. Doesn't this feed forward to trajectories?
+
+I can see this would make coercing to/from SpatialLines easy and
+complete, but I fail to see a use case for a single attribute item
+relating to more than one point set.
+
+Yes, trajectories::TracksCollection objects have a double nesting (ID =
+person, Track = sequence of contiguously registered fixes) but the
+contiguity here concerns time, not space, so projected onto space I
+still don't see this as a reason to have sets of sets, rather than sets.
+
+> 
+> Roger
+> 
+>>
+>> I still wonder whether users will be helped by having one class that
+>> represents both simple points and multi points.
+>>
+>> I tend to make students believe that data.frames are lists with equal
+>> length column vectors. They're not:
+>>
+>>> data.frame(a = 1:2, b = list(1:3, 2:1))
+>> Error in data.frame(1:3, c(2L, 1L), check.names = FALSE,
+>> stringsAsFactors = TRUE) :
+>>  arguments imply differing number of rows: 3, 2 # OF COURSE!
+>>> d = data.frame(a = 1:2)
+>>> d$b = list(1:3, 2:1) # ???
+>>> d
+>>  a       b
+>> 1 1 1, 2, 3
+>> 2 2    2, 1
+>>> d$c = data.frame(d = 4:3) # ????
+>>> d
+>>  a       b d
+>> 1 1 1, 2, 3 4
+>> 2 2    2, 1 3
+>>> class(d$c)
+>> [1] "data.frame"
+>>> d$c
+>>  d
+>> 1 4
+>> 2 3
+>>
+>> and people actually use this ability for sp objects.
+>>
+>> Just read in your google location history dump with jsonlite to see how
+>> messy things can get.
+>>
+>> On 08/13/2015 08:36 PM, Roger Bivand wrote:
+>>> On Thu, 13 Aug 2015, Robert J. Hijmans wrote:
+>>>
+>>>> Or use a third column for the coordinates, that, when present, serves
+>>>> as the key to the attributes? Perhaps that is, in the long run, easier
+>>>> than row names as row names cannot be directly operated on, and are
+>>>> characters.
+>>>
+>>> All unique strings are hashed internally in base R, so string lookup in
+>>> R is cheap - this applies to the strings used for row.names:
+>>>
+>>> https://cran.r-project.org/doc/manuals/r-devel/R-ints.html#The-CHARSXP-cache
+>>>
+>>>
+>>>
+>>> Bets would be off in C/C++, unless going through SEXP (which we could
+>>> check that we do?).
+>>>
+>>> Roger
+>>>
+>>>>
+>>>> On Thu, Aug 13, 2015 at 9:57 AM, Edzer Pebesma
+>>>> <edzer.pebesma at uni-muenster.de> wrote:
+>>>>>
+>>>>> On 08/13/2015 06:17 PM, Robert J. Hijmans wrote:
+>>>>>> Edzer, That's great. But why not make it more consistent with the
+>>>>>> other classes by modifying SpatialPoints* such that it can have
+>>>>>> multiple points per record; just like for SpatialLines and
+>>>>>> SpatialPolygons? Would that guarantee to break too much; or
+>>>>>> perhaps be
+>>>>>> too much work to avoid that?  Robert
+>>>>>
+>>>>> That is a clever idea; the match to the data slot would then be
+>>>>> done by
+>>>>> the rownames of the coords slot, and allow for many-to-one, in which
+>>>>> case the number of rows in the coords slot gets larger than the number
+>>>>> of attribute records.
+>>>>>
+>>>>> Would users understand this?
+>>>>>
+>>>>> I was looking at support by rgeos, but it seems we (nearly) have this
+>>>>> already when rownames of the coords slot are present, and indicate
+>>>>> group
+>>>>> (not sure if this is documented at all!):
+>>>>>
+>>>>>> m = matrix(1:8,4,2, dimnames = list(c(1,1,2,2)))
+>>>>>> m
+>>>>>   [,1] [,2]
+>>>>> 1    1    5
+>>>>> 1    2    6
+>>>>> 2    3    7
+>>>>> 2    4    8
+>>>>>
+>>>>>> library(rgeos)
+>>>>> rgeos version: 0.3-11, (SVN revision 479)
+>>>>>  GEOS runtime version: 3.4.2-CAPI-1.8.2 r3921
+>>>>>  Linking to sp version: 1.1-1
+>>>>>  Polygon checking: TRUE
+>>>>>
+>>>>>> gIntersects(SpatialPoints(m), byid=T) # NOT 4x4!!!
+>>>>>       1     2
+>>>>> 1  TRUE FALSE
+>>>>> 2 FALSE  TRUE
+>>>>>
+>>>>>> m2 = matrix(1:8,4,2)
+>>>>>> gIntersects(SpatialPoints(m2), byid=T)
+>>>>>       1     2     3     4
+>>>>> 1  TRUE FALSE FALSE FALSE
+>>>>> 2 FALSE  TRUE FALSE FALSE
+>>>>> 3 FALSE FALSE  TRUE FALSE
+>>>>> 4 FALSE FALSE FALSE  TRUE
+>>>>>> gIntersects(SpatialPoints(m), SpatialPoints(m2), byid=T)
+>>>>>       1     2
+>>>>> 1  TRUE FALSE
+>>>>> 2  TRUE FALSE
+>>>>> 3 FALSE  TRUE
+>>>>> 4 FALSE  TRUE
+>>>>>
+>>>>>
+>>>>>>
+>>>>>> On Wed, Aug 12, 2015 at 8:43 AM, Edzer Pebesma
+>>>>>> <edzer.pebesma at uni-muenster.de> wrote:
+>>>>>>> The development version of sp, on r-forge, now provides objets with
+>>>>>>> MultiPoint geometries, called SpatialMultiPoints and
+>>>>>>> SpatialMultiPointsDataFrame.
+>>>>>>>
+>>>>>>> It can do things like:
+>>>>>>>
+>>>>>>> cl1 = cbind(rnorm(3, 10), rnorm(3, 10))
+>>>>>>> cl2 = cbind(rnorm(5, 10), rnorm(5,  0))
+>>>>>>> cl3 = cbind(rnorm(7,  0), rnorm(7, 10))
+>>>>>>>
+>>>>>>> library(sp)
+>>>>>>> mp = SpatialMultiPoints(list(cl1, cl2, cl3))
+>>>>>>> plot(mp, col = 2, cex = 1, pch = 1:3)
+>>>>>>> mp
+>>>>>>> mp[1:2]
+>>>>>>>
+>>>>>>> print(mp, asWKT=TRUE, digits=3)
+>>>>>>>
+>>>>>>> mpdf = SpatialMultiPointsDataFrame(list(cl1, cl2, cl3),
+>>>>>>> data.frame(a = 1:3))
+>>>>>>> mpdf
+>>>>>>>
+>>>>>>> plot(mpdf, col = mpdf$a, cex = 1:3)
+>>>>>>> as(mpdf, "data.frame")
+>>>>>>> mpdf[1:2,]
+>>>>>>>
+>>>>>>> Comments are welcome.
+>>>>>>> -- 
+>>>>>>> Edzer Pebesma
+>>>>>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>>>>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>>>>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>>>>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>>>>>> Spatial Statistics Society http://www.spatialstatistics.info
+>>>>>
+>>>>> -- 
+>>>>> Edzer Pebesma
+>>>>> Institute for Geoinformatics (ifgi),  University of M?nster,
+>>>>> Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+>>>>> Journal of Statistical Software:   http://www.jstatsoft.org/
+>>>>> Computers & Geosciences:   http://elsevier.com/locate/cageo/
+>>>>> Spatial Statistics Society http://www.spatialstatistics.info
+>>>>>
+>>>> _______________________________________________
+>>>> Rspatial-devel mailing list
+>>>> Rspatial-devel at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rspatial-devel
+>>>>
+>>>>
+>>>
+>>
+>>
+> 
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi),  University of M?nster,
+Heisenbergstra?e 2, 48149 M?nster, Germany; +49 251 83 33081
+Journal of Statistical Software:   http://www.jstatsoft.org/
+Computers & Geosciences:   http://elsevier.com/locate/cageo/
+Spatial Statistics Society http://www.spatialstatistics.info
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20150814/afa88ff9/attachment.sig>
+

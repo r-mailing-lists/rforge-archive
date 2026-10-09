@@ -1,0 +1,1104 @@
+From marc.taylor at thuenen.de  Thu Apr  7 09:37:00 2016
+From: marc.taylor at thuenen.de (Marc Taylor)
+Date: Thu, 7 Apr 2016 09:37:00 +0200
+Subject: [FLR-list] fitting a custom SRModel with a covariate
+Message-ID: <57060E1C.5040105@thuenen.de>
+
+Dear FLR-Listers,
+
+I was hoping someone might help me figure out a way to create a custom 
+SRModel that uses a covariate in addition to ssb and rec.
+
+ From the documentation of SRModels (i.e. ?SRModels), reference is made 
+to several models that would be of interest to me (e.g. 'ricker.c.a', 
+'ricker.c.b', etc.), but these do not appear to be presently included in 
+FLCore.  I made an attempt (below) to define a custom model, but am 
+getting errors when fitting with fmle().
+
+If anyone has any experience with such models, I would greatly 
+appreciate any advise.
+
+Cheers,
+Marc
+
+*Example script*:
+
+# packages ----------------------------------------------------------------
+library(FLCore) # FLCore_2.5.20160107
+
+
+# load data ---------------------------------------------------------------
+
+data("ple4")
+
+
+# make srr obbject and add covariate --------------------------------------
+
+ple4Sr <- as.FLSR(ple4)
+
+env1 <- c(-0.81, -1.73, -0.09, 0.42, -1.01, -1.06, -0.79, -0.42, -0.74,
+-0.3, 0.25, 0.09, -0.18, -0.29, 0.13, 0.09, 0.48, 0.33, 0.41,
+0.4, -0.21, -0.64, -0.97, -0.02, -0.19, 0.28, -0.03, -0.19, -0.47,
+-0.97, -0.88, 0.23, 0.82, 0.92, 0.17, 0.67, -0.07, 0.32, 0.9,
+-0.64, 0.97, 0.54, 1.18, 0.67, 0.44, 1.29, 1.54, 1.22, 0.47,
+1.04, 1.31, 1.06)
+
+ple4Sr at covar <- FLQuants(list(env1=FLQuant(env1, dim=dim(ple4Sr at ssb), 
+dimnames=dimnames(ple4Sr at ssb))))
+ple4Sr at covar$env1
+
+
+# attempt with existing SRModel fails
+model(ple4Sr) <- "ricker.c.a"
+# Error in do.call(value, list()) : could not find function "ricker.c.a"
+
+
+
+# make new srr function ---------------------------------------------------
+
+# adapt ricker
+ricker <- function(){
+     logl <- function(a, b, rec, ssb) loglAR1(log(rec), log(a *
+         ssb * exp(-b * ssb)))
+     initial <- structure(function(rec, ssb) {
+         res <- coefficients(lm(log(c(rec)/c(ssb)) ~ c(ssb)))
+         return(FLPar(a = max(exp(res[1])), b = -max(res[2])))
+     }, lower = rep(-Inf, 2), upper = rep(Inf, 2))
+     model <- rec ~ a * ssb * exp(-b * ssb)
+     return(list(logl = logl, model = model, initial = initial))
+}
+
+# to this (incl. env. control term - 'env1')
+ri.ec <- function(){
+     logl <- function(a, b, e1, rec, ssb, env1) loglAR1(log(rec), log(a *
+         ssb * exp(-b * ssb) * exp(e1 * env1)))
+     initial <- structure(function(rec, ssb, env1) {
+         res <- coefficients(lm(log(c(rec)/c(ssb)) ~ c(ssb) + c(env1)))
+         return(FLPar(a = max(exp(res[1])), b = -max(res[2], env1 = 
+max(res[3]))))
+     }, lower = rep(-Inf, 3), upper = rep(Inf, 3))
+     model <- rec ~ a * ssb * exp(-b * ssb) * exp(e1 * env1)
+     return(list(logl = logl, model = model, initial = initial))
+}
+
+
+# fit SRR -----------------------------------------------------------------
+model(ple4Sr) <- "ri.ec"
+ple4Sr <- fmle(ple4Sr)
+# Error in loglAR1(log(rec), log(a * ssb * exp(-b * ssb) * exp(e1 * 
+env1))) :
+#   error in evaluating the argument 'hat' in selecting a method for 
+function 'loglAR1': Error: argument "e1" is missing, with no default
+summary(ple4Sr)
+plot(ple4Sr)
+
+-- 
+Achtung: Das Th?nen-Institut hat die Domain gewechselt. Bitte ?ndern Sie meine Mailadresse in Ihrem Adressbuch!
+Notice: Th?nen Institute has changed its domain. Please change my email address in your address book!
+
+Dr. Marc Taylor
+Marine Lebende Resourcen / Marine Living Resources
+Th?nen-Institut f?r Seefischerei / Th?nen Institute of Sea Fisheries
+Palmaille 9
+22767 Hamburg, Germany
+
+Tel:  +49 40 38905-143
+Mail: marc.taylor at thuenen.de
+Web:  www.ti.bund.de
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/flr-list/attachments/20160407/dbbd956f/attachment.html>
+
+From lauriekell at gmail.com  Thu Apr  7 09:49:30 2016
+From: lauriekell at gmail.com (laurie)
+Date: Thu, 7 Apr 2016 09:49:30 +0200
+Subject: [FLR-list] fitting a custom SRModel with a covariate
+In-Reply-To: <57060E1C.5040105@thuenen.de>
+References: <57060E1C.5040105@thuenen.de>
+Message-ID: <5706110A.9000602@gmail.com>
+
+see, which is in FLCore
+
+
+rickerCa <- function() {
+   logl <- function(a, b, c, rec, ssb, covar)
+     loglAR1(log(rec), log(a * (1 - c * covar) * ssb * exp(-b * ssb)))
+
+   initial <- structure(function(rec, ssb) {
+         # The function to provide initial values
+     res  <-coefficients(lm(c(log(rec/ssb))~c(ssb)))
+     return(FLPar(a=max(exp(res[1])), b=-max(res[2]), c=1))},
+
+   # lower and upper limits for optim()
+     lower=rep(-Inf, 3),
+     upper=rep( Inf, 3))
+
+     model  <- rec ~ a * (1 - c * covar) * ssb * exp(-b * ssb)
+     return(list(logl=logl, model=model, initial=initial))
+}
+
+
+There is an example using it somewhere, I will see if I can find it.
+
+Laurie
+
+On 07/04/16 09:37, Marc Taylor wrote:
+> Dear FLR-Listers,
+>
+> I was hoping someone might help me figure out a way to create a custom 
+> SRModel that uses a covariate in addition to ssb and rec.
+>
+> From the documentation of SRModels (i.e. ?SRModels), reference is made 
+> to several models that would be of interest to me (e.g. 'ricker.c.a', 
+> 'ricker.c.b', etc.), but these do not appear to be presently included 
+> in FLCore.  I made an attempt (below) to define a custom model, but am 
+> getting errors when fitting with fmle().
+>
+> If anyone has any experience with such models, I would greatly 
+> appreciate any advise.
+>
+> Cheers,
+> Marc
+>
+> *Example script*:
+>
+> # packages 
+> ----------------------------------------------------------------
+> library(FLCore) # FLCore_2.5.20160107
+>
+>
+> # load data 
+> ---------------------------------------------------------------
+>
+> data("ple4")
+>
+>
+> # make srr obbject and add covariate 
+> --------------------------------------
+>
+> ple4Sr <- as.FLSR(ple4)
+>
+> env1 <- c(-0.81, -1.73, -0.09, 0.42, -1.01, -1.06, -0.79, -0.42, -0.74,
+> -0.3, 0.25, 0.09, -0.18, -0.29, 0.13, 0.09, 0.48, 0.33, 0.41,
+> 0.4, -0.21, -0.64, -0.97, -0.02, -0.19, 0.28, -0.03, -0.19, -0.47,
+> -0.97, -0.88, 0.23, 0.82, 0.92, 0.17, 0.67, -0.07, 0.32, 0.9,
+> -0.64, 0.97, 0.54, 1.18, 0.67, 0.44, 1.29, 1.54, 1.22, 0.47,
+> 1.04, 1.31, 1.06)
+>
+> ple4Sr at covar <- FLQuants(list(env1=FLQuant(env1, dim=dim(ple4Sr at ssb), 
+> dimnames=dimnames(ple4Sr at ssb))))
+> ple4Sr at covar$env1
+>
+>
+> # attempt with existing SRModel fails
+> model(ple4Sr) <- "ricker.c.a"
+> # Error in do.call(value, list()) : could not find function "ricker.c.a"
+>
+>
+>
+> # make new srr function 
+> ---------------------------------------------------
+>
+> # adapt ricker
+> ricker <- function(){
+>     logl <- function(a, b, rec, ssb) loglAR1(log(rec), log(a *
+>         ssb * exp(-b * ssb)))
+>     initial <- structure(function(rec, ssb) {
+>         res <- coefficients(lm(log(c(rec)/c(ssb)) ~ c(ssb)))
+>         return(FLPar(a = max(exp(res[1])), b = -max(res[2])))
+>     }, lower = rep(-Inf, 2), upper = rep(Inf, 2))
+>     model <- rec ~ a * ssb * exp(-b * ssb)
+>     return(list(logl = logl, model = model, initial = initial))
+> }
+>
+> # to this (incl. env. control term - 'env1')
+> ri.ec <- function(){
+>     logl <- function(a, b, e1, rec, ssb, env1) loglAR1(log(rec), log(a *
+>         ssb * exp(-b * ssb) * exp(e1 * env1)))
+>     initial <- structure(function(rec, ssb, env1) {
+>         res <- coefficients(lm(log(c(rec)/c(ssb)) ~ c(ssb) + c(env1)))
+>         return(FLPar(a = max(exp(res[1])), b = -max(res[2], env1 = 
+> max(res[3]))))
+>     }, lower = rep(-Inf, 3), upper = rep(Inf, 3))
+>     model <- rec ~ a * ssb * exp(-b * ssb) * exp(e1 * env1)
+>     return(list(logl = logl, model = model, initial = initial))
+> }
+>
+>
+> # fit SRR 
+> -----------------------------------------------------------------
+> model(ple4Sr) <- "ri.ec"
+> ple4Sr <- fmle(ple4Sr)
+> # Error in loglAR1(log(rec), log(a * ssb * exp(-b * ssb) * exp(e1 * 
+> env1))) :
+> #   error in evaluating the argument 'hat' in selecting a method for 
+> function 'loglAR1': Error: argument "e1" is missing, with no default
+> summary(ple4Sr)
+> plot(ple4Sr)
+> -- 
+> Achtung: Das Th?nen-Institut hat die Domain gewechselt. Bitte ?ndern Sie meine Mailadresse in Ihrem Adressbuch!
+> Notice: Th?nen Institute has changed its domain. Please change my email address in your address book!
+>
+> Dr. Marc Taylor
+> Marine Lebende Resourcen / Marine Living Resources
+> Th?nen-Institut f?r Seefischerei / Th?nen Institute of Sea Fisheries
+> Palmaille 9
+> 22767 Hamburg, Germany
+>
+> Tel:  +49 40 38905-143
+> Mail:marc.taylor at thuenen.de
+> Web:www.ti.bund.de
+>
+>
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/flr-list/attachments/20160407/f45b278a/attachment.html>
+
+From marc.taylor at thuenen.de  Thu Apr  7 10:03:42 2016
+From: marc.taylor at thuenen.de (Marc Taylor)
+Date: Thu, 7 Apr 2016 10:03:42 +0200
+Subject: [FLR-list] fitting a custom SRModel with a covariate
+In-Reply-To: <5706110A.9000602@gmail.com>
+References: <57060E1C.5040105@thuenen.de> <5706110A.9000602@gmail.com>
+Message-ID: <5706145E.1090104@thuenen.de>
+
+Thanks Laurie. I would greatly appreciate the example if you are able to 
+find it.
+
+Cheers,
+Marc
+
+
+Achtung: Das Th?nen-Institut hat die Domain gewechselt. Bitte ?ndern Sie meine Mailadresse in Ihrem Adressbuch!
+Notice: Th?nen Institute has changed its domain. Please change my email address in your address book!
+
+Dr. Marc Taylor
+Marine Lebende Resourcen / Marine Living Resources
+Th?nen-Institut f?r Seefischerei / Th?nen Institute of Sea Fisheries
+Palmaille 9
+22767 Hamburg, Germany
+
+Tel:  +49 40 38905-143
+Mail: marc.taylor at thuenen.de
+Web:  www.ti.bund.de
+
+On 4/7/2016 9:49 AM, laurie wrote:
+> see, which is in FLCore
+>
+>
+> rickerCa <- function() {
+>   logl <- function(a, b, c, rec, ssb, covar)
+>     loglAR1(log(rec), log(a * (1 - c * covar) * ssb * exp(-b * ssb)))
+>
+>   initial <- structure(function(rec, ssb) {
+>         # The function to provide initial values
+>     res  <-coefficients(lm(c(log(rec/ssb))~c(ssb)))
+>     return(FLPar(a=max(exp(res[1])), b=-max(res[2]), c=1))},
+>
+>   # lower and upper limits for optim()
+>     lower=rep(-Inf, 3),
+>     upper=rep( Inf, 3))
+>
+>     model  <- rec ~ a * (1 - c * covar) * ssb * exp(-b * ssb)
+>     return(list(logl=logl, model=model, initial=initial))
+> }
+>
+>
+> There is an example using it somewhere, I will see if I can find it.
+>
+> Laurie
+>
+> On 07/04/16 09:37, Marc Taylor wrote:
+>> Dear FLR-Listers,
+>>
+>> I was hoping someone might help me figure out a way to create a 
+>> custom SRModel that uses a covariate in addition to ssb and rec.
+>>
+>> From the documentation of SRModels (i.e. ?SRModels), reference is 
+>> made to several models that would be of interest to me (e.g. 
+>> 'ricker.c.a', 'ricker.c.b', etc.), but these do not appear to be 
+>> presently included in FLCore.  I made an attempt (below) to define a 
+>> custom model, but am getting errors when fitting with fmle().
+>>
+>> If anyone has any experience with such models, I would greatly 
+>> appreciate any advise.
+>>
+>> Cheers,
+>> Marc
+>>
+>> *Example script*:
+>>
+>> # packages 
+>> ----------------------------------------------------------------
+>> library(FLCore) # FLCore_2.5.20160107
+>>
+>>
+>> # load data 
+>> ---------------------------------------------------------------
+>>
+>> data("ple4")
+>>
+>>
+>> # make srr obbject and add covariate 
+>> --------------------------------------
+>>
+>> ple4Sr <- as.FLSR(ple4)
+>>
+>> env1 <- c(-0.81, -1.73, -0.09, 0.42, -1.01, -1.06, -0.79, -0.42, -0.74,
+>> -0.3, 0.25, 0.09, -0.18, -0.29, 0.13, 0.09, 0.48, 0.33, 0.41,
+>> 0.4, -0.21, -0.64, -0.97, -0.02, -0.19, 0.28, -0.03, -0.19, -0.47,
+>> -0.97, -0.88, 0.23, 0.82, 0.92, 0.17, 0.67, -0.07, 0.32, 0.9,
+>> -0.64, 0.97, 0.54, 1.18, 0.67, 0.44, 1.29, 1.54, 1.22, 0.47,
+>> 1.04, 1.31, 1.06)
+>>
+>> ple4Sr at covar <- FLQuants(list(env1=FLQuant(env1, dim=dim(ple4Sr at ssb), 
+>> dimnames=dimnames(ple4Sr at ssb))))
+>> ple4Sr at covar$env1
+>>
+>>
+>> # attempt with existing SRModel fails
+>> model(ple4Sr) <- "ricker.c.a"
+>> # Error in do.call(value, list()) : could not find function "ricker.c.a"
+>>
+>>
+>>
+>> # make new srr function 
+>> ---------------------------------------------------
+>>
+>> # adapt ricker
+>> ricker <- function(){
+>>     logl <- function(a, b, rec, ssb) loglAR1(log(rec), log(a *
+>>         ssb * exp(-b * ssb)))
+>>     initial <- structure(function(rec, ssb) {
+>>         res <- coefficients(lm(log(c(rec)/c(ssb)) ~ c(ssb)))
+>>         return(FLPar(a = max(exp(res[1])), b = -max(res[2])))
+>>     }, lower = rep(-Inf, 2), upper = rep(Inf, 2))
+>>     model <- rec ~ a * ssb * exp(-b * ssb)
+>>     return(list(logl = logl, model = model, initial = initial))
+>> }
+>>
+>> # to this (incl. env. control term - 'env1')
+>> ri.ec <- function(){
+>>     logl <- function(a, b, e1, rec, ssb, env1) loglAR1(log(rec), log(a *
+>>         ssb * exp(-b * ssb) * exp(e1 * env1)))
+>>     initial <- structure(function(rec, ssb, env1) {
+>>         res <- coefficients(lm(log(c(rec)/c(ssb)) ~ c(ssb) + c(env1)))
+>>         return(FLPar(a = max(exp(res[1])), b = -max(res[2], env1 = 
+>> max(res[3]))))
+>>     }, lower = rep(-Inf, 3), upper = rep(Inf, 3))
+>>     model <- rec ~ a * ssb * exp(-b * ssb) * exp(e1 * env1)
+>>     return(list(logl = logl, model = model, initial = initial))
+>> }
+>>
+>>
+>> # fit SRR 
+>> -----------------------------------------------------------------
+>> model(ple4Sr) <- "ri.ec"
+>> ple4Sr <- fmle(ple4Sr)
+>> # Error in loglAR1(log(rec), log(a * ssb * exp(-b * ssb) * exp(e1 * 
+>> env1))) :
+>> #   error in evaluating the argument 'hat' in selecting a method for 
+>> function 'loglAR1': Error: argument "e1" is missing, with no default
+>> summary(ple4Sr)
+>> plot(ple4Sr)
+>> -- 
+>> Achtung: Das Th?nen-Institut hat die Domain gewechselt. Bitte ?ndern Sie meine Mailadresse in Ihrem Adressbuch!
+>> Notice: Th?nen Institute has changed its domain. Please change my email address in your address book!
+>>
+>> Dr. Marc Taylor
+>> Marine Lebende Resourcen / Marine Living Resources
+>> Th?nen-Institut f?r Seefischerei / Th?nen Institute of Sea Fisheries
+>> Palmaille 9
+>> 22767 Hamburg, Germany
+>>
+>> Tel:  +49 40 38905-143
+>> Mail:marc.taylor at thuenen.de
+>> Web:www.ti.bund.de
+>>
+>>
+>> _______________________________________________
+>> flr-list mailing list
+>> flr-list at flr-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>
+>
+>
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/flr-list/attachments/20160407/c3b00167/attachment-0001.html>
+
+From iago.mosqueira at jrc.ec.europa.eu  Thu Apr  7 16:46:08 2016
+From: iago.mosqueira at jrc.ec.europa.eu (Iago MOSQUEIRA (JRC))
+Date: Thu, 07 Apr 2016 23:46:08 +0900
+Subject: [FLR-list] fitting a custom SRModel with a covariate
+In-Reply-To: <5706145E.1090104@thuenen.de>
+References: <57060E1C.5040105@thuenen.de> <5706110A.9000602@gmail.com>
+ <5706145E.1090104@thuenen.de>
+Message-ID: <570672B0.5060006@jrc.ec.europa.eu>
+
+
+Hi,
+
+trying the example I found a bug in FLCore. This just shows that no much 
+use has been made of this model ...
+
+Can you install from github (i.e. do you have Rtools installed if in 
+windows?)? If so do
+
+library(devtools)
+
+install_github('flr/FLCore')
+
+and then
+
+library(FLCore)
+
+data("ple4")
+
+ple4SR <- as.FLSR(ple4)
+
+env1 <- c(-0.81, -1.73, -0.09, 0.42, -1.01, -1.06, -0.79, -0.42, -0.74, 
+-0.3, 0.25, 0.09, -0.18, -0.29, 0.13, 0.09, 0.48, 0.33, 0.41, 0.4, 
+-0.21, -0.64, -0.97, -0.02, -0.19, 0.28, -0.03, -0.19, -0.47, -0.97, 
+-0.88, 0.23, 0.82, 0.92, 0.17, 0.67, -0.07, 0.32, 0.9, -0.64, 0.97, 
+0.54, 1.18, 0.67, 0.44, 1.29, 1.54, 1.22, 0.47, 1.04, 1.31, 1.06)
+
+covar(ple4SR) <- FLQuants(covar=FLQuant(env1, 
+dimnames=dimnames(ssb(ple4SR))))
+
+model(ple4SR) <- rickerCa
+
+ple4SR <- fmle(ple4SR)
+
+plot(ple4SR)
+
+This now fits, but I am not so sure about the values. Does this covar 
+make sense for these data? Or is it just for testing?
+
+Let me know how it goes. It you cannot install from source, I will 
+compile a new package tomorrow.
+
+Cheers,
+
+
+Iago
+
+
+
+On 07/04/16 17:03, Marc Taylor wrote:
+> Thanks Laurie. I would greatly appreciate the example if you are able to
+> find it.
+>
+> Cheers,
+> Marc
+>
+>
+> Achtung: Das Th?nen-Institut hat die Domain gewechselt. Bitte ?ndern Sie
+> meine Mailadresse in Ihrem Adressbuch!
+> Notice: Th?nen Institute has changed its domain. Please change my email
+> address in your address book!
+>
+> Dr. Marc Taylor
+> Marine Lebende Resourcen / Marine Living Resources
+> Th?nen-Institut f?r Seefischerei / Th?nen Institute of Sea Fisheries
+> Palmaille 9
+> 22767 Hamburg, Germany
+>
+> Tel:  +49 40 38905-143
+> Mail: marc.taylor at thuenen.de
+> Web:  www.ti.bund.de
+>
+> On 4/7/2016 9:49 AM, laurie wrote:
+>> see, which is in FLCore
+>>
+>>
+>> rickerCa <- function() {
+>>   logl <- function(a, b, c, rec, ssb, covar)
+>>     loglAR1(log(rec), log(a * (1 - c * covar) * ssb * exp(-b * ssb)))
+>>
+>>   initial <- structure(function(rec, ssb) {
+>>         # The function to provide initial values
+>>     res  <-coefficients(lm(c(log(rec/ssb))~c(ssb)))
+>>     return(FLPar(a=max(exp(res[1])), b=-max(res[2]), c=1))},
+>>
+>>   # lower and upper limits for optim()
+>>     lower=rep(-Inf, 3),
+>>     upper=rep( Inf, 3))
+>>
+>>     model  <- rec ~ a * (1 - c * covar) * ssb * exp(-b * ssb)
+>>     return(list(logl=logl, model=model, initial=initial))
+>> }
+>>
+>>
+>> There is an example using it somewhere, I will see if I can find it.
+>>
+>> Laurie
+>>
+>> On 07/04/16 09:37, Marc Taylor wrote:
+>>> Dear FLR-Listers,
+>>>
+>>> I was hoping someone might help me figure out a way to create a
+>>> custom SRModel that uses a covariate in addition to ssb and rec.
+>>>
+>>> From the documentation of SRModels (i.e. ?SRModels), reference is
+>>> made to several models that would be of interest to me (e.g.
+>>> 'ricker.c.a', 'ricker.c.b', etc.), but these do not appear to be
+>>> presently included in FLCore.  I made an attempt (below) to define a
+>>> custom model, but am getting errors when fitting with fmle().
+>>>
+>>> If anyone has any experience with such models, I would greatly
+>>> appreciate any advise.
+>>>
+>>> Cheers,
+>>> Marc
+>>>
+>>> *Example script*:
+>>>
+>>> # packages
+>>> ----------------------------------------------------------------
+>>> library(FLCore) # FLCore_2.5.20160107
+>>>
+>>>
+>>> # load data
+>>> ---------------------------------------------------------------
+>>>
+>>> data("ple4")
+>>>
+>>>
+>>> # make srr obbject and add covariate
+>>> --------------------------------------
+>>>
+>>> ple4Sr <- as.FLSR(ple4)
+>>>
+>>> env1 <- c(-0.81, -1.73, -0.09, 0.42, -1.01, -1.06, -0.79, -0.42, -0.74,
+>>> -0.3, 0.25, 0.09, -0.18, -0.29, 0.13, 0.09, 0.48, 0.33, 0.41,
+>>> 0.4, -0.21, -0.64, -0.97, -0.02, -0.19, 0.28, -0.03, -0.19, -0.47,
+>>> -0.97, -0.88, 0.23, 0.82, 0.92, 0.17, 0.67, -0.07, 0.32, 0.9,
+>>> -0.64, 0.97, 0.54, 1.18, 0.67, 0.44, 1.29, 1.54, 1.22, 0.47,
+>>> 1.04, 1.31, 1.06)
+>>>
+>>> ple4Sr at covar <- FLQuants(list(env1=FLQuant(env1, dim=dim(ple4Sr at ssb),
+>>> dimnames=dimnames(ple4Sr at ssb))))
+>>> ple4Sr at covar$env1
+>>>
+>>>
+>>> # attempt with existing SRModel fails
+>>> model(ple4Sr) <- "ricker.c.a"
+>>> # Error in do.call(value, list()) : could not find function "ricker.c.a"
+>>>
+>>>
+>>>
+>>> # make new srr function
+>>> ---------------------------------------------------
+>>>
+>>> # adapt ricker
+>>> ricker <- function(){
+>>>     logl <- function(a, b, rec, ssb) loglAR1(log(rec), log(a *
+>>>         ssb * exp(-b * ssb)))
+>>>     initial <- structure(function(rec, ssb) {
+>>>         res <- coefficients(lm(log(c(rec)/c(ssb)) ~ c(ssb)))
+>>>         return(FLPar(a = max(exp(res[1])), b = -max(res[2])))
+>>>     }, lower = rep(-Inf, 2), upper = rep(Inf, 2))
+>>>     model <- rec ~ a * ssb * exp(-b * ssb)
+>>>     return(list(logl = logl, model = model, initial = initial))
+>>> }
+>>>
+>>> # to this (incl. env. control term - 'env1')
+>>> ri.ec <- function(){
+>>>     logl <- function(a, b, e1, rec, ssb, env1) loglAR1(log(rec), log(a *
+>>>         ssb * exp(-b * ssb) * exp(e1 * env1)))
+>>>     initial <- structure(function(rec, ssb, env1) {
+>>>         res <- coefficients(lm(log(c(rec)/c(ssb)) ~ c(ssb) + c(env1)))
+>>>         return(FLPar(a = max(exp(res[1])), b = -max(res[2], env1 =
+>>> max(res[3]))))
+>>>     }, lower = rep(-Inf, 3), upper = rep(Inf, 3))
+>>>     model <- rec ~ a * ssb * exp(-b * ssb) * exp(e1 * env1)
+>>>     return(list(logl = logl, model = model, initial = initial))
+>>> }
+>>>
+>>>
+>>> # fit SRR
+>>> -----------------------------------------------------------------
+>>> model(ple4Sr) <- "ri.ec"
+>>> ple4Sr <- fmle(ple4Sr)
+>>> # Error in loglAR1(log(rec), log(a * ssb * exp(-b * ssb) * exp(e1 *
+>>> env1))) :
+>>> #   error in evaluating the argument 'hat' in selecting a method for
+>>> function 'loglAR1': Error: argument "e1" is missing, with no default
+>>> summary(ple4Sr)
+>>> plot(ple4Sr)
+>>> --
+>>> Achtung: Das Th?nen-Institut hat die Domain gewechselt. Bitte ?ndern
+>>> Sie meine Mailadresse in Ihrem Adressbuch!
+>>> Notice: Th?nen Institute has changed its domain. Please change my
+>>> email address in your address book!
+>>>
+>>> Dr. Marc Taylor
+>>> Marine Lebende Resourcen / Marine Living Resources
+>>> Th?nen-Institut f?r Seefischerei / Th?nen Institute of Sea Fisheries
+>>> Palmaille 9
+>>> 22767 Hamburg, Germany
+>>>
+>>> Tel:  +49 40 38905-143
+>>> Mail:marc.taylor at thuenen.de
+>>> Web:www.ti.bund.de
+>>>
+>>>
+>>> _______________________________________________
+>>> flr-list mailing list
+>>> flr-list at flr-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>>
+>>
+>>
+>> _______________________________________________
+>> flr-list mailing list
+>> flr-list at flr-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>
+>
+>
+>
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>
+
+
+-- 
+Dr Iago Mosqueira
+
+European Commission ? Joint Research Center
+Institute for the Protection and Security of the Citizen (IPSC)
+Maritime Affairs Unit G03
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Office : +39 0332 785413
+Fax: +39 0332 789658
+
+iago.mosqueira at jrc.ec.europa.eu
+
+http://fishreg.jrc.ec.europa.eu/home
+
+From marc.taylor at thuenen.de  Fri Apr  8 11:28:54 2016
+From: marc.taylor at thuenen.de (Marc Taylor)
+Date: Fri, 8 Apr 2016 11:28:54 +0200
+Subject: [FLR-list] fitting a custom SRModel with a covariate
+In-Reply-To: <570672B0.5060006@jrc.ec.europa.eu>
+References: <57060E1C.5040105@thuenen.de> <5706110A.9000602@gmail.com>
+ <5706145E.1090104@thuenen.de> <570672B0.5060006@jrc.ec.europa.eu>
+Message-ID: <570779D6.3030107@thuenen.de>
+
+Dear Iago,
+
+Thank you for updating this functionality. The fit does indeed converge now.
+
+This covariate was indeed arbitrary, so I have now provided an example 
+below where the covariate is constructed based on the residuals of the 
+ricker() fit. So, the rickerCa() should now make a significant 
+improvement over the fit of the ricker(), but this is not clear by just 
+looking at AIC.
+
+I'm also wondering where this model is described? I have come across 
+another version of an adapted Ricker where the covariate term is 
+exp(c*covar) rather than (1-c*covar). As is, the fitted rickerCa 
+produces NAs.
+
+I've tried this alternate version and the fit looks quite good (as well 
+as a substantially lower AIC).
+
+Anyway, thanks for fixing this so promptly.
+
+Cheers,
+Marc
+
+p.s. Perhaps you are now updating the documentation for ?SRModels - At 
+the moment I am not able to access its help page in the new FLCore version.
+
+###
+
+library(FLCore) # FLCore_2.6.0.20160401
+data("ple4")
+
+
+
+# fit basic ricker --------------------------------------------------------
+ple4SR <- as.FLSR(ple4)
+model(ple4SR) <- "ricker"
+ple4SR <- fmle(ple4SR)
+summary(ple4SR)
+plot(ple4SR)
+
+
+# create environmental covariate with residuals ---------------------------
+set.seed(1)
+env <- c(2 * residuals(ple4SR) + rnorm(dims(ple4SR at ssb)$year, 0, 1))
+env
+plot(c(env), c(residuals(ple4SR)))
+plot(c(env), t="l")
+
+
+# make new SR obj with covariate ------------------------------------------
+ple4SR2 <- as.FLSR(ple4)
+covar(ple4SR2) <- FLQuants(covar=FLQuant(env, 
+dimnames=dimnames(ssb(ple4SR2))))
+
+
+# fit rickerCa
+model(ple4SR2) <- rickerCa
+ple4SR2 <- fmle(ple4SR2)
+plot(ple4SR2)
+params(ple4SR2)
+plot(c(covar(ple4SR2)$covar), c(residuals(ple4SR2)))
+  c(residuals(ple4SR2)) # produces NAs
+
+
+
+# Compare AIC -------------------------------------------------------------
+AIC(ple4SR)
+AIC(ple4SR2)
+
+
+
+# alt model (covariate term is exp(c*covar), initial=0) 
+---------------------------------------------------------------
+
+# compare nls
+START <- list(a=params(ple4SR)["a"], b=params(ple4SR)["b"], c=0)
+R <- c(ple4SR2 at rec)
+S <- c(ple4SR2 at ssb)
+covar <- c(covar(ple4SR2)$covar)
+fitnls <- nls(log(R) ~ log(a) + log(S) - b*S + c*covar, start=START)
+summary(fitnls)
+plot(log(R), predict(fitnls)); abline(0,1)
+plot(S, resid(fitnls)); abline(h=0)
+plot(covar, resid(fitnls)); abline(h=0)
+
+
+rickerCa.alt <- function ()
+{
+     logl <- function(a, b, c, rec, ssb, covar) loglAR1(log(rec),
+         log(a * ssb * exp(-b * ssb) * exp(c*covar)))
+     initial <- structure(function(rec, ssb) {
+         res <- coefficients(lm(c(log(rec/ssb)) ~ c(ssb)))
+         return(FLPar(a = max(exp(res[1])), b = -max(res[2]),
+             c = 0))
+     }, lower = rep(-Inf, 3), upper = rep(Inf, 3))
+     model <- rec ~ a * ssb * exp(-b * ssb) * exp(c*covar)
+     return(list(logl = logl, model = model, initial = initial))
+}
+
+ple4SR3 <- as.FLSR(ple4)
+covar(ple4SR3) <- FLQuants(covar=FLQuant(env, 
+dimnames=dimnames(ssb(ple4SR3))))
+model(ple4SR3) <- rickerCa.alt
+ple4SR3 <- fmle(ple4SR3, start=as.list(coefficients(fitnls)) )
+plot(ple4SR3)
+params(ple4SR3)
+coefficients(fitnls)
+
+AIC(ple4SR)
+AIC(ple4SR2)
+AIC(ple4SR3)
+
+
+
+
+Achtung: Das Th?nen-Institut hat die Domain gewechselt. Bitte ?ndern Sie meine Mailadresse in Ihrem Adressbuch!
+Notice: Th?nen Institute has changed its domain. Please change my email address in your address book!
+
+Dr. Marc Taylor
+Marine Lebende Resourcen / Marine Living Resources
+Th?nen-Institut f?r Seefischerei / Th?nen Institute of Sea Fisheries
+Palmaille 9
+22767 Hamburg, Germany
+
+Tel:  +49 40 38905-143
+Mail: marc.taylor at thuenen.de
+Web:  www.ti.bund.de
+
+On 4/7/2016 4:46 PM, Iago MOSQUEIRA (JRC) wrote:
+>
+> library(FLCore)
+>
+> data("ple4")
+>
+> ple4SR <- as.FLSR(ple4)
+>
+> env1 <- c(-0.81, -1.73, -0.09, 0.42, -1.01, -1.06, -0.79, -0.42, 
+> -0.74, -0.3, 0.25, 0.09, -0.18, -0.29, 0.13, 0.09, 0.48, 0.33, 0.41, 
+> 0.4, -0.21, -0.64, -0.97, -0.02, -0.19, 0.28, -0.03, -0.19, -0.47, 
+> -0.97, -0.88, 0.23, 0.82, 0.92, 0.17, 0.67, -0.07, 0.32, 0.9, -0.64, 
+> 0.97, 0.54, 1.18, 0.67, 0.44, 1.29, 1.54, 1.22, 0.47, 1.04, 1.31, 1.06)
+>
+> covar(ple4SR) <- FLQuants(covar=FLQuant(env1, 
+> dimnames=dimnames(ssb(ple4SR))))
+>
+> model(ple4SR) <- rickerCa
+>
+> ple4SR <- fmle(ple4SR)
+>
+> plot(ple4SR) 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/flr-list/attachments/20160408/a636f62a/attachment.html>
+
+From iago.mosqueira at jrc.ec.europa.eu  Mon Apr 11 05:44:52 2016
+From: iago.mosqueira at jrc.ec.europa.eu (Iago MOSQUEIRA (JRC))
+Date: Mon, 11 Apr 2016 12:44:52 +0900
+Subject: [FLR-list] fitting a custom SRModel with a covariate
+In-Reply-To: <570779D6.3030107@thuenen.de>
+References: <57060E1C.5040105@thuenen.de> <5706110A.9000602@gmail.com>
+ <5706145E.1090104@thuenen.de> <570672B0.5060006@jrc.ec.europa.eu>
+ <570779D6.3030107@thuenen.de>
+Message-ID: <570B1DB4.2050501@jrc.ec.europa.eu>
+
+
+Hi,
+
+If you end up using it with some covariates that improve the fit, please 
+do send me the code, as I would like to have an example for testing.
+
+This is what we have right now on the model in the reviewed help file, 
+still to be updated in the compiled package, avialable at
+
+https://github.com/flr/FLCore/blob/topic/roxygen/R/SRmodels.R
+
+#' Ricker model with one covariate. The covariate can be used, for 
+example, to
+#' account for an enviromental factor that influences the recruitment 
+dynamics.
+#' In the equations, \emph{c} is the shape parameter and \emph{X} is the
+#' covariate.
+#'
+#' \itemize{
+#' \item rickerCa: Ricker stock-recruitment model with one
+#' multiplicative covariate.
+#' \deqn{R = a (1- c X) S e^{-b S}}{R = a*(1-c*X)*S*e^{-b*S}} }
+
+If you think we should be more precise, please feel free to suggest changes.
+
+Thanks,
+
+
+Iago
+
+
+On 08/04/16 18:28, Marc Taylor wrote:
+> Dear Iago,
+>
+> Thank you for updating this functionality. The fit does indeed converge
+> now.
+>
+> This covariate was indeed arbitrary, so I have now provided an example
+> below where the covariate is constructed based on the residuals of the
+> ricker() fit. So, the rickerCa() should now make a significant
+> improvement over the fit of the ricker(), but this is not clear by just
+> looking at AIC.
+>
+> I'm also wondering where this model is described? I have come across
+> another version of an adapted Ricker where the covariate term is
+> exp(c*covar) rather than (1-c*covar). As is, the fitted rickerCa
+> produces NAs.
+>
+> I've tried this alternate version and the fit looks quite good (as well
+> as a substantially lower AIC).
+>
+> Anyway, thanks for fixing this so promptly.
+>
+> Cheers,
+> Marc
+>
+> p.s. Perhaps you are now updating the documentation for ?SRModels - At
+> the moment I am not able to access its help page in the new FLCore version.
+>
+> ###
+>
+> library(FLCore) # FLCore_2.6.0.20160401
+> data("ple4")
+>
+>
+>
+> # fit basic ricker --------------------------------------------------------
+> ple4SR <- as.FLSR(ple4)
+> model(ple4SR) <- "ricker"
+> ple4SR <- fmle(ple4SR)
+> summary(ple4SR)
+> plot(ple4SR)
+>
+>
+> # create environmental covariate with residuals ---------------------------
+> set.seed(1)
+> env <- c(2 * residuals(ple4SR) + rnorm(dims(ple4SR at ssb)$year, 0, 1))
+> env
+> plot(c(env), c(residuals(ple4SR)))
+> plot(c(env), t="l")
+>
+>
+> # make new SR obj with covariate ------------------------------------------
+> ple4SR2 <- as.FLSR(ple4)
+> covar(ple4SR2) <- FLQuants(covar=FLQuant(env,
+> dimnames=dimnames(ssb(ple4SR2))))
+>
+>
+> # fit rickerCa
+> model(ple4SR2) <- rickerCa
+> ple4SR2 <- fmle(ple4SR2)
+> plot(ple4SR2)
+> params(ple4SR2)
+> plot(c(covar(ple4SR2)$covar), c(residuals(ple4SR2)))
+>   c(residuals(ple4SR2)) # produces NAs
+>
+>
+>
+> # Compare AIC -------------------------------------------------------------
+> AIC(ple4SR)
+> AIC(ple4SR2)
+>
+>
+>
+> # alt model (covariate term is exp(c*covar), initial=0)
+> ---------------------------------------------------------------
+>
+> # compare nls
+> START <- list(a=params(ple4SR)["a"], b=params(ple4SR)["b"], c=0)
+> R <- c(ple4SR2 at rec)
+> S <- c(ple4SR2 at ssb)
+> covar <- c(covar(ple4SR2)$covar)
+> fitnls <- nls(log(R) ~ log(a) + log(S) - b*S + c*covar, start=START)
+> summary(fitnls)
+> plot(log(R), predict(fitnls)); abline(0,1)
+> plot(S, resid(fitnls)); abline(h=0)
+> plot(covar, resid(fitnls)); abline(h=0)
+>
+>
+> rickerCa.alt <- function ()
+> {
+>      logl <- function(a, b, c, rec, ssb, covar) loglAR1(log(rec),
+>          log(a * ssb * exp(-b * ssb) * exp(c*covar)))
+>      initial <- structure(function(rec, ssb) {
+>          res <- coefficients(lm(c(log(rec/ssb)) ~ c(ssb)))
+>          return(FLPar(a = max(exp(res[1])), b = -max(res[2]),
+>              c = 0))
+>      }, lower = rep(-Inf, 3), upper = rep(Inf, 3))
+>      model <- rec ~ a * ssb * exp(-b * ssb) * exp(c*covar)
+>      return(list(logl = logl, model = model, initial = initial))
+> }
+>
+> ple4SR3 <- as.FLSR(ple4)
+> covar(ple4SR3) <- FLQuants(covar=FLQuant(env,
+> dimnames=dimnames(ssb(ple4SR3))))
+> model(ple4SR3) <- rickerCa.alt
+> ple4SR3 <- fmle(ple4SR3, start=as.list(coefficients(fitnls)) )
+> plot(ple4SR3)
+> params(ple4SR3)
+> coefficients(fitnls)
+>
+> AIC(ple4SR)
+> AIC(ple4SR2)
+> AIC(ple4SR3)
+>
+>
+>
+>
+> Achtung: Das Th?nen-Institut hat die Domain gewechselt. Bitte ?ndern Sie
+> meine Mailadresse in Ihrem Adressbuch!
+> Notice: Th?nen Institute has changed its domain. Please change my email
+> address in your address book!
+>
+> Dr. Marc Taylor
+> Marine Lebende Resourcen / Marine Living Resources
+> Th?nen-Institut f?r Seefischerei / Th?nen Institute of Sea Fisheries
+> Palmaille 9
+> 22767 Hamburg, Germany
+>
+> Tel:  +49 40 38905-143
+> Mail: marc.taylor at thuenen.de
+> Web:  www.ti.bund.de
+>
+> On 4/7/2016 4:46 PM, Iago MOSQUEIRA (JRC) wrote:
+>>
+>> library(FLCore)
+>>
+>> data("ple4")
+>>
+>> ple4SR <- as.FLSR(ple4)
+>>
+>> env1 <- c(-0.81, -1.73, -0.09, 0.42, -1.01, -1.06, -0.79, -0.42,
+>> -0.74, -0.3, 0.25, 0.09, -0.18, -0.29, 0.13, 0.09, 0.48, 0.33, 0.41,
+>> 0.4, -0.21, -0.64, -0.97, -0.02, -0.19, 0.28, -0.03, -0.19, -0.47,
+>> -0.97, -0.88, 0.23, 0.82, 0.92, 0.17, 0.67, -0.07, 0.32, 0.9, -0.64,
+>> 0.97, 0.54, 1.18, 0.67, 0.44, 1.29, 1.54, 1.22, 0.47, 1.04, 1.31, 1.06)
+>>
+>> covar(ple4SR) <- FLQuants(covar=FLQuant(env1,
+>> dimnames=dimnames(ssb(ple4SR))))
+>>
+>> model(ple4SR) <- rickerCa
+>>
+>> ple4SR <- fmle(ple4SR)
+>>
+>> plot(ple4SR)
+>
+>
+>
+>
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>
+
+
+-- 
+Dr Iago Mosqueira
+
+European Commission ? Joint Research Center
+Institute for the Protection and Security of the Citizen (IPSC)
+Maritime Affairs Unit G03
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Office : +39 0332 785413
+Fax: +39 0332 789658
+
+iago.mosqueira at jrc.ec.europa.eu
+
+http://fishreg.jrc.ec.europa.eu/home
+
+From lauriekell at gmail.com  Mon Apr 11 19:10:29 2016
+From: lauriekell at gmail.com (laurie)
+Date: Mon, 11 Apr 2016 19:10:29 +0200
+Subject: [FLR-list] data poor examples
+Message-ID: <570BDA85.9070506@gmail.com>
+
+Dear All
+
+A paper has just been accepted in Fisheries Research on life history 
+traits http://www.sciencedirect.com/science/article/pii/S0165783616300698
+
+The dataset and the methods used are in FLife, which is a replacement 
+for the lh package. There are several more paper in the pipe line that 
+use FLife, both submitted and in prep. Currenly FLife is available from 
+my github repos https://github.com/laurieKell/FLife, and will be 
+available from flr-project.org soon.
+
+Laurie
+
+
+
+
+

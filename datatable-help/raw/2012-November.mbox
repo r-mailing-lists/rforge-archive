@@ -1,0 +1,2399 @@
+From gsee000 at gmail.com  Wed Nov  7 22:53:28 2012
+From: gsee000 at gmail.com (G See)
+Date: Wed, 7 Nov 2012 15:53:28 -0600
+Subject: [datatable-help] rbinding an empty data.table and a non-empty
+	data.table
+Message-ID: <CA+xi=qakqyfr0Tgi20g8QtgA9fT957P71XLue38642CAvk2NkA@mail.gmail.com>
+
+When I try to rbind an empty data.table to a non-empty data table, all my
+data are converted to logical.  Here's an example
+
+# create a directory and put 2 csv file in it.
+dir.create("~/tmp")
+system("echo 'A,B' > ~/tmp/new.csv") # this csv only has headers; no data
+write.csv(data.frame(A=1, B=2), row.names=FALSE, file='~/tmp/new2.csv') #
+this one has header and 1 row
+
+lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv)
+#[[1]]
+#[1] A B
+#<0 rows> (or 0-length row.names)
+#
+#[[2]]
+#  A B
+#1 1 2
+
+# now rbind them, and we're left with the data from the non-empy csv
+do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv))
+#  A B
+#1 1 2
+
+# Now let's try to work with data.tables instead of data.frames
+lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+as.data.table(read.csv(x)))
+#[[1]]
+#Empty data.table (0 rows) of 2 cols: A,B
+#
+#[[2]]
+#   A B
+#1: 1 2
+
+#Ok, but look at what happens when we rbind them
+do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+as.data.table(read.csv(x))))
+      A    B
+1: TRUE TRUE
+
+
+ What's going on here?
+
+Thanks,
+Garrett
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20121107/e8966d99/attachment.html>
+
+From MEC at stowers.org  Wed Nov  7 23:07:25 2012
+From: MEC at stowers.org (Cook, Malcolm)
+Date: Wed, 7 Nov 2012 16:07:25 -0600
+Subject: [datatable-help] rbinding an empty data.table and a
+	non-empty	data.table
+In-Reply-To: <CA+xi=qakqyfr0Tgi20g8QtgA9fT957P71XLue38642CAvk2NkA@mail.gmail.com>
+References: <CA+xi=qakqyfr0Tgi20g8QtgA9fT957P71XLue38642CAvk2NkA@mail.gmail.com>
+Message-ID: <2C40E43D1F7A56408C4463FD245DDDF9078F44BE68@EXCHMB-02.stowers-institute.org>
+
+not sure but try data.table::rbindlist like this (it should be faster too)
+
+rbindlist(lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x) as.data.table(read.csv(x)))
+
+~Malcolm
+
+From: datatable-help-bounces at lists.r-forge.r-project.org [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of G See
+Sent: Wednesday, November 07, 2012 3:53 PM
+To: datatable-help at lists.r-forge.r-project.org
+Subject: [datatable-help] rbinding an empty data.table and a non-empty data.table
+
+When I try to rbind an empty data.table to a non-empty data table, all my data are converted to logical.  Here's an example
+
+# create a directory and put 2 csv file in it.
+dir.create("~/tmp")
+system("echo 'A,B' > ~/tmp/new.csv") # this csv only has headers; no data
+write.csv(data.frame(A=1, B=2), row.names=FALSE, file='~/tmp/new2.csv') # this one has header and 1 row
+
+lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv)
+#[[1]]
+#[1] A B
+#<0 rows> (or 0-length row.names)
+#
+#[[2]]
+#  A B
+#1 1 2
+
+# now rbind them, and we're left with the data from the non-empy csv
+do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv))
+#  A B
+#1 1 2
+
+# Now let's try to work with data.tables instead of data.frames
+lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x) as.data.table(read.csv(x)))
+#[[1]]
+#Empty data.table (0 rows) of 2 cols: A,B
+#
+#[[2]]
+#   A B
+#1: 1 2
+
+#Ok, but look at what happens when we rbind them
+do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x) as.data.table(read.csv(x))))
+      A    B
+1: TRUE TRUE
+
+
+ What's going on here?
+
+Thanks,
+Garrett
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20121107/197cfde6/attachment.html>
+
+From gsee000 at gmail.com  Wed Nov  7 23:08:51 2012
+From: gsee000 at gmail.com (G See)
+Date: Wed, 7 Nov 2012 16:08:51 -0600
+Subject: [datatable-help] rbinding an empty data.table and a non-empty
+	data.table
+In-Reply-To: <2C40E43D1F7A56408C4463FD245DDDF9078F44BE68@EXCHMB-02.stowers-institute.org>
+References: <CA+xi=qakqyfr0Tgi20g8QtgA9fT957P71XLue38642CAvk2NkA@mail.gmail.com>
+ <2C40E43D1F7A56408C4463FD245DDDF9078F44BE68@EXCHMB-02.stowers-institute.org>
+Message-ID: <CA+xi=qarhwQcH7qo9SY3O4KtcPzUVh=C0wbzXxqHBnV+PS1cOw@mail.gmail.com>
+
+Thanks. I actually discovered it using rbindlist; it suffers the same
+problem.
+
+Garrett
+
+
+On Wed, Nov 7, 2012 at 4:07 PM, Cook, Malcolm <MEC at stowers.org> wrote:
+
+> not sure but try data.table::rbindlist like this (it should be faster too)
+> ****
+>
+> ** **
+>
+> rbindlist(lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+> as.data.table(read.csv(x)))****
+>
+> ** **
+>
+> ~Malcolm****
+>
+> ** **
+>
+> *From:* datatable-help-bounces at lists.r-forge.r-project.org [mailto:
+> datatable-help-bounces at lists.r-forge.r-project.org] *On Behalf Of *G See
+> *Sent:* Wednesday, November 07, 2012 3:53 PM
+> *To:* datatable-help at lists.r-forge.r-project.org
+> *Subject:* [datatable-help] rbinding an empty data.table and a non-empty
+> data.table****
+>
+> ** **
+>
+> When I try to rbind an empty data.table to a non-empty data table, all my
+> data are converted to logical.  Here's an example****
+>
+> ** **
+>
+> # create a directory and put 2 csv file in it.****
+>
+> dir.create("~/tmp")****
+>
+> system("echo 'A,B' > ~/tmp/new.csv") # this csv only has headers; no data*
+> ***
+>
+> write.csv(data.frame(A=1, B=2), row.names=FALSE, file='~/tmp/new2.csv') #
+> this one has header and 1 row****
+>
+> ** **
+>
+> lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv)****
+>
+> #[[1]]****
+>
+> #[1] A B****
+>
+> #<0 rows> (or 0-length row.names)****
+>
+> #****
+>
+> #[[2]]****
+>
+> #  A B****
+>
+> #1 1 2****
+>
+> ** **
+>
+> # now rbind them, and we're left with the data from the non-empy csv****
+>
+> do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv))****
+>
+> #  A B****
+>
+> #1 1 2****
+>
+> ** **
+>
+> # Now let's try to work with data.tables instead of data.frames****
+>
+> lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+> as.data.table(read.csv(x)))****
+>
+> #[[1]]****
+>
+> #Empty data.table (0 rows) of 2 cols: A,B****
+>
+> #****
+>
+> #[[2]]****
+>
+> #   A B****
+>
+> #1: 1 2****
+>
+> ** **
+>
+> #Ok, but look at what happens when we rbind them****
+>
+> do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+> as.data.table(read.csv(x))))****
+>
+>       A    B****
+>
+> 1: TRUE TRUE****
+>
+> ** **
+>
+> ** **
+>
+>  What's going on here?****
+>
+> ** **
+>
+> Thanks,****
+>
+> Garrett****
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20121107/b2d6fe67/attachment.html>
+
+From gsee000 at gmail.com  Wed Nov  7 23:28:13 2012
+From: gsee000 at gmail.com (G See)
+Date: Wed, 7 Nov 2012 16:28:13 -0600
+Subject: [datatable-help] rbinding an empty data.table and a non-empty
+	data.table
+In-Reply-To: <CA+xi=qarhwQcH7qo9SY3O4KtcPzUVh=C0wbzXxqHBnV+PS1cOw@mail.gmail.com>
+References: <CA+xi=qakqyfr0Tgi20g8QtgA9fT957P71XLue38642CAvk2NkA@mail.gmail.com>
+ <2C40E43D1F7A56408C4463FD245DDDF9078F44BE68@EXCHMB-02.stowers-institute.org>
+ <CA+xi=qarhwQcH7qo9SY3O4KtcPzUVh=C0wbzXxqHBnV+PS1cOw@mail.gmail.com>
+Message-ID: <CA+xi=qZUqFGkOxGaTc0pgkDLAR+vmE=h8JSOaMdU+ZzcDZzLYw@mail.gmail.com>
+
+FWIW, I can work around by `Filter`ing to exclude components that have no
+rows
+
+  > rbindlist(Filter(nrow, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"),
+function(x) as.data.table(read.csv(x)))))
+     A B
+  1: 1 2
+
+Best,
+Garrett
+
+On Wed, Nov 7, 2012 at 4:08 PM, G See <gsee000 at gmail.com> wrote:
+
+> Thanks. I actually discovered it using rbindlist; it suffers the same
+> problem.
+>
+> Garrett
+>
+>
+> On Wed, Nov 7, 2012 at 4:07 PM, Cook, Malcolm <MEC at stowers.org> wrote:
+>
+>> not sure but try data.table::rbindlist like this (it should be faster too)
+>> ****
+>>
+>> ** **
+>>
+>> rbindlist(lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+>> as.data.table(read.csv(x)))****
+>>
+>> ** **
+>>
+>> ~Malcolm****
+>>
+>> ** **
+>>
+>> *From:* datatable-help-bounces at lists.r-forge.r-project.org [mailto:
+>> datatable-help-bounces at lists.r-forge.r-project.org] *On Behalf Of *G See
+>> *Sent:* Wednesday, November 07, 2012 3:53 PM
+>> *To:* datatable-help at lists.r-forge.r-project.org
+>> *Subject:* [datatable-help] rbinding an empty data.table and a non-empty
+>> data.table****
+>>
+>> ** **
+>>
+>> When I try to rbind an empty data.table to a non-empty data table, all my
+>> data are converted to logical.  Here's an example****
+>>
+>> ** **
+>>
+>> # create a directory and put 2 csv file in it.****
+>>
+>> dir.create("~/tmp")****
+>>
+>> system("echo 'A,B' > ~/tmp/new.csv") # this csv only has headers; no data
+>> ****
+>>
+>> write.csv(data.frame(A=1, B=2), row.names=FALSE, file='~/tmp/new2.csv') #
+>> this one has header and 1 row****
+>>
+>> ** **
+>>
+>> lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv)****
+>>
+>> #[[1]]****
+>>
+>> #[1] A B****
+>>
+>> #<0 rows> (or 0-length row.names)****
+>>
+>> #****
+>>
+>> #[[2]]****
+>>
+>> #  A B****
+>>
+>> #1 1 2****
+>>
+>> ** **
+>>
+>> # now rbind them, and we're left with the data from the non-empy csv****
+>>
+>> do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv))***
+>> *
+>>
+>> #  A B****
+>>
+>> #1 1 2****
+>>
+>> ** **
+>>
+>> # Now let's try to work with data.tables instead of data.frames****
+>>
+>> lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+>> as.data.table(read.csv(x)))****
+>>
+>> #[[1]]****
+>>
+>> #Empty data.table (0 rows) of 2 cols: A,B****
+>>
+>> #****
+>>
+>> #[[2]]****
+>>
+>> #   A B****
+>>
+>> #1: 1 2****
+>>
+>> ** **
+>>
+>> #Ok, but look at what happens when we rbind them****
+>>
+>> do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+>> as.data.table(read.csv(x))))****
+>>
+>>       A    B****
+>>
+>> 1: TRUE TRUE****
+>>
+>> ** **
+>>
+>> ** **
+>>
+>>  What's going on here?****
+>>
+>> ** **
+>>
+>> Thanks,****
+>>
+>> Garrett****
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20121107/53543aed/attachment-0001.html>
+
+From mdowle at mdowle.plus.com  Wed Nov  7 23:46:54 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 7 Nov 2012 22:46:54 -0000
+Subject: [datatable-help] rbinding an empty data.table and a non-empty
+ data.table
+In-Reply-To: <CA+xi=qarhwQcH7qo9SY3O4KtcPzUVh=C0wbzXxqHBnV+PS1cOw@mail.gmail.com>
+References: <CA+xi=qakqyfr0Tgi20g8QtgA9fT957P71XLue38642CAvk2NkA@mail.gmail.com>
+ <2C40E43D1F7A56408C4463FD245DDDF9078F44BE68@EXCHMB-02.stowers-institute.org>
+ <CA+xi=qarhwQcH7qo9SY3O4KtcPzUVh=C0wbzXxqHBnV+PS1cOw@mail.gmail.com>
+Message-ID: <433f549f227f9a1f128eee458e75d317.squirrel@webmail.plus.net>
+
+
+Well spotted. It's a new bug. rbind calls rbindlist internally, so that fits.
+
+rbindlist's result has column types taken from the first non-NULL item.
+I'd coded for that at least, see "First non-NULL" comment in the C source
+:
+
+https://r-forge.r-project.org/scm/viewvc.php/pkg/src/rbindlist.c?view=markup&root=datatable
+
+But the types _should_ be taken from the first _non-empty_ data.table
+item, then. Since it's read.csv that's creating the first data.frame with
+empty logical(0) columns :
+
+> sapply(read.csv("~/tmp/new.csv"),class)
+        A         B
+"logical" "logical"
+
+All known bugs had just been cleared, sigh ;)  Will fix and include in
+release to CRAN ...
+
+Thanks!
+
+Matthew
+
+
+> Thanks. I actually discovered it using rbindlist; it suffers the same
+> problem.
+>
+> Garrett
+>
+>
+> On Wed, Nov 7, 2012 at 4:07 PM, Cook, Malcolm <MEC at stowers.org> wrote:
+>
+>> not sure but try data.table::rbindlist like this (it should be faster
+>> too)
+>> ****
+>>
+>> ** **
+>>
+>> rbindlist(lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+>> as.data.table(read.csv(x)))****
+>>
+>> ** **
+>>
+>> ~Malcolm****
+>>
+>> ** **
+>>
+>> *From:* datatable-help-bounces at lists.r-forge.r-project.org [mailto:
+>> datatable-help-bounces at lists.r-forge.r-project.org] *On Behalf Of *G See
+>> *Sent:* Wednesday, November 07, 2012 3:53 PM
+>> *To:* datatable-help at lists.r-forge.r-project.org
+>> *Subject:* [datatable-help] rbinding an empty data.table and a non-empty
+>> data.table****
+>>
+>> ** **
+>>
+>> When I try to rbind an empty data.table to a non-empty data table, all
+>> my
+>> data are converted to logical.  Here's an example****
+>>
+>> ** **
+>>
+>> # create a directory and put 2 csv file in it.****
+>>
+>> dir.create("~/tmp")****
+>>
+>> system("echo 'A,B' > ~/tmp/new.csv") # this csv only has headers; no
+>> data*
+>> ***
+>>
+>> write.csv(data.frame(A=1, B=2), row.names=FALSE, file='~/tmp/new2.csv')
+>> #
+>> this one has header and 1 row****
+>>
+>> ** **
+>>
+>> lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), read.csv)****
+>>
+>> #[[1]]****
+>>
+>> #[1] A B****
+>>
+>> #<0 rows> (or 0-length row.names)****
+>>
+>> #****
+>>
+>> #[[2]]****
+>>
+>> #  A B****
+>>
+>> #1 1 2****
+>>
+>> ** **
+>>
+>> # now rbind them, and we're left with the data from the non-empy csv****
+>>
+>> do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"),
+>> read.csv))****
+>>
+>> #  A B****
+>>
+>> #1 1 2****
+>>
+>> ** **
+>>
+>> # Now let's try to work with data.tables instead of data.frames****
+>>
+>> lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+>> as.data.table(read.csv(x)))****
+>>
+>> #[[1]]****
+>>
+>> #Empty data.table (0 rows) of 2 cols: A,B****
+>>
+>> #****
+>>
+>> #[[2]]****
+>>
+>> #   A B****
+>>
+>> #1: 1 2****
+>>
+>> ** **
+>>
+>> #Ok, but look at what happens when we rbind them****
+>>
+>> do.call(rbind, lapply(c("~/tmp/new.csv", "~/tmp/new2.csv"), function(x)
+>> as.data.table(read.csv(x))))****
+>>
+>>       A    B****
+>>
+>> 1: TRUE TRUE****
+>>
+>> ** **
+>>
+>> ** **
+>>
+>>  What's going on here?****
+>>
+>> ** **
+>>
+>> Thanks,****
+>>
+>> Garrett****
+>>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+From dieter.menne at menne-biomed.de  Thu Nov  8 17:45:28 2012
+From: dieter.menne at menne-biomed.de (Dieter Menne)
+Date: Thu, 8 Nov 2012 08:45:28 -0800 (PST)
+Subject: [datatable-help] [J(channel) , ]  [J(chan) ,
+ ]  give different results when chan=channel
+Message-ID: <1352393128470-4648911.post@n4.nabble.com>
+
+I just got bitten by a nasty bug in my code:
+
+
+library(data.table)
+eso = data.table(pH=rnorm(10),channel=1:2,key="channel")
+chan = 1
+channel = chan
+
+eso[J(chan)]    # not a column name, returns what I want
+eso[J(channel)] # channel is a column and key, returns all
+
+>From a standpoint of evaluation, it is clear to me what happens, but I find
+this behavior highly confusing. I would wish if the latter could optionally
+be flagged with a warning, in case this is not "by design".
+
+Dieter
+
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/J-channel-J-chan-give-different-results-when-chan-channel-tp4648911.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Thu Nov  8 18:29:08 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 8 Nov 2012 17:29:08 -0000
+Subject: [datatable-help] [J(channel) , ]  [J(chan) ,
+ ]  give different results when chan=channel
+In-Reply-To: <1352393128470-4648911.post@n4.nabble.com>
+References: <1352393128470-4648911.post@n4.nabble.com>
+Message-ID: <6b748eadcdac69c88486c7cd780f3c2b.squirrel@webmail.plus.net>
+
+
+I see what you mean and agree this doesn't feel comfortable. To address
+this, .() was added as a first step in 1.8.2 :
+
+o New DT[.(...)] syntax (in the style of package plyr) is identical to
+  DT[list(...)], DT[J(...)] and DT[data.table(...)]. We plan to add
+  ..(), too, so that .() and ..() are analogous to the file system's
+  ./ and ../; i.e., .() evaluates within the frame of DT and ..() in
+  the parent scope.
+
+So in this case instead of
+
+    eso[J(channel)]
+
+it would be
+
+    eso[..(channel)]
+
+and the contents of () would be evaluated in calling scope.
+
+Thought about a new flag to [.data.table, but that might appear far away
+on the line of code from i, or even further down on another line.  ..()
+like that is right there in i where your eyes are looking at i. Easier to
+read.
+
+That was the idea, anyway. Would this work for you?
+
+Easy to remember .() and ..() because it's just like the file system.
+
+Matthew
+
+
+> I just got bitten by a nasty bug in my code:
+>
+>
+> library(data.table)
+> eso = data.table(pH=rnorm(10),channel=1:2,key="channel")
+> chan = 1
+> channel = chan
+>
+> eso[J(chan)]    # not a column name, returns what I want
+> eso[J(channel)] # channel is a column and key, returns all
+>
+> From a standpoint of evaluation, it is clear to me what happens, but I
+> find
+> this behavior highly confusing. I would wish if the latter could
+> optionally
+> be flagged with a warning, in case this is not "by design".
+>
+> Dieter
+>
+>
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/J-channel-J-chan-give-different-results-when-chan-channel-tp4648911.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+From dieter.menne at menne-biomed.de  Fri Nov  9 08:13:53 2012
+From: dieter.menne at menne-biomed.de (Dieter Menne)
+Date: Thu, 8 Nov 2012 23:13:53 -0800 (PST)
+Subject: [datatable-help] [J(channel) , ]  [J(chan) ,
+ ]  give different results when chan=channel
+In-Reply-To: <6b748eadcdac69c88486c7cd780f3c2b.squirrel@webmail.plus.net>
+References: <1352393128470-4648911.post@n4.nabble.com>
+ <6b748eadcdac69c88486c7cd780f3c2b.squirrel@webmail.plus.net>
+Message-ID: <1352445233132-4649008.post@n4.nabble.com>
+
+Thank, Matthew, 
+
+.() is a good idea, it is more intuitive than J() (why join?) or list () . I
+am not so sure about the ..(). It's certainly intuitive, but thinking about
+how to explain that feature to students is a nightmare.
+
+Probably a feature such as you find it in plyr::join would be good: It print
+a text ?"joining by: id' that reminds you that you better tell explicitly
+what "by" is. So in my case: since there is a ambiguity in "channel", a
+warning should be printed, with a recommendation to use ..() or .(). 
+
+Eats performance, though, but probably only for small problem which anyway
+are irrelevant.
+
+Dieter
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/J-channel-J-chan-give-different-results-when-chan-channel-tp4648911p4649008.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Fri Nov  9 11:02:17 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 9 Nov 2012 10:02:17 -0000
+Subject: [datatable-help] [J(channel) , ]  [J(chan) ,
+ ]  give different results when chan=channel
+In-Reply-To: <1352445233132-4649008.post@n4.nabble.com>
+References: <1352393128470-4648911.post@n4.nabble.com>
+ <6b748eadcdac69c88486c7cd780f3c2b.squirrel@webmail.plus.net>
+ <1352445233132-4649008.post@n4.nabble.com>
+Message-ID: <63a2e00db187ffb7a5612d7ee3dd38fb.squirrel@webmail.plus.net>
+
+
+> Thank, Matthew,
+>
+> .() is a good idea, it is more intuitive than J() (why join?)
+
+Great. J=Join to stem the confusion between row number lookup, and looking
+up the numbers in the key (i.e. joining).
+
+I've seen it said before that .() is intuitive but I've never understood
+why really. "." is also used to hide variables in environments (i.e. not
+something users should see; . = hidden?) or related to S3 methods (. =
+special). What's intuitive about .() as a function for regular users to
+use?  At least J() stands for something: join. What's .() stand for? I
+only (now) find it intuitive in the context of .() and ..() being
+analogous to the file system's ./ and ../   So if we didn't go ahead and
+add ..(), I'm not sure I would like .() anymore ;)  Have I missed
+something about .()?
+
+All it is is some way to make a list from the integer vector so data.table
+knows to join it rather than row number lookup. For character and factor,
+it's unambiguous, and the J() (or .()) isn't needed.
+
+> I
+> am not so sure about the ..(). It's certainly intuitive, but thinking
+> about
+> how to explain that feature to students is a nightmare.
+
+Yes but explaining _anything_ to students is a nightmare. Good luck!
+
+> Probably a feature such as you find it in plyr::join would be good: It
+> print
+> a text ??"joining by: id' that reminds you that you better tell explicitly
+> what "by" is. So in my case: since there is a ambiguity in "channel", a
+> warning should be printed, with a recommendation to use ..() or .().
+
+Great idea. Some extra verbosity in verbosity mode would be good. And then
+it would make sense to have several levels of verbosity rather than the
+current on/off.
+
+>
+> Eats performance, though.
+
+I didn't know this. Does it search the stack each time to see if there is
+an ambiguity, then? Presumably it has to search all the way up to confirm
+there's no ambiguity.   I wouldn't propose to do that in data.table.  The
+verbosity mode wouldn't detect that,  but just say what it is doing and if
+the variable isn't in the data.table then to use ..() to make the code
+robust.  In a similar way that if 'by' is provided equal to key(i) then it
+suggests (now in 1.8.3) to remove 'by' and leave it to by-without-by.
+
+Thanks for discussion. It's very useful to get feedback like this at an
+early stage.
+
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Fri Nov  9 22:52:50 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 9 Nov 2012 21:52:50 -0000
+Subject: [datatable-help] === v1.8.4 is now on CRAN ===
+Message-ID: <ce61dab2cd4e0dc8916b13b54b0604f7.squirrel@webmail.plus.net>
+
+
+v1.8.4 is now on CRAN and passing checks. Binaries may take a few days to
+reach all mirrors.
+
+13 new features
+27 bug fixes
+ 8 user visible changes
+ 2 bugs caught in beta
+ 2 notes
+
+All known bugs have been fixed.
+
+test.data.table() should return 869 tests passed.
+
+Several new features may only be in NEWS and not reflected in the main
+documentation, yet.
+
+Many thanks to everyone for finding and reporting!!
+
+    http://datatable.r-forge.r-project.org/
+
+Matthew
+
+
+
+From mdowle at mdowle.plus.com  Mon Nov 12 11:29:23 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 12 Nov 2012 10:29:23 +0000
+Subject: [datatable-help] =?utf-8?q?Two_very_minor_glitches_with_v1=2E8=2E?=
+ =?utf-8?q?4_on_R_=3C=3D_2=2E15=2E0?=
+Message-ID: <8f58a60ca6c08206a62b0b8fa01f2850@imap.plus.net>
+
+
+On R 2.15.1 and 2.15.2, there are no known problems.
+
+The glitches are :
+
+i)  Test 764 fails in 2.15.0 and earlier: X[Y] where Y is an empty (0 
+row) data.table.
+     An error message about pmin() is issued, rather than an empty 
+data.table.
+     In R 2.15.1 there was this (relied on by test 764) :
+       "pmin() and pmax() now also work when one of the inputs is of 
+length zero and
+        others are not, returning a zero-length vector".
+
+ii) If setnames is passed character 'old' but detects duplicate column 
+names exist,
+     the error will be "paste0 not found", rather than the intended 
+error message.
+     paste0() was added to 2.15.0.
+
+All other tests (including after 764) pass fine in R >= 2.12.0, as 
+intended and stated.
+
+These could and should have been caught (by me) before release to CRAN, 
+apologies.
+
+Not planning to release a patch to CRAN, unless anything else comes up.
+
+Matthew
+
+
+
+From mdowle at mdowle.plus.com  Tue Nov 13 19:23:35 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 13 Nov 2012 18:23:35 +0000
+Subject: [datatable-help] =?utf-8?b?PT09IHYxLjguNiBpcyBub3cgb24gQ1JBTiA9?=
+ =?utf-8?b?PT0=?=
+Message-ID: <d7cd7df5d73f7717de8951696d4ae5d3@imap.plus.net>
+
+v1.8.6 is now on CRAN and passing checks. Binaries may take a few days 
+to
+reach all mirrors.
+
+     http://cran.r-project.org/web/packages/data.table/NEWS
+
+Matthew
+
+
+From cubalibro at gmail.com  Fri Nov 16 15:15:12 2012
+From: cubalibro at gmail.com (Berto)
+Date: Fri, 16 Nov 2012 06:15:12 -0800 (PST)
+Subject: [datatable-help] Subsetting columns in data.table
+Message-ID: <1353075312045-4649736.post@n4.nabble.com>
+
+Dear all,
+
+I am naive in data.table usage, so I write to you to get help on a perhaps
+trivial question, that it's not clear to me after reading the "Introduction
+to data.table" or the "FAQ" vignettes.
+
+I'd like to subset the rows with contain a value above a certain threshold
+for a certain column, but below another threshold for all the rest and then
+do some operations (e.g. sum):
+
+#Example data
+DT = data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9, w=3:11,
+z=LETTERS[1:9])
+setkey(DT,z)
+DT
+
+   x y v  w z
+1: a 1 1  3 A
+2: a 3 2  4 B
+3: a 6 3  5 C
+4: b 1 4  6 D
+5: b 3 5  7 E
+6: b 6 6  8 F
+7: c 1 7  9 G
+8: c 3 8 10 H
+9: c 6 9 11 I
+
+#Easy case, 1 variable
+DT[y>=3&v<=7,sum(y), by=x]
+
+#Particular solution (low ncols)
+DT[y>=3&v<=7&w<=7,sum(y), by=x]
+
+x V1
+1: a  9
+2: b  3
+
+#Attempt subgroup for general solution
+DT[y>=3, .SD<=7,]
+
+         x    y     v     w     z
+[1,] FALSE TRUE  TRUE  TRUE FALSE
+[2,] FALSE TRUE  TRUE  TRUE FALSE
+[3,] FALSE TRUE  TRUE  TRUE FALSE
+[4,] FALSE TRUE  TRUE FALSE FALSE
+[5,] FALSE TRUE FALSE FALSE FALSE
+[6,] FALSE TRUE FALSE FALSE FALSE
+
+##gives a matrix with logical for <=7.
+
+#Second attempt based on FAQ 2.1
+DT[y>=3,lapply(.SD<=7,sum),by=x]
+
+   x V1 V2 V3 V4 V5 V6 V7 V8
+1: a  1  1  1  1  1  1  0  0
+2: b  1  1  1  1  1  0  0  0
+3: c  1  1  0  0  0  0  0  0
+
+I would appreciate any suggestions, maybe this has been covered already in
+some post of SO that I've missed.
+
+Thanks in advance for your support!!
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Subsetting-columns-in-data-table-tp4649736.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Fri Nov 16 16:50:29 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 16 Nov 2012 15:50:29 +0000
+Subject: [datatable-help] Subsetting columns in data.table
+In-Reply-To: <1353075312045-4649736.post@n4.nabble.com>
+References: <1353075312045-4649736.post@n4.nabble.com>
+Message-ID: <8f76cc7b8dba16f65fef84aeb3dcc618@imap.plus.net>
+
+
+Hi,
+
+I'm not following this one I'm afraid. The example data is good, and 
+it's nice
+to see your attempts, but the desired result isn't clear, at least to 
+me.
+
+I can't think of any reason to do .SD<=7. .SD is a data.table, so it 
+doesn't
+make much sense to compare a list of vectors to the single value 7.
+
+Matthew
+
+
+On 16.11.2012 14:15, Berto wrote:
+> Dear all,
+>
+> I am naive in data.table usage, so I write to you to get help on a 
+> perhaps
+> trivial question, that it's not clear to me after reading the 
+> "Introduction
+> to data.table" or the "FAQ" vignettes.
+>
+> I'd like to subset the rows with contain a value above a certain 
+> threshold
+> for a certain column, but below another threshold for all the rest 
+> and then
+> do some operations (e.g. sum):
+>
+> #Example data
+> DT = data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9, 
+> w=3:11,
+> z=LETTERS[1:9])
+> setkey(DT,z)
+> DT
+>
+>    x y v  w z
+> 1: a 1 1  3 A
+> 2: a 3 2  4 B
+> 3: a 6 3  5 C
+> 4: b 1 4  6 D
+> 5: b 3 5  7 E
+> 6: b 6 6  8 F
+> 7: c 1 7  9 G
+> 8: c 3 8 10 H
+> 9: c 6 9 11 I
+>
+> #Easy case, 1 variable
+> DT[y>=3&v<=7,sum(y), by=x]
+>
+> #Particular solution (low ncols)
+> DT[y>=3&v<=7&w<=7,sum(y), by=x]
+>
+> x V1
+> 1: a  9
+> 2: b  3
+>
+> #Attempt subgroup for general solution
+> DT[y>=3, .SD<=7,]
+>
+>          x    y     v     w     z
+> [1,] FALSE TRUE  TRUE  TRUE FALSE
+> [2,] FALSE TRUE  TRUE  TRUE FALSE
+> [3,] FALSE TRUE  TRUE  TRUE FALSE
+> [4,] FALSE TRUE  TRUE FALSE FALSE
+> [5,] FALSE TRUE FALSE FALSE FALSE
+> [6,] FALSE TRUE FALSE FALSE FALSE
+>
+> ##gives a matrix with logical for <=7.
+>
+> #Second attempt based on FAQ 2.1
+> DT[y>=3,lapply(.SD<=7,sum),by=x]
+>
+>    x V1 V2 V3 V4 V5 V6 V7 V8
+> 1: a  1  1  1  1  1  1  0  0
+> 2: b  1  1  1  1  1  0  0  0
+> 3: c  1  1  0  0  0  0  0  0
+>
+> I would appreciate any suggestions, maybe this has been covered 
+> already in
+> some post of SO that I've missed.
+>
+> Thanks in advance for your support!!
+>
+>
+>
+> --
+> View this message in context:
+> 
+> http://r.789695.n4.nabble.com/Subsetting-columns-in-data-table-tp4649736.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+From cubalibro at gmail.com  Fri Nov 16 19:32:22 2012
+From: cubalibro at gmail.com (Berto)
+Date: Fri, 16 Nov 2012 10:32:22 -0800 (PST)
+Subject: [datatable-help] Subsetting columns in data.table
+In-Reply-To: <8f76cc7b8dba16f65fef84aeb3dcc618@imap.plus.net>
+References: <1353075312045-4649736.post@n4.nabble.com>
+ <8f76cc7b8dba16f65fef84aeb3dcc618@imap.plus.net>
+Message-ID: <1353090742272-4649779.post@n4.nabble.com>
+
+Hi Matthew, thanks for the quick reply.
+
+I want to find all the rows that are above a threshold for one column (e.g.
+y>=3) and below another threshold for all the rest (e.g. v<=7&w<=7, for a
+threshold<7).
+
+Once I have this subsetting, I'd like to use the sum function (e.g. sum(y),
+by=x).
+
+I know how to do it for a low number of columns, specifiying all columns
+names<threshold:
+
+DT[y>=3&*v<=7&w<=7*,sum(y), by=x] 
+ 
+which gives the expected result:
+
+    x V1 
+1: a  9 
+2: b  3 
+
+But if the number of columns grows, I can't specify all columns anymore,
+maybe should I use column names?
+
+cols <- cols[names(DT) %in% "y" == FALSE] #column names excluding the one
+with higher threshold
+
+Hope to be clearer this time, otherwise please let me know!
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Subsetting-columns-in-data-table-tp4649736p4649779.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Sat Nov 17 02:08:33 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 17 Nov 2012 01:08:33 +0000
+Subject: [datatable-help] Subsetting columns in data.table
+In-Reply-To: <1353090742272-4649779.post@n4.nabble.com>
+References: <1353075312045-4649736.post@n4.nabble.com>
+ <8f76cc7b8dba16f65fef84aeb3dcc618@imap.plus.net>
+ <1353090742272-4649779.post@n4.nabble.com>
+Message-ID: <cb6927bb5d0c7a790b2ed3d53f91c078@imap.plus.net>
+
+
+Hi Berto,
+
+I think we may be experiencing a language barrier here. This is 
+datatable-help; i.e.,
+not r-help. You *can* write in another language on this list, if you'd 
+like to, in
+case someone else here understands better. The rules are less strict 
+here. Nobody has yet
+done so, but there is no rule against it. Why not?
+
+Proceeding in English for now ...
+
+I like the lack of spaces, but what do the * mean?  In other words, 
+you've presented
+a line of code :
+     DT[y>=3&*v<=7&w<=7*,sum(y), by=x]
+but that doesn't actually evaluate to anything, does it? So that's 
+pseudo-code. I don't even need to copy and paste that into R to know 
+it's invalid.  That cannot possible give the expected result, because of 
+the "*" characters.
+
+Might you be looking for something like :
+
+     sapply(.SD, `<`, 7)
+
+?   Dunno. Guessing.
+
+But, focussing on this part of your email :
+
+> But if the number of columns grows, I can't specify all columns 
+> anymore,
+> maybe should I use column names?
+
+You actually do, really, honestly, need to show us, physically, in 
+email, what you mean. Columns
+of what? Growing how? Show us 2,3,4,5 columns. Show us the manual way. 
+Show us the input and
+show us the output.
+
+Your email can be very long. It can contain very little English.  But 
+you
+actually need to show what the output is you would like, for me (at 
+least)
+to understand.
+
+What I am certain of is that whatever you want to do is possible. And 
+if it isn't, then
+we will likely enhance data.table to do it.
+
+Matthew
+
+
+On 16.11.2012 18:32, Berto wrote:
+> Hi Matthew, thanks for the quick reply.
+>
+> I want to find all the rows that are above a threshold for one column 
+> (e.g.
+> y>=3) and below another threshold for all the rest (e.g. v<=7&w<=7, 
+> for a
+> threshold<7).
+>
+> Once I have this subsetting, I'd like to use the sum function (e.g. 
+> sum(y),
+> by=x).
+>
+> I know how to do it for a low number of columns, specifiying all 
+> columns
+> names<threshold:
+>
+> DT[y>=3&*v<=7&w<=7*,sum(y), by=x]
+>
+> which gives the expected result:
+>
+>     x V1
+> 1: a  9
+> 2: b  3
+>
+> But if the number of columns grows, I can't specify all columns 
+> anymore,
+> maybe should I use column names?
+>
+> cols <- cols[names(DT) %in% "y" == FALSE] #column names excluding the 
+> one
+> with higher threshold
+>
+> Hope to be clearer this time, otherwise please let me know!
+>
+>
+>
+>
+> --
+> View this message in context:
+> 
+> http://r.789695.n4.nabble.com/Subsetting-columns-in-data-table-tp4649736p4649779.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From cubalibro at gmail.com  Sat Nov 17 08:47:33 2012
+From: cubalibro at gmail.com (Berto)
+Date: Fri, 16 Nov 2012 23:47:33 -0800 (PST)
+Subject: [datatable-help] Subsetting columns in data.table
+In-Reply-To: <cb6927bb5d0c7a790b2ed3d53f91c078@imap.plus.net>
+References: <1353075312045-4649736.post@n4.nabble.com>
+ <8f76cc7b8dba16f65fef84aeb3dcc618@imap.plus.net>
+ <1353090742272-4649779.post@n4.nabble.com>
+ <cb6927bb5d0c7a790b2ed3d53f91c078@imap.plus.net>
+Message-ID: <1353138453214-4649841.post@n4.nabble.com>
+
+Matthew Dowle wrote
+> Hi Berto,
+> 
+> I think we may be experiencing a language barrier here. This is 
+> datatable-help; i.e.,
+> not r-help. You *can* write in another language on this list, if you'd 
+> like to, in
+> case someone else here understands better. The rules are less strict 
+> here. Nobody has yet
+> done so, but there is no rule against it. Why not?
+> 
+> Proceeding in English for now ...
+
+Sorry for my loose English writing, I'll try to be more precise this time.
+
+If this does not work, I'll switch the language.
+
+
+
+Matthew Dowle wrote
+> I like the lack of spaces, but what do the * mean?  In other words, 
+> you've presented
+> a line of code :
+>      DT[y>=3&*v<=7&w<=7*,sum(y), by=x]
+> but that doesn't actually evaluate to anything, does it? So that's 
+> pseudo-code. I don't even need to copy and paste that into R to know 
+> it's invalid.  That cannot possible give the expected result, because of 
+> the "*" characters.
+
+I don't have these asteriks in my message, but this part of the code was
+highlighted in bold as *here*.
+
+I've run all code and copy-pasted in the post.
+
+
+
+Matthew Dowle wrote
+> Might you be looking for something like :
+> 
+>      sapply(.SD, `<`, 7)
+> 
+> ?   Dunno. Guessing.
+
+I've tried the sapply suggestion but the result is a logical matrix, not
+what I am looking for:
+
+DT3 = data.table( x=rep ( c("a","b","c"), each=3), y = c(1,3,6),  u = 2:10,
+v = 1:9, w = 3:11)
+
+DT3[y>=3, sapply(.SD, `<`, 7),] 
+
+         x    y     u     v     w
+[1,] FALSE TRUE  TRUE  TRUE  TRUE
+[2,] FALSE TRUE  TRUE  TRUE  TRUE
+[3,] FALSE TRUE  TRUE  TRUE FALSE
+[4,] FALSE TRUE FALSE  TRUE FALSE
+[5,] FALSE TRUE FALSE FALSE FALSE
+[6,] FALSE TRUE FALSE FALSE FALSE
+
+
+Matthew Dowle wrote
+> But, focussing on this part of your email :
+> 
+>> But if the number of columns grows, I can't specify all columns 
+>> anymore,
+>> maybe should I use column names?
+> 
+> You actually do, really, honestly, need to show us, physically, in 
+> email, what you mean. Columns
+> of what? Growing how? Show us 2,3,4,5 columns. Show us the manual way. 
+> Show us the input and
+> show us the output.
+> 
+> Your email can be very long. It can contain very little English.  But 
+> you
+> actually need to show what the output is you would like, for me (at 
+> least)
+> to understand.
+> 
+> What I am certain of is that whatever you want to do is possible. And 
+> if it isn't, then
+> we will likely enhance data.table to do it.
+
+I see the verb "grow" is misleading here, I meant "if the number of columns
+is high".
+
+I want this code for a data.table with 1000s of rows and 10s - 100s of
+"other numeric columns".
+
+Find below 2 examples: DT3 and DT5 (input, subset, output).
+
+
+#Example data table (DT3) with 1 character column (x), 1 numeric column of
+interest (y) and 3 other numeric columns (u, v, w) - input
+
+DT3 = data.table( x=rep ( c("a","b","c"), each=3), y = c(1,3,6),  u = 2:10,
+v = 1:9, w = 3:11)
+
+DT3
+
+   x y  u v  w
+1: a 1  2 1  3
+2: a 3  3 2  4
+3: a 6  4 3  5
+4: b 1  5 4  6
+5: b 3  6 5  7
+6: b 6  7 6  8
+7: c 1  8 7  9
+8: c 3  9 8 10
+9: c 6 10 9 11
+
+# What I want to subset from DT3:
+
+DT3[y>=3 & u <=7 & v <=7 & w <=7, ]  # but this way, I need to write all
+column names 
+
+x y u v w
+1: a 3 3 2 4
+2: a 6 4 3 5
+3: b 3 6 5 7
+
+# Sum(y) calculation in this subset from DT3 - output
+
+DT3[y>=3 & u <=7 & v <=7 & w <=7, sum(y), by=x]
+
+   x V1
+1: a  9
+2: b  3
+
+# Mean(y) calculation in this subset from DT3 - output
+
+DT3[y>=3 & u <=7 & v <=7 & w <=7, mean(y), by=x]
+
+   x  V1
+1: a 4.5
+2: b 3.0
+
+# Max(y) in this subset from DT3 - output
+
+DT3[y>=3 & u <=7 & v <=7 & w <=7, max(y), by=x]
+
+   x V1
+1: a  6
+2: b  3
+
+
+#Another example data table (DT5) with 1 character column (x), 1 numeric
+column of interest (y) and 5 other numeric columns (s, t, u, v, w) - input
+
+DT5 = data.table( x=rep ( c("a","b","c"), each=3), y = c(1,3,6), s = 4:12, t
+= 0:8, u = 2:10, v = 1:9, w = 3:11)
+
+DT5
+
+   x y  s t  u v  w
+1: a 1  4 0  2 1  3
+2: a 3  5 1  3 2  4
+3: a 6  6 2  4 3  5
+4: b 1  7 3  5 4  6
+5: b 3  8 4  6 5  7
+6: b 6  9 5  7 6  8
+7: c 1 10 6  8 7  9
+8: c 3 11 7  9 8 10
+9: c 6 12 8 10 9 11
+
+# Same subset from DT5 as used in DT3:
+
+DT5[y>=3 & u <=7 & v <=7 & w <=7,]
+
+   x y s t u v w
+1: a 3 5 1 3 2 4
+2: a 6 6 2 4 3 5
+3: b 3 8 4 6 5 7
+
+# Now filtering by s and t columns as well, excludes "3: b 3 8 4 6 5 7" as
+s=8.
+
+DT5[y>=3 & s <=7 & t <=7 & u <=7 & v <=7 & w <=7,]  ## it works, but
+inconvenient for 10s-100s of columns
+ 
+  x y s t u v w
+1: a 3 5 1 3 2 4
+2: a 6 6 2 4 3 5 
+
+# Doing a sum(y) calculation over this subset from DT5 - output
+
+DT5[y>=3 & s <=7 & t <=7 & u <=7 & v <=7 & w <=7, sum(y), by=x]
+
+   x V1
+1: a  9
+
+# Doing a mean(y) calculation over this subset from DT5 - output
+
+DT5[y>=3 & s <=7 & t <=7 & u <=7 & v <=7 & w <=7, mean(y), by=x]
+
+   x  V1
+1: a 4.5
+
+All the outputs shown here match the expectations, but it's not useful for
+10s-100s of columns.
+
+I hope the desired output is clear now; ignore my past attempts to avoid
+confusion.
+
+Thanks again!
+
+B
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Subsetting-columns-in-data-table-tp4649736p4649841.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From pcvdwh at gmail.com  Sun Nov 18 20:19:58 2012
+From: pcvdwh at gmail.com (Philip de Witt Hamer)
+Date: Sun, 18 Nov 2012 20:19:58 +0100
+Subject: [datatable-help] assignment by reference in subset
+Message-ID: <158AF151-E6A2-4EFC-9CE2-6787957EEA19@gmail.com>
+
+Dear all,
+
+data.table is great! thanks for this life(time)saving package.
+
+Now, I run into a difficult nut to crack using ':='.
+I'd like to do a calculation using column information conditional on another column
+
+first some jumbo data:
+
+library(data.table)
+DT <- data.table(
+ 1:50,
+ rep(1:5,each=10),
+ runif(50,0,1)
+)
+setnames(DT, 1:3, c("id","grp","p"))
+
+id's are unique
+grp's speaks for itself
+think of p's as e.g. p-values
+
+next, if I want to obtain the nr of p values at least as extreme as the p of each row from the whole set, this seems to work well:  
+
+DT[,c1 := sum(DT[,p] <= p), by=id]
+
+but then, I would like to get the nr of p values at least as extreme as the p of each row for the subset with identical grp, I am having a hard time, because these attempts fail:
+
+DT[,c2 := sum(DT[grp,p] <= p),by=id]
+DT[,c3 := sum(DT[DT[,grp]==grp,p] <= p), by=id]
+
+What I am after is like the following output examplified by the first 20 rows.
+So that p=0.286 for the first row is compared with the p's of grp=1, the result is 3 because three of these p's are equal or smaller than 0.286 (i.e. 0.286, 0.078, and 0.211).
+
+    id grp          p c1 c2
+ 1:  1   1 0.28619666 12  3
+ 2:  2   1 0.31725169 14  4
+ 3:  3   1 0.82172331 41  8
+ 4:  4   1 0.07867874  4  1
+ 5:  5   1 0.69134289 35  7
+ 6:  6   1 0.21123476  7  2
+ 7:  7   1 0.39156432 20  5
+ 8:  8   1 0.98862365 50 10
+ 9:  9   1 0.55943136 25  6
+10: 10   1 0.93543842 47  9
+11: 11   2 0.48740254 21  5
+12: 12   2 0.02974435  1  1
+13: 13   2 0.14566443  6  2
+14: 14   2 0.23408044 10  3
+15: 15   2 0.63503196 32  7
+16: 16   2 0.34114088 16  4
+17: 17   2 0.56849053 26  6
+18: 18   2 0.71877039 36  8
+19: 19   2 0.84100007 42 10
+20: 20   2 0.81776585 40  9
+
+Any help to solve this issue is greatly appreciated.
+
+Philip
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20121118/9d07a27d/attachment.html>
+
+From mailinglist.honeypot at gmail.com  Sun Nov 18 21:03:48 2012
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Sun, 18 Nov 2012 12:03:48 -0800
+Subject: [datatable-help] assignment by reference in subset
+In-Reply-To: <158AF151-E6A2-4EFC-9CE2-6787957EEA19@gmail.com>
+References: <158AF151-E6A2-4EFC-9CE2-6787957EEA19@gmail.com>
+Message-ID: <CAHA9McPnbRJkE-Oy5EviEhUyZWjqW3q2Pz=NP67nXO9+VwnFig@mail.gmail.com>
+
+Hi,
+
+On Sun, Nov 18, 2012 at 11:19 AM, Philip de Witt Hamer <pcvdwh at gmail.com> wrote:
+> Dear all,
+>
+> data.table is great! thanks for this life(time)saving package.
+>
+> Now, I run into a difficult nut to crack using ':='.
+> I'd like to do a calculation using column information conditional on another
+> column
+>
+> first some jumbo data:
+>
+> library(data.table)
+> DT <- data.table(
+>  1:50,
+>  rep(1:5,each=10),
+>  runif(50,0,1)
+> )
+> setnames(DT, 1:3, c("id","grp","p"))
+>
+> id's are unique
+> grp's speaks for itself
+> think of p's as e.g. p-values
+>
+> next, if I want to obtain the nr of p values at least as extreme as the p of
+> each row from the whole set, this seems to work well:
+>
+> DT[,c1 := sum(DT[,p] <= p), by=id]
+>
+> but then, I would like to get the nr of p values at least as extreme as the
+> p of each row for the subset with identical grp, I am having a hard time,
+> because these attempts fail:
+>
+> DT[,c2 := sum(DT[grp,p] <= p),by=id]
+> DT[,c3 := sum(DT[DT[,grp]==grp,p] <= p), by=id]
+
+You will want to group by "grp".
+
+This gets you pretty close -- it fails the "ties" criterion:
+
+DT[, cg := rank(p) - 1, by=grp]
+
+If you *really* want to keep the ties criterion, perhaps here's a way
+to do so by avoiding a for loop:
+
+DT[, cgo := rowSums(outer(p, p, '-') > 0), by=grp]
+
+The problem is that if your groups are very large, the `outer` call
+might chew lots of RAM, since you'll be creating a p x p matrix (per
+group).
+
+Does that get you where you need to be?
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+ | Memorial Sloan-Kettering Cancer Center
+ | Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From tbfowler4 at gmail.com  Mon Nov 19 00:17:36 2012
+From: tbfowler4 at gmail.com (Thell Fowler)
+Date: Sun, 18 Nov 2012 17:17:36 -0600
+Subject: [datatable-help] (no subject)
+Message-ID: <CAAJPTXiQsV_J_4T-3aQ+aEumPoSa+-pd9sNRbGnPE2n+qz67aw@mail.gmail.com>
+
+Hi all!
+
+Two quick questions:
+
+1) What is called by data.table during print to determine the format of the
+printed output?  Looking at the print method didn't reveal any formatting
+being applied that I could see.
+
+2) Would a method of attaching a 'format' attribute to a var list , such
+that the data.table print method could apply it, be worth-while?
+
+I'm thinking that this would have no effect on actual calculation times,
+and if a flag (similar to by, group, .SDcols) could be utilized then it
+wouldn't delay perceived response time unless desired, but could be there
+as a forwardable attribute when sub-setting and messaging data; and
+therefore be a useful tool in visual inspection and sharing of results.
+ I'm thinking of a 'format' attribute in the form of an expression taking a
+singular list as an argument that can then be applied.
+
+
+-- 
+Sincerely,
+Thell
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20121118/af9d42a7/attachment.html>
+
+From mailinglist.honeypot at gmail.com  Mon Nov 19 01:45:43 2012
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Sun, 18 Nov 2012 16:45:43 -0800
+Subject: [datatable-help] (no subject)
+In-Reply-To: <CAAJPTXiQsV_J_4T-3aQ+aEumPoSa+-pd9sNRbGnPE2n+qz67aw@mail.gmail.com>
+References: <CAAJPTXiQsV_J_4T-3aQ+aEumPoSa+-pd9sNRbGnPE2n+qz67aw@mail.gmail.com>
+Message-ID: <CAHA9McOoU0qVAtTvR8gFpVyg=cnsS0-W90W6S4JJdR-c0hVT1g@mail.gmail.com>
+
+Hi,
+
+On Sun, Nov 18, 2012 at 3:17 PM, Thell Fowler <tbfowler4 at gmail.com> wrote:
+> Hi all!
+>
+> Two quick questions:
+>
+> 1) What is called by data.table during print to determine the format of the
+> printed output?  Looking at the print method didn't reveal any formatting
+> being applied that I could see.
+
+See the data.table:::print.data.table function, which also uses
+data.table:::format.data.table
+
+Neither of these are exported in the NAMESPACE, hence the need for the
+triple :::
+
+> 2) Would a method of attaching a 'format' attribute to a var list , such
+> that the data.table print method could apply it, be worth-while?
+>
+> I'm thinking that this would have no effect on actual calculation times, and
+> if a flag (similar to by, group, .SDcols) could be utilized then it wouldn't
+> delay perceived response time unless desired, but could be there as a
+> forwardable attribute when sub-setting and messaging data; and therefore be
+> a useful tool in visual inspection and sharing of results.  I'm thinking of
+> a 'format' attribute in the form of an expression taking a singular list as
+> an argument that can then be applied.
+
+Perhaps others will have more luck, but I don't think I quite follow
+... maybe a concrete example could help (as in, an example of how you
+would add this flag and how the output would look like?)
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+ | Memorial Sloan-Kettering Cancer Center
+ | Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Mon Nov 19 23:06:51 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 19 Nov 2012 22:06:51 +0000
+Subject: [datatable-help] Subsetting columns in data.table
+In-Reply-To: <1353138453214-4649841.post@n4.nabble.com>
+References: <1353075312045-4649736.post@n4.nabble.com>
+ <8f76cc7b8dba16f65fef84aeb3dcc618@imap.plus.net>
+ <1353090742272-4649779.post@n4.nabble.com>
+ <cb6927bb5d0c7a790b2ed3d53f91c078@imap.plus.net>
+ <1353138453214-4649841.post@n4.nabble.com>
+Message-ID: <2d279691c33bebf24fd11d98b7bc6ce7@imap.plus.net>
+
+
+Hi Berto,
+
+Thanks. I think I get it now. How about this :
+
+DT5 = data.table(x=rep(c("a","b","c"), each=3), y=c(1,3,6), s=4:12, 
+t=0:8, u=2:10, v=1:9, w=3:11)
+othercols = setdiff(names(DT5),c("x","y"))
+DT5[y<=3 & Reduce(`&`,lapply(DT5[,othercols,with=FALSE],`<=`,7)), 
+max(y), by=x]
+    x V1
+1: a  3
+2: b  1
+
+HTH
+Matthew
+
+
+On 17.11.2012 07:47, Berto wrote:
+> Matthew Dowle wrote
+>> Hi Berto,
+>>
+>> I think we may be experiencing a language barrier here. This is
+>> datatable-help; i.e.,
+>> not r-help. You *can* write in another language on this list, if 
+>> you'd
+>> like to, in
+>> case someone else here understands better. The rules are less strict
+>> here. Nobody has yet
+>> done so, but there is no rule against it. Why not?
+>>
+>> Proceeding in English for now ...
+>
+> Sorry for my loose English writing, I'll try to be more precise this 
+> time.
+>
+> If this does not work, I'll switch the language.
+>
+>
+>
+> Matthew Dowle wrote
+>> I like the lack of spaces, but what do the * mean?  In other words,
+>> you've presented
+>> a line of code :
+>>      DT[y>=3&*v<=7&w<=7*,sum(y), by=x]
+>> but that doesn't actually evaluate to anything, does it? So that's
+>> pseudo-code. I don't even need to copy and paste that into R to know
+>> it's invalid.  That cannot possible give the expected result, 
+>> because of
+>> the "*" characters.
+>
+> I don't have these asteriks in my message, but this part of the code 
+> was
+> highlighted in bold as *here*.
+>
+> I've run all code and copy-pasted in the post.
+>
+>
+>
+> Matthew Dowle wrote
+>> Might you be looking for something like :
+>>
+>>      sapply(.SD, `<`, 7)
+>>
+>> ?   Dunno. Guessing.
+>
+> I've tried the sapply suggestion but the result is a logical matrix, 
+> not
+> what I am looking for:
+>
+> DT3 = data.table( x=rep ( c("a","b","c"), each=3), y = c(1,3,6),  u = 
+> 2:10,
+> v = 1:9, w = 3:11)
+>
+> DT3[y>=3, sapply(.SD, `<`, 7),]
+>
+>          x    y     u     v     w
+> [1,] FALSE TRUE  TRUE  TRUE  TRUE
+> [2,] FALSE TRUE  TRUE  TRUE  TRUE
+> [3,] FALSE TRUE  TRUE  TRUE FALSE
+> [4,] FALSE TRUE FALSE  TRUE FALSE
+> [5,] FALSE TRUE FALSE FALSE FALSE
+> [6,] FALSE TRUE FALSE FALSE FALSE
+>
+>
+> Matthew Dowle wrote
+>> But, focussing on this part of your email :
+>>
+>>> But if the number of columns grows, I can't specify all columns
+>>> anymore,
+>>> maybe should I use column names?
+>>
+>> You actually do, really, honestly, need to show us, physically, in
+>> email, what you mean. Columns
+>> of what? Growing how? Show us 2,3,4,5 columns. Show us the manual 
+>> way.
+>> Show us the input and
+>> show us the output.
+>>
+>> Your email can be very long. It can contain very little English.  
+>> But
+>> you
+>> actually need to show what the output is you would like, for me (at
+>> least)
+>> to understand.
+>>
+>> What I am certain of is that whatever you want to do is possible. 
+>> And
+>> if it isn't, then
+>> we will likely enhance data.table to do it.
+>
+> I see the verb "grow" is misleading here, I meant "if the number of 
+> columns
+> is high".
+>
+> I want this code for a data.table with 1000s of rows and 10s - 100s 
+> of
+> "other numeric columns".
+>
+> Find below 2 examples: DT3 and DT5 (input, subset, output).
+>
+>
+> #Example data table (DT3) with 1 character column (x), 1 numeric 
+> column of
+> interest (y) and 3 other numeric columns (u, v, w) - input
+>
+> DT3 = data.table( x=rep ( c("a","b","c"), each=3), y = c(1,3,6),  u = 
+> 2:10,
+> v = 1:9, w = 3:11)
+>
+> DT3
+>
+>    x y  u v  w
+> 1: a 1  2 1  3
+> 2: a 3  3 2  4
+> 3: a 6  4 3  5
+> 4: b 1  5 4  6
+> 5: b 3  6 5  7
+> 6: b 6  7 6  8
+> 7: c 1  8 7  9
+> 8: c 3  9 8 10
+> 9: c 6 10 9 11
+>
+> # What I want to subset from DT3:
+>
+> DT3[y>=3 & u <=7 & v <=7 & w <=7, ]  # but this way, I need to write 
+> all
+> column names
+>
+> x y u v w
+> 1: a 3 3 2 4
+> 2: a 6 4 3 5
+> 3: b 3 6 5 7
+>
+> # Sum(y) calculation in this subset from DT3 - output
+>
+> DT3[y>=3 & u <=7 & v <=7 & w <=7, sum(y), by=x]
+>
+>    x V1
+> 1: a  9
+> 2: b  3
+>
+> # Mean(y) calculation in this subset from DT3 - output
+>
+> DT3[y>=3 & u <=7 & v <=7 & w <=7, mean(y), by=x]
+>
+>    x  V1
+> 1: a 4.5
+> 2: b 3.0
+>
+> # Max(y) in this subset from DT3 - output
+>
+> DT3[y>=3 & u <=7 & v <=7 & w <=7, max(y), by=x]
+>
+>    x V1
+> 1: a  6
+> 2: b  3
+>
+>
+> #Another example data table (DT5) with 1 character column (x), 1 
+> numeric
+> column of interest (y) and 5 other numeric columns (s, t, u, v, w) - 
+> input
+>
+> DT5 = data.table( x=rep ( c("a","b","c"), each=3), y = c(1,3,6), s = 
+> 4:12, t
+> = 0:8, u = 2:10, v = 1:9, w = 3:11)
+>
+> DT5
+>
+>    x y  s t  u v  w
+> 1: a 1  4 0  2 1  3
+> 2: a 3  5 1  3 2  4
+> 3: a 6  6 2  4 3  5
+> 4: b 1  7 3  5 4  6
+> 5: b 3  8 4  6 5  7
+> 6: b 6  9 5  7 6  8
+> 7: c 1 10 6  8 7  9
+> 8: c 3 11 7  9 8 10
+> 9: c 6 12 8 10 9 11
+>
+> # Same subset from DT5 as used in DT3:
+>
+> DT5[y>=3 & u <=7 & v <=7 & w <=7,]
+>
+>    x y s t u v w
+> 1: a 3 5 1 3 2 4
+> 2: a 6 6 2 4 3 5
+> 3: b 3 8 4 6 5 7
+>
+> # Now filtering by s and t columns as well, excludes "3: b 3 8 4 6 5 
+> 7" as
+> s=8.
+>
+> DT5[y>=3 & s <=7 & t <=7 & u <=7 & v <=7 & w <=7,]  ## it works, but
+> inconvenient for 10s-100s of columns
+>
+>   x y s t u v w
+> 1: a 3 5 1 3 2 4
+> 2: a 6 6 2 4 3 5
+>
+> # Doing a sum(y) calculation over this subset from DT5 - output
+>
+> DT5[y>=3 & s <=7 & t <=7 & u <=7 & v <=7 & w <=7, sum(y), by=x]
+>
+>    x V1
+> 1: a  9
+>
+> # Doing a mean(y) calculation over this subset from DT5 - output
+>
+> DT5[y>=3 & s <=7 & t <=7 & u <=7 & v <=7 & w <=7, mean(y), by=x]
+>
+>    x  V1
+> 1: a 4.5
+>
+> All the outputs shown here match the expectations, but it's not 
+> useful for
+> 10s-100s of columns.
+>
+> I hope the desired output is clear now; ignore my past attempts to 
+> avoid
+> confusion.
+>
+> Thanks again!
+>
+> B
+>
+>
+>
+> --
+> View this message in context:
+> 
+> http://r.789695.n4.nabble.com/Subsetting-columns-in-data-table-tp4649736p4649841.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+From mdowle at mdowle.plus.com  Mon Nov 19 23:54:07 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 19 Nov 2012 22:54:07 +0000
+Subject: [datatable-help] assignment by reference in subset
+In-Reply-To: <CAHA9McPnbRJkE-Oy5EviEhUyZWjqW3q2Pz=NP67nXO9+VwnFig@mail.gmail.com>
+References: <158AF151-E6A2-4EFC-9CE2-6787957EEA19@gmail.com>
+ <CAHA9McPnbRJkE-Oy5EviEhUyZWjqW3q2Pz=NP67nXO9+VwnFig@mail.gmail.com>
+Message-ID: <59499158b9527871b775dfe7ec75f78a@imap.plus.net>
+
+On 18.11.2012 20:03, Steve Lianoglou wrote:
+> Hi,
+>
+> On Sun, Nov 18, 2012 at 11:19 AM, Philip de Witt Hamer
+> <pcvdwh at gmail.com> wrote:
+>> Dear all,
+>>
+>> data.table is great! thanks for this life(time)saving package.
+>>
+>> Now, I run into a difficult nut to crack using ':='.
+>> I'd like to do a calculation using column information conditional on 
+>> another
+>> column
+>>
+>> first some jumbo data:
+>>
+>> library(data.table)
+>> DT <- data.table(
+>>  1:50,
+>>  rep(1:5,each=10),
+>>  runif(50,0,1)
+>> )
+>> setnames(DT, 1:3, c("id","grp","p"))
+>>
+>> id's are unique
+>> grp's speaks for itself
+>> think of p's as e.g. p-values
+>>
+>> next, if I want to obtain the nr of p values at least as extreme as 
+>> the p of
+>> each row from the whole set, this seems to work well:
+>>
+>> DT[,c1 := sum(DT[,p] <= p), by=id]
+>>
+>> but then, I would like to get the nr of p values at least as extreme 
+>> as the
+>> p of each row for the subset with identical grp, I am having a hard 
+>> time,
+>> because these attempts fail:
+>>
+>> DT[,c2 := sum(DT[grp,p] <= p),by=id]
+>> DT[,c3 := sum(DT[DT[,grp]==grp,p] <= p), by=id]
+>
+> You will want to group by "grp".
+>
+> This gets you pretty close -- it fails the "ties" criterion:
+>
+> DT[, cg := rank(p) - 1, by=grp]
+>
+> If you *really* want to keep the ties criterion, perhaps here's a way
+> to do so by avoiding a for loop:
+>
+> DT[, cgo := rowSums(outer(p, p, '-') > 0), by=grp]
+>
+> The problem is that if your groups are very large, the `outer` call
+> might chew lots of RAM, since you'll be creating a p x p matrix (per
+> group).
+>
+> Does that get you where you need to be?
+>
+> -steve
+
+
+Grouping by grp feels right to me, too. How about :
+
+    setkey(DT,grp,p)
+
+and then using the ordered p within each group :
+
+    DT[,c1:=seq_len(.N),by=grp]
+    DT[,c1:=max(c1),by='grp,p']  # to deal with ties
+
+NB: data.table grouping of numerics is machine tolerance aware. So
+this ties treatment is more like sum(DT[,p] <= p+tol) which may or
+may not be what you need. tol = .Machine$double.eps ^ 0.5.
+
+Or, staying with the self join approach, one trick for the scoping
+issue you hit is :
+
+    DT[,c3:={i=list(grp);sum(DT[i,p]<=p)},by=id]
+
+Where the DT[i,...] part relies on the fact that single name i is 
+evaluated
+in calling scope.
+
+Or another way in one step is :
+
+    DT[,c3:=sum(DT[eval(.(grp)),p]<=p),by=id]
+
+which uses the feature that eval() is already like what ..() will do in 
+future.
+
+But grouping by grp should be much faster and cleaner, if possible.
+
+Matthew
+
+
+
+
+From cubalibro at gmail.com  Tue Nov 20 21:54:20 2012
+From: cubalibro at gmail.com (Berto)
+Date: Tue, 20 Nov 2012 12:54:20 -0800 (PST)
+Subject: [datatable-help] Subsetting columns in data.table
+In-Reply-To: <2d279691c33bebf24fd11d98b7bc6ce7@imap.plus.net>
+References: <1353075312045-4649736.post@n4.nabble.com>
+ <8f76cc7b8dba16f65fef84aeb3dcc618@imap.plus.net>
+ <1353090742272-4649779.post@n4.nabble.com>
+ <cb6927bb5d0c7a790b2ed3d53f91c078@imap.plus.net>
+ <1353138453214-4649841.post@n4.nabble.com>
+ <2d279691c33bebf24fd11d98b7bc6ce7@imap.plus.net>
+Message-ID: <1353444860893-4650221.post@n4.nabble.com>
+
+Matthew Dowle wrote
+> othercols = setdiff(names(DT5),c("x","y"))
+> DT5[y<=3 & Reduce(`&`,lapply(DT5[,othercols,with=FALSE],`<=`,7)), 
+> max(y), by=x]
+>     x V1
+> 1: a  3
+> 2: b  1
+
+Many thanks, Matthew!
+
+That's exactly what I was looking for.
+ 
+Congratulations for the great package and thank you for the advice!
+
+ Berto
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Subsetting-columns-in-data-table-tp4649736p4650221.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From pcvdwh at gmail.com  Wed Nov 21 10:19:47 2012
+From: pcvdwh at gmail.com (Philip de Witt Hamer)
+Date: Wed, 21 Nov 2012 10:19:47 +0100
+Subject: [datatable-help] assignment by reference in subset
+In-Reply-To: <59499158b9527871b775dfe7ec75f78a@imap.plus.net>
+References: <158AF151-E6A2-4EFC-9CE2-6787957EEA19@gmail.com>
+ <CAHA9McPnbRJkE-Oy5EviEhUyZWjqW3q2Pz=NP67nXO9+VwnFig@mail.gmail.com>
+ <59499158b9527871b775dfe7ec75f78a@imap.plus.net>
+Message-ID: <848B6851-4123-41AD-B147-C2C6C3855C91@gmail.com>
+
+Hi Steve and Matthew,
+
+Very helpful solutions indeed! Thanks a lot.
+
+I played around with all your valuable suggestions a little.
+To me it seems that, the simplest one step solution that would handle ties the way I had hoped for is:
+
+DT[, cmx := rank(p,ties.method="max"), by=grp]
+
+--Philip
+
+On Nov 19, 2012, at 11:54 PM, Matthew Dowle wrote:
+
+> On 18.11.2012 20:03, Steve Lianoglou wrote:
+>> Hi,
+>> 
+>> On Sun, Nov 18, 2012 at 11:19 AM, Philip de Witt Hamer
+>> <pcvdwh at gmail.com> wrote:
+>>> Dear all,
+>>> 
+>>> data.table is great! thanks for this life(time)saving package.
+>>> 
+>>> Now, I run into a difficult nut to crack using ':='.
+>>> I'd like to do a calculation using column information conditional on another
+>>> column
+>>> 
+>>> first some jumbo data:
+>>> 
+>>> library(data.table)
+>>> DT <- data.table(
+>>> 1:50,
+>>> rep(1:5,each=10),
+>>> runif(50,0,1)
+>>> )
+>>> setnames(DT, 1:3, c("id","grp","p"))
+>>> 
+>>> id's are unique
+>>> grp's speaks for itself
+>>> think of p's as e.g. p-values
+>>> 
+>>> next, if I want to obtain the nr of p values at least as extreme as the p of
+>>> each row from the whole set, this seems to work well:
+>>> 
+>>> DT[,c1 := sum(DT[,p] <= p), by=id]
+>>> 
+>>> but then, I would like to get the nr of p values at least as extreme as the
+>>> p of each row for the subset with identical grp, I am having a hard time,
+>>> because these attempts fail:
+>>> 
+>>> DT[,c2 := sum(DT[grp,p] <= p),by=id]
+>>> DT[,c3 := sum(DT[DT[,grp]==grp,p] <= p), by=id]
+>> 
+>> You will want to group by "grp".
+>> 
+>> This gets you pretty close -- it fails the "ties" criterion:
+>> 
+>> DT[, cg := rank(p) - 1, by=grp]
+>> 
+>> If you *really* want to keep the ties criterion, perhaps here's a way
+>> to do so by avoiding a for loop:
+>> 
+>> DT[, cgo := rowSums(outer(p, p, '-') > 0), by=grp]
+>> 
+>> The problem is that if your groups are very large, the `outer` call
+>> might chew lots of RAM, since you'll be creating a p x p matrix (per
+>> group).
+>> 
+>> Does that get you where you need to be?
+>> 
+>> -steve
+> 
+> 
+> Grouping by grp feels right to me, too. How about :
+> 
+>   setkey(DT,grp,p)
+> 
+> and then using the ordered p within each group :
+> 
+>   DT[,c1:=seq_len(.N),by=grp]
+>   DT[,c1:=max(c1),by='grp,p']  # to deal with ties
+> 
+> NB: data.table grouping of numerics is machine tolerance aware. So
+> this ties treatment is more like sum(DT[,p] <= p+tol) which may or
+> may not be what you need. tol = .Machine$double.eps ^ 0.5.
+> 
+> Or, staying with the self join approach, one trick for the scoping
+> issue you hit is :
+> 
+>   DT[,c3:={i=list(grp);sum(DT[i,p]<=p)},by=id]
+> 
+> Where the DT[i,...] part relies on the fact that single name i is evaluated
+> in calling scope.
+> 
+> Or another way in one step is :
+> 
+>   DT[,c3:=sum(DT[eval(.(grp)),p]<=p),by=id]
+> 
+> which uses the feature that eval() is already like what ..() will do in future.
+> 
+> But grouping by grp should be much faster and cleaner, if possible.
+> 
+> Matthew
+> 
+> 
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20121121/3df2ffc8/attachment.html>
+
+From dominic.roye at gmail.com  Sat Nov 24 21:52:00 2012
+From: dominic.roye at gmail.com (Dominic Roye)
+Date: Sat, 24 Nov 2012 21:52:00 +0100
+Subject: [datatable-help] datatable and function "which.max"
+In-Reply-To: <CALvVS-FTdNw5r9NbnxrQmO49CP7Z2=fFafqyQJiPqe4m3P85wA@mail.gmail.com>
+References: <CALvVS-FTdNw5r9NbnxrQmO49CP7Z2=fFafqyQJiPqe4m3P85wA@mail.gmail.com>
+Message-ID: <CALvVS-H25md53TZLy=+1cbzJ7e=Ao-GVNOz5bEg64vU3W8-4rQ@mail.gmail.com>
+
+Hello,
+
+I hope you can help me with the datatable. My aim is to know the
+position of the daily maximum temperature (Ta).
+
+str(y)
+Classes ?data.table? and 'data.frame':  17135 obs. of  6 variables:
+ $ X  : chr  "01/01/2010" "01/01/2010" "01/01/2010" "01/01/2010" ...
+ $ X.1: chr  "0:10:00" "0:20:00" "0:30:00" "0:40:00" ...
+ $ Ta : num  5.28 5.45 5.54 5.54 5.51 5.51 5.5 5.56 5.58 5.63 ...
+ $ HR : int  100 100 100 100 100 100 100 100 100 100 ...
+ $ RS : int  0 0 0 0 0 0 0 0 0 0 ...
+ $ v  : num  2.3 2.5 1.1 2.3 2.2 2.1 2.2 2.9 2.4 2.6 ...
+ - attr(*, ".internal.selfref")=<externalptr>
+
+For this i made the datatable and than:
+
+> z <- y[,which.max(Ta),by=X]
+> z
+              X  V1
+  1: 01/01/2010  84
+  2: 02/01/2010 132
+  3: 03/01/2010  84
+  4: 04/01/2010  92
+  5: 05/01/2010   1
+ ---
+115: 25/04/2010  92
+116: 26/04/2010  96
+117: 27/04/2010  86
+118: 28/04/2010  90
+119: 29/04/2010  88
+
+
+it works well, but the index don?t correspond with the index of the
+original table. Have you any idea?
+
+When i try it with z <- y[,max(Ta),by=X] it works perfect, but so I
+don`t know the time,
+
+Thanks for your help.
+
+Best regards,
+
+Dominic
+
+From mdowle at mdowle.plus.com  Sat Nov 24 23:54:41 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 24 Nov 2012 22:54:41 -0000
+Subject: [datatable-help] datatable and function "which.max"
+In-Reply-To: <CALvVS-H25md53TZLy=+1cbzJ7e=Ao-GVNOz5bEg64vU3W8-4rQ@mail.gmail.com>
+References: <CALvVS-FTdNw5r9NbnxrQmO49CP7Z2=fFafqyQJiPqe4m3P85wA@mail.gmail.com>
+ <CALvVS-H25md53TZLy=+1cbzJ7e=Ao-GVNOz5bEg64vU3W8-4rQ@mail.gmail.com>
+Message-ID: <a4e88078f8eb8ca51c79fac858ba2baf.squirrel@webmail.plus.net>
+
+Hi,
+Welcome to the list.
+There's two ways:
+y[,.SD[which.max(...)],by=...]
+or
+y[,.I[which.max(...)],by=...]
+See ?data.table for .SD and .I
+
+> Hello,
+>
+> I hope you can help me with the datatable. My aim is to know the
+> position of the daily maximum temperature (Ta).
+>
+> str(y)
+> Classes ?data.table? and 'data.frame':  17135 obs. of  6 variables:
+>  $ X  : chr  "01/01/2010" "01/01/2010" "01/01/2010" "01/01/2010" ...
+>  $ X.1: chr  "0:10:00" "0:20:00" "0:30:00" "0:40:00" ...
+>  $ Ta : num  5.28 5.45 5.54 5.54 5.51 5.51 5.5 5.56 5.58 5.63 ...
+>  $ HR : int  100 100 100 100 100 100 100 100 100 100 ...
+>  $ RS : int  0 0 0 0 0 0 0 0 0 0 ...
+>  $ v  : num  2.3 2.5 1.1 2.3 2.2 2.1 2.2 2.9 2.4 2.6 ...
+>  - attr(*, ".internal.selfref")=<externalptr>
+>
+> For this i made the datatable and than:
+>
+>> z <- y[,which.max(Ta),by=X]
+>> z
+>               X  V1
+>   1: 01/01/2010  84
+>   2: 02/01/2010 132
+>   3: 03/01/2010  84
+>   4: 04/01/2010  92
+>   5: 05/01/2010   1
+>  ---
+> 115: 25/04/2010  92
+> 116: 26/04/2010  96
+> 117: 27/04/2010  86
+> 118: 28/04/2010  90
+> 119: 29/04/2010  88
+>
+>
+> it works well, but the index don?t correspond with the index of the
+> original table. Have you any idea?
+>
+> When i try it with z <- y[,max(Ta),by=X] it works perfect, but so I
+> don`t know the time,
+>
+> Thanks for your help.
+>
+> Best regards,
+>
+> Dominic
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From leodidonato at gmail.com  Mon Nov 26 20:15:30 2012
+From: leodidonato at gmail.com (leodido)
+Date: Mon, 26 Nov 2012 11:15:30 -0800 (PST)
+Subject: [datatable-help] Join and sum not compatible matrices through
+	data.table
+Message-ID: <1353957330240-4650882.post@n4.nabble.com>
+
+Hi,
+
+I'm playing with data.table package and I need some help to better
+understand it.
+
+I've posted an answer related to it (and related to join table and aggregate
+results data)  here
+<http://stackoverflow.com/questions/13571359/join-and-sum-not-compatible-matrices-through-data-table>  
+(Join and sum not compatible matrices through data.table on stackoverflow).
+
+If someone here can share its knowledge :)
+
+Thanks in advance.
+
+Di Donato Leonardo
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Join-and-sum-not-compatible-matrices-through-data-table-tp4650882.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Tue Nov 27 01:00:55 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 27 Nov 2012 00:00:55 +0000
+Subject: [datatable-help] Join and sum not compatible matrices through
+ data.table
+In-Reply-To: <1353957330240-4650882.post@n4.nabble.com>
+References: <1353957330240-4650882.post@n4.nabble.com>
+Message-ID: <e4a2447d58c286bd4a41986659906883@imap.plus.net>
+
+
+Aaron's answer looks good to me.
+
+Matthew
+
+On 26.11.2012 19:15, leodido wrote:
+> Hi,
+>
+> I'm playing with data.table package and I need some help to better
+> understand it.
+>
+> I've posted an answer related to it (and related to join table and 
+> aggregate
+> results data)  here
+> 
+> <http://stackoverflow.com/questions/13571359/join-and-sum-not-compatible-matrices-through-data-table>
+>
+> (Join and sum not compatible matrices through data.table on 
+> stackoverflow).
+>
+> If someone here can share its knowledge :)
+>
+> Thanks in advance.
+>
+> Di Donato Leonardo
+>
+>
+>
+> --
+> View this message in context:
+> 
+> http://r.789695.n4.nabble.com/Join-and-sum-not-compatible-matrices-through-data-table-tp4650882.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From leodidonato at gmail.com  Tue Nov 27 04:29:42 2012
+From: leodidonato at gmail.com (leodido)
+Date: Mon, 26 Nov 2012 19:29:42 -0800 (PST)
+Subject: [datatable-help] Join and sum not compatible matrices through
+	data.table
+In-Reply-To: <e4a2447d58c286bd4a41986659906883@imap.plus.net>
+References: <1353957330240-4650882.post@n4.nabble.com>
+ <e4a2447d58c286bd4a41986659906883@imap.plus.net>
+Message-ID: <1353986982647-4650915.post@n4.nabble.com>
+
+To me too, Matthew.
+
+However, I'll benchmark Aaron solution against MadScone solution (achieved
+through reshape package).
+
+In the meanwhile I continue to investigate a way to implement this solution
+for data.table matrices.
+
+Bye,
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Join-and-sum-not-compatible-matrices-through-data-table-tp4650882p4650915.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+

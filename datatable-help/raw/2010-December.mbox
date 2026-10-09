@@ -1,0 +1,4321 @@
+From tshort.rlists at gmail.com  Wed Dec  1 21:01:27 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Wed, 1 Dec 2010 15:01:27 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+Message-ID: <AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+
+This is more for Matthew's input. Following up on cedta used within
+sys.source'd code, could cedta be changed to only check for a
+namespace? According to the following tracker issue, if a package
+doesn't have a namespace, it won't drop to using data.frame's anyway.
+
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1074&group_id=240&atid=978
+
+How about something like this?
+
+cedta = function() {
+    # Calling Environment Data Table Aware
+
+    te = topenv(parent.frame(2))
+    !isNamespace(te) ||
+        getNamespaceName(te) == "data.table" ||
+        "data.table" %in% names(getNamespaceImports(te))
+}
+
+If I do that, I can execute the following:
+
+sys.source("t.R", new.env(parent=.GlobalEnv))
+
+with t.R as follows:
+
+--------------------------
+TESTDT = data.table(a=as.integer(c(1,3,4,4,4,4,7)),
+                    b=as.integer(c(5,5,6,6,9,9,2)),
+                    v=1:7)
+setkey(TESTDT,a,b)
+x <- TESTDT[SJ(4,6), v, mult="first"]
+
+test.data.table()
+--------------------------
+
+I'm not sure if this'd break other stuff, though. I haven't tested it
+anymore than just doing this.
+
+- Tom
+
+From santosh.srinivas at gmail.com  Sat Dec  4 01:45:08 2010
+From: santosh.srinivas at gmail.com (Santosh Srinivas)
+Date: Sat, 4 Dec 2010 06:15:08 +0530
+Subject: [datatable-help] basic data.table query
+Message-ID: <4cf98f1b.2a978e0a.1d61.ffffa334@mx.google.com>
+
+Someone in r-help recommended me to post the question in this group . TIA
+
+ 
+
+Hello Group,
+
+I need a modification in the data.table example to get my intended
+result shown below ... is there a more simple way!
+
+dt <- data.table(A = rep(1:3, each=4), B = rep(1:4, each=3), C = rep(1:2,
+6))
+dt[, transform(.SD,D=mean(A)), by="B"]
+
+
+The result I want is below ... which is probably long winded!
+
+data.table(unique(as.data.frame(dt[, transform(.SD,D=mean(A)),
+by="B"][,list(B,D)])))
+    B        D
+[1,] 1 1.000000
+[2,] 2 1.666667
+[3,] 3 2.333333
+[4,] 4 3.000000
+
+Thank you.
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101204/a97e45fe/attachment.htm>
+
+From mailinglist.honeypot at gmail.com  Sat Dec  4 04:51:59 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Fri, 3 Dec 2010 22:51:59 -0500
+Subject: [datatable-help] basic data.table query
+In-Reply-To: <4cf98f1b.2a978e0a.1d61.ffffa334@mx.google.com>
+References: <4cf98f1b.2a978e0a.1d61.ffffa334@mx.google.com>
+Message-ID: <AANLkTi=xev=MuhB6NMv=Zi5s=eUrUr0TUBF1j7UXivgF@mail.gmail.com>
+
+Hi,
+
+On Fri, Dec 3, 2010 at 7:45 PM, Santosh Srinivas
+<santosh.srinivas at gmail.com> wrote:
+> Someone in r-help recommended me to post the question in this group ? TIA
+>
+>
+>
+> Hello Group,
+>
+> I need a modification in the data.table example to get my intended
+> result shown below ... is there a more simple way!
+>
+> dt <- data.table(A = rep(1:3, each=4), B = rep(1:4, each=3), C = rep(1:2,
+> 6))
+> dt[, transform(.SD,D=mean(A)), by="B"]
+>
+>
+> The result I want is below ... which is probably long winded!
+>
+> data.table(unique(as.data.frame(dt[, transform(.SD,D=mean(A)),
+> by="B"][,list(B,D)])))
+> ? ? B ? ? ? ?D
+> [1,] 1 1.000000
+> [2,] 2 1.666667
+> [3,] 3 2.333333
+> [4,] 4 3.000000
+
+I'm not sure if I'm missing something, but this looks like what you want, no?
+
+R> dt[, list(D=mean(A)), by='B']
+     B        D
+[1,] 1 1.000000
+[2,] 2 1.666667
+[3,] 3 2.333333
+[4,] 4 3.000000
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From santosh.srinivas at gmail.com  Sat Dec  4 05:05:32 2010
+From: santosh.srinivas at gmail.com (Santosh Srinivas)
+Date: Sat, 4 Dec 2010 09:35:32 +0530
+Subject: [datatable-help] basic data.table query
+In-Reply-To: <AANLkTi=xev=MuhB6NMv=Zi5s=eUrUr0TUBF1j7UXivgF@mail.gmail.com>
+References: <4cf98f1b.2a978e0a.1d61.ffffa334@mx.google.com>
+	<AANLkTi=xev=MuhB6NMv=Zi5s=eUrUr0TUBF1j7UXivgF@mail.gmail.com>
+Message-ID: <AANLkTi=NO=7dCLugB9mhq4dUMMnxQuPKe0kY3Kn1z-D+@mail.gmail.com>
+
+Thanks. Just getting used to data.table .. was wondering how to get
+the middle part (need to use list()) in the brackets ... thanks
+
+On Sat, Dec 4, 2010 at 9:21 AM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Hi,
+>
+> On Fri, Dec 3, 2010 at 7:45 PM, Santosh Srinivas
+> <santosh.srinivas at gmail.com> wrote:
+>> Someone in r-help recommended me to post the question in this group ? TIA
+>>
+>>
+>>
+>> Hello Group,
+>>
+>> I need a modification in the data.table example to get my intended
+>> result shown below ... is there a more simple way!
+>>
+>> dt <- data.table(A = rep(1:3, each=4), B = rep(1:4, each=3), C = rep(1:2,
+>> 6))
+>> dt[, transform(.SD,D=mean(A)), by="B"]
+>>
+>>
+>> The result I want is below ... which is probably long winded!
+>>
+>> data.table(unique(as.data.frame(dt[, transform(.SD,D=mean(A)),
+>> by="B"][,list(B,D)])))
+>> ? ? B ? ? ? ?D
+>> [1,] 1 1.000000
+>> [2,] 2 1.666667
+>> [3,] 3 2.333333
+>> [4,] 4 3.000000
+>
+> I'm not sure if I'm missing something, but this looks like what you want, no?
+>
+> R> dt[, list(D=mean(A)), by='B']
+> ? ? B ? ? ? ?D
+> [1,] 1 1.000000
+> [2,] 2 1.666667
+> [3,] 3 2.333333
+> [4,] 4 3.000000
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+From mdowle at mdowle.plus.com  Tue Dec  7 03:17:37 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 07 Dec 2010 02:17:37 +0000
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+Message-ID: <1291688257.2433.132.camel@Adam>
+
+Been offline for a few days, just catching up with these threads.
+
+Yes - Tom's idea looks good to me. .GlobalEnv would be considered
+data.table aware since it isn't a namespace then, thus short-circuiting
+the first || when called from the user workspace and retaining the
+efficiency fix of the change from cendta to cedta a while back (that the
+identical(te,.GlobalEnv) was there for) so I'm happy.
+
+The topenv when the caller is a namespaceless package is .GlobalEnv
+rather than the package (if I remember the issue correctly) which is the
+reason namespaceless packages are incorrectly considered data.table
+aware. As Tom says that's an issue anyway and shouldn't be affected by
+this change. In practice it's not an issue since we're not aware of any
+namespaceless packages being used by data.table users. Have changed the
+priority of that tracker item to low (which oddly on R-Forge is 1 not
+5).
+
+The new cedta might well fix this bug neatly too :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1131&group_id=240&atid=975
+
+Haven't looked at the test_that proposal yet. Shall I look once these
+issues are resolved and a few tests are working ok?
+
+Matthew
+
+
+On Wed, 2010-12-01 at 15:01 -0500, Tom Short wrote:
+> This is more for Matthew's input. Following up on cedta used within
+> sys.source'd code, could cedta be changed to only check for a
+> namespace? According to the following tracker issue, if a package
+> doesn't have a namespace, it won't drop to using data.frame's anyway.
+> 
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1074&group_id=240&atid=978
+> 
+> How about something like this?
+> 
+> cedta = function() {
+>     # Calling Environment Data Table Aware
+> 
+>     te = topenv(parent.frame(2))
+>     !isNamespace(te) ||
+>         getNamespaceName(te) == "data.table" ||
+>         "data.table" %in% names(getNamespaceImports(te))
+> }
+> 
+> If I do that, I can execute the following:
+> 
+> sys.source("t.R", new.env(parent=.GlobalEnv))
+> 
+> with t.R as follows:
+> 
+> --------------------------
+> TESTDT = data.table(a=as.integer(c(1,3,4,4,4,4,7)),
+>                     b=as.integer(c(5,5,6,6,9,9,2)),
+>                     v=1:7)
+> setkey(TESTDT,a,b)
+> x <- TESTDT[SJ(4,6), v, mult="first"]
+> 
+> test.data.table()
+> --------------------------
+> 
+> I'm not sure if this'd break other stuff, though. I haven't tested it
+> anymore than just doing this.
+> 
+> - Tom
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Tue Dec  7 03:26:04 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 07 Dec 2010 02:26:04 +0000
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTimKxZUSQ0FUsJ2qtTtPKx5=2dR6h--7WotBF0PS@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<7b61cd4c695667cf016ba8a7a5fb5ae1.squirrel@webmail.plus.net>
+	<AANLkTinaTnXaopDV7E1XWtAyOEBW27un88hKO_+VAze1@mail.gmail.com>
+	<AANLkTimKxZUSQ0FUsJ2qtTtPKx5=2dR6h--7WotBF0PS@mail.gmail.com>
+Message-ID: <1291688764.2433.134.camel@Adam>
+
+On Tue, 2010-11-23 at 14:25 -0500, Steve Lianoglou wrote:
+> On Tue, Nov 23, 2010 at 1:56 PM, Tom Short <tshort.rlists at gmail.com> wrote:
+> [snip]
+> > That would probably work fine for most of my uses, but I'm worried
+> > about consistency with data frames. data.frame defaults to
+> > auto-conversion and has a stringsAsFactors argument that defaults to
+> > default.stringsAsFactors() that in turn uses
+> > options('stringsAsFactors'). Here's a tentative vote for adding a
+> > stringsAsFactors argument that works like data.frame's. The down sides
+> > are an added argument and use of a global option.
+> 
+> I'm not sure I see the same pitfalls of having an extra argument,
+> since it has a (reasonable) default value and I think it can largely
+> be ignored by the user w/o really changing how data.table(...) works
+> now in any surprising way.
+> 
+> Anyway, I think I'm a +1 for the stringsAsFactors param.
+> 
+> 
+Added feature request for this one :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1224&group_id=240&atid=978
+
+
+
+
+From mailinglist.honeypot at gmail.com  Tue Dec  7 04:37:10 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 6 Dec 2010 22:37:10 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <1291688257.2433.132.camel@Adam>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+	<1291688257.2433.132.camel@Adam>
+Message-ID: <AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+
+Hi,
+
+On Mon, Dec 6, 2010 at 9:17 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Been offline for a few days, just catching up with these threads.
+>
+> Yes - Tom's idea looks good to me. .GlobalEnv would be considered
+> data.table aware since it isn't a namespace then, thus short-circuiting
+> the first || when called from the user workspace and retaining the
+> efficiency fix of the change from cendta to cedta a while back (that the
+> identical(te,.GlobalEnv) was there for) so I'm happy.
+>
+> The topenv when the caller is a namespaceless package is .GlobalEnv
+> rather than the package (if I remember the issue correctly) which is the
+> reason namespaceless packages are incorrectly considered data.table
+> aware. As Tom says that's an issue anyway and shouldn't be affected by
+> this change. In practice it's not an issue since we're not aware of any
+> namespaceless packages being used by data.table users. Have changed the
+> priority of that tracker item to low (which oddly on R-Forge is 1 not
+> 5).
+>
+> The new cedta might well fix this bug neatly too :
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1131&group_id=240&atid=975
+>
+> Haven't looked at the test_that proposal yet. Shall I look once these
+> issues are resolved and a few tests are working ok?
+
+Yeah, I've been meaning to implement Tom's suggestion in my testthat
+branch and send you guys a link to checkout, but I've been busy trying
+to catch up w/ stuff at school.
+
+I'll work on something for you to look at and send you an update in
+the next day or two.
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mel at mbacou.com  Tue Dec  7 04:54:09 2010
+From: mel at mbacou.com (mbacou)
+Date: Mon, 6 Dec 2010 19:54:09 -0800 (PST)
+Subject: [datatable-help] Is data.table ready for prime-time and sensitive
+	work?
+Message-ID: <1291694049311-3075753.post@n4.nabble.com>
+
+
+Hello to the list,
+
+I'm afraid this is a non-specific question.
+
+I've been using data.table for only a couple of weeks on various spatial,
+economic and agro-ecological data with many individual sets reaching over 3
+millions records of numeric data -- but I'm working on very tight deadlines
+and right now don't have the luxury to test any R library extensively. I see
+data.table was first released in March 2010, not terribly cited when
+searching through Google, and I'm very worried about its overall robustness.
+
+I'm pretty much using R and data.table as a more flexible and elegant
+alternative to SAS and SQL to join, slice and dice datasets according to
+sometimes complex aggregation formulas. I've been very impressed at the run
+times, but some initial code produced very puzzling results and I'm at the
+point of comparing output with a purely SQL-based approach (much more
+convoluted, but I thought a good way to test nonetheless).
+
+My question is: is data.table ready for production? Would you rely on it for
+sensitive publications?
+
+Thanks for sharing, --Mel.
+
+
+
+-- 
+View this message in context: http://r.789695.n4.nabble.com/Is-data-table-ready-for-prime-time-and-sensitive-work-tp3075753p3075753.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From tshort.rlists at gmail.com  Tue Dec  7 13:16:44 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 7 Dec 2010 07:16:44 -0500
+Subject: [datatable-help] Is data.table ready for prime-time and
+	sensitive work?
+In-Reply-To: <1291694049311-3075753.post@n4.nabble.com>
+References: <1291694049311-3075753.post@n4.nabble.com>
+Message-ID: <AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com>
+
+On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+> My question is: is data.table ready for production? Would you rely on it for
+> sensitive publications?
+
+If you have tight time deadlines, you may want to go with what you
+have experience with, especially if it involves complicated queries or
+manipulations. If you've already tried the data.table features you'll
+need for "production", then using data.table may help you get things
+done faster.
+
+Data.table has been robust for me on 6-GB datasets on a machine with
+24 GB of ram. With data.table, as with most tools, user error is more
+likely than a tool bug, so you need to test/check your data and your
+results.
+
+- Tom
+
+From mdowle at mdowle.plus.com  Tue Dec  7 14:30:42 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 7 Dec 2010 13:30:42 -0000
+Subject: [datatable-help] Is data.table ready for prime-time
+	andsensitive work?
+References: <1291694049311-3075753.post@n4.nabble.com>
+	<AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com>
+Message-ID: <idlcu4$m7g$1@dough.gmane.org>
+
+Just to clarify also about the date of first release - March 2010? Any 
+chance Mel you looked at the CRAN archive page and read off the last row? 
+Oldest is first not last on that page :
+
+http://cran.r-project.org/src/contrib/Archive/data.table/
+
+v1.0 was released April 2006 but that was removed from CRAN happily because 
+base quickly (within weeks) included features that removed the need for 
+data.table.  It was re-released in Aug 2008 with new functionality so that's 
+the relevant release date for your purpose.
+
+Feel free to post the puzzling results. You've done well to use it for 2 
+weeks without posting, so you can probably tilt towards using this list more 
+(on a new thread please). If we can get you over those hurdles first then 
+reconsider if the 'robustness' question still stands.
+
+Other info which you may have not have found yet ...
+
+Crantastic has 5 detailed user reviews of data.table. It does state that 
+v1.1 was released over 2 years ago, too, so leads me to guess you may have 
+missed the link to crantastic on the data.table homepage.
+
+There are some oddities in the ranking formula but if you look at 
+http://crantastic.org/popcon and realise that the batch near the bottom 
+starting with reshape, ggplot2 and plyr should be at the top (seems like a 
+bug, I'll let them know) then data.table appears to be around the 8th most 
+popular CRAN package with average score 4.7/5 and 10 users, compared to 
+ggplot2's 39 users.  So crantastic itself is not popular since everyone 
+knows that ggplot2 has many more than 39 users, and some very popular and 
+stable packages don't have any votes at all. Even so perhaps this small 
+amount of data may be useful in your assessment generally.  "data.table" is 
+not the easiest to google for.
+
+The NEWS file (link on the homepage) says that v1.2 was released in Aug 
+2008, too, at the bottom, along with what changed in each release since 
+then.
+
+Matthew
+
+"Tom Short" <tshort.rlists at gmail.com> wrote in message 
+news:AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg at mail.gmail.com...
+> On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+>> My question is: is data.table ready for production? Would you rely on it 
+>> for
+>> sensitive publications?
+>
+> If you have tight time deadlines, you may want to go with what you
+> have experience with, especially if it involves complicated queries or
+> manipulations. If you've already tried the data.table features you'll
+> need for "production", then using data.table may help you get things
+> done faster.
+>
+> Data.table has been robust for me on 6-GB datasets on a machine with
+> 24 GB of ram. With data.table, as with most tools, user error is more
+> likely than a tool bug, so you need to test/check your data and your
+> results.
+>
+> - Tom 
+
+
+
+
+From rforler at uchicago.edu  Tue Dec  7 14:48:03 2010
+From: rforler at uchicago.edu (Rob Forler)
+Date: Tue, 7 Dec 2010 07:48:03 -0600
+Subject: [datatable-help] Is data.table ready for prime-time
+	andsensitive work?
+In-Reply-To: <idlcu4$m7g$1@dough.gmane.org>
+References: <1291694049311-3075753.post@n4.nabble.com>
+	<AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com>
+	<idlcu4$m7g$1@dough.gmane.org>
+Message-ID: <AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com>
+
+I can attest that I used data.table very extensively for several months on
+large datasets (financial). I was replacing a fair of poorly coded
+data/frame, sql, plyr, apply code, and was able to match the previous
+numbers and do a significant amount of new analysis because of the ease of
+using data.tables.
+
+If I was still coding in R on a regular basis you can gauarauntee I'd use
+data.table every day.
+
+Thanks,
+Rob
+
+On Tue, Dec 7, 2010 at 7:30 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+
+> Just to clarify also about the date of first release - March 2010? Any
+> chance Mel you looked at the CRAN archive page and read off the last row?
+> Oldest is first not last on that page :
+>
+> http://cran.r-project.org/src/contrib/Archive/data.table/
+>
+> v1.0 was released April 2006 but that was removed from CRAN happily because
+> base quickly (within weeks) included features that removed the need for
+> data.table.  It was re-released in Aug 2008 with new functionality so
+> that's
+> the relevant release date for your purpose.
+>
+> Feel free to post the puzzling results. You've done well to use it for 2
+> weeks without posting, so you can probably tilt towards using this list
+> more
+> (on a new thread please). If we can get you over those hurdles first then
+> reconsider if the 'robustness' question still stands.
+>
+> Other info which you may have not have found yet ...
+>
+> Crantastic has 5 detailed user reviews of data.table. It does state that
+> v1.1 was released over 2 years ago, too, so leads me to guess you may have
+> missed the link to crantastic on the data.table homepage.
+>
+> There are some oddities in the ranking formula but if you look at
+> http://crantastic.org/popcon and realise that the batch near the bottom
+> starting with reshape, ggplot2 and plyr should be at the top (seems like a
+> bug, I'll let them know) then data.table appears to be around the 8th most
+> popular CRAN package with average score 4.7/5 and 10 users, compared to
+> ggplot2's 39 users.  So crantastic itself is not popular since everyone
+> knows that ggplot2 has many more than 39 users, and some very popular and
+> stable packages don't have any votes at all. Even so perhaps this small
+> amount of data may be useful in your assessment generally.  "data.table" is
+> not the easiest to google for.
+>
+> The NEWS file (link on the homepage) says that v1.2 was released in Aug
+> 2008, too, at the bottom, along with what changed in each release since
+> then.
+>
+> Matthew
+>
+> "Tom Short" <tshort.rlists at gmail.com> wrote in message
+> news:AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg at mail.gmail.com...
+>  > On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+> >> My question is: is data.table ready for production? Would you rely on it
+> >> for
+> >> sensitive publications?
+> >
+> > If you have tight time deadlines, you may want to go with what you
+> > have experience with, especially if it involves complicated queries or
+> > manipulations. If you've already tried the data.table features you'll
+> > need for "production", then using data.table may help you get things
+> > done faster.
+> >
+> > Data.table has been robust for me on 6-GB datasets on a machine with
+> > 24 GB of ram. With data.table, as with most tools, user error is more
+> > likely than a tool bug, so you need to test/check your data and your
+> > results.
+> >
+> > - Tom
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101207/eefd6865/attachment.htm>
+
+From mdowle at mdowle.plus.com  Tue Dec  7 14:54:48 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 7 Dec 2010 13:54:48 -0000
+Subject: [datatable-help] Is data.table ready for prime-timeandsensitive
+	work?
+References: <1291694049311-3075753.post@n4.nabble.com><AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com><idlcu4$m7g$1@dough.gmane.org>
+	<AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com>
+Message-ID: <idlebs$t69$1@dough.gmane.org>
+
+Thanks Rob. That begs an obvious question then ... what are you coding in now ?
+  "Rob Forler" <rforler at uchicago.edu> wrote in message news:AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com...
+  I can attest that I used data.table very extensively for several months on large datasets (financial). I was replacing a fair of poorly coded data/frame, sql, plyr, apply code, and was able to match the previous numbers and do a significant amount of new analysis because of the ease of using data.tables.
+
+  If I was still coding in R on a regular basis you can gauarauntee I'd use data.table every day.
+
+  Thanks,
+  Rob
+
+
+  On Tue, Dec 7, 2010 at 7:30 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+
+    Just to clarify also about the date of first release - March 2010? Any
+    chance Mel you looked at the CRAN archive page and read off the last row?
+    Oldest is first not last on that page :
+
+    http://cran.r-project.org/src/contrib/Archive/data.table/
+
+    v1.0 was released April 2006 but that was removed from CRAN happily because
+    base quickly (within weeks) included features that removed the need for
+    data.table.  It was re-released in Aug 2008 with new functionality so that's
+    the relevant release date for your purpose.
+
+    Feel free to post the puzzling results. You've done well to use it for 2
+    weeks without posting, so you can probably tilt towards using this list more
+    (on a new thread please). If we can get you over those hurdles first then
+    reconsider if the 'robustness' question still stands.
+
+    Other info which you may have not have found yet ...
+
+    Crantastic has 5 detailed user reviews of data.table. It does state that
+    v1.1 was released over 2 years ago, too, so leads me to guess you may have
+    missed the link to crantastic on the data.table homepage.
+
+    There are some oddities in the ranking formula but if you look at
+    http://crantastic.org/popcon and realise that the batch near the bottom
+    starting with reshape, ggplot2 and plyr should be at the top (seems like a
+    bug, I'll let them know) then data.table appears to be around the 8th most
+    popular CRAN package with average score 4.7/5 and 10 users, compared to
+    ggplot2's 39 users.  So crantastic itself is not popular since everyone
+    knows that ggplot2 has many more than 39 users, and some very popular and
+    stable packages don't have any votes at all. Even so perhaps this small
+    amount of data may be useful in your assessment generally.  "data.table" is
+    not the easiest to google for.
+
+    The NEWS file (link on the homepage) says that v1.2 was released in Aug
+    2008, too, at the bottom, along with what changed in each release since
+    then.
+
+    Matthew
+
+    "Tom Short" <tshort.rlists at gmail.com> wrote in message
+    news:AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg at mail.gmail.com...
+
+    > On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+    >> My question is: is data.table ready for production? Would you rely on it
+    >> for
+    >> sensitive publications?
+    >
+    > If you have tight time deadlines, you may want to go with what you
+    > have experience with, especially if it involves complicated queries or
+    > manipulations. If you've already tried the data.table features you'll
+    > need for "production", then using data.table may help you get things
+    > done faster.
+    >
+    > Data.table has been robust for me on 6-GB datasets on a machine with
+    > 24 GB of ram. With data.table, as with most tools, user error is more
+    > likely than a tool bug, so you need to test/check your data and your
+    > results.
+    >
+    > - Tom
+
+
+
+    _______________________________________________
+    datatable-help mailing list
+    datatable-help at lists.r-forge.r-project.org
+    https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+
+
+------------------------------------------------------------------------------
+
+
+  _______________________________________________
+  datatable-help mailing list
+  datatable-help at lists.r-forge.r-project.org
+  https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101207/15f2fa87/attachment-0001.htm>
+
+From rforler at uchicago.edu  Tue Dec  7 15:02:26 2010
+From: rforler at uchicago.edu (Rob Forler)
+Date: Tue, 7 Dec 2010 08:02:26 -0600
+Subject: [datatable-help] Is data.table ready for prime-timeandsensitive
+	work?
+In-Reply-To: <idlebs$t69$1@dough.gmane.org>
+References: <1291694049311-3075753.post@n4.nabble.com>
+	<AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com>
+	<idlcu4$m7g$1@dough.gmane.org>
+	<AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com>
+	<idlebs$t69$1@dough.gmane.org>
+Message-ID: <AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv@mail.gmail.com>
+
+I'm coding in python now. The group I'm in now has a similar tool (closed
+source)  to data.table but in python and is based on numpy.
+
+The api isn't as beautiful as data.table's, but has similar functionality.
+
+-Rob
+
+On Tue, Dec 7, 2010 at 7:54 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+
+>  Thanks Rob. That begs an obvious question then ... what are you coding in
+> now ?
+>
+> "Rob Forler" <rforler at uchicago.edu> wrote in message
+> news:AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com...
+>   I can attest that I used data.table very extensively for several months
+> on large datasets (financial). I was replacing a fair of poorly coded
+> data/frame, sql, plyr, apply code, and was able to match the previous
+> numbers and do a significant amount of new analysis because of the ease of
+> using data.tables.
+>
+> If I was still coding in R on a regular basis you can gauarauntee I'd use
+> data.table every day.
+>
+> Thanks,
+> Rob
+>
+> On Tue, Dec 7, 2010 at 7:30 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+>
+>> Just to clarify also about the date of first release - March 2010? Any
+>> chance Mel you looked at the CRAN archive page and read off the last row?
+>> Oldest is first not last on that page :
+>>
+>> http://cran.r-project.org/src/contrib/Archive/data.table/
+>>
+>> v1.0 was released April 2006 but that was removed from CRAN happily
+>> because
+>> base quickly (within weeks) included features that removed the need for
+>> data.table.  It was re-released in Aug 2008 with new functionality so
+>> that's
+>> the relevant release date for your purpose.
+>>
+>> Feel free to post the puzzling results. You've done well to use it for 2
+>> weeks without posting, so you can probably tilt towards using this list
+>> more
+>> (on a new thread please). If we can get you over those hurdles first then
+>> reconsider if the 'robustness' question still stands.
+>>
+>> Other info which you may have not have found yet ...
+>>
+>> Crantastic has 5 detailed user reviews of data.table. It does state that
+>> v1.1 was released over 2 years ago, too, so leads me to guess you may have
+>> missed the link to crantastic on the data.table homepage.
+>>
+>> There are some oddities in the ranking formula but if you look at
+>> http://crantastic.org/popcon and realise that the batch near the bottom
+>> starting with reshape, ggplot2 and plyr should be at the top (seems like a
+>> bug, I'll let them know) then data.table appears to be around the 8th most
+>> popular CRAN package with average score 4.7/5 and 10 users, compared to
+>> ggplot2's 39 users.  So crantastic itself is not popular since everyone
+>> knows that ggplot2 has many more than 39 users, and some very popular and
+>> stable packages don't have any votes at all. Even so perhaps this small
+>> amount of data may be useful in your assessment generally.  "data.table"
+>> is
+>> not the easiest to google for.
+>>
+>> The NEWS file (link on the homepage) says that v1.2 was released in Aug
+>> 2008, too, at the bottom, along with what changed in each release since
+>> then.
+>>
+>> Matthew
+>>
+>> "Tom Short" <tshort.rlists at gmail.com> wrote in message
+>> news:AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg at mail.gmail.com...
+>>  > On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+>> >> My question is: is data.table ready for production? Would you rely on
+>> it
+>> >> for
+>> >> sensitive publications?
+>> >
+>> > If you have tight time deadlines, you may want to go with what you
+>> > have experience with, especially if it involves complicated queries or
+>> > manipulations. If you've already tried the data.table features you'll
+>> > need for "production", then using data.table may help you get things
+>> > done faster.
+>> >
+>> > Data.table has been robust for me on 6-GB datasets on a machine with
+>> > 24 GB of ram. With data.table, as with most tools, user error is more
+>> > likely than a tool bug, so you need to test/check your data and your
+>> > results.
+>> >
+>> > - Tom
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>  ------------------------------
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101207/ce1aef02/attachment.htm>
+
+From mdowle at mdowle.plus.com  Tue Dec  7 15:30:07 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 7 Dec 2010 14:30:07 -0000
+Subject: [datatable-help] Is data.table ready for
+	prime-timeandsensitivework?
+References: <1291694049311-3075753.post@n4.nabble.com><AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com><idlcu4$m7g$1@dough.gmane.org><AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com><idlebs$t69$1@dough.gmane.org>
+	<AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv@mail.gmail.com>
+Message-ID: <idlgdj$7rm$1@dough.gmane.org>
+
+Interesting. I don't know python but it's been on the radar a few times.
+  "Rob Forler" <rforler at uchicago.edu> wrote in message news:AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv at mail.gmail.com...
+  I'm coding in python now. The group I'm in now has a similar tool (closed source)  to data.table but in python and is based on numpy.
+
+  The api isn't as beautiful as data.table's, but has similar functionality. 
+
+  -Rob
+
+  On Tue, Dec 7, 2010 at 7:54 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+
+    Thanks Rob. That begs an obvious question then ... what are you coding in now ?
+      "Rob Forler" <rforler at uchicago.edu> wrote in message news:AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com...
+      I can attest that I used data.table very extensively for several months on large datasets (financial). I was replacing a fair of poorly coded data/frame, sql, plyr, apply code, and was able to match the previous numbers and do a significant amount of new analysis because of the ease of using data.tables.
+
+      If I was still coding in R on a regular basis you can gauarauntee I'd use data.table every day.
+
+      Thanks,
+      Rob
+
+
+      On Tue, Dec 7, 2010 at 7:30 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+
+        Just to clarify also about the date of first release - March 2010? Any
+        chance Mel you looked at the CRAN archive page and read off the last row?
+        Oldest is first not last on that page :
+
+        http://cran.r-project.org/src/contrib/Archive/data.table/
+
+        v1.0 was released April 2006 but that was removed from CRAN happily because
+        base quickly (within weeks) included features that removed the need for
+        data.table.  It was re-released in Aug 2008 with new functionality so that's
+        the relevant release date for your purpose.
+
+        Feel free to post the puzzling results. You've done well to use it for 2
+        weeks without posting, so you can probably tilt towards using this list more
+        (on a new thread please). If we can get you over those hurdles first then
+        reconsider if the 'robustness' question still stands.
+
+        Other info which you may have not have found yet ...
+
+        Crantastic has 5 detailed user reviews of data.table. It does state that
+        v1.1 was released over 2 years ago, too, so leads me to guess you may have
+        missed the link to crantastic on the data.table homepage.
+
+        There are some oddities in the ranking formula but if you look at
+        http://crantastic.org/popcon and realise that the batch near the bottom
+        starting with reshape, ggplot2 and plyr should be at the top (seems like a
+        bug, I'll let them know) then data.table appears to be around the 8th most
+        popular CRAN package with average score 4.7/5 and 10 users, compared to
+        ggplot2's 39 users.  So crantastic itself is not popular since everyone
+        knows that ggplot2 has many more than 39 users, and some very popular and
+        stable packages don't have any votes at all. Even so perhaps this small
+        amount of data may be useful in your assessment generally.  "data.table" is
+        not the easiest to google for.
+
+        The NEWS file (link on the homepage) says that v1.2 was released in Aug
+        2008, too, at the bottom, along with what changed in each release since
+        then.
+
+        Matthew
+
+        "Tom Short" <tshort.rlists at gmail.com> wrote in message
+        news:AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg at mail.gmail.com...
+
+        > On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+        >> My question is: is data.table ready for production? Would you rely on it
+        >> for
+        >> sensitive publications?
+        >
+        > If you have tight time deadlines, you may want to go with what you
+        > have experience with, especially if it involves complicated queries or
+        > manipulations. If you've already tried the data.table features you'll
+        > need for "production", then using data.table may help you get things
+        > done faster.
+        >
+        > Data.table has been robust for me on 6-GB datasets on a machine with
+        > 24 GB of ram. With data.table, as with most tools, user error is more
+        > likely than a tool bug, so you need to test/check your data and your
+        > results.
+        >
+        > - Tom
+
+
+
+        _______________________________________________
+        datatable-help mailing list
+        datatable-help at lists.r-forge.r-project.org
+        https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+
+
+--------------------------------------------------------------------------
+
+
+      _______________________________________________
+      datatable-help mailing list
+      datatable-help at lists.r-forge.r-project.org
+      https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+
+    _______________________________________________
+    datatable-help mailing list
+    datatable-help at lists.r-forge.r-project.org
+    https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+
+
+
+------------------------------------------------------------------------------
+
+
+  _______________________________________________
+  datatable-help mailing list
+  datatable-help at lists.r-forge.r-project.org
+  https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101207/82e233de/attachment-0001.htm>
+
+From rforler at uchicago.edu  Tue Dec  7 17:40:50 2010
+From: rforler at uchicago.edu (Rob Forler)
+Date: Tue, 7 Dec 2010 10:40:50 -0600
+Subject: [datatable-help] Is data.table ready for
+	prime-timeandsensitivework?
+In-Reply-To: <idlgdj$7rm$1@dough.gmane.org>
+References: <1291694049311-3075753.post@n4.nabble.com>
+	<AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com>
+	<idlcu4$m7g$1@dough.gmane.org>
+	<AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com>
+	<idlebs$t69$1@dough.gmane.org>
+	<AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv@mail.gmail.com>
+	<idlgdj$7rm$1@dough.gmane.org>
+Message-ID: <AANLkTinyKPFaW1D=HxVwKXPpK3Jv2fLFKWNBxJWnt94B@mail.gmail.com>
+
+It's not a hard language to pick up, but definitely one of the challenges
+with replacing R with python is many of the stat and data packages that
+exist in R.
+
+Python has strong scientific and data packages, but I not at the same level.
+
+On the other hand python is much stronger from a language point of view
+(good oo etc), and has many more operational tools.
+
+-Rob
+
+
+On Tue, Dec 7, 2010 at 8:30 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+
+>  Interesting. I don't know python but it's been on the radar a few times.
+>
+> "Rob Forler" <rforler at uchicago.edu> wrote in message
+> news:AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv at mail.gmail.com...
+>   I'm coding in python now. The group I'm in now has a similar tool
+> (closed source)  to data.table but in python and is based on numpy.
+>
+> The api isn't as beautiful as data.table's, but has similar functionality.
+>
+> -Rob
+>
+> On Tue, Dec 7, 2010 at 7:54 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+>
+>>  Thanks Rob. That begs an obvious question then ... what are you coding
+>> in now ?
+>>
+>> "Rob Forler" <rforler at uchicago.edu> wrote in message
+>> news:AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com...
+>>   I can attest that I used data.table very extensively for several months
+>> on large datasets (financial). I was replacing a fair of poorly coded
+>> data/frame, sql, plyr, apply code, and was able to match the previous
+>> numbers and do a significant amount of new analysis because of the ease of
+>> using data.tables.
+>>
+>> If I was still coding in R on a regular basis you can gauarauntee I'd use
+>> data.table every day.
+>>
+>> Thanks,
+>> Rob
+>>
+>> On Tue, Dec 7, 2010 at 7:30 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+>>
+>>> Just to clarify also about the date of first release - March 2010? Any
+>>> chance Mel you looked at the CRAN archive page and read off the last row?
+>>> Oldest is first not last on that page :
+>>>
+>>> http://cran.r-project.org/src/contrib/Archive/data.table/
+>>>
+>>> v1.0 was released April 2006 but that was removed from CRAN happily
+>>> because
+>>> base quickly (within weeks) included features that removed the need for
+>>> data.table.  It was re-released in Aug 2008 with new functionality so
+>>> that's
+>>> the relevant release date for your purpose.
+>>>
+>>> Feel free to post the puzzling results. You've done well to use it for 2
+>>> weeks without posting, so you can probably tilt towards using this list
+>>> more
+>>> (on a new thread please). If we can get you over those hurdles first then
+>>> reconsider if the 'robustness' question still stands.
+>>>
+>>> Other info which you may have not have found yet ...
+>>>
+>>> Crantastic has 5 detailed user reviews of data.table. It does state that
+>>> v1.1 was released over 2 years ago, too, so leads me to guess you may
+>>> have
+>>> missed the link to crantastic on the data.table homepage.
+>>>
+>>> There are some oddities in the ranking formula but if you look at
+>>> http://crantastic.org/popcon and realise that the batch near the bottom
+>>> starting with reshape, ggplot2 and plyr should be at the top (seems like
+>>> a
+>>> bug, I'll let them know) then data.table appears to be around the 8th
+>>> most
+>>> popular CRAN package with average score 4.7/5 and 10 users, compared to
+>>> ggplot2's 39 users.  So crantastic itself is not popular since everyone
+>>> knows that ggplot2 has many more than 39 users, and some very popular and
+>>> stable packages don't have any votes at all. Even so perhaps this small
+>>> amount of data may be useful in your assessment generally.  "data.table"
+>>> is
+>>> not the easiest to google for.
+>>>
+>>> The NEWS file (link on the homepage) says that v1.2 was released in Aug
+>>> 2008, too, at the bottom, along with what changed in each release since
+>>> then.
+>>>
+>>> Matthew
+>>>
+>>> "Tom Short" <tshort.rlists at gmail.com> wrote in message
+>>> news:AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg at mail.gmail.com...
+>>>  > On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+>>> >> My question is: is data.table ready for production? Would you rely on
+>>> it
+>>> >> for
+>>> >> sensitive publications?
+>>> >
+>>> > If you have tight time deadlines, you may want to go with what you
+>>> > have experience with, especially if it involves complicated queries or
+>>> > manipulations. If you've already tried the data.table features you'll
+>>> > need for "production", then using data.table may help you get things
+>>> > done faster.
+>>> >
+>>> > Data.table has been robust for me on 6-GB datasets on a machine with
+>>> > 24 GB of ram. With data.table, as with most tools, user error is more
+>>> > likely than a tool bug, so you need to test/check your data and your
+>>> > results.
+>>> >
+>>> > - Tom
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>>  ------------------------------
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>>
+>  ------------------------------
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101207/756faf8b/attachment.htm>
+
+From santosh.srinivas at gmail.com  Tue Dec  7 17:47:11 2010
+From: santosh.srinivas at gmail.com (Santosh Srinivas)
+Date: Tue, 7 Dec 2010 22:17:11 +0530
+Subject: [datatable-help] Is data.table ready for
+	prime-timeandsensitivework?
+In-Reply-To: <AANLkTinyKPFaW1D=HxVwKXPpK3Jv2fLFKWNBxJWnt94B@mail.gmail.com>
+References: <1291694049311-3075753.post@n4.nabble.com>
+	<AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com>
+	<idlcu4$m7g$1@dough.gmane.org>
+	<AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com>
+	<idlebs$t69$1@dough.gmane.org>
+	<AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv@mail.gmail.com>
+	<idlgdj$7rm$1@dough.gmane.org>
+	<AANLkTinyKPFaW1D=HxVwKXPpK3Jv2fLFKWNBxJWnt94B@mail.gmail.com>
+Message-ID: <AANLkTikQ3KQO0FwujQzbbqhH9sfNP-A6KHo02aZH68hO@mail.gmail.com>
+
+First ... thanks for data.table .... even I (with average R skills) am
+able to do some cool stuff on large datasets and FAST!.
+
+I've heard that integrability with R is quite decent?
+Python is next on my list but I hope my experience will be complementary
+
+
+On Tue, Dec 7, 2010 at 10:10 PM, Rob Forler <rforler at uchicago.edu> wrote:
+> It's not a hard language to pick up, but definitely one of the challenges
+> with replacing R with python is many of the stat and data?packages that
+> exist in R.
+> Python has strong scientific and data packages, but I not at the same level.
+>
+> On the other hand python is much stronger from a language point of view
+> (good oo etc), and has many more operational tools.
+>
+> -Rob
+>
+> On Tue, Dec 7, 2010 at 8:30 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> wrote:
+>>
+>> Interesting. I don't know python but it's been on the radar a few times.
+>>
+>> "Rob Forler" <rforler at uchicago.edu> wrote in message
+>> news:AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv at mail.gmail.com...
+>> I'm coding in python now. The group I'm in now has a similar tool (closed
+>> source)??to data.table but in python and is based on numpy.
+>>
+>> The api isn't as beautiful as data.table's, but has?similar functionality.
+>>
+>> -Rob
+>>
+>> On Tue, Dec 7, 2010 at 7:54 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+>> wrote:
+>>>
+>>> Thanks Rob. That begs an obvious question?then?... what are you coding in
+>>> now ?
+>>>
+>>> "Rob Forler" <rforler at uchicago.edu> wrote in message
+>>> news:AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com...
+>>> I can attest that I used data.table very extensively for several months
+>>> on large datasets (financial). I was replacing a fair of poorly coded
+>>> data/frame, sql, plyr, apply code, and was able to match the previous
+>>> numbers and do a significant amount of new analysis because of the ease of
+>>> using data.tables.
+>>>
+>>> If I was still coding in R on a regular basis you can gauarauntee I'd use
+>>> data.table every day.
+>>>
+>>> Thanks,
+>>> Rob
+>>>
+>>> On Tue, Dec 7, 2010 at 7:30 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+>>> wrote:
+>>>>
+>>>> Just to clarify also about the date of first release - March 2010? Any
+>>>> chance Mel you looked at the CRAN archive page and read off the last
+>>>> row?
+>>>> Oldest is first not last on that page :
+>>>>
+>>>> http://cran.r-project.org/src/contrib/Archive/data.table/
+>>>>
+>>>> v1.0 was released April 2006 but that was removed from CRAN happily
+>>>> because
+>>>> base quickly (within weeks) included features that removed the need for
+>>>> data.table. ?It was re-released in Aug 2008 with new functionality so
+>>>> that's
+>>>> the relevant release date for your purpose.
+>>>>
+>>>> Feel free to post the puzzling results. You've done well to use it for 2
+>>>> weeks without posting, so you can probably tilt towards using this list
+>>>> more
+>>>> (on a new thread please). If we can get you over those hurdles first
+>>>> then
+>>>> reconsider if the 'robustness' question still stands.
+>>>>
+>>>> Other info which you may have not have found yet ...
+>>>>
+>>>> Crantastic has 5 detailed user reviews of data.table. It does state that
+>>>> v1.1 was released over 2 years ago, too, so leads me to guess you may
+>>>> have
+>>>> missed the link to crantastic on the data.table homepage.
+>>>>
+>>>> There are some oddities in the ranking formula but if you look at
+>>>> http://crantastic.org/popcon and realise that the batch near the bottom
+>>>> starting with reshape, ggplot2 and plyr should be at the top (seems like
+>>>> a
+>>>> bug, I'll let them know) then data.table appears to be around the 8th
+>>>> most
+>>>> popular CRAN package with average score 4.7/5 and 10 users, compared to
+>>>> ggplot2's 39 users. ?So crantastic itself is not popular since everyone
+>>>> knows that ggplot2 has many more than 39 users, and some very popular
+>>>> and
+>>>> stable packages don't have any votes at all. Even so perhaps this small
+>>>> amount of data may be useful in your assessment generally. ?"data.table"
+>>>> is
+>>>> not the easiest to google for.
+>>>>
+>>>> The NEWS file (link on the homepage) says that v1.2 was released in Aug
+>>>> 2008, too, at the bottom, along with what changed in each release since
+>>>> then.
+>>>>
+>>>> Matthew
+>>>>
+>>>> "Tom Short" <tshort.rlists at gmail.com> wrote in message
+>>>> news:AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg at mail.gmail.com...
+>>>> > On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+>>>> >> My question is: is data.table ready for production? Would you rely on
+>>>> >> it
+>>>> >> for
+>>>> >> sensitive publications?
+>>>> >
+>>>> > If you have tight time deadlines, you may want to go with what you
+>>>> > have experience with, especially if it involves complicated queries or
+>>>> > manipulations. If you've already tried the data.table features you'll
+>>>> > need for "production", then using data.table may help you get things
+>>>> > done faster.
+>>>> >
+>>>> > Data.table has been robust for me on 6-GB datasets on a machine with
+>>>> > 24 GB of ram. With data.table, as with most tools, user error is more
+>>>> > likely than a tool bug, so you need to test/check your data and your
+>>>> > results.
+>>>> >
+>>>> > - Tom
+>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> datatable-help mailing list
+>>>> datatable-help at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>> ________________________________
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>> ________________________________
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+
+From rforler at uchicago.edu  Tue Dec  7 18:07:14 2010
+From: rforler at uchicago.edu (Rob Forler)
+Date: Tue, 7 Dec 2010 11:07:14 -0600
+Subject: [datatable-help] Is data.table ready for
+	prime-timeandsensitivework?
+In-Reply-To: <AANLkTikQ3KQO0FwujQzbbqhH9sfNP-A6KHo02aZH68hO@mail.gmail.com>
+References: <1291694049311-3075753.post@n4.nabble.com>
+	<AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg@mail.gmail.com>
+	<idlcu4$m7g$1@dough.gmane.org>
+	<AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com>
+	<idlebs$t69$1@dough.gmane.org>
+	<AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv@mail.gmail.com>
+	<idlgdj$7rm$1@dough.gmane.org>
+	<AANLkTinyKPFaW1D=HxVwKXPpK3Jv2fLFKWNBxJWnt94B@mail.gmail.com>
+	<AANLkTikQ3KQO0FwujQzbbqhH9sfNP-A6KHo02aZH68hO@mail.gmail.com>
+Message-ID: <AANLkTikhm4BFyGeehr3b86M0RhRgMUwU9NppFuEqRVBy@mail.gmail.com>
+
+I don't do anything that mixes R and python so I can't comment on using the
+two interchangeably.
+
+There are some api's that I've played around with that seem okay, but they
+probably buckle under a reasonable amount of preasure.
+
+On Tue, Dec 7, 2010 at 10:47 AM, Santosh Srinivas <
+santosh.srinivas at gmail.com> wrote:
+
+> First ... thanks for data.table .... even I (with average R skills) am
+> able to do some cool stuff on large datasets and FAST!.
+>
+> I've heard that integrability with R is quite decent?
+> Python is next on my list but I hope my experience will be complementary
+>
+>
+> On Tue, Dec 7, 2010 at 10:10 PM, Rob Forler <rforler at uchicago.edu> wrote:
+> > It's not a hard language to pick up, but definitely one of the challenges
+> > with replacing R with python is many of the stat and data packages that
+> > exist in R.
+> > Python has strong scientific and data packages, but I not at the same
+> level.
+> >
+> > On the other hand python is much stronger from a language point of view
+> > (good oo etc), and has many more operational tools.
+> >
+> > -Rob
+> >
+> > On Tue, Dec 7, 2010 at 8:30 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> > wrote:
+> >>
+> >> Interesting. I don't know python but it's been on the radar a few times.
+> >>
+> >> "Rob Forler" <rforler at uchicago.edu> wrote in message
+> >> news:AANLkTikCZL=WhE_UoWiUvoQ+TLXj8dgrJ6iG4GhdOSdv at mail.gmail.com...
+> >> I'm coding in python now. The group I'm in now has a similar tool
+> (closed
+> >> source)  to data.table but in python and is based on numpy.
+> >>
+> >> The api isn't as beautiful as data.table's, but has similar
+> functionality.
+> >>
+> >> -Rob
+> >>
+> >> On Tue, Dec 7, 2010 at 7:54 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> >> wrote:
+> >>>
+> >>> Thanks Rob. That begs an obvious question then ... what are you coding
+> in
+> >>> now ?
+> >>>
+> >>> "Rob Forler" <rforler at uchicago.edu> wrote in message
+> >>> news:AANLkTikSsoy8F6aKuQYXW5GWeMLiE+Y07D_3X+K7AeX=@mail.gmail.com...
+> >>> I can attest that I used data.table very extensively for several months
+> >>> on large datasets (financial). I was replacing a fair of poorly coded
+> >>> data/frame, sql, plyr, apply code, and was able to match the previous
+> >>> numbers and do a significant amount of new analysis because of the ease
+> of
+> >>> using data.tables.
+> >>>
+> >>> If I was still coding in R on a regular basis you can gauarauntee I'd
+> use
+> >>> data.table every day.
+> >>>
+> >>> Thanks,
+> >>> Rob
+> >>>
+> >>> On Tue, Dec 7, 2010 at 7:30 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> >>> wrote:
+> >>>>
+> >>>> Just to clarify also about the date of first release - March 2010? Any
+> >>>> chance Mel you looked at the CRAN archive page and read off the last
+> >>>> row?
+> >>>> Oldest is first not last on that page :
+> >>>>
+> >>>> http://cran.r-project.org/src/contrib/Archive/data.table/
+> >>>>
+> >>>> v1.0 was released April 2006 but that was removed from CRAN happily
+> >>>> because
+> >>>> base quickly (within weeks) included features that removed the need
+> for
+> >>>> data.table.  It was re-released in Aug 2008 with new functionality so
+> >>>> that's
+> >>>> the relevant release date for your purpose.
+> >>>>
+> >>>> Feel free to post the puzzling results. You've done well to use it for
+> 2
+> >>>> weeks without posting, so you can probably tilt towards using this
+> list
+> >>>> more
+> >>>> (on a new thread please). If we can get you over those hurdles first
+> >>>> then
+> >>>> reconsider if the 'robustness' question still stands.
+> >>>>
+> >>>> Other info which you may have not have found yet ...
+> >>>>
+> >>>> Crantastic has 5 detailed user reviews of data.table. It does state
+> that
+> >>>> v1.1 was released over 2 years ago, too, so leads me to guess you may
+> >>>> have
+> >>>> missed the link to crantastic on the data.table homepage.
+> >>>>
+> >>>> There are some oddities in the ranking formula but if you look at
+> >>>> http://crantastic.org/popcon and realise that the batch near the
+> bottom
+> >>>> starting with reshape, ggplot2 and plyr should be at the top (seems
+> like
+> >>>> a
+> >>>> bug, I'll let them know) then data.table appears to be around the 8th
+> >>>> most
+> >>>> popular CRAN package with average score 4.7/5 and 10 users, compared
+> to
+> >>>> ggplot2's 39 users.  So crantastic itself is not popular since
+> everyone
+> >>>> knows that ggplot2 has many more than 39 users, and some very popular
+> >>>> and
+> >>>> stable packages don't have any votes at all. Even so perhaps this
+> small
+> >>>> amount of data may be useful in your assessment generally.
+>  "data.table"
+> >>>> is
+> >>>> not the easiest to google for.
+> >>>>
+> >>>> The NEWS file (link on the homepage) says that v1.2 was released in
+> Aug
+> >>>> 2008, too, at the bottom, along with what changed in each release
+> since
+> >>>> then.
+> >>>>
+> >>>> Matthew
+> >>>>
+> >>>> "Tom Short" <tshort.rlists at gmail.com> wrote in message
+> >>>> news:AANLkTik=0j5da9j8_zVaW4DZhygKg6oqRP1Pg+JG3TFg at mail.gmail.com...
+> >>>> > On Mon, Dec 6, 2010 at 10:54 PM, mbacou <mel at mbacou.com> wrote:
+> >>>> >> My question is: is data.table ready for production? Would you rely
+> on
+> >>>> >> it
+> >>>> >> for
+> >>>> >> sensitive publications?
+> >>>> >
+> >>>> > If you have tight time deadlines, you may want to go with what you
+> >>>> > have experience with, especially if it involves complicated queries
+> or
+> >>>> > manipulations. If you've already tried the data.table features
+> you'll
+> >>>> > need for "production", then using data.table may help you get things
+> >>>> > done faster.
+> >>>> >
+> >>>> > Data.table has been robust for me on 6-GB datasets on a machine with
+> >>>> > 24 GB of ram. With data.table, as with most tools, user error is
+> more
+> >>>> > likely than a tool bug, so you need to test/check your data and your
+> >>>> > results.
+> >>>> >
+> >>>> > - Tom
+> >>>>
+> >>>>
+> >>>>
+> >>>> _______________________________________________
+> >>>> datatable-help mailing list
+> >>>> datatable-help at lists.r-forge.r-project.org
+> >>>>
+> >>>>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >>>
+> >>> ________________________________
+> >>>
+> >>> _______________________________________________
+> >>> datatable-help mailing list
+> >>> datatable-help at lists.r-forge.r-project.org
+> >>>
+> >>>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >>>
+> >>> _______________________________________________
+> >>> datatable-help mailing list
+> >>> datatable-help at lists.r-forge.r-project.org
+> >>>
+> >>>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >>>
+> >>
+> >> ________________________________
+> >>
+> >> _______________________________________________
+> >> datatable-help mailing list
+> >> datatable-help at lists.r-forge.r-project.org
+> >>
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >>
+> >> _______________________________________________
+> >> datatable-help mailing list
+> >> datatable-help at lists.r-forge.r-project.org
+> >>
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >>
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> >
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101207/3e6055fb/attachment-0001.htm>
+
+From mdowle at mdowle.plus.com  Tue Dec  7 20:07:06 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 7 Dec 2010 19:07:06 -0000
+Subject: [datatable-help] Stackoverflow thread comparing merge times
+Message-ID: <9d325b78134dfb5456414742ced21034.squirrel@webmail.plus.net>
+
+
+Does anyone have time to see if this post uses data.table correctly :
+
+http://stackoverflow.com/questions/4322219/whats-the-fastest-way-to-merge-join-data-frames-in-r
+
+The  dt[, colMeans(cbind(x, y)), by="g1,g2"] bit looks wrong to me. Is
+that why it takes 131 seconds vs 2.73 for sqldf ?  Shouldn't it be
+dt[,list(mean(x),mean(y)),by="g1,g2"] ?
+
+And also the y2= bit of dt1[dt2,list(x,y1,y2=dt2$y2)] looks odd.
+
+Matthew
+
+
+
+From mailinglist.honeypot at gmail.com  Tue Dec  7 20:36:36 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 7 Dec 2010 14:36:36 -0500
+Subject: [datatable-help] Stackoverflow thread comparing merge times
+In-Reply-To: <9d325b78134dfb5456414742ced21034.squirrel@webmail.plus.net>
+References: <9d325b78134dfb5456414742ced21034.squirrel@webmail.plus.net>
+Message-ID: <AANLkTik-xC1ksVtFLnB=9-KETTCDyBj9sgJCy2VLft2b@mail.gmail.com>
+
+Hi,
+
+On Tue, Dec 7, 2010 at 2:07 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> Does anyone have time to see if this post uses data.table correctly :
+>
+> http://stackoverflow.com/questions/4322219/whats-the-fastest-way-to-merge-join-data-frames-in-r
+>
+> The ?dt[, colMeans(cbind(x, y)), by="g1,g2"] bit looks wrong to me. Is
+> that why it takes 131 seconds vs 2.73 for sqldf ? ?Shouldn't it be
+> dt[,list(mean(x),mean(y)),by="g1,g2"] ?
+>
+> And also the y2= bit of dt1[dt2,list(x,y1,y2=dt2$y2)] looks odd.
+
+Don't know what's wrong with me today, but running this part of the
+given example in "the obvious way" is causing data.table to error and
+I'm not sure what I'm (obviously(?)) doing wrong:
+
+set.seed(123)
+N <- 1e5
+d1 <- data.frame(x=sample(N,N), y1=rnorm(N))
+d2 <- data.frame(x=sample(N,N), y2=rnorm(N))
+
+d1 <- data.table(d1, key="x")
+d2 <- data.table(d2, key="x")
+merge(d1, d2, by="x")
+
+Error in x[, key, with = FALSE] : incorrect number of dimensions
+
+What am I missing?
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From tshort.rlists at gmail.com  Tue Dec  7 20:37:33 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 7 Dec 2010 14:37:33 -0500
+Subject: [datatable-help] Fwd:  Stackoverflow thread comparing merge times
+In-Reply-To: <AANLkTim6eL_yTPuTP1dWs4VfuqLAWnTFN4pNQc8CSmsP@mail.gmail.com>
+References: <9d325b78134dfb5456414742ced21034.squirrel@webmail.plus.net>
+	<AANLkTim6eL_yTPuTP1dWs4VfuqLAWnTFN4pNQc8CSmsP@mail.gmail.com>
+Message-ID: <AANLkTi=j8NdJqVfK2JrH25FJupg5EJj6sEaA9rFJb2oY@mail.gmail.com>
+
+Forgot to reply to the list...
+
+On Tue, Dec 7, 2010 at 2:07 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> Does anyone have time to see if this post uses data.table correctly :
+>
+> http://stackoverflow.com/questions/4322219/whats-the-fastest-way-to-merge-join-data-frames-in-r
+
+Not enough time to do it justice. On my system, I get the following:
+
+> system.time(aggregate <- aggregate(d[c("x", "y")], d[c("g1", "g2")], mean))
+? user ?system elapsed
+? 6.72 ? ?0.08 ? ?6.65
+> system.time(dt1 <- dt[, list(x=mean(x), y=mean(y)), by = "g1,g2"])
+? user ?system elapsed
+? 3.95 ? ?0.02 ? ?3.87
+> system.time(dt2 <- dt[, list(x=.Internal(mean(x)), y=.Internal(mean(y))), by = "g1,g2"])
+? user ?system elapsed
+? 0.12 ? ?0.01 ? ?0.19
+
+This is a "many groups" case.
+
+- Tom
+
+From tshort.rlists at gmail.com  Tue Dec  7 20:43:50 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 7 Dec 2010 14:43:50 -0500
+Subject: [datatable-help] Stackoverflow thread comparing merge times
+In-Reply-To: <AANLkTik-xC1ksVtFLnB=9-KETTCDyBj9sgJCy2VLft2b@mail.gmail.com>
+References: <9d325b78134dfb5456414742ced21034.squirrel@webmail.plus.net>
+	<AANLkTik-xC1ksVtFLnB=9-KETTCDyBj9sgJCy2VLft2b@mail.gmail.com>
+Message-ID: <AANLkTint_CMfpQC_jxDP51zNN8zBvdKqTs=wcrK1G6Xk@mail.gmail.com>
+
+On Tue, Dec 7, 2010 at 2:36 PM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Hi,
+>
+> On Tue, Dec 7, 2010 at 2:07 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>>
+>> Does anyone have time to see if this post uses data.table correctly :
+>>
+>> http://stackoverflow.com/questions/4322219/whats-the-fastest-way-to-merge-join-data-frames-in-r
+>>
+>> The ?dt[, colMeans(cbind(x, y)), by="g1,g2"] bit looks wrong to me. Is
+>> that why it takes 131 seconds vs 2.73 for sqldf ? ?Shouldn't it be
+>> dt[,list(mean(x),mean(y)),by="g1,g2"] ?
+>>
+>> And also the y2= bit of dt1[dt2,list(x,y1,y2=dt2$y2)] looks odd.
+>
+> Don't know what's wrong with me today, but running this part of the
+> given example in "the obvious way" is causing data.table to error and
+> I'm not sure what I'm (obviously(?)) doing wrong:
+>
+> set.seed(123)
+> N <- 1e5
+> d1 <- data.frame(x=sample(N,N), y1=rnorm(N))
+> d2 <- data.frame(x=sample(N,N), y2=rnorm(N))
+>
+> d1 <- data.table(d1, key="x")
+> d2 <- data.table(d2, key="x")
+> merge(d1, d2, by="x")
+>
+> Error in x[, key, with = FALSE] : incorrect number of dimensions
+>
+> What am I missing?
+
+It's a problem with the column name "x". I thought we got rid of the
+naming issues a while ago. The following seems to work:
+
+set.seed(123)
+N <- 1e5
+d1 <- data.frame(xx=sample(N,N), y1=rnorm(N))
+d2 <- data.frame(xx=sample(N,N), y2=rnorm(N))
+
+d1 <- data.table(d1, key="xx")
+d2 <- data.table(d2, key="xx")
+merge(d1, d2)
+
+Right now, I don't have time to dig further.
+
+- Tom
+
+From mel at mbacou.com  Wed Dec  8 02:11:40 2010
+From: mel at mbacou.com (mbacou)
+Date: Tue, 7 Dec 2010 17:11:40 -0800 (PST)
+Subject: [datatable-help] Is data.table ready for prime-time and
+	sensitive work?
+In-Reply-To: <1291694049311-3075753.post@n4.nabble.com>
+References: <1291694049311-3075753.post@n4.nabble.com>
+Message-ID: <1291770700204-3077533.post@n4.nabble.com>
+
+
+Thanks very much for the notes and clarifications.
+
+Just knowing that there is indeed a sizable user base and more than 8 months
+of real-world testing (sorry for drawing hasty and erroneous conclusions
+from CRAN archives) is very reassuring.
+
+Also I can now attest that my odd results can all be traced back to data
+issues in the input files (as often).
+
+Hoping to contribute further to the list in the future.
+
+--Mel.
+-- 
+View this message in context: http://r.789695.n4.nabble.com/Is-data-table-ready-for-prime-time-and-sensitive-work-tp3075753p3077533.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mel at mbacou.com  Wed Dec  8 02:16:32 2010
+From: mel at mbacou.com (mbacou)
+Date: Tue, 7 Dec 2010 17:16:32 -0800 (PST)
+Subject: [datatable-help] Detailed verbose after common data operations?
+Message-ID: <1291770992599-3077538.post@n4.nabble.com>
+
+
+Just throwing a more generic question that probably doesn't belong here, but
+is there any way with R to get more detailed verbose after common operations
+on data.frame or data.table (such as deleting, updating, subsetting or
+joining rows) similar to what you get in either SQL, SAS or STATA -- I mean
+the standard "xx rows affected" or "xx rows matched" message?
+
+I know this can be achieved with extra lines of code, but how many of us
+really check every step manually?
+
+I found myself repeatedly throwing commands (especially subsetting) that do
+nothing because of small typos and not always realizing.
+
+Thanks, --Mel.
+-- 
+View this message in context: http://r.789695.n4.nabble.com/Detailed-verbose-after-common-data-operations-tp3077538p3077538.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Wed Dec  8 10:07:43 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 8 Dec 2010 09:07:43 -0000
+Subject: [datatable-help] Stackoverflow thread comparing merge times
+References: <9d325b78134dfb5456414742ced21034.squirrel@webmail.plus.net><AANLkTik-xC1ksVtFLnB=9-KETTCDyBj9sgJCy2VLft2b@mail.gmail.com>
+	<AANLkTint_CMfpQC_jxDP51zNN8zBvdKqTs=wcrK1G6Xk@mail.gmail.com>
+Message-ID: <idnhsv$ek8$1@dough.gmane.org>
+
+Bug raised for this one :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1229&group_id=240&atid=975
+
+The "x" issue was fixed in [.data.table. It wasn't a specific fix as far as 
+I remember but when the internal scoping was tidied up and made more robust. 
+Maybe this is a new one in merge.data.table when it calls [.data.table.
+
+I don't use merge() btw, preferring d1[d2] syntax instead which may explain 
+why this got missed.
+
+Matthew
+
+"Tom Short" <tshort.rlists at gmail.com> wrote in message 
+news:AANLkTint_CMfpQC_jxDP51zNN8zBvdKqTs=wcrK1G6Xk at mail.gmail.com...
+On Tue, Dec 7, 2010 at 2:36 PM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Hi,
+>
+> On Tue, Dec 7, 2010 at 2:07 PM, Matthew Dowle <mdowle at mdowle.plus.com> 
+> wrote:
+>>
+>> Does anyone have time to see if this post uses data.table correctly :
+>>
+>> http://stackoverflow.com/questions/4322219/whats-the-fastest-way-to-merge-join-data-frames-in-r
+>>
+>> The dt[, colMeans(cbind(x, y)), by="g1,g2"] bit looks wrong to me. Is
+>> that why it takes 131 seconds vs 2.73 for sqldf ? Shouldn't it be
+>> dt[,list(mean(x),mean(y)),by="g1,g2"] ?
+>>
+>> And also the y2= bit of dt1[dt2,list(x,y1,y2=dt2$y2)] looks odd.
+>
+> Don't know what's wrong with me today, but running this part of the
+> given example in "the obvious way" is causing data.table to error and
+> I'm not sure what I'm (obviously(?)) doing wrong:
+>
+> set.seed(123)
+> N <- 1e5
+> d1 <- data.frame(x=sample(N,N), y1=rnorm(N))
+> d2 <- data.frame(x=sample(N,N), y2=rnorm(N))
+>
+> d1 <- data.table(d1, key="x")
+> d2 <- data.table(d2, key="x")
+> merge(d1, d2, by="x")
+>
+> Error in x[, key, with = FALSE] : incorrect number of dimensions
+>
+> What am I missing?
+
+It's a problem with the column name "x". I thought we got rid of the
+naming issues a while ago. The following seems to work:
+
+set.seed(123)
+N <- 1e5
+d1 <- data.frame(xx=sample(N,N), y1=rnorm(N))
+d2 <- data.frame(xx=sample(N,N), y2=rnorm(N))
+
+d1 <- data.table(d1, key="xx")
+d2 <- data.table(d2, key="xx")
+merge(d1, d2)
+
+Right now, I don't have time to dig further.
+
+- Tom 
+
+
+
+
+From mdowle at mdowle.plus.com  Wed Dec  8 10:28:56 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 8 Dec 2010 09:28:56 -0000
+Subject: [datatable-help] Detailed verbose after common data operations?
+References: <1291770992599-3077538.post@n4.nabble.com>
+Message-ID: <idnj4p$kcc$1@dough.gmane.org>
+
+Try options(datatable.verbose=TRUE) globally
+or setting the verbose argument in [] syntax for each query.
+
+I don't think it currently prints what you've mentioned, but
+the principle is there.
+
+If you provide short examples, and what you'd like printed
+in verbose mode, it should be doable.
+
+"mbacou" <mel at mbacou.com> wrote in message 
+news:1291770992599-3077538.post at n4.nabble.com...
+>
+> Just throwing a more generic question that probably doesn't belong here, 
+> but
+> is there any way with R to get more detailed verbose after common 
+> operations
+> on data.frame or data.table (such as deleting, updating, subsetting or
+> joining rows) similar to what you get in either SQL, SAS or STATA -- I 
+> mean
+> the standard "xx rows affected" or "xx rows matched" message?
+>
+> I know this can be achieved with extra lines of code, but how many of us
+> really check every step manually?
+>
+> I found myself repeatedly throwing commands (especially subsetting) that 
+> do
+> nothing because of small typos and not always realizing.
+>
+> Thanks, --Mel.
+> -- 
+> View this message in context: 
+> http://r.789695.n4.nabble.com/Detailed-verbose-after-common-data-operations-tp3077538p3077538.html
+> Sent from the datatable-help mailing list archive at Nabble.com. 
+
+
+
+
+From mel at mbacou.com  Fri Dec 10 04:53:20 2010
+From: mel at mbacou.com (mbacou)
+Date: Thu, 9 Dec 2010 19:53:20 -0800 (PST)
+Subject: [datatable-help] Detailed verbose after common data operations?
+In-Reply-To: <idnj4p$kcc$1@dough.gmane.org>
+References: <1291770992599-3077538.post@n4.nabble.com>
+	<idnj4p$kcc$1@dough.gmane.org>
+Message-ID: <1291953200796-3081352.post@n4.nabble.com>
+
+
+Matt,
+
+Thanks for the suggestion. [verbose=TRUE] does provide timing for grouping
+operations, but I wonder if this could be extended to other fairly standard
+operations with more user-friendly messages -- and maybe using another
+argument if verbose is typically used for developers and not for end-users,
+or by calling another function (similar to warnings() behavior).
+
+For example:
+
+- on data.table creation
+=> "DF with xx variables and yy observations indexed on {w, z}"
+
+- on index creation
+=> "key created on variables x, y, z with xx unique values"
+
+- on subsetting
+=> "xx observations affected"
+
+- on joining
+=> "xx observations matched, yy NAs generated"
+
+
+I'm happy to hear about other users' views and suggestions here.
+
+--Mel.
+
+
+-- 
+View this message in context: http://r.789695.n4.nabble.com/Detailed-verbose-after-common-data-operations-tp3077538p3081352.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Mon Dec 13 15:10:00 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 13 Dec 2010 14:10:00 -0000
+Subject: [datatable-help] Detailed verbose after common data operations?
+References: <1291770992599-3077538.post@n4.nabble.com><idnj4p$kcc$1@dough.gmane.org>
+	<1291953200796-3081352.post@n4.nabble.com>
+Message-ID: <ie59fr$3kf$1@dough.gmane.org>
+
+Hi,
+
+That's a very nice idea.  Perhaps verbose could be changed from boolean to :
+   0 (silent by default),
+   1 (user messages like your suggestions)
+   2 (for performance tuning and advanced tracing, of the type it currently 
+does)
+similar to the warn option in R.
+
+Added feature request here :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1233&group_id=240&atid=978
+
+Matthew
+
+"mbacou" <mel at mbacou.com> wrote in message 
+news:1291953200796-3081352.post at n4.nabble.com...
+>
+> Matt,
+>
+> Thanks for the suggestion. [verbose=TRUE] does provide timing for grouping
+> operations, but I wonder if this could be extended to other fairly 
+> standard
+> operations with more user-friendly messages -- and maybe using another
+> argument if verbose is typically used for developers and not for 
+> end-users,
+> or by calling another function (similar to warnings() behavior).
+>
+> For example:
+>
+> - on data.table creation
+> => "DF with xx variables and yy observations indexed on {w, z}"
+>
+> - on index creation
+> => "key created on variables x, y, z with xx unique values"
+>
+> - on subsetting
+> => "xx observations affected"
+>
+> - on joining
+> => "xx observations matched, yy NAs generated"
+>
+>
+> I'm happy to hear about other users' views and suggestions here.
+>
+> --Mel.
+>
+>
+> -- 
+> View this message in context: 
+> http://r.789695.n4.nabble.com/Detailed-verbose-after-common-data-operations-tp3077538p3081352.html
+> Sent from the datatable-help mailing list archive at Nabble.com. 
+
+
+
+
+From dbetebenner at nciea.org  Wed Dec 15 01:58:26 2010
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Tue, 14 Dec 2010 18:58:26 -0600
+Subject: [datatable-help] Using data.table within another package/scoping
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694A7B0B0159@AUSP01VMBX05.collaborationhost.net>
+
+All,
+
+I have been trying to integrate data.table into a package I produce and keep having problems with an "object not found" issue.
+When I source the function, it works, but when it is put into a package it doesn't work.
+
+Here's a simple example giving the same results:
+
+dataTableTest1 <- function(n) {
+      my.dt <- data.table(rep(1:n, each=5), rnorm(5*n))
+      names(my.dt) <- c("ID", "SCORE")
+      my.dt
+      eval(parse(text="my.dt[,mean(SCORE), by=ID]"))
+}
+
+After embedding this into a package, in the man page for the function I run the test dataTableTest1(5):
+Below are the results of the dataTableTest-Ex.Rout
+
+R version 2.11.1 (2010-05-31)
+Copyright (C) 2010 The R Foundation for Statistical Computing
+ISBN 3-900051-07-0
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> pkgname <- "dataTableTest"
+> source(file.path(R.home("share"), "R", "examples-header.R"))
+> options(warn = 1)
+> library('dataTableTest')
+Loading required package: data.table
+>
+> assign(".oldSearch", search(), pos = 'CheckExEnv')
+> cleanEx()
+> nameEx("dataTableTest1")
+> ### * dataTableTest1
+>
+> flush(stderr()); flush(stdout())
+>
+> ### Name: dataTableTest1
+> ### Title: data.table test function
+> ### Aliases: dataTableTest1
+> ### Keywords: misc models
+>
+> ### ** Examples
+>
+> dataTableTest1(5)
+Error in mean(SCORE) : object 'SCORE' not found
+Calls: dataTableTest1 ... eval -> eval -> [ -> [.data.table -> [.data.frame -> mean
+Execution halted
+
+
+
+Any help understanding why SCORE is found when the function is sourced but is not found when the function is embedded in the package would be greatly appreciated.
+
+Best regards,
+
+
+Damian
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101214/f03d5b9b/attachment.htm>
+
+From mailinglist.honeypot at gmail.com  Wed Dec 15 02:06:54 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 14 Dec 2010 20:06:54 -0500
+Subject: [datatable-help] Using data.table within another package/scoping
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694A7B0B0159@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694A7B0B0159@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <AANLkTi=Y0Epe3Pc9HOAj6qzzco7dDV=9bFYdarLSNH+=@mail.gmail.com>
+
+Hi Damian,
+
+
+On Tue, Dec 14, 2010 at 7:58 PM, Damian Betebenner
+<dbetebenner at nciea.org> wrote:
+[snip]
+> I have been trying to integrate data.table into a package I produce and keep
+> having problems with an ?object not found? issue.
+>
+> When I source the function, it works, but when it is put into a package it
+> doesn?t work.
+[snip]
+
+Two things:
+
+(1) Install version 1.5.1 from R-forge:
+
+R> install.packages('data.table', repos="http://r-forge.r-project.org")
+
+(2a) List "data.table" in your DESCRIPTION::Imports filed
+(2b) add "imports(data.table)" in your NAMESPACE file
+
+Does that work?
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Wed Dec 15 02:14:19 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 15 Dec 2010 01:14:19 +0000
+Subject: [datatable-help] Using data.table within another package/scoping
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694A7B0B0159@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694A7B0B0159@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <1292375659.3479.10.camel@Adam>
+
+
+Hi,
+
+> Calls: dataTableTest1 ... eval -> eval -> [ -> [.data.table ->
+[.data.frame -> mean
+
+Looks like [.data.frame is being dispatched. To use data.table in your
+package you'll need the latest version on R-Forge, put data.table in
+Imports rather than Depends, and your package will need a namespace.
+Hope that works.
+
+Matthew
+
+On Tue, 2010-12-14 at 18:58 -0600, Damian Betebenner wrote:
+> All,
+> 
+>  
+> 
+> I have been trying to integrate data.table into a package I produce
+> and keep having problems with an ?object not found? issue.
+> 
+> When I source the function, it works, but when it is put into a
+> package it doesn?t work.
+> 
+>  
+> 
+> Here?s a simple example giving the same results:
+> 
+>  
+> 
+> dataTableTest1 <- function(n) {
+> 
+>       my.dt <- data.table(rep(1:n, each=5), rnorm(5*n))
+> 
+>       names(my.dt) <- c("ID", "SCORE") 
+> 
+>       my.dt
+> 
+>       eval(parse(text="my.dt[,mean(SCORE), by=ID]"))
+> 
+> }
+> 
+>  
+> 
+> After embedding this into a package, in the man page for the function
+> I run the test dataTableTest1(5):
+> 
+> Below are the results of the dataTableTest-Ex.Rout
+> 
+>  
+> 
+> R version 2.11.1 (2010-05-31)
+> 
+> Copyright (C) 2010 The R Foundation for Statistical Computing
+> 
+> ISBN 3-900051-07-0
+> 
+>  
+> 
+> R is free software and comes with ABSOLUTELY NO WARRANTY.
+> 
+> You are welcome to redistribute it under certain conditions.
+> 
+> Type 'license()' or 'licence()' for distribution details.
+> 
+>  
+> 
+>   Natural language support but running in an English locale
+> 
+>  
+> 
+> R is a collaborative project with many contributors.
+> 
+> Type 'contributors()' for more information and
+> 
+> 'citation()' on how to cite R or R packages in publications.
+> 
+>  
+> 
+> Type 'demo()' for some demos, 'help()' for on-line help, or
+> 
+> 'help.start()' for an HTML browser interface to help.
+> 
+> Type 'q()' to quit R.
+> 
+>  
+> 
+> > pkgname <- "dataTableTest"
+> 
+> > source(file.path(R.home("share"), "R", "examples-header.R"))
+> 
+> > options(warn = 1)
+> 
+> > library('dataTableTest')
+> 
+> Loading required package: data.table
+> 
+> > 
+> 
+> > assign(".oldSearch", search(), pos = 'CheckExEnv')
+> 
+> > cleanEx()
+> 
+> > nameEx("dataTableTest1")
+> 
+> > ### * dataTableTest1
+> 
+> > 
+> 
+> > flush(stderr()); flush(stdout())
+> 
+> > 
+> 
+> > ### Name: dataTableTest1
+> 
+> > ### Title: data.table test function
+> 
+> > ### Aliases: dataTableTest1
+> 
+> > ### Keywords: misc models
+> 
+> > 
+> 
+> > ### ** Examples
+> 
+> > 
+> 
+> > dataTableTest1(5)
+> 
+> Error in mean(SCORE) : object 'SCORE' not found
+> 
+> Calls: dataTableTest1 ... eval -> eval -> [ -> [.data.table ->
+> [.data.frame -> mean
+> 
+> Execution halted
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+> Any help understanding why SCORE is found when the function is sourced
+> but is not found when the function is embedded in the package would be
+> greatly appreciated.
+> 
+>  
+> 
+> Best regards,
+> 
+>  
+> 
+>  
+> 
+> Damian
+> 
+>  
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From dbetebenner at nciea.org  Wed Dec 15 10:33:23 2010
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Wed, 15 Dec 2010 03:33:23 -0600
+Subject: [datatable-help] Using data.table within another package/scoping
+In-Reply-To: <AANLkTi=Y0Epe3Pc9HOAj6qzzco7dDV=9bFYdarLSNH+=@mail.gmail.com>
+References: <8AD9137B75B37049AA711A4B64CEDB694A7B0B0159@AUSP01VMBX05.collaborationhost.net>
+	<AANLkTi=Y0Epe3Pc9HOAj6qzzco7dDV=9bFYdarLSNH+=@mail.gmail.com>
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694A7B0B01CB@AUSP01VMBX05.collaborationhost.net>
+
+Steve,
+
+That appears to work!!! Thank you for your help.
+
+Best regards,
+
+Damian
+
+
+-----Original Message-----
+From: Steve Lianoglou [mailto:mailinglist.honeypot at gmail.com] 
+Sent: Tuesday, December 14, 2010 8:07 PM
+To: Damian Betebenner
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Using data.table within another package/scoping
+
+Hi Damian,
+
+
+On Tue, Dec 14, 2010 at 7:58 PM, Damian Betebenner
+<dbetebenner at nciea.org> wrote:
+[snip]
+> I have been trying to integrate data.table into a package I produce and keep
+> having problems with an "object not found" issue.
+>
+> When I source the function, it works, but when it is put into a package it
+> doesn't work.
+[snip]
+
+Two things:
+
+(1) Install version 1.5.1 from R-forge:
+
+R> install.packages('data.table', repos="http://r-forge.r-project.org")
+
+(2a) List "data.table" in your DESCRIPTION::Imports filed
+(2b) add "imports(data.table)" in your NAMESPACE file
+
+Does that work?
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Thu Dec 16 00:47:08 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 15 Dec 2010 23:47:08 +0000
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+	<1291688257.2433.132.camel@Adam>
+	<AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+Message-ID: <1292456828.1824.26.camel@Adam>
+
+Hi Tom,
+
+I tested your change to cedta - passes build, tests and vignettes. Looks
+good. It didn't fix bug 1131 (I had hoped it might too) but I fixed that
+by adding a check on whether the caller is the debugger frame.
+
+Could you commit your change please then I'll do mine on top.
+
+Matthew
+
+
+On Mon, 2010-12-06 at 22:37 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> On Mon, Dec 6, 2010 at 9:17 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > Been offline for a few days, just catching up with these threads.
+> >
+> > Yes - Tom's idea looks good to me. .GlobalEnv would be considered
+> > data.table aware since it isn't a namespace then, thus short-circuiting
+> > the first || when called from the user workspace and retaining the
+> > efficiency fix of the change from cendta to cedta a while back (that the
+> > identical(te,.GlobalEnv) was there for) so I'm happy.
+> >
+> > The topenv when the caller is a namespaceless package is .GlobalEnv
+> > rather than the package (if I remember the issue correctly) which is the
+> > reason namespaceless packages are incorrectly considered data.table
+> > aware. As Tom says that's an issue anyway and shouldn't be affected by
+> > this change. In practice it's not an issue since we're not aware of any
+> > namespaceless packages being used by data.table users. Have changed the
+> > priority of that tracker item to low (which oddly on R-Forge is 1 not
+> > 5).
+> >
+> > The new cedta might well fix this bug neatly too :
+> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1131&group_id=240&atid=975
+> >
+> > Haven't looked at the test_that proposal yet. Shall I look once these
+> > issues are resolved and a few tests are working ok?
+> 
+> Yeah, I've been meaning to implement Tom's suggestion in my testthat
+> branch and send you guys a link to checkout, but I've been busy trying
+> to catch up w/ stuff at school.
+> 
+> I'll work on something for you to look at and send you an update in
+> the next day or two.
+> 
+> -steve
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Sat Dec 18 04:50:19 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Fri, 17 Dec 2010 22:50:19 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <1292456828.1824.26.camel@Adam>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+	<1291688257.2433.132.camel@Adam>
+	<AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+	<1292456828.1824.26.camel@Adam>
+Message-ID: <AANLkTinYo1M09Xf+SP-7fhDqgzOsLYWc2LCABVuLBk=K@mail.gmail.com>
+
+Hi all,
+
+After a long delay, I've gotten around to testing some of the
+test_that-ized unit tests and everything seems clean using Tom's
+changes to cedta.R.
+
+Here are what my S4 tests are like:
+https://github.com/lianos/datatable/blob/testthat/pkg/inst/tests/test-S4.R
+
+These run clean and don't have the problem with "locked environments"
+and stuff that the "normal tests" have that are being run through a
+man/*.Rd file.
+
+To give you an idea of what some of the current tests (1-16) look like
+when they are test_that-ized, look here:
+https://github.com/lianos/datatable/blob/testthat/pkg/inst/tests/test-all.R
+
+They can be even simpler to write if you don't insist on keeping track
+of their test IDs (numbers). For instance, test 1 can go from this:
+
+  expect_that(TESTDT[SJ(4,6),v,mult="first"], is_identical_to(3L), info="1")
+
+to this:
+
+  expect_identical(TESTDT[SJ(4,6),v,mult="first"], 3L)
+
+Running tests are very simple as well. You can run them in "the usual
+way" via R CMD check. When you do so, the results look like so:
+
+$ R CMD check <data.table>
+...
+... R CMD check progress ...
+** running tests for arch 'i386'
+  Running ?test-all.R?
+ OK
+** running tests for arch 'x86_64'
+  Running ?test-all.R?
+ OK
+...
+
+I deliberately put in a wrong expected result to show you what it
+looks like when a test like this fails:
+
+$ R CMD check <data.table>
+...
+... R CMD check progress ...
+** running tests for arch 'i386'
+  Running ?test-all.R?
+ ERROR
+Running the tests in 'tests/test-all.R' failed.
+Last 13 lines of output:
+
+  S4-isms : .....
+  Sorted Joins : 1...............
+
+  1. Failure: basic sorted joins work
+--------------------------------------------
+  TESTDT[SJ(4, 6), v, mult = "first"] is not identical to 4L. Differences:
+  Mean relative difference: 0.25
+  1
+  Error: Test failures
+  In addition: Warning message:
+  In getPackageName(where) :
+    Created a package name, "2010-12-17 22:23:34", when none found
+  Execution halted
+...
+
+You can also run the unit tests in your "live" R session like so:
+
+R> library(data.table)
+R> library(testthat)
+R> test_dir('/path/to/datatable/pkg/inst/tests')
+
+or a single file at a time:
+
+R> test_file(''/path/to/datatable/pkg/inst/tests/test-something.R")
+
+If you'd consider moving the test suite over to test_that, I'll
+volunteer to do the conversions over the next week (or so (maybe after
+xmas)). We can organize the tests a bit more cleanly into different
+files and "contexts" to be a bit more explicit about which groups of
+tests are testing what types of functionality if you like.
+
+If you don't want to keep track of unit tests by their number, than
+the conversions will be a bit less cumbersome, but it's your choice.
+
+Regardless of the unit test framework switch, my "S4-ism" code is
+ready to land back in trunk as it stands now. The tests for adding
+generic methods to an S4 object that uses the data.table won't work
+with the current test.data.table.R stuff, so I'd just keep those out
+for now. See the commented part of the testing blocks at the bottom
+here to see what I mean (tests 228 to 231):
+
+https://github.com/lianos/datatable/blob/master/pkg/R/test.data.table.R
+
+Sorry for the long email, but there are two issues rolled into one here.
+
+Thanks,
+-steve
+
+On Wed, Dec 15, 2010 at 6:47 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Hi Tom,
+>
+> I tested your change to cedta - passes build, tests and vignettes. Looks
+> good. It didn't fix bug 1131 (I had hoped it might too) but I fixed that
+> by adding a check on whether the caller is the debugger frame.
+>
+> Could you commit your change please then I'll do mine on top.
+>
+> Matthew
+>
+>
+> On Mon, 2010-12-06 at 22:37 -0500, Steve Lianoglou wrote:
+>> Hi,
+>>
+>> On Mon, Dec 6, 2010 at 9:17 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> > Been offline for a few days, just catching up with these threads.
+>> >
+>> > Yes - Tom's idea looks good to me. .GlobalEnv would be considered
+>> > data.table aware since it isn't a namespace then, thus short-circuiting
+>> > the first || when called from the user workspace and retaining the
+>> > efficiency fix of the change from cendta to cedta a while back (that the
+>> > identical(te,.GlobalEnv) was there for) so I'm happy.
+>> >
+>> > The topenv when the caller is a namespaceless package is .GlobalEnv
+>> > rather than the package (if I remember the issue correctly) which is the
+>> > reason namespaceless packages are incorrectly considered data.table
+>> > aware. As Tom says that's an issue anyway and shouldn't be affected by
+>> > this change. In practice it's not an issue since we're not aware of any
+>> > namespaceless packages being used by data.table users. Have changed the
+>> > priority of that tracker item to low (which oddly on R-Forge is 1 not
+>> > 5).
+>> >
+>> > The new cedta might well fix this bug neatly too :
+>> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1131&group_id=240&atid=975
+>> >
+>> > Haven't looked at the test_that proposal yet. Shall I look once these
+>> > issues are resolved and a few tests are working ok?
+>>
+>> Yeah, I've been meaning to implement Tom's suggestion in my testthat
+>> branch and send you guys a link to checkout, but I've been busy trying
+>> to catch up w/ stuff at school.
+>>
+>> I'll work on something for you to look at and send you an update in
+>> the next day or two.
+>>
+>> -steve
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Sun Dec 19 15:26:29 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 19 Dec 2010 14:26:29 +0000
+Subject: [datatable-help] Fwd: Stackoverflow thread comparing merge times
+In-Reply-To: <AANLkTi=j8NdJqVfK2JrH25FJupg5EJj6sEaA9rFJb2oY@mail.gmail.com>
+References: <9d325b78134dfb5456414742ced21034.squirrel@webmail.plus.net>
+	<AANLkTim6eL_yTPuTP1dWs4VfuqLAWnTFN4pNQc8CSmsP@mail.gmail.com>
+	<AANLkTi=j8NdJqVfK2JrH25FJupg5EJj6sEaA9rFJb2oY@mail.gmail.com>
+Message-ID: <1292768789.1875.20.camel@Adam>
+
+Just posted to that stackoverflow thread showing a worst, better and
+best use of data.table. Hope that gets the point across. I'm sure plyr
+can be used better too so I sent Hadley the link to it.
+
+New feature requests for data.table (any thoughts anyone?) :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1230&group_id=240&atid=978
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1231&group_id=240&atid=978
+
+Matthew
+
+
+On Tue, 2010-12-07 at 14:37 -0500, Tom Short wrote:
+> Forgot to reply to the list...
+> 
+> On Tue, Dec 7, 2010 at 2:07 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> >
+> > Does anyone have time to see if this post uses data.table correctly :
+> >
+> > http://stackoverflow.com/questions/4322219/whats-the-fastest-way-to-merge-join-data-frames-in-r
+> 
+> Not enough time to do it justice. On my system, I get the following:
+> 
+> > system.time(aggregate <- aggregate(d[c("x", "y")], d[c("g1", "g2")], mean))
+>   user  system elapsed
+>   6.72    0.08    6.65
+> > system.time(dt1 <- dt[, list(x=mean(x), y=mean(y)), by = "g1,g2"])
+>   user  system elapsed
+>   3.95    0.02    3.87
+> > system.time(dt2 <- dt[, list(x=.Internal(mean(x)), y=.Internal(mean(y))), by = "g1,g2"])
+>   user  system elapsed
+>   0.12    0.01    0.19
+> 
+> This is a "many groups" case.
+> 
+> - Tom
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From jgvcqa at rit.edu  Thu Dec 23 20:35:10 2010
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Thu, 23 Dec 2010 14:35:10 -0500
+Subject: [datatable-help] Summing over many variables
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+
+Consider this set of code:
+
+DT1<-data.table(A1=1:100,A2=1:100,A3=1:100,B1=101:200,B2=101:200,B3=101:200,C1=301:400,D1=301:400,grp=rep(1:5,each=20))
+setkey(DT1,grp)
+(DT2<-DT1[,lapply(.SD,sum),by=grp]) # from data.table FAQ
+
+
+I have two questions:
+1. I have many columns like C1 and D1 that I don't want to include in the new data.table (nor do I want grp.1 in it). How can I nicely have these not be part of my result? (If it helps, I know the indices for the A and the B columns)
+
+2. However, in addition to (and sometimes instead of) DT2, what I want is this result:
+DT2[,list(sum(A1+A2+A3),sum(B1+B2+B3)),by=grp]
+
+Now, in the actual data set, it's more like A1 to A30 and B1 to B20, and I will be doing this for many subsets of the A's and B's.
+So, I would like to have a way to easily find the sum (or sd, or ...) by some easier method than by referencing the column names--use of column indices would be nice for the actual problem. I know that the column numbers can be referenced with with=FALSE, but don't really see how to use that in this problem.
+
+Any ideas? Thanks.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101223/70b1f37c/attachment.htm>
+
+From mailinglist.honeypot at gmail.com  Thu Dec 23 20:51:46 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Thu, 23 Dec 2010 14:51:46 -0500
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+Message-ID: <AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+
+Hi,
+
+On Thu, Dec 23, 2010 at 2:35 PM, Joseph Voelkel <jgvcqa at rit.edu> wrote:
+> Consider this set of code:
+>
+> DT1<-data.table(A1=1:100,A2=1:100,A3=1:100,B1=101:200,B2=101:200,B3=101:200,C1=301:400,D1=301:400,grp=rep(1:5,each=20))
+>
+> setkey(DT1,grp)
+>
+> (DT2<-DT1[,lapply(.SD,sum),by=grp]) # from data.table FAQ
+>
+> I have two questions:
+>
+> 1. I have many columns like C1 and D1 that I don't want to include in the
+> new data.table (nor do I want grp.1 in it). How can I nicely have these not
+> be part of my result? (If it helps, I know the indices for the A and the B
+> columns)
+
+Since you already know the indices, it might be faster to just pull
+them out of DT2 after you're done processing it. Barring that, one way
+you could do it "inline" is this:
+
+R> skip <- match(c("C1", "D1", "grp"), colnames(DT1))
+R> dt2 <- DT1[, {
+  lapply(.SD[, -skip, with=FALSE], sum)
+}, by='grp']
+
+Perhaps there are more elegant ways ...
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Thu Dec 23 22:33:03 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 23 Dec 2010 21:33:03 +0000
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+Message-ID: <1293139983.2693.28.camel@Adam>
+
+
+Yes that's one way. We aren't that happy with using lapply in j as it
+loses the benefit of data.table.
+
+I tend to 'flatten' tables like this. Try to have few columns. In this
+case it would be either a 3 column table (grp,colname,value) or maybe a
+4 column table if you ever want to group by "A" or
+"B" (grp,letter,number,value). The query would then be
+DT[,sum(value),by=list(grp,letter,number)]. You can then do pattern
+matches and filters etc in the i rather than in the j e.g.
+DT[letter=="A",sum(value),by=group] for just the "A"s. The answer comes
+out in 'flat' format but you can always 'unflatten' the result to make
+it look pretty or easier to read.  [Note that I sinned by using '==' in
+the i just then invoking vector scan, so to avoid that for speed you
+would setkey(letter,group) then DT["A",sum(value),by=group]], or getting
+fancy if you only wanted some groups (say 1 and 3) then 'by without by'
+e.g. DT[list("A",c(1,3)),sum(value)].
+
+'flat' is a common way to use data.table to store higher dimensional
+data, and especially sparse higher dimensional data.
+
+The 'grp.1' repetition is a problem I'd like to remove. It's related to
+this feature request (but is almost a bug). At the moment you have to
+remove the grp.1 afterwards.
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=978&group_id=240&atid=978
+
+Matthew
+
+On Thu, 2010-12-23 at 14:51 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> On Thu, Dec 23, 2010 at 2:35 PM, Joseph Voelkel <jgvcqa at rit.edu> wrote:
+> > Consider this set of code:
+> >
+> > DT1<-data.table(A1=1:100,A2=1:100,A3=1:100,B1=101:200,B2=101:200,B3=101:200,C1=301:400,D1=301:400,grp=rep(1:5,each=20))
+> >
+> > setkey(DT1,grp)
+> >
+> > (DT2<-DT1[,lapply(.SD,sum),by=grp]) # from data.table FAQ
+> >
+> > I have two questions:
+> >
+> > 1. I have many columns like C1 and D1 that I don't want to include in the
+> > new data.table (nor do I want grp.1 in it). How can I nicely have these not
+> > be part of my result? (If it helps, I know the indices for the A and the B
+> > columns)
+> 
+> Since you already know the indices, it might be faster to just pull
+> them out of DT2 after you're done processing it. Barring that, one way
+> you could do it "inline" is this:
+> 
+> R> skip <- match(c("C1", "D1", "grp"), colnames(DT1))
+> R> dt2 <- DT1[, {
+>   lapply(.SD[, -skip, with=FALSE], sum)
+> }, by='grp']
+> 
+> Perhaps there are more elegant ways ...
+> 
+> -steve
+> 
+
+
+
+From mdowle at mdowle.plus.com  Thu Dec 23 22:59:14 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 23 Dec 2010 21:59:14 +0000
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTinYo1M09Xf+SP-7fhDqgzOsLYWc2LCABVuLBk=K@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+	<1291688257.2433.132.camel@Adam>
+	<AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+	<1292456828.1824.26.camel@Adam>
+	<AANLkTinYo1M09Xf+SP-7fhDqgzOsLYWc2LCABVuLBk=K@mail.gmail.com>
+Message-ID: <1293141554.2998.22.camel@Adam>
+
+Hi Steve,
+
+Sorry not had time to look at this yet. Hoping to soon. Let me know if
+you're held up. It's high priority my side too as I'd like to fix
+the .Depends issue, the 2 outstanding bugs, get cedta sorted and release
+those few things onto CRAN soon. S4 tests would be nice to include.
+
+One thought though .. how would we know the ported tests correctly fail
+when they should?  Or perhaps it's easier to ask ... how would we know
+the ported tests fail in the same conditions the old tests fail?
+
+So I'm thinking we should keep the old test.data.table() there running
+even if it's just locked down. We could put new tests into test_that
+going forward (starting with S4) and that would save you the time of
+porting. Would that work?
+
+Matthew
+
+
+On Fri, 2010-12-17 at 22:50 -0500, Steve Lianoglou wrote:
+> Hi all,
+> 
+> After a long delay, I've gotten around to testing some of the
+> test_that-ized unit tests and everything seems clean using Tom's
+> changes to cedta.R.
+> 
+> Here are what my S4 tests are like:
+> https://github.com/lianos/datatable/blob/testthat/pkg/inst/tests/test-S4.R
+> 
+> These run clean and don't have the problem with "locked environments"
+> and stuff that the "normal tests" have that are being run through a
+> man/*.Rd file.
+> 
+> To give you an idea of what some of the current tests (1-16) look like
+> when they are test_that-ized, look here:
+> https://github.com/lianos/datatable/blob/testthat/pkg/inst/tests/test-all.R
+> 
+> They can be even simpler to write if you don't insist on keeping track
+> of their test IDs (numbers). For instance, test 1 can go from this:
+> 
+>   expect_that(TESTDT[SJ(4,6),v,mult="first"], is_identical_to(3L), info="1")
+> 
+> to this:
+> 
+>   expect_identical(TESTDT[SJ(4,6),v,mult="first"], 3L)
+> 
+> Running tests are very simple as well. You can run them in "the usual
+> way" via R CMD check. When you do so, the results look like so:
+> 
+> $ R CMD check <data.table>
+> ...
+> ... R CMD check progress ...
+> ** running tests for arch 'i386'
+>   Running ?test-all.R?
+>  OK
+> ** running tests for arch 'x86_64'
+>   Running ?test-all.R?
+>  OK
+> ...
+> 
+> I deliberately put in a wrong expected result to show you what it
+> looks like when a test like this fails:
+> 
+> $ R CMD check <data.table>
+> ...
+> ... R CMD check progress ...
+> ** running tests for arch 'i386'
+>   Running ?test-all.R?
+>  ERROR
+> Running the tests in 'tests/test-all.R' failed.
+> Last 13 lines of output:
+> 
+>   S4-isms : .....
+>   Sorted Joins : 1...............
+> 
+>   1. Failure: basic sorted joins work
+> --------------------------------------------
+>   TESTDT[SJ(4, 6), v, mult = "first"] is not identical to 4L. Differences:
+>   Mean relative difference: 0.25
+>   1
+>   Error: Test failures
+>   In addition: Warning message:
+>   In getPackageName(where) :
+>     Created a package name, "2010-12-17 22:23:34", when none found
+>   Execution halted
+> ...
+> 
+> You can also run the unit tests in your "live" R session like so:
+> 
+> R> library(data.table)
+> R> library(testthat)
+> R> test_dir('/path/to/datatable/pkg/inst/tests')
+> 
+> or a single file at a time:
+> 
+> R> test_file(''/path/to/datatable/pkg/inst/tests/test-something.R")
+> 
+> If you'd consider moving the test suite over to test_that, I'll
+> volunteer to do the conversions over the next week (or so (maybe after
+> xmas)). We can organize the tests a bit more cleanly into different
+> files and "contexts" to be a bit more explicit about which groups of
+> tests are testing what types of functionality if you like.
+> 
+> If you don't want to keep track of unit tests by their number, than
+> the conversions will be a bit less cumbersome, but it's your choice.
+> 
+> Regardless of the unit test framework switch, my "S4-ism" code is
+> ready to land back in trunk as it stands now. The tests for adding
+> generic methods to an S4 object that uses the data.table won't work
+> with the current test.data.table.R stuff, so I'd just keep those out
+> for now. See the commented part of the testing blocks at the bottom
+> here to see what I mean (tests 228 to 231):
+> 
+> https://github.com/lianos/datatable/blob/master/pkg/R/test.data.table.R
+> 
+> Sorry for the long email, but there are two issues rolled into one here.
+> 
+> Thanks,
+> -steve
+> 
+> On Wed, Dec 15, 2010 at 6:47 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > Hi Tom,
+> >
+> > I tested your change to cedta - passes build, tests and vignettes. Looks
+> > good. It didn't fix bug 1131 (I had hoped it might too) but I fixed that
+> > by adding a check on whether the caller is the debugger frame.
+> >
+> > Could you commit your change please then I'll do mine on top.
+> >
+> > Matthew
+> >
+> >
+> > On Mon, 2010-12-06 at 22:37 -0500, Steve Lianoglou wrote:
+> >> Hi,
+> >>
+> >> On Mon, Dec 6, 2010 at 9:17 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> >> > Been offline for a few days, just catching up with these threads.
+> >> >
+> >> > Yes - Tom's idea looks good to me. .GlobalEnv would be considered
+> >> > data.table aware since it isn't a namespace then, thus short-circuiting
+> >> > the first || when called from the user workspace and retaining the
+> >> > efficiency fix of the change from cendta to cedta a while back (that the
+> >> > identical(te,.GlobalEnv) was there for) so I'm happy.
+> >> >
+> >> > The topenv when the caller is a namespaceless package is .GlobalEnv
+> >> > rather than the package (if I remember the issue correctly) which is the
+> >> > reason namespaceless packages are incorrectly considered data.table
+> >> > aware. As Tom says that's an issue anyway and shouldn't be affected by
+> >> > this change. In practice it's not an issue since we're not aware of any
+> >> > namespaceless packages being used by data.table users. Have changed the
+> >> > priority of that tracker item to low (which oddly on R-Forge is 1 not
+> >> > 5).
+> >> >
+> >> > The new cedta might well fix this bug neatly too :
+> >> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1131&group_id=240&atid=975
+> >> >
+> >> > Haven't looked at the test_that proposal yet. Shall I look once these
+> >> > issues are resolved and a few tests are working ok?
+> >>
+> >> Yeah, I've been meaning to implement Tom's suggestion in my testthat
+> >> branch and send you guys a link to checkout, but I've been busy trying
+> >> to catch up w/ stuff at school.
+> >>
+> >> I'll work on something for you to look at and send you an update in
+> >> the next day or two.
+> >>
+> >> -steve
+> >>
+> >
+> >
+> >
+> 
+> 
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Thu Dec 23 23:25:40 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Thu, 23 Dec 2010 17:25:40 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <1293141554.2998.22.camel@Adam>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+	<1291688257.2433.132.camel@Adam>
+	<AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+	<1292456828.1824.26.camel@Adam>
+	<AANLkTinYo1M09Xf+SP-7fhDqgzOsLYWc2LCABVuLBk=K@mail.gmail.com>
+	<1293141554.2998.22.camel@Adam>
+Message-ID: <AANLkTik1oJ0OP4AAOVG2tr=EdbiUUOAaeS9XNf6TUDW-@mail.gmail.com>
+
+Hi,
+
+On Thu, Dec 23, 2010 at 4:59 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Hi Steve,
+>
+> Sorry not had time to look at this yet. Hoping to soon. Let me know if
+> you're held up. It's high priority my side too as I'd like to fix
+> the .Depends issue, the 2 outstanding bugs, get cedta sorted and release
+> those few things onto CRAN soon. S4 tests would be nice to include.
+
+I'm not held up really, I'm just using my current modified version
+until you guys have time to give a tentative heads up for me to push
+these back into the package.
+
+> One thought though .. how would we know the ported tests correctly fail
+> when they should? ?Or perhaps it's easier to ask ... how would we know
+> the ported tests fail in the same conditions the old tests fail?
+
+There are functions that test to ensure a code block fails, like:
+
+expect_that(log("a"), throws_error("Non-numeric argument")) ## or
+expect_error(log("a"), "Non-numeric argument")
+
+Is that what you're asking? Or are you asking how we can test/ensure
+that the tests have been "ported over" faithfully?
+
+> So I'm thinking we should keep the old test.data.table() there running
+> even if it's just locked down. We could put new tests into test_that
+> going forward (starting with S4) and that would save you the time of
+> porting. Would that work?
+
+That can work too, if you like. I was thinking that porting the tests
+over, though, might encourage/ensure further tests to use testthat
+since they might function as examples on how one tests different
+things.
+
+Still, we can start by doing what you suggest and slowly incorporate
+the older tests into this framework if anyone feels it'd be better.
+
+Really -- whatever you like, you're driving this boat.
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From jgvcqa at rit.edu  Fri Dec 24 14:05:14 2010
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Fri, 24 Dec 2010 08:05:14 -0500
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <1293139983.2693.28.camel@Adam>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+	<1293139983.2693.28.camel@Adam>
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC0D6C6C@ex02mail01.ad.rit.edu>
+
+Thank you, Steve and Matthew. Insight along with answers--just what I needed.
+
+From jgvcqa at rit.edu  Mon Dec 27 19:23:26 2010
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Mon, 27 Dec 2010 13:23:26 -0500
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <1293139983.2693.28.camel@Adam>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+	<1293139983.2693.28.camel@Adam>
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC0D6CB5@ex02mail01.ad.rit.edu>
+
+I like Matthew's idea of flattening tables. But, as usual, I did not tell the whole story in my first post. I will probably want to look at many expressions, for example,
+
+sum(A1+A2+A3+A4+A5)
+sum(A2+A3+A4+A5+A6)
+sum(A3+A4+A5+A6+A7)
+sum((A1+A2)/2 - (A3+A4)/2)
+
+To be able to investigate a sequence of these easily, I found (after some trial and error, and then thinking about it a bit more to try to make my problem look like one from the datatable-faq) that this will do the trick:
+
+library(data.table)
+
+# create data table
+DT1<-data.table(A1=1:1000000,A2=1:1000000,A3=1:1000000,A4=1:1000000,A5=1:1000000,grp=rep(1:50000,each=20))
+setkey(DT1,grp)
+
+# Say I want DT1[,sum(A1+A2+A3+A4+A5),by=grp]
+
+# First, create expression of interest, and convert it to data-table-useful form
+ASumExpr<-parse(text=paste("quote(sum(",paste("A",1:5,sep="",collapse="+"),"))",sep=""))
+# (Next few lines: to help me and maybe you see what this looks like...)
+ASumExpr
+str(ASumExpr)
+eval(ASumExpr)
+str(eval(ASumExpr))
+str(quote(mean(x))) # from example in datatable-faq.pdf. So eval(ASumExpr) looks good
+
+# long-hand typing method. OK for one or two, but not in general
+system.time(dt2a<-DT1[,sum(A1+A2+A3+A4+A5),by=grp])
+# formula method. This will be useful.
+system.time(dt2b<-DT1[,eval(eval(ASumExpr)),by=grp])
+
+identical(dt2a, dt2b)
+
+# Fast and easy to write. Just what I wanted. Thanks again for the ideas that lead to this useful solution.
+
+Joe V.
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+Sent: Thursday, December 23, 2010 4:33 PM
+To: Joseph Voelkel
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Summing over many variables
+
+
+Yes that's one way. We aren't that happy with using lapply in j as it
+loses the benefit of data.table.
+
+I tend to 'flatten' tables like this. Try to have few columns. In this
+case it would be either a 3 column table (grp,colname,value) or maybe a
+4 column table if you ever want to group by "A" or
+"B" (grp,letter,number,value). The query would then be
+DT[,sum(value),by=list(grp,letter,number)]. You can then do pattern
+matches and filters etc in the i rather than in the j e.g.
+DT[letter=="A",sum(value),by=group] for just the "A"s. The answer comes
+out in 'flat' format but you can always 'unflatten' the result to make
+it look pretty or easier to read.  [Note that I sinned by using '==' in
+the i just then invoking vector scan, so to avoid that for speed you
+would setkey(letter,group) then DT["A",sum(value),by=group]], or getting
+fancy if you only wanted some groups (say 1 and 3) then 'by without by'
+e.g. DT[list("A",c(1,3)),sum(value)].
+
+'flat' is a common way to use data.table to store higher dimensional
+data, and especially sparse higher dimensional data.
+
+The 'grp.1' repetition is a problem I'd like to remove. It's related to
+this feature request (but is almost a bug). At the moment you have to
+remove the grp.1 afterwards.
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=978&group_id=240&atid=978
+
+Matthew
+
+
+From jgvcqa at rit.edu  Wed Dec 29 18:57:01 2010
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Wed, 29 Dec 2010 12:57:01 -0500
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <1293556910.2756.43.camel@Adam>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+	<1293139983.2693.28.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6CB5@ex02mail01.ad.rit.edu>
+	<1293556910.2756.43.camel@Adam>
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC0D6D1F@ex02mail01.ad.rit.edu>
+
+Thanks, Matthew.
+
+1. Yes, you have the subsetting of j on your faq.
+2. The double eval appears to handle this subsetting. In my smaller problem, which I am working on first, I have about 55K records and 250 variables. Using either A1+A2+A3+A4+A5 or eval(eval()) takes about 0.22 sec of user time. So, from this indirect measure, the two are equally efficient.
+3. By the way, for this example, I used 6 keys, which happened for this problem to correspond to 1 record for each unique key. That is, my output also contained 55K records. I originally solved the problem by using apply with sum on the five columns that contained the A1 through A5 value, e.g. apply(DT1[,11:15,with=FALSE],1,sum). This operation took about 0.62 sec. So, even here, data.table is 3x faster than apply.
+4. Of course, no key is really needed here, so if I just want to return the sum along with the key vars, I can just use DT1[,list(key1,key2,key3,key4,key5,key6,sum=A1+A2+A3+A4+A5)] which runs in under 0.01 seconds.
+5. Finally, I tried your idea of removing the quote and just trying the one eval(). It worked with a simple contrived example, but not for my more complex one--I have no idea why not, because the two seem analogous...
+
+ 
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+Sent: Tuesday, December 28, 2010 12:22 PM
+To: Joseph Voelkel
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Summing over many variables
+
+Glad that works. Thanks for posting back. One thintg with that approach
+is that data.table inspects the j expression to see which columns it
+uses. It only subsets the ones that are used, for efficiency. There's a
+faq on that I think. If the expression is wrapped up inside an eval I
+think it still inspects the j but I can't quite remember. I'd be
+surprised if that works with the double eval like that. If A runs from 1
+to 100 in your real data and you're taking many sub-sums of 5, then this
+could make a big difference. Try timing sum(A1) vs sum(A2+A3+A4+A5) with
+and without the eval(eval()). That should reveal whether the j is being
+inspected ok.
+Also looking at it again, you shouldn't need the quote() inside the text
+passed to parse. Then it's just a single eval and j inspection should be
+ok I think i.e. DT1[,eval(ASumExpr),by=grp] rather than
+DT1[,eval(eval(ASumExpr)),by=grp]
+
+Matthew
+
+
+On Mon, 2010-12-27 at 13:23 -0500, Joseph Voelkel wrote:
+> I like Matthew's idea of flattening tables. But, as usual, I did not tell the whole story in my first post. I will probably want to look at many expressions, for example,
+> 
+> sum(A1+A2+A3+A4+A5)
+> sum(A2+A3+A4+A5+A6)
+> sum(A3+A4+A5+A6+A7)
+> sum((A1+A2)/2 - (A3+A4)/2)
+> 
+> To be able to investigate a sequence of these easily, I found (after some trial and error, and then thinking about it a bit more to try to make my problem look like one from the datatable-faq) that this will do the trick:
+> 
+> library(data.table)
+> 
+> # create data table
+> DT1<-data.table(A1=1:1000000,A2=1:1000000,A3=1:1000000,A4=1:1000000,A5=1:1000000,grp=rep(1:50000,each=20))
+> setkey(DT1,grp)
+> 
+> # Say I want DT1[,sum(A1+A2+A3+A4+A5),by=grp]
+> 
+> # First, create expression of interest, and convert it to data-table-useful form
+> ASumExpr<-parse(text=paste("quote(sum(",paste("A",1:5,sep="",collapse="+"),"))",sep=""))
+> # (Next few lines: to help me and maybe you see what this looks like...)
+> ASumExpr
+> str(ASumExpr)
+> eval(ASumExpr)
+> str(eval(ASumExpr))
+> str(quote(mean(x))) # from example in datatable-faq.pdf. So eval(ASumExpr) looks good
+> 
+> # long-hand typing method. OK for one or two, but not in general
+> system.time(dt2a<-DT1[,sum(A1+A2+A3+A4+A5),by=grp])
+> # formula method. This will be useful.
+> system.time(dt2b<-DT1[,eval(eval(ASumExpr)),by=grp])
+> 
+> identical(dt2a, dt2b)
+> 
+> # Fast and easy to write. Just what I wanted. Thanks again for the ideas that lead to this useful solution.
+> 
+> Joe V.
+> 
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> Sent: Thursday, December 23, 2010 4:33 PM
+> To: Joseph Voelkel
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Summing over many variables
+> 
+> 
+> Yes that's one way. We aren't that happy with using lapply in j as it
+> loses the benefit of data.table.
+> 
+> I tend to 'flatten' tables like this. Try to have few columns. In this
+> case it would be either a 3 column table (grp,colname,value) or maybe a
+> 4 column table if you ever want to group by "A" or
+> "B" (grp,letter,number,value). The query would then be
+> DT[,sum(value),by=list(grp,letter,number)]. You can then do pattern
+> matches and filters etc in the i rather than in the j e.g.
+> DT[letter=="A",sum(value),by=group] for just the "A"s. The answer comes
+> out in 'flat' format but you can always 'unflatten' the result to make
+> it look pretty or easier to read.  [Note that I sinned by using '==' in
+> the i just then invoking vector scan, so to avoid that for speed you
+> would setkey(letter,group) then DT["A",sum(value),by=group]], or getting
+> fancy if you only wanted some groups (say 1 and 3) then 'by without by'
+> e.g. DT[list("A",c(1,3)),sum(value)].
+> 
+> 'flat' is a common way to use data.table to store higher dimensional
+> data, and especially sparse higher dimensional data.
+> 
+> The 'grp.1' repetition is a problem I'd like to remove. It's related to
+> this feature request (but is almost a bug). At the moment you have to
+> remove the grp.1 afterwards.
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=978&group_id=240&atid=978
+> 
+> Matthew
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From jgvcqa at rit.edu  Wed Dec 29 19:00:58 2010
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Wed, 29 Dec 2010 13:00:58 -0500
+Subject: [datatable-help] Bug in merge for data.table?
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC0D6D20@ex02mail01.ad.rit.edu>
+
+Consider the following code. It seems like the errors that occur when y only has a key column is a bug. Yes?
+
+DT<-data.table(a=rep(1:2,each=3),b=1:6,key="a")
+
+y<-J(a=c(0,1),bb=c(10,11),key="a") # y, with key column and one more column
+merge(y,DT) # fine
+merge(y,DT,all=TRUE) # fine
+
+y<-J(a=c(0,1),key="a") # y with only a key column
+merge(y,DT) # fine
+merge(y,DT,all=TRUE) # error
+merge(DT,y,all=TRUE) # a different error
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101229/ce2e4d1f/attachment.html>
+
+From dbetebenner at nciea.org  Wed Dec 29 18:25:36 2010
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Wed, 29 Dec 2010 11:25:36 -0600
+Subject: [datatable-help] Use of data.table with doMC/foreach
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694A7B258433@AUSP01VMBX05.collaborationhost.net>
+
+All,
+
+Does anyone have experience using data.table in parallel using doMC/foreach?
+
+I have a data.table with approximately 3.5 million rows and am calculating different summaries (e.g., medians and counts) on some of the variables across approximately
+500 distinct groupings (same j variable with 500 different by groups). My thought was to run the different analyses in parallel on my multi-core machine and get a good performance
+boost but thus far it doesn't work any faster.
+
+The data.table performance is great for each by grouping (about 7.5 seconds), but doing this 500 times take a while.
+
+Anyone have experience along these lines.
+
+Best,
+
+Damian
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20101229/5da58c29/attachment.htm>
+
+From mdowle at mdowle.plus.com  Tue Dec 28 18:21:50 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 28 Dec 2010 17:21:50 +0000
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <70EFCDD908F9264785FA08EC3A47132016CC0D6CB5@ex02mail01.ad.rit.edu>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+	<1293139983.2693.28.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6CB5@ex02mail01.ad.rit.edu>
+Message-ID: <1293556910.2756.43.camel@Adam>
+
+Glad that works. Thanks for posting back. One thing with that approach
+is that data.table inspects the j expression to see which columns it
+uses. It only subsets the ones that are used, for efficiency. There's a
+faq on that I think. If the expression is wrapped up inside an eval I
+think it still inspects the j but I can't quite remember. I'd be
+surprised if that works with the double eval like that. If A runs from 1
+to 100 in your real data and you're taking many sub-sums of 5, then this
+could make a big difference. Try timing sum(A1) vs sum(A2+A3+A4+A5) with
+and without the eval(eval()). That should reveal whether the j is being
+inspected ok.
+Also looking at it again, you shouldn't need the quote() inside the text
+passed to parse. Then it's just a single eval and j inspection should be
+ok I think i.e. DT1[,eval(ASumExpr),by=grp] rather than
+DT1[,eval(eval(ASumExpr)),by=grp]
+
+Matthew
+
+
+On Mon, 2010-12-27 at 13:23 -0500, Joseph Voelkel wrote:
+> I like Matthew's idea of flattening tables. But, as usual, I did not tell the whole story in my first post. I will probably want to look at many expressions, for example,
+> 
+> sum(A1+A2+A3+A4+A5)
+> sum(A2+A3+A4+A5+A6)
+> sum(A3+A4+A5+A6+A7)
+> sum((A1+A2)/2 - (A3+A4)/2)
+> 
+> To be able to investigate a sequence of these easily, I found (after some trial and error, and then thinking about it a bit more to try to make my problem look like one from the datatable-faq) that this will do the trick:
+> 
+> library(data.table)
+> 
+> # create data table
+> DT1<-data.table(A1=1:1000000,A2=1:1000000,A3=1:1000000,A4=1:1000000,A5=1:1000000,grp=rep(1:50000,each=20))
+> setkey(DT1,grp)
+> 
+> # Say I want DT1[,sum(A1+A2+A3+A4+A5),by=grp]
+> 
+> # First, create expression of interest, and convert it to data-table-useful form
+> ASumExpr<-parse(text=paste("quote(sum(",paste("A",1:5,sep="",collapse="+"),"))",sep=""))
+> # (Next few lines: to help me and maybe you see what this looks like...)
+> ASumExpr
+> str(ASumExpr)
+> eval(ASumExpr)
+> str(eval(ASumExpr))
+> str(quote(mean(x))) # from example in datatable-faq.pdf. So eval(ASumExpr) looks good
+> 
+> # long-hand typing method. OK for one or two, but not in general
+> system.time(dt2a<-DT1[,sum(A1+A2+A3+A4+A5),by=grp])
+> # formula method. This will be useful.
+> system.time(dt2b<-DT1[,eval(eval(ASumExpr)),by=grp])
+> 
+> identical(dt2a, dt2b)
+> 
+> # Fast and easy to write. Just what I wanted. Thanks again for the ideas that lead to this useful solution.
+> 
+> Joe V.
+> 
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> Sent: Thursday, December 23, 2010 4:33 PM
+> To: Joseph Voelkel
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Summing over many variables
+> 
+> 
+> Yes that's one way. We aren't that happy with using lapply in j as it
+> loses the benefit of data.table.
+> 
+> I tend to 'flatten' tables like this. Try to have few columns. In this
+> case it would be either a 3 column table (grp,colname,value) or maybe a
+> 4 column table if you ever want to group by "A" or
+> "B" (grp,letter,number,value). The query would then be
+> DT[,sum(value),by=list(grp,letter,number)]. You can then do pattern
+> matches and filters etc in the i rather than in the j e.g.
+> DT[letter=="A",sum(value),by=group] for just the "A"s. The answer comes
+> out in 'flat' format but you can always 'unflatten' the result to make
+> it look pretty or easier to read.  [Note that I sinned by using '==' in
+> the i just then invoking vector scan, so to avoid that for speed you
+> would setkey(letter,group) then DT["A",sum(value),by=group]], or getting
+> fancy if you only wanted some groups (say 1 and 3) then 'by without by'
+> e.g. DT[list("A",c(1,3)),sum(value)].
+> 
+> 'flat' is a common way to use data.table to store higher dimensional
+> data, and especially sparse higher dimensional data.
+> 
+> The 'grp.1' repetition is a problem I'd like to remove. It's related to
+> this feature request (but is almost a bug). At the moment you have to
+> remove the grp.1 afterwards.
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=978&group_id=240&atid=978
+> 
+> Matthew
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Fri Dec 31 15:13:12 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 31 Dec 2010 14:13:12 +0000
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <70EFCDD908F9264785FA08EC3A47132016CC0D6D1F@ex02mail01.ad.rit.edu>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+	<1293139983.2693.28.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6CB5@ex02mail01.ad.rit.edu>
+	<1293556910.2756.43.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6D1F@ex02mail01.ad.rit.edu>
+Message-ID: <1293804792.1566.56.camel@Adam>
+
+Hi,
+
+I don't quite follow all of that e.g. I'm thinking secondary keys at
+points (manual now, or 'built-in' feature request). Anyway, sounds like
+it's working. On point 3 I'm not sure that's really data.table, rather
+the difference between a vectorized sum and apply()-ed sum. You should
+see the same difference with a data.frame.
+
+Where it isn't working (point 5) was there an error message or was the
+result incorrect? Might be a clue that reveals a bug.
+
+Matthew
+
+On Wed, 2010-12-29 at 12:57 -0500, Joseph Voelkel wrote:
+> Thanks, Matthew.
+> 
+> 1. Yes, you have the subsetting of j on your faq.
+> 2. The double eval appears to handle this subsetting. In my smaller problem, which I am working on first, I have about 55K records and 250 variables. Using either A1+A2+A3+A4+A5 or eval(eval()) takes about 0.22 sec of user time. So, from this indirect measure, the two are equally efficient.
+> 3. By the way, for this example, I used 6 keys, which happened for this problem to correspond to 1 record for each unique key. That is, my output also contained 55K records. I originally solved the problem by using apply with sum on the five columns that contained the A1 through A5 value, e.g. apply(DT1[,11:15,with=FALSE],1,sum). This operation took about 0.62 sec. So, even here, data.table is 3x faster than apply.
+> 4. Of course, no key is really needed here, so if I just want to return the sum along with the key vars, I can just use DT1[,list(key1,key2,key3,key4,key5,key6,sum=A1+A2+A3+A4+A5)] which runs in under 0.01 seconds.
+> 5. Finally, I tried your idea of removing the quote and just trying the one eval(). It worked with a simple contrived example, but not for my more complex one--I have no idea why not, because the two seem analogous...
+> 
+>  
+> 
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> Sent: Tuesday, December 28, 2010 12:22 PM
+> To: Joseph Voelkel
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Summing over many variables
+> 
+> Glad that works. Thanks for posting back. One thintg with that approach
+> is that data.table inspects the j expression to see which columns it
+> uses. It only subsets the ones that are used, for efficiency. There's a
+> faq on that I think. If the expression is wrapped up inside an eval I
+> think it still inspects the j but I can't quite remember. I'd be
+> surprised if that works with the double eval like that. If A runs from 1
+> to 100 in your real data and you're taking many sub-sums of 5, then this
+> could make a big difference. Try timing sum(A1) vs sum(A2+A3+A4+A5) with
+> and without the eval(eval()). That should reveal whether the j is being
+> inspected ok.
+> Also looking at it again, you shouldn't need the quote() inside the text
+> passed to parse. Then it's just a single eval and j inspection should be
+> ok I think i.e. DT1[,eval(ASumExpr),by=grp] rather than
+> DT1[,eval(eval(ASumExpr)),by=grp]
+> 
+> Matthew
+> 
+> 
+> On Mon, 2010-12-27 at 13:23 -0500, Joseph Voelkel wrote:
+> > I like Matthew's idea of flattening tables. But, as usual, I did not tell the whole story in my first post. I will probably want to look at many expressions, for example,
+> > 
+> > sum(A1+A2+A3+A4+A5)
+> > sum(A2+A3+A4+A5+A6)
+> > sum(A3+A4+A5+A6+A7)
+> > sum((A1+A2)/2 - (A3+A4)/2)
+> > 
+> > To be able to investigate a sequence of these easily, I found (after some trial and error, and then thinking about it a bit more to try to make my problem look like one from the datatable-faq) that this will do the trick:
+> > 
+> > library(data.table)
+> > 
+> > # create data table
+> > DT1<-data.table(A1=1:1000000,A2=1:1000000,A3=1:1000000,A4=1:1000000,A5=1:1000000,grp=rep(1:50000,each=20))
+> > setkey(DT1,grp)
+> > 
+> > # Say I want DT1[,sum(A1+A2+A3+A4+A5),by=grp]
+> > 
+> > # First, create expression of interest, and convert it to data-table-useful form
+> > ASumExpr<-parse(text=paste("quote(sum(",paste("A",1:5,sep="",collapse="+"),"))",sep=""))
+> > # (Next few lines: to help me and maybe you see what this looks like...)
+> > ASumExpr
+> > str(ASumExpr)
+> > eval(ASumExpr)
+> > str(eval(ASumExpr))
+> > str(quote(mean(x))) # from example in datatable-faq.pdf. So eval(ASumExpr) looks good
+> > 
+> > # long-hand typing method. OK for one or two, but not in general
+> > system.time(dt2a<-DT1[,sum(A1+A2+A3+A4+A5),by=grp])
+> > # formula method. This will be useful.
+> > system.time(dt2b<-DT1[,eval(eval(ASumExpr)),by=grp])
+> > 
+> > identical(dt2a, dt2b)
+> > 
+> > # Fast and easy to write. Just what I wanted. Thanks again for the ideas that lead to this useful solution.
+> > 
+> > Joe V.
+> > 
+> > -----Original Message-----
+> > From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> > Sent: Thursday, December 23, 2010 4:33 PM
+> > To: Joseph Voelkel
+> > Cc: datatable-help at lists.r-forge.r-project.org
+> > Subject: Re: [datatable-help] Summing over many variables
+> > 
+> > 
+> > Yes that's one way. We aren't that happy with using lapply in j as it
+> > loses the benefit of data.table.
+> > 
+> > I tend to 'flatten' tables like this. Try to have few columns. In this
+> > case it would be either a 3 column table (grp,colname,value) or maybe a
+> > 4 column table if you ever want to group by "A" or
+> > "B" (grp,letter,number,value). The query would then be
+> > DT[,sum(value),by=list(grp,letter,number)]. You can then do pattern
+> > matches and filters etc in the i rather than in the j e.g.
+> > DT[letter=="A",sum(value),by=group] for just the "A"s. The answer comes
+> > out in 'flat' format but you can always 'unflatten' the result to make
+> > it look pretty or easier to read.  [Note that I sinned by using '==' in
+> > the i just then invoking vector scan, so to avoid that for speed you
+> > would setkey(letter,group) then DT["A",sum(value),by=group]], or getting
+> > fancy if you only wanted some groups (say 1 and 3) then 'by without by'
+> > e.g. DT[list("A",c(1,3)),sum(value)].
+> > 
+> > 'flat' is a common way to use data.table to store higher dimensional
+> > data, and especially sparse higher dimensional data.
+> > 
+> > The 'grp.1' repetition is a problem I'd like to remove. It's related to
+> > this feature request (but is almost a bug). At the moment you have to
+> > remove the grp.1 afterwards.
+> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=978&group_id=240&atid=978
+> > 
+> > Matthew
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+
+
+
+From mdowle at mdowle.plus.com  Fri Dec 31 15:22:46 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 31 Dec 2010 14:22:46 +0000
+Subject: [datatable-help] Use of data.table with doMC/foreach
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694A7B258433@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694A7B258433@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <1293805366.1566.73.camel@Adam>
+
+Tom might be your man on that.
+What I'd say is that if the 7.5sec wasn't ok for one grouping then we
+might be a bit stuck, but in your case it should be ok using a parallel
+wrapper through the 500 groupings. I'd need a toy example to go further
+with this one please to see why there's no apparent speed up.
+Matthew
+
+
+On Wed, 2010-12-29 at 11:25 -0600, Damian Betebenner wrote:
+> All,
+> 
+>  
+> 
+> Does anyone have experience using data.table in parallel using
+> doMC/foreach?
+> 
+>  
+> 
+> I have a data.table with approximately 3.5 million rows and am
+> calculating different summaries (e.g., medians and counts) on some of
+> the variables across approximately
+> 
+> 500 distinct groupings (same j variable with 500 different by groups).
+> My thought was to run the different analyses in parallel on my
+> multi-core machine and get a good performance
+> 
+> boost but thus far it doesn?t work any faster.
+> 
+>  
+> 
+> The data.table performance is great for each by grouping (about 7.5
+> seconds), but doing this 500 times take a while.
+> 
+>  
+> 
+> Anyone have experience along these lines.
+> 
+>  
+> 
+> Best,
+> 
+>  
+> 
+> Damian
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Fri Dec 31 15:52:57 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 31 Dec 2010 14:52:57 +0000
+Subject: [datatable-help] Bug in merge for data.table?
+In-Reply-To: <70EFCDD908F9264785FA08EC3A47132016CC0D6D20@ex02mail01.ad.rit.edu>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6D20@ex02mail01.ad.rit.edu>
+Message-ID: <1293807177.2046.0.camel@Adam>
+
+
+Looks like a bug to me. Thanks for raising it.
+Added here:
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1241&group_id=240&atid=975
+Matthew
+
+On Wed, 2010-12-29 at 13:00 -0500, Joseph Voelkel wrote:
+> Consider the following code. It seems like the errors that occur when
+> y only has a key column is a bug. Yes?
+> 
+>  
+> 
+> DT<-data.table(a=rep(1:2,each=3),b=1:6,key="a")
+> 
+>  
+> 
+> y<-J(a=c(0,1),bb=c(10,11),key="a") # y, with key column and one more
+> column
+> 
+> merge(y,DT) # fine
+> 
+> merge(y,DT,all=TRUE) # fine
+> 
+>                 
+> 
+> y<-J(a=c(0,1),key="a") # y with only a key column
+> 
+> merge(y,DT) # fine
+> 
+> merge(y,DT,all=TRUE) # error
+> 
+>  
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From tshort.rlists at gmail.com  Fri Dec 31 15:55:31 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Fri, 31 Dec 2010 09:55:31 -0500
+Subject: [datatable-help] Use of data.table with doMC/foreach
+In-Reply-To: <1293805366.1566.73.camel@Adam>
+References: <8AD9137B75B37049AA711A4B64CEDB694A7B258433@AUSP01VMBX05.collaborationhost.net>
+	<1293805366.1566.73.camel@Adam>
+Message-ID: <AANLkTincrOk=CbD4JYCgP=Zf4xYQxvki+tXsLYb-QQbT@mail.gmail.com>
+
+I've only tried multicore. See here:
+
+http://news.gmane.org/gmane.comp.lang.r.datatable/cutoff=326
+
+If data tables are only used on the inside of the "for loop", it
+should be pretty easy. If you need data tables grouping operations to
+be run in parallel, it's quite a bit harder.
+
+- Tom
+
+On Fri, Dec 31, 2010 at 9:22 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Tom might be your man on that.
+> What I'd say is that if the 7.5sec wasn't ok for one grouping then we
+> might be a bit stuck, but in your case it should be ok using a parallel
+> wrapper through the 500 groupings. I'd need a toy example to go further
+> with this one please to see why there's no apparent speed up.
+> Matthew
+>
+>
+> On Wed, 2010-12-29 at 11:25 -0600, Damian Betebenner wrote:
+>> All,
+>>
+>>
+>>
+>> Does anyone have experience using data.table in parallel using
+>> doMC/foreach?
+>>
+>>
+>>
+>> I have a data.table with approximately 3.5 million rows and am
+>> calculating different summaries (e.g., medians and counts) on some of
+>> the variables across approximately
+>>
+>> 500 distinct groupings (same j variable with 500 different by groups).
+>> My thought was to run the different analyses in parallel on my
+>> multi-core machine and get a good performance
+>>
+>> boost but thus far it doesn?t work any faster.
+>>
+>>
+>>
+>> The data.table performance is great for each by grouping (about 7.5
+>> seconds), but doing this 500 times take a while.
+>>
+>>
+>>
+>> Anyone have experience along these lines.
+>>
+>>
+>>
+>> Best,
+>>
+>>
+>>
+>> Damian
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+From tshort.rlists at gmail.com  Fri Dec 31 15:56:43 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Fri, 31 Dec 2010 09:56:43 -0500
+Subject: [datatable-help] Bug in merge for data.table?
+In-Reply-To: <1293807177.2046.0.camel@Adam>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6D20@ex02mail01.ad.rit.edu>
+	<1293807177.2046.0.camel@Adam>
+Message-ID: <AANLkTi=bg7UfhJdqWOazia15wAYGwr9z8bPFc8_PnO_q@mail.gmail.com>
+
+Agreed. There are a couple of bugs in merge that need to be fixed.
+It's not as well used as the main data.table indexing.
+
+- Tom
+
+On Fri, Dec 31, 2010 at 9:52 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> Looks like a bug to me. Thanks for raising it.
+> Added here:
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1241&group_id=240&atid=975
+> Matthew
+>
+> On Wed, 2010-12-29 at 13:00 -0500, Joseph Voelkel wrote:
+>> Consider the following code. It seems like the errors that occur when
+>> y only has a key column is a bug. Yes?
+>>
+>>
+>>
+>> DT<-data.table(a=rep(1:2,each=3),b=1:6,key="a")
+>>
+>>
+>>
+>> y<-J(a=c(0,1),bb=c(10,11),key="a") # y, with key column and one more
+>> column
+>>
+>> merge(y,DT) # fine
+>>
+>> merge(y,DT,all=TRUE) # fine
+>>
+>>
+>>
+>> y<-J(a=c(0,1),key="a") # y with only a key column
+>>
+>> merge(y,DT) # fine
+>>
+>> merge(y,DT,all=TRUE) # error
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+From tshort.rlists at gmail.com  Fri Dec 31 15:59:49 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Fri, 31 Dec 2010 09:59:49 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <1292456828.1824.26.camel@Adam>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+	<1291688257.2433.132.camel@Adam>
+	<AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+	<1292456828.1824.26.camel@Adam>
+Message-ID: <AANLkTinD-nGjpATnvo2nOs2rQg0-z5o+-mtuz_6AN8ss@mail.gmail.com>
+
+Matthew, do you mind just doing the cedta fix? I keep meaning to do
+this. On my end, it's not hard, but my local repository isn't up to
+date, and I don't have much time in the next month or so.
+
+- Tom
+
+On Wed, Dec 15, 2010 at 6:47 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Hi Tom,
+>
+> I tested your change to cedta - passes build, tests and vignettes. Looks
+> good. It didn't fix bug 1131 (I had hoped it might too) but I fixed that
+> by adding a check on whether the caller is the debugger frame.
+>
+> Could you commit your change please then I'll do mine on top.
+>
+> Matthew
+>
+>
+> On Mon, 2010-12-06 at 22:37 -0500, Steve Lianoglou wrote:
+>> Hi,
+>>
+>> On Mon, Dec 6, 2010 at 9:17 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> > Been offline for a few days, just catching up with these threads.
+>> >
+>> > Yes - Tom's idea looks good to me. .GlobalEnv would be considered
+>> > data.table aware since it isn't a namespace then, thus short-circuiting
+>> > the first || when called from the user workspace and retaining the
+>> > efficiency fix of the change from cendta to cedta a while back (that the
+>> > identical(te,.GlobalEnv) was there for) so I'm happy.
+>> >
+>> > The topenv when the caller is a namespaceless package is .GlobalEnv
+>> > rather than the package (if I remember the issue correctly) which is the
+>> > reason namespaceless packages are incorrectly considered data.table
+>> > aware. As Tom says that's an issue anyway and shouldn't be affected by
+>> > this change. In practice it's not an issue since we're not aware of any
+>> > namespaceless packages being used by data.table users. Have changed the
+>> > priority of that tracker item to low (which oddly on R-Forge is 1 not
+>> > 5).
+>> >
+>> > The new cedta might well fix this bug neatly too :
+>> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1131&group_id=240&atid=975
+>> >
+>> > Haven't looked at the test_that proposal yet. Shall I look once these
+>> > issues are resolved and a few tests are working ok?
+>>
+>> Yeah, I've been meaning to implement Tom's suggestion in my testthat
+>> branch and send you guys a link to checkout, but I've been busy trying
+>> to catch up w/ stuff at school.
+>>
+>> I'll work on something for you to look at and send you an update in
+>> the next day or two.
+>>
+>> -steve
+>>
+>
+>
+>
+
+From tshort.rlists at gmail.com  Fri Dec 31 16:33:26 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Fri, 31 Dec 2010 10:33:26 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <1293141554.2998.22.camel@Adam>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+	<1291688257.2433.132.camel@Adam>
+	<AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+	<1292456828.1824.26.camel@Adam>
+	<AANLkTinYo1M09Xf+SP-7fhDqgzOsLYWc2LCABVuLBk=K@mail.gmail.com>
+	<1293141554.2998.22.camel@Adam>
+Message-ID: <AANLkTimDfviaFpX4Nh_cRXpj3HiJLFBcpmkocPoOC8DW@mail.gmail.com>
+
+I vote to move the tests all over to the new format. I also prefer the
+expect_identical() syntax. That lets us do away with the test numbers.
+
+- Tom
+
+On Thu, Dec 23, 2010 at 4:59 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Hi Steve,
+>
+> Sorry not had time to look at this yet. Hoping to soon. Let me know if
+> you're held up. It's high priority my side too as I'd like to fix
+> the .Depends issue, the 2 outstanding bugs, get cedta sorted and release
+> those few things onto CRAN soon. S4 tests would be nice to include.
+>
+> One thought though .. how would we know the ported tests correctly fail
+> when they should? ?Or perhaps it's easier to ask ... how would we know
+> the ported tests fail in the same conditions the old tests fail?
+>
+> So I'm thinking we should keep the old test.data.table() there running
+> even if it's just locked down. We could put new tests into test_that
+> going forward (starting with S4) and that would save you the time of
+> porting. Would that work?
+>
+> Matthew
+>
+>
+> On Fri, 2010-12-17 at 22:50 -0500, Steve Lianoglou wrote:
+>> Hi all,
+>>
+>> After a long delay, I've gotten around to testing some of the
+>> test_that-ized unit tests and everything seems clean using Tom's
+>> changes to cedta.R.
+>>
+>> Here are what my S4 tests are like:
+>> https://github.com/lianos/datatable/blob/testthat/pkg/inst/tests/test-S4.R
+>>
+>> These run clean and don't have the problem with "locked environments"
+>> and stuff that the "normal tests" have that are being run through a
+>> man/*.Rd file.
+>>
+>> To give you an idea of what some of the current tests (1-16) look like
+>> when they are test_that-ized, look here:
+>> https://github.com/lianos/datatable/blob/testthat/pkg/inst/tests/test-all.R
+>>
+>> They can be even simpler to write if you don't insist on keeping track
+>> of their test IDs (numbers). For instance, test 1 can go from this:
+>>
+>> ? expect_that(TESTDT[SJ(4,6),v,mult="first"], is_identical_to(3L), info="1")
+>>
+>> to this:
+>>
+>> ? expect_identical(TESTDT[SJ(4,6),v,mult="first"], 3L)
+>>
+>> Running tests are very simple as well. You can run them in "the usual
+>> way" via R CMD check. When you do so, the results look like so:
+>>
+>> $ R CMD check <data.table>
+>> ...
+>> ... R CMD check progress ...
+>> ** running tests for arch 'i386'
+>> ? Running ?test-all.R?
+>> ?OK
+>> ** running tests for arch 'x86_64'
+>> ? Running ?test-all.R?
+>> ?OK
+>> ...
+>>
+>> I deliberately put in a wrong expected result to show you what it
+>> looks like when a test like this fails:
+>>
+>> $ R CMD check <data.table>
+>> ...
+>> ... R CMD check progress ...
+>> ** running tests for arch 'i386'
+>> ? Running ?test-all.R?
+>> ?ERROR
+>> Running the tests in 'tests/test-all.R' failed.
+>> Last 13 lines of output:
+>>
+>> ? S4-isms : .....
+>> ? Sorted Joins : 1...............
+>>
+>> ? 1. Failure: basic sorted joins work
+>> --------------------------------------------
+>> ? TESTDT[SJ(4, 6), v, mult = "first"] is not identical to 4L. Differences:
+>> ? Mean relative difference: 0.25
+>> ? 1
+>> ? Error: Test failures
+>> ? In addition: Warning message:
+>> ? In getPackageName(where) :
+>> ? ? Created a package name, "2010-12-17 22:23:34", when none found
+>> ? Execution halted
+>> ...
+>>
+>> You can also run the unit tests in your "live" R session like so:
+>>
+>> R> library(data.table)
+>> R> library(testthat)
+>> R> test_dir('/path/to/datatable/pkg/inst/tests')
+>>
+>> or a single file at a time:
+>>
+>> R> test_file(''/path/to/datatable/pkg/inst/tests/test-something.R")
+>>
+>> If you'd consider moving the test suite over to test_that, I'll
+>> volunteer to do the conversions over the next week (or so (maybe after
+>> xmas)). We can organize the tests a bit more cleanly into different
+>> files and "contexts" to be a bit more explicit about which groups of
+>> tests are testing what types of functionality if you like.
+>>
+>> If you don't want to keep track of unit tests by their number, than
+>> the conversions will be a bit less cumbersome, but it's your choice.
+>>
+>> Regardless of the unit test framework switch, my "S4-ism" code is
+>> ready to land back in trunk as it stands now. The tests for adding
+>> generic methods to an S4 object that uses the data.table won't work
+>> with the current test.data.table.R stuff, so I'd just keep those out
+>> for now. See the commented part of the testing blocks at the bottom
+>> here to see what I mean (tests 228 to 231):
+>>
+>> https://github.com/lianos/datatable/blob/master/pkg/R/test.data.table.R
+>>
+>> Sorry for the long email, but there are two issues rolled into one here.
+>>
+>> Thanks,
+>> -steve
+>>
+>> On Wed, Dec 15, 2010 at 6:47 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> > Hi Tom,
+>> >
+>> > I tested your change to cedta - passes build, tests and vignettes. Looks
+>> > good. It didn't fix bug 1131 (I had hoped it might too) but I fixed that
+>> > by adding a check on whether the caller is the debugger frame.
+>> >
+>> > Could you commit your change please then I'll do mine on top.
+>> >
+>> > Matthew
+>> >
+>> >
+>> > On Mon, 2010-12-06 at 22:37 -0500, Steve Lianoglou wrote:
+>> >> Hi,
+>> >>
+>> >> On Mon, Dec 6, 2010 at 9:17 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> >> > Been offline for a few days, just catching up with these threads.
+>> >> >
+>> >> > Yes - Tom's idea looks good to me. .GlobalEnv would be considered
+>> >> > data.table aware since it isn't a namespace then, thus short-circuiting
+>> >> > the first || when called from the user workspace and retaining the
+>> >> > efficiency fix of the change from cendta to cedta a while back (that the
+>> >> > identical(te,.GlobalEnv) was there for) so I'm happy.
+>> >> >
+>> >> > The topenv when the caller is a namespaceless package is .GlobalEnv
+>> >> > rather than the package (if I remember the issue correctly) which is the
+>> >> > reason namespaceless packages are incorrectly considered data.table
+>> >> > aware. As Tom says that's an issue anyway and shouldn't be affected by
+>> >> > this change. In practice it's not an issue since we're not aware of any
+>> >> > namespaceless packages being used by data.table users. Have changed the
+>> >> > priority of that tracker item to low (which oddly on R-Forge is 1 not
+>> >> > 5).
+>> >> >
+>> >> > The new cedta might well fix this bug neatly too :
+>> >> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1131&group_id=240&atid=975
+>> >> >
+>> >> > Haven't looked at the test_that proposal yet. Shall I look once these
+>> >> > issues are resolved and a few tests are working ok?
+>> >>
+>> >> Yeah, I've been meaning to implement Tom's suggestion in my testthat
+>> >> branch and send you guys a link to checkout, but I've been busy trying
+>> >> to catch up w/ stuff at school.
+>> >>
+>> >> I'll work on something for you to look at and send you an update in
+>> >> the next day or two.
+>> >>
+>> >> -steve
+>> >>
+>> >
+>> >
+>> >
+>>
+>>
+>>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+From jgvcqa at rit.edu  Fri Dec 31 23:10:55 2010
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Fri, 31 Dec 2010 17:10:55 -0500
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <1293804792.1566.56.camel@Adam>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+	<1293139983.2693.28.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6CB5@ex02mail01.ad.rit.edu>
+	<1293556910.2756.43.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6D1F@ex02mail01.ad.rit.edu>
+	<1293804792.1566.56.camel@Adam>
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC0D6D84@ex02mail01.ad.rit.edu>
+
+Matthew, just to address point 5 (double eval of quoted works, single eval on unquoted does not):
+
+> dt1key<-data.table(A1=1:100,onekey=rep(1:2,each=50))
+> setkey(dt1key,onekey)
+> ASumExpr<-parse(text="quote(sum(A1))")
+> ASumExpr
+expression(quote(sum(A1)))
+attr(,"srcfile")
+<text> 
+> str(eval(ASumExpr))
+ language sum(A1)
+> 
+> ASumExprNoQ<-parse(text="sum(A1)")
+> ASumExprNoQ
+expression(sum(A1))
+attr(,"srcfile")
+<text> 
+> str(ASumExprNoQ) # not the same as eval(ASumExpr)
+length 1 expression(sum(A1))
+ - attr(*, "srcref")=List of 1
+  ..$ :Class 'srcref'  atomic [1:6] 1 1 1 7 1 7
+  .. .. ..- attr(*, "srcfile")=Classes 'srcfilecopy', 'srcfile' <environment: 0x060cef18> 
+ - attr(*, "srcfile")=Classes 'srcfilecopy', 'srcfile' <environment: 0x060cef18> 
+> 
+> # test of 3 ways to obtain results
+> dt1key[,sum(A1),by=onekey]
+     onekey   V1
+[1,]      1 1275
+[2,]      2 3775
+> dt1key[,eval(eval(ASumExpr)),by=onekey]
+     onekey   V1
+[1,]      1 1275
+[2,]      2 3775
+> dt1key[,eval(ASumExprNoQ),by=onekey]
+Error in `[.data.table`(dt1key, , eval(ASumExprNoQ), by = onekey) : 
+  columns of j don't evaluate to consistent types for each group
+In addition: Warning message:
+In if (as.character(jsub[[1]]) %in% c("list", "DT")) { :
+  the condition has length > 1 and only the first element will be used
+>  
+>
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+Sent: Friday, December 31, 2010 9:13 AM
+To: Joseph Voelkel
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: RE: [datatable-help] Summing over many variables
+
+Hi,
+
+I don't quite follow all of that e.g. I'm thinking secondary keys at
+points (manual now, or 'built-in' feature request). Anyway, sounds like
+it's working. On point 3 I'm not sure that's really data.table, rather
+the difference between a vectorized sum and apply()-ed sum. You should
+see the same difference with a data.frame.
+
+Where it isn't working (point 5) was there an error message or was the
+result incorrect? Might be a clue that reveals a bug.
+
+Matthew
+
+On Wed, 2010-12-29 at 12:57 -0500, Joseph Voelkel wrote:
+> Thanks, Matthew.
+> 
+> 1. Yes, you have the subsetting of j on your faq.
+> 2. The double eval appears to handle this subsetting. In my smaller problem, which I am working on first, I have about 55K records and 250 variables. Using either A1+A2+A3+A4+A5 or eval(eval()) takes about 0.22 sec of user time. So, from this indirect measure, the two are equally efficient.
+> 3. By the way, for this example, I used 6 keys, which happened for this problem to correspond to 1 record for each unique key. That is, my output also contained 55K records. I originally solved the problem by using apply with sum on the five columns that contained the A1 through A5 value, e.g. apply(DT1[,11:15,with=FALSE],1,sum). This operation took about 0.62 sec. So, even here, data.table is 3x faster than apply.
+> 4. Of course, no key is really needed here, so if I just want to return the sum along with the key vars, I can just use DT1[,list(key1,key2,key3,key4,key5,key6,sum=A1+A2+A3+A4+A5)] which runs in under 0.01 seconds.
+> 5. Finally, I tried your idea of removing the quote and just trying the one eval(). It worked with a simple contrived example, but not for my more complex one--I have no idea why not, because the two seem analogous...
+> 
+>  
+> 
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> Sent: Tuesday, December 28, 2010 12:22 PM
+> To: Joseph Voelkel
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Summing over many variables
+> 
+> Glad that works. Thanks for posting back. One thintg with that approach
+> is that data.table inspects the j expression to see which columns it
+> uses. It only subsets the ones that are used, for efficiency. There's a
+> faq on that I think. If the expression is wrapped up inside an eval I
+> think it still inspects the j but I can't quite remember. I'd be
+> surprised if that works with the double eval like that. If A runs from 1
+> to 100 in your real data and you're taking many sub-sums of 5, then this
+> could make a big difference. Try timing sum(A1) vs sum(A2+A3+A4+A5) with
+> and without the eval(eval()). That should reveal whether the j is being
+> inspected ok.
+> Also looking at it again, you shouldn't need the quote() inside the text
+> passed to parse. Then it's just a single eval and j inspection should be
+> ok I think i.e. DT1[,eval(ASumExpr),by=grp] rather than
+> DT1[,eval(eval(ASumExpr)),by=grp]
+> 
+> Matthew
+> 
+> 
+> On Mon, 2010-12-27 at 13:23 -0500, Joseph Voelkel wrote:
+> > I like Matthew's idea of flattening tables. But, as usual, I did not tell the whole story in my first post. I will probably want to look at many expressions, for example,
+> > 
+> > sum(A1+A2+A3+A4+A5)
+> > sum(A2+A3+A4+A5+A6)
+> > sum(A3+A4+A5+A6+A7)
+> > sum((A1+A2)/2 - (A3+A4)/2)
+> > 
+> > To be able to investigate a sequence of these easily, I found (after some trial and error, and then thinking about it a bit more to try to make my problem look like one from the datatable-faq) that this will do the trick:
+> > 
+> > library(data.table)
+> > 
+> > # create data table
+> > DT1<-data.table(A1=1:1000000,A2=1:1000000,A3=1:1000000,A4=1:1000000,A5=1:1000000,grp=rep(1:50000,each=20))
+> > setkey(DT1,grp)
+> > 
+> > # Say I want DT1[,sum(A1+A2+A3+A4+A5),by=grp]
+> > 
+> > # First, create expression of interest, and convert it to data-table-useful form
+> > ASumExpr<-parse(text=paste("quote(sum(",paste("A",1:5,sep="",collapse="+"),"))",sep=""))
+> > # (Next few lines: to help me and maybe you see what this looks like...)
+> > ASumExpr
+> > str(ASumExpr)
+> > eval(ASumExpr)
+> > str(eval(ASumExpr))
+> > str(quote(mean(x))) # from example in datatable-faq.pdf. So eval(ASumExpr) looks good
+> > 
+> > # long-hand typing method. OK for one or two, but not in general
+> > system.time(dt2a<-DT1[,sum(A1+A2+A3+A4+A5),by=grp])
+> > # formula method. This will be useful.
+> > system.time(dt2b<-DT1[,eval(eval(ASumExpr)),by=grp])
+> > 
+> > identical(dt2a, dt2b)
+> > 
+> > # Fast and easy to write. Just what I wanted. Thanks again for the ideas that lead to this useful solution.
+> > 
+> > Joe V.
+> > 
+> > -----Original Message-----
+> > From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> > Sent: Thursday, December 23, 2010 4:33 PM
+> > To: Joseph Voelkel
+> > Cc: datatable-help at lists.r-forge.r-project.org
+> > Subject: Re: [datatable-help] Summing over many variables
+> > 
+> > 
+> > Yes that's one way. We aren't that happy with using lapply in j as it
+> > loses the benefit of data.table.
+> > 
+> > I tend to 'flatten' tables like this. Try to have few columns. In this
+> > case it would be either a 3 column table (grp,colname,value) or maybe a
+> > 4 column table if you ever want to group by "A" or
+> > "B" (grp,letter,number,value). The query would then be
+> > DT[,sum(value),by=list(grp,letter,number)]. You can then do pattern
+> > matches and filters etc in the i rather than in the j e.g.
+> > DT[letter=="A",sum(value),by=group] for just the "A"s. The answer comes
+> > out in 'flat' format but you can always 'unflatten' the result to make
+> > it look pretty or easier to read.  [Note that I sinned by using '==' in
+> > the i just then invoking vector scan, so to avoid that for speed you
+> > would setkey(letter,group) then DT["A",sum(value),by=group]], or getting
+> > fancy if you only wanted some groups (say 1 and 3) then 'by without by'
+> > e.g. DT[list("A",c(1,3)),sum(value)].
+> > 
+> > 'flat' is a common way to use data.table to store higher dimensional
+> > data, and especially sparse higher dimensional data.
+> > 
+> > The 'grp.1' repetition is a problem I'd like to remove. It's related to
+> > this feature request (but is almost a bug). At the moment you have to
+> > remove the grp.1 afterwards.
+> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=978&group_id=240&atid=978
+> > 
+> > Matthew
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+
+
+

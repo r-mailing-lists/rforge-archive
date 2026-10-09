@@ -1,0 +1,417 @@
+From kponting at avaya.com  Tue Feb 11 15:54:21 2014
+From: kponting at avaya.com (Ponting, Keith (Keith))
+Date: Tue, 11 Feb 2014 14:54:21 +0000
+Subject: [inlinedocs] inlinedocs generating spurious TRUE lines in examples
+Message-ID: <BCE401C8C61C5F4987F47930F3D566FA4E27A7FB@AZ-FFEXMB03.global.avaya.com>
+
+Hello again,
+
+I have run across an interesting issue using the most recent inlinedocs (2013.9.3) on one of my old libraries. The symptom is that running R CMD check fails with:
+
+* checking examples ... ERROR
+Running examples in 'MinerHits-Ex.R' failed
+The error most likely occurred in:
+
+> ### Name: HitInfo
+> ### Title: HitInfo
+> ### Aliases: HitInfo
+>
+> ### ** Examples
+> library(MinerHits)
+> TRUE
+[1] TRUE
+> if ( file.exists("../MinerHits_testdata/SBC") ){ # text data too big to package!
++ TRUE
++   sbc.tiny.test <- HitInfo("../MinerHits_testdata/SBC/PerformanceTester/%d/hits",
++ TRUE
++                        ## select a very small subset of the hits for testing
++ TRUE
+Error: unexpected numeric constant in:
+"                       ## select a very small subset of the hits for testing
+TRUE"
+Execution halted
+
+
+The immediate cause of the problem is all those TRUE lines. Tracing the process I find that in applying parsers, I get to the following state after examples.in.attr parser:
+
+debug: docs <- combine(docs, L)
+Browse[2]> L$HitInfo
+$examples
+[1] TRUE
+
+Browse[2]> docs$HitInfo$examples
+[1] "library(MinerHits)"
+ [2] "if ( file.exists(\"../MinerHits_testdata/SBC\") ){ # text data too big to package!"
+ [3] "  sbc.tiny.test <- HitInfo(\"../MinerHits_testdata/SBC/PerformanceTester/%d/hits\","
+[4] "                       ## select a very small subset of the hits for testing"
+ [5] "                       term.ids=15:20,take.ids=(0:20),selector=HitThresh(2),"
+ [6] "                       phrases=\"7-11\",dataset=\"SBC\")"
+ [7] "  sbc.tiny.test"
+ [8] "  summary(sbc.tiny.test)"
+ [9] "  ll(sbc.tiny.test)"
+[10] "  ## normal use invokes R.oo save.Object"
+[11] "  save(sbc.tiny.test,file=\"sbc.tiny.test.RData\")"
+[12] "  ## But this code is saving for distribution with package."
+[13] "  ## In order to be usable with data function, need to do normal save:"
+[14] "  save(\"sbc.tiny.test\",file=\"sbc.tiny.test.RData\")"
+[15] "}"
+
+and after the combine call this becomes:
+
+Browse[2]> docs$HitInfo$examples
+[1] "library(MinerHits)\nTRUE"
+ [2] "if ( file.exists(\"../MinerHits_testdata/SBC\") ){ # text data too big to package!\nTRUE"
+ [3] "  sbc.tiny.test <- HitInfo(\"../MinerHits_testdata/SBC/PerformanceTester/%d/hits\",\nTRUE"
+[4] "                       ## select a very small subset of the hits for testing\nTRUE"
+ [5] "                       term.ids=15:20,take.ids=(0:20),selector=HitThresh(2),\nTRUE"
+ [6] "                       phrases=\"7-11\",dataset=\"SBC\")\nTRUE"
+ [7] "  sbc.tiny.test\nTRUE"
+ [8] "  summary(sbc.tiny.test)\nTRUE"
+ [9] "  ll(sbc.tiny.test)\nTRUE"
+[10] "  ## normal use invokes R.oo save.Object\nTRUE"
+[11] "  save(sbc.tiny.test,file=\"sbc.tiny.test.RData\")\nTRUE"
+[12] "  ## But this code is saving for distribution with package.\nTRUE"
+[13] "  ## In order to be usable with data function, need to do normal save:\nTRUE"
+[14] "  save(\"sbc.tiny.test\",file=\"sbc.tiny.test.RData\")\nTRUE"
+[15] "}\nTRUE"
+
+And all those TRUE lines subsequently break R CMD check. I note that the definition of combine.character is:
+function (x, y)
+paste(x, y, sep = "\n")
+<environment: namespace:inlinedocs>
+which is where all the \nTRUE comes from.  Is that paste really what you intended combine.character to do in the case where there are examples both in the tests subdirectory and in attributes? I suspect that it would work better as a simple concatenation of the two character vectors.
+
+
+
+The reason for the TRUE being found by examples.in.attr is that R.oo (which I am using here), gives an "export" attribute, which is discovered by the default behaviour of attr(o, "ex") in inlinedocs. We cannot change that usage without breaking behaviour, but we could add exact=TRUE to the attr call?
+
+Thanks,
+
+Keith
+
+Keith Ponting
+Avaya Speech Analytics, Malvern WR14 3SZ  UK
+Any opinions are those of the author not the company.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/inlinedocs-support/attachments/20140211/beff8456/attachment.html>
+
+From tdhock5 at gmail.com  Tue Feb 11 23:06:58 2014
+From: tdhock5 at gmail.com (Toby Hocking)
+Date: Tue, 11 Feb 2014 17:06:58 -0500
+Subject: [inlinedocs] changed it
+Message-ID: <CALK03d06rHR4d=SDSq0c-qyTL7Jhu4xZM3CjajWWupuSAfXkZQ@mail.gmail.com>
+
+Hey Keith nice to hear from you! On my side, I haven't touched inlinedocs
+since the article's publication and it has been working fine for me. In
+fact I just used it to generate the documentation for a new fast regular
+expression package that I am using to extract data from a weird file format
+at my new job in the McGill University human genetics department (Montreal,
+Canada).
+
+https://github.com/tdhock/revector
+
+Thanks for your detailed analysis. I added the exact=TRUE as you suggested,
+and it passed the package checks.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/inlinedocs-support/attachments/20140211/053af2d7/attachment.html>
+
+From kponting at avaya.com  Wed Feb 12 15:35:30 2014
+From: kponting at avaya.com (Ponting, Keith (Keith))
+Date: Wed, 12 Feb 2014 14:35:30 +0000
+Subject: [inlinedocs] inlinedocs generating spurious TRUE lines in
+ examples
+In-Reply-To: <52FB297B.5020002@bgc-jena.mpg.de>
+References: <BCE401C8C61C5F4987F47930F3D566FA4E27A7FB@AZ-FFEXMB03.global.avaya.com>
+ <52FB297B.5020002@bgc-jena.mpg.de>
+Message-ID: <BCE401C8C61C5F4987F47930F3D566FA4E27AB05@AZ-FFEXMB03.global.avaya.com>
+
+Thanks Thomas,
+
+I have modified version 2013.9.3 with both your suggestion below and the exact match - the resulting modified versions work fine for me, passing R CMD check etc. 
+
+Keith
+
+> -----Original Message-----
+> From: Thomas Wutzler [mailto:twutz at bgc-jena.mpg.de]
+> Sent: 12 February 2014 07:58
+> To: Ponting, Keith (Keith)
+> Cc: inlinedocs-support at lists.r-forge.r-project.org
+> Subject: Re: [inlinedocs] inlinedocs generating spurious TRUE lines in
+> examples
+> 
+> Hello Keith,
+> 
+> requiring the package user to specify exact match of "ex" is ok.
+> 
+> If I am understanding correctly,  there is an additional problem: What
+> happens if  there are several examples consisting of several lines for
+> the same function?
+> 
+> Then the call to paste should be reformulated from
+> paste(x, y, sep = "\n")
+> to
+> paste(c(x, y), collapse = "\n")
+> 
+> Would this break behaviour in other uses of  combine.character?
+> 
+> The several examples case may be prevented with requiring exact match of
+> "ex". However, I vaguely remember that there were other ways to specify
+> examples, making the several examples case possible.
+> 
+> Yours,
+> Thomas
+> 
+> On 11.02.2014 15:54, Ponting, Keith (Keith) wrote:
+> > Hello again,
+> >
+> >
+> >
+> > I have run across an interesting issue using the most recent
+> inlinedocs
+> > (2013.9.3) on one of my old libraries. The symptom is that running R
+> CMD
+> > check fails with:
+> >
+> >
+> >
+> > * checking examples ... ERROR
+> >
+> > Running examples in 'MinerHits-Ex.R' failed
+> >
+> > The error most likely occurred in:
+> >
+> >
+> >
+> >> ### Name: HitInfo
+> >
+> >> ### Title: HitInfo
+> >
+> >> ### Aliases: HitInfo
+> >
+> >>
+> >
+> >> ### ** Examples
+> >
+> >> library(MinerHits)
+> >
+> >> TRUE
+> >
+> > [1] TRUE
+> >
+> >> if ( file.exists("../MinerHits_testdata/SBC") ){ # text data too big
+> > to package!
+> >
+> > + TRUE
+> >
+> > +   sbc.tiny.test <-
+> > HitInfo("../MinerHits_testdata/SBC/PerformanceTester/%d/hits",
+> >
+> > + TRUE
+> >
+> > +                        ## select a very small subset of the hits for
+> > testing
+> >
+> > + TRUE
+> >
+> > Error: unexpected numeric constant in:
+> >
+> > "                       ## select a very small subset of the hits for
+> > testing
+> >
+> > TRUE"
+> >
+> > Execution halted
+> >
+> >
+> >
+> >
+> >
+> > The immediate cause of the problem is all those TRUE lines. Tracing
+> the
+> > process I find that in applying parsers, I get to the following state
+> > after examples.in.attr parser:
+> >
+> >
+> >
+> > debug: docs <- combine(docs, L)
+> >
+> > Browse[2]> L$HitInfo
+> >
+> > $examples
+> >
+> > [1] TRUE
+> >
+> >
+> >
+> > Browse[2]> docs$HitInfo$examples
+> >
+> > [1]
+> > "library(MinerHits)"
+> >
+> >
+> >  [2] "if ( file.exists(\"../MinerHits_testdata/SBC\") ){ # text data
+> too
+> > big to package!"
+> >
+> >  [3] "  sbc.tiny.test <-
+> > HitInfo(\"../MinerHits_testdata/SBC/PerformanceTester/%d/hits\","
+> >
+> > [4] "                       ## select a very small subset of the hits
+> > for testing"
+> >
+> >  [5] "
+> > term.ids=15:20,take.ids=(0:20),selector=HitThresh(2),"
+> >
+> >  [6] "
+> > phrases=\"7-11\",dataset=\"SBC\")"
+> >
+> >  [7] "
+> > sbc.tiny.test"
+> >
+> >
+> >  [8] "
+> > summary(sbc.tiny.test)"
+> >
+> >
+> >  [9] "  ll(sbc.tiny.test)"
+> >
+> >
+> > [10] "  ## normal use invokes R.oo
+> > save.Object"
+> >
+> > [11] "
+> > save(sbc.tiny.test,file=\"sbc.tiny.test.RData\")"
+> >
+> >
+> > [12] "  ## But this code is saving for distribution with
+> > package."
+> >
+> > [13] "  ## In order to be usable with data function, need to do normal
+> > save:"
+> >
+> > [14] "
+> > save(\"sbc.tiny.test\",file=\"sbc.tiny.test.RData\")"
+> >
+> >
+> > [15] "}"
+> >
+> >
+> >
+> >
+> > and after the combine call this becomes:
+> >
+> >
+> >
+> > Browse[2]> docs$HitInfo$examples
+> >
+> > [1]
+> > "library(MinerHits)\nTRUE"
+> >
+> >
+> >  [2] "if ( file.exists(\"../MinerHits_testdata/SBC\") ){ # text data
+> too
+> > big to package!\nTRUE"
+> >
+> >  [3] "  sbc.tiny.test <-
+> >
+> HitInfo(\"../MinerHits_testdata/SBC/PerformanceTester/%d/hits\",\nTRUE"
+> >
+> > [4] "                       ## select a very small subset of the hits
+> > for testing\nTRUE"
+> >
+> >  [5] "
+> > term.ids=15:20,take.ids=(0:20),selector=HitThresh(2),\nTRUE"
+> >
+> >  [6] "
+> > phrases=\"7-11\",dataset=\"SBC\")\nTRUE"
+> >
+> >  [7] "  sbc.tiny.test\nTRUE"
+> >
+> >
+> >  [8] "
+> > summary(sbc.tiny.test)\nTRUE"
+> >
+> >
+> >  [9] "
+> > ll(sbc.tiny.test)\nTRUE"
+> >
+> >
+> > [10] "  ## normal use invokes R.oo
+> > save.Object\nTRUE"
+> >
+> > [11] "
+> > save(sbc.tiny.test,file=\"sbc.tiny.test.RData\")\nTRUE"
+> >
+> >
+> > [12] "  ## But this code is saving for distribution with
+> > package.\nTRUE"
+> >
+> > [13] "  ## In order to be usable with data function, need to do normal
+> > save:\nTRUE"
+> >
+> > [14] "
+> > save(\"sbc.tiny.test\",file=\"sbc.tiny.test.RData\")\nTRUE"
+> >
+> >
+> > [15] "}\nTRUE"
+> >
+> >
+> >
+> >
+> > And all those TRUE lines subsequently break R CMD check. I note that
+> the
+> > definition of combine.character is:
+> >
+> > function (x, y)
+> >
+> > paste(x, y, sep = "\n")
+> >
+> > <environment: namespace:inlinedocs>
+> >
+> > which is where all the \nTRUE comes from.  Is that paste really what
+> you
+> > intended combine.character to do in the case where there are examples
+> > both in the tests subdirectory and in attributes? I suspect that it
+> > would work better as a simple concatenation of the two character
+> vectors.
+> >
+> >
+> >
+> >
+> >
+> >
+> >
+> > The reason for the TRUE being found by examples.in.attr is that R.oo
+> > (which I am using here), gives an "export" attribute, which is
+> > discovered by the default behaviour of attr(o, "ex") in inlinedocs. We
+> > cannot change that usage without breaking behaviour, but we could add
+> > exact=TRUE to the attr call?
+> >
+> >
+> >
+> > Thanks,
+> >
+> >
+> >
+> > Keith
+> >
+> >
+> >
+> > Keith Ponting
+> >
+> > Avaya Speech Analytics, Malvern WR14 3SZ  UK
+> >
+> > Any opinions are those of the author not the company.
+> >
+> >
+> >
+> > _______________________________________________
+> > Inlinedocs-support mailing list
+> > Inlinedocs-support at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-
+> bin/mailman/listinfo/inlinedocs-support
+> >
+
+

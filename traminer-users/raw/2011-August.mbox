@@ -1,0 +1,222 @@
+From Matthias.Studer at unige.ch  Tue Aug 30 09:55:20 2011
+From: Matthias.Studer at unige.ch (Matthias Studer)
+Date: Tue, 30 Aug 2011 09:55:20 +0200
+Subject: [Traminer-users] alining sequences according to exogenous time
+ variables
+In-Reply-To: <441733.10734.1311612125550.JavaMail.root@aten1.sciences-po.fr>
+References: <441733.10734.1311612125550.JavaMail.root@aten1.sciences-po.fr>
+Message-ID: <4E5C9768.8040904@unige.ch>
+
+Hi Simon,
+
+Sorry for taking so much time to answer your question... In this answer, 
+I will reuse the same code as the one used to truncate the sequence to a 
+varying length (available here: 
+http://lists.r-forge.r-project.org/pipermail/traminer-users/2011-May/000070.html 
+)
+
+Below, I give two examples to answer your question based on the mvad 
+dataset. In the first one, we will align the sequence according to a 
+random date specific to each individual. In the second one, we will 
+compute the age at first joblessness episode to align the sequence.
+
+
+## loading TraMineR and the data
+library(TraMineR)
+data(mvad)
+
+## Defining alphabet and so on
+mvad.alphabet <- c("employment", "FE", "HE", "joblessness", "school",
+     "training")
+mvad.labels <- c("employment", "further education", "higher education",
+     "joblessness", "school", "training")
+mvad.scodes <- c("EM", "FE", "HE", "JL", "SC", "TR")
+
+## The idea is to transform the data before defining the sequence object
+## Here we store the sequence data in a the mvad.data object
+mvad.data <- mvad[, 17:86]
+
+
+## Here we generate a random integer to align the sequences
+## The results is a vector of length 712 with integer values ranging 
+from 1 to 20
+## This should be the date you want to use to align your sequences
+randomlength <- ceiling(runif(nrow(mvad))*20)
+head(randomlength)
+
+## On way is to use a "position" matrix, which store, for each cell the 
+current position in the sequence (see the previous mail about truncating 
+sequences)
+positionindex <- matrix(1:70, nrow=nrow(mvad), ncol=70, byrow=TRUE)
+
+head(positionindex)
+
+## Using this position matrix, we can affect the NA value to each position
+## that are before the aligning date
+mvad.data[positionindex < randomlength] <- NA
+
+## Now, here is the trick. We delete the NA values appearing on the left 
+using the option left="DEL"
+
+mvad.seq <- seqdef(mvad.data, alphabet = mvad.alphabet, states = 
+mvad.scodes,
+     labels = mvad.labels, xtstep = 6, left="DEL")
+
+
+all.equal(as.numeric(seqlength(mvad.seq)), 71-randomlength)
+seqdplot(mvad.seq)
+
+## Second example, we align the sequences with the age at first 
+joblessness episode
+### Start by retrieving this age
+
+## Use a fresh data object
+mvad.data <- mvad[, 17:86]
+
+## Creating a vector containing by default NA values
+age <- rep(NA, nrow(mvad.data))
+
+state <- "joblessness"
+## for each column
+for(i in 1:ncol(mvad.data)){
+     ## Asign current column value to individual who first enter the 
+state "state"
+     ## To do that search for individuals that did not experience the 
+state before
+     ## Those individuals have NA entries in the age vector
+     notexperienced <- is.na(age)
+     ## Select the individual that are now in the state "state"
+     instate <- mvad.data[, i] == state
+     ## Assign current column value to individuals that meet both conditions
+     age[notexperienced & instate ] <- i
+}
+
+
+
+## indiv with NA values in age never experienced the state joblessness, 
+so remove it.
+
+mvad.dataJL <- mvad.data[!is.na(age), ]
+ageJL <- age[!is.na(age)]
+
+## Use the position matrix
+positionindex <- matrix(1:70, nrow=nrow(mvad.dataJL), ncol=70, byrow=TRUE)
+
+## Using this position matrix, we can affect the NA value to each position
+## that are before the aligning date
+mvad.dataJL[positionindex < ageJL] <- NA
+
+## Now, here is the trick. We delete the NA values appearing on the left 
+using the option left="DEL"
+
+mvad.seqJL <- seqdef(mvad.dataJL, alphabet = mvad.alphabet, states = 
+mvad.scodes,
+     labels = mvad.labels, xtstep = 6, left="DEL")
+
+seqdplot(mvad.seqJL)
+
+Hope this helps.
+
+Matthias Studer
+
+Le 25.07.2011 18:42, Simon PAYE a ?crit :
+> Dear colleagues,
+> I come back to the TraMineR list for another technical question that might be of use for other career or time-use analysts.
+> My purpose is to align all the sequences of my sequence object according to a date specific to each individual. The variable indicating the date is exogenous to the sequence. In my case, I would like to align careers according to the moment in which a specific turning point occurs (for example being given job tenure).
+> Example: aligning two sequences according to the date of tenure award
+>          2000        2001        2002       2003       2004      2005
+> X       A            A           B          B          B          C
+> Y                    A           A          B          B
+> (X got married in 2002 and Y in 2003)
+> I intend to end up with this:
+>             T-2        T-1        Ten.       T+1        T+2        T+3
+> X          A          A           B          B          B          C
+> Y                     A           A          B          B
+> I have already aligned sequences manually in Excel, but it is a rather frustrating task. As I would like to do this aligning operation for various turning points in the career (e.g. parenthood, major publication, etc), I hope that we can succesfully develop a small loop in TraMineR or perhaps a new argument in the sequIplot function, something like:
+> R>  seqdef(mydata, var = 81:127, align = mydata$year.tenure)
+>
+> All the best and thank you again,
+> Simon
+>
+>
+> --------------------------------------------------------------------------
+> Tous les courriers ?lectroniques ?mis depuis la messagerie
+> de Sciences Po doivent respecter des conditions d'usages.
+> Pour les consulter rendez-vous sur
+> http://www.ressources-numeriques.sciences-po.fr/confidentialite_courriel.htm
+> _______________________________________________
+> Traminer-users mailing list
+> Traminer-users at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users
+
+  * Anglais - d?tect?
+  * Anglais
+  * Fran?ais
+  * Allemand
+
+  * Anglais
+  * Fran?ais
+  * Allemand
+
+<javascript:void(0);>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20110830/148b912d/attachment.htm>
+
+From Matthias.Studer at unige.ch  Tue Aug 30 14:44:12 2011
+From: Matthias.Studer at unige.ch (Matthias Studer)
+Date: Tue, 30 Aug 2011 14:44:12 +0200
+Subject: [Traminer-users] "Discrepancy Analysis of State Sequences"
+ published in "Sociological Methods & Research"
+Message-ID: <4E5CDB1C.4080307@unige.ch>
+
+Dear all,
+
+We are very pleased to announce the publication of our article 
+"Discrepancy Analysis of State Sequences" in the latest issue of 
+"Sociological Methods & Research". It is available here : 
+http://smr.sagepub.com/content/40/3/471 .
+
+This article presents the methods for discrepancy analysis made 
+available in TraMineR. Those methods allow to measure the relationship 
+between state sequences and explanatory variables and to assess the 
+significance of the association.
+
+All the numerical results and plots presented in the article can easily 
+be reproduced with the R script provided here: 
+http://mephisto.unige.ch/traminer/scripts/discrepancy_analysis.R
+
+Best regards,
+
+Matthias, Gilbert, Alexis et Nicolas
+
+PS: A preprint version can be downloaded from the TraMineR website.
+
+
+Studer, M., Ritschard, G., Gabadinho, A. & M?ller, N.S. (2011), 
+"Discrepancy Analysis of State Sequences", Sociological Methods and 
+Research. Vol. 40(3), pp. 471-510.
+
+Abstract
+In this article, the authors define a methodological framework for 
+analyzing the relationship between state sequences and covariates. 
+Inspired by the principles of analysis of variance, this approach looks 
+at how the covariates explain the discrepancy of the sequences. The 
+authors use the pairwise dissimilarities between sequences to determine 
+the discrepancy, which makes it possible to develop a series of 
+statistical significance--based analysis tools. They introduce 
+generalized simple and multifactor discrepancy-based methods to test for 
+differences between groups, a pseudo-R 2 for measuring the strength of 
+sequence-covariate associations, a generalized Levene statistic for 
+testing differences in the within-group discrepancies, as well as tools 
+and plots for studying the evolution of the differences along the time 
+frame and a regression tree method for discovering the most significant 
+discriminant covariates and their interactions. In addition, the authors 
+extend all methods to account for case weights. The scope of the 
+proposed methodological framework is illustrated using a real-world 
+sequence data set.
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20110830/0dd41030/attachment.htm>
+

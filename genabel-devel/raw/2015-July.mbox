@@ -1,0 +1,546 @@
+From yurii.aulchenko at gmail.com  Fri Jul  3 18:03:57 2015
+From: yurii.aulchenko at gmail.com (Yury Aulchenko)
+Date: Fri, 3 Jul 2015 18:03:57 +0200
+Subject: [GenABEL-dev] Fwd: CRAN packages maintained by you
+References: <21909.1101.132120.323584@fangorn.hornik.net>
+Message-ID: <C75BF75D-7ED2-42C9-A821-51F4033D8860@gmail.com>
+
+FYI 
+
+----------------
+Sent from mobile device, please excuse possible typos
+
+Begin forwarded message:
+
+> From: Kurt Hornik <Kurt.Hornik at wu.ac.at>
+> Date: 2 Jul 2015 11:28:45 CEST
+> To: CRAN at R-project.org
+> Subject: CRAN packages maintained by you
+> Reply-To: Kurt.Hornik at wu.ac.at
+> 
+> 
+> Dear CRAN package maintainers,
+> 
+> You may already have seen the following news item for r-devel:
+> 
+>    * 'R CMD check --as-cran' now checks code usage (via 'codetools')
+>      with only the base package attached, so that functions from
+>      default packages other than base which are used in the package
+>      code but not imported are reported as undefined globals.
+> 
+> This may result in lots of notes about undefined globals which can be
+> found in the default packages.  The change was made because even though
+> the default packages (stats, graphics, ...) are typically loaded and
+> attached, bindings not found in the package code itself, the imports or
+> base are searched for along the search path starting with the global
+> environment, and there is no control over what is actually found there.
+> Therefore, undefined globals corresponding to functions or variables in
+> the default packages, really need to be imported into the package
+> namespace.
+> 
+> With current versions of r-devel, one can get a convenient summary of
+> all undefined globals, which can be used for programmatically generating
+> the missing imports as follows.  
+> 
+> One package currently gives
+> 
+> * checking R code for possible problems ... NOTE
+> choose_palette : SaveColorsToFile: no visible global function
+>  definition for ?write.table?
+> choose_palette : ShowExample: no visible global function definition for
+>  ?dev.list?
+> choose_palette : ShowExample: no visible global function definition for
+>  ?dev.new?
+> choose_palette : ShowExample: no visible global function definition for
+>  ?dev.cur?
+> choose_palette : ShowExample: no visible global function definition for
+>  ?par?
+> choose_palette : RegenExample: no visible global function definition
+>  for ?dev.list?
+> choose_palette : RegenExample: no visible global function definition
+>  for ?dev.set?
+> choose_palette : PlotMap: no visible global function definition for
+>  ?polygon?
+> <...................................................................>
+> choose_palette : PlotMosaic: no visible global function definition for
+>  ?image?
+> choose_palette : PlotLines: no visible global function definition for
+>  ?segments?
+> choose_palette: no visible global function definition for
+>  ?compareVersion?
+> choose_palette: no visible global function definition for ?dev.list?
+> choose_palette: no visible global function definition for ?dev.off?
+> desaturate: no visible global function definition for ?col2rgb?
+> Undefined global functions or variables:
+>  barplot col2rgb compareVersion cutree dev.cur dev.list dev.new
+>  dev.off dev.set dist dnorm hclust head image na.omit par persp pie
+>  polygon rect rnorm runif segments volcano write.table
+> 
+> Using the above output, do
+> 
+> txt <- "barplot col2rgb compareVersion cutree dev.cur dev.list dev.new
+>  dev.off dev.set dist dnorm hclust head image na.omit par persp pie
+>  polygon rect rnorm runif segments volcano write.table"
+> 
+> and use
+> 
+> imports_for_undefined_globals <-
+> function(txt, lst, selective = TRUE)
+> {
+>    if(!missing(txt))
+>        lst <- scan(what = character(), text = txt, quiet = TRUE)
+>    nms <- lapply(lst, find)
+>    ind <- sapply(nms, length) > 0L
+>    imp <- split(lst[ind], substring(unlist(nms[ind]), 9L))
+>    if(selective) {
+>        sprintf("importFrom(%s)",
+>                vapply(Map(c, names(imp), imp),
+>                       function(e)
+>                           paste0("\"", e, "\"", collapse = ", "),
+>                       ""))
+>    } else {
+>        sprintf("import(\"%s\")", names(imp))
+>    }
+> }                       
+> 
+> to get
+> 
+> R> writeLines(imports_for_undefined_globals(txt))
+> importFrom("datasets", "volcano")
+> importFrom("grDevices", "col2rgb", "dev.cur", "dev.list", "dev.new", "dev.off", "dev.set")
+> importFrom("graphics", "barplot", "image", "par", "persp", "pie", "polygon", "rect", "segments")
+> importFrom("stats", "cutree", "dist", "dnorm", "hclust", "na.omit", "rnorm", "runif")
+> importFrom("utils", "compareVersion", "head", "write.table")
+> 
+> For non-selective importing, use
+> 
+> R> writeLines(imports_for_undefined_globals(txt, selective = FALSE))
+> import("datasets")
+> import("grDevices")
+> import("graphics")
+> import("stats")
+> import("utils")
+> 
+> Of course, namespaces newly imported from also need to be listed in the
+> Imports: field of DESCRIPTION.
+> 
+> Please make sure you make the necessary changes before you submit new
+> versions of your package to CRAN.
+> 
+> Best
+> -k
+> 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150703/16e28d17/attachment.html>
+
+From yurii.aulchenko at gmail.com  Wed Jul  8 17:50:35 2015
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Wed, 8 Jul 2015 17:50:35 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r2000 - pkg/GenABEL/R
+In-Reply-To: <20150708154449.1C9C21861AB@r-forge.r-project.org>
+References: <20150708154449.1C9C21861AB@r-forge.r-project.org>
+Message-ID: <8627980E-F069-4A90-BC22-36D7E36E16E3@gmail.com>
+
+Hi nd_0001! (Yakov?)
+
+?no/one measurement? as diagnostic comment may be confusing for the user; and then you say ?number of points is too small?, apparently also relating to the npt
+
+Looking in the documentation, I assume that npt is length of 
+
+data: Input vector of Chi square statistic
+
+so why not calling it the way people know form the doc? e.g.
+
+?input vector ?data? has zero-length? and so on?
+
+Yurii
+
+> On 08 Jul 2015, at 17:44, noreply at r-forge.r-project.org wrote:
+> 
+> Author: nd_0001
+> Date: 2015-07-08 17:44:48 +0200 (Wed, 08 Jul 2015)
+> New Revision: 2000
+> 
+> Modified:
+>   pkg/GenABEL/R/VIFGC_ovdom.R
+> Log:
+> Minor changes in GC functions, need to rewrite. Also catched 2000th revision=)
+> 
+> Modified: pkg/GenABEL/R/VIFGC_ovdom.R
+> ===================================================================
+> --- pkg/GenABEL/R/VIFGC_ovdom.R	2015-07-08 07:36:58 UTC (rev 1999)
+> +++ pkg/GenABEL/R/VIFGC_ovdom.R	2015-07-08 15:44:48 UTC (rev 2000)
+> @@ -136,8 +136,9 @@
+>     if (ntp < 1) 
+>         stop("no valid measurments")
+>     if (ntp == 1) {
+> -        warning(paste("One measurment, Lambda = 1 returned"))
+> -        return(list(estimate = 1, se = 999.99))
+> +        stop("Only one measurment. Stoped.")
+> +        #warning(paste("One measurment, Lambda = 1 returned"))
+> +        #return(list(estimate = 1, se = 999.99))
+>     }
+>     if (ntp < 10) 
+>         warning(paste("number of points is too small:", ntp))
+> 
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+
+
+From drosophila.simulans at gmail.com  Wed Jul  8 18:39:39 2015
+From: drosophila.simulans at gmail.com (Yakov Tsepilov)
+Date: Wed, 8 Jul 2015 22:39:39 +0600
+Subject: [GenABEL-dev] [Genabel-commits] r2000 - pkg/GenABEL/R
+In-Reply-To: <8627980E-F069-4A90-BC22-36D7E36E16E3@gmail.com>
+References: <20150708154449.1C9C21861AB@r-forge.r-project.org>
+ <8627980E-F069-4A90-BC22-36D7E36E16E3@gmail.com>
+Message-ID: <CAPPpKsXMgQMv=-0Kxmk3XZbE3MPgzo8SDSO5y8TL_JJo1ugUhA@mail.gmail.com>
+
+Hi Yurii,
+
+Good suggestion, anyway I will rewrite scripts in proper way (according to
+Genabel standards for code formatting).
+
+With kind regards, Yakov Tsepilov.
+
+
+2015-07-08 21:50 GMT+06:00 Yurii Aulchenko <yurii.aulchenko at gmail.com>:
+
+> Hi nd_0001! (Yakov?)
+>
+> ?no/one measurement? as diagnostic comment may be confusing for the user;
+> and then you say ?number of points is too small?, apparently also relating
+> to the npt
+>
+> Looking in the documentation, I assume that npt is length of
+>
+> data: Input vector of Chi square statistic
+>
+> so why not calling it the way people know form the doc? e.g.
+>
+> ?input vector ?data? has zero-length? and so on?
+>
+> Yurii
+>
+> > On 08 Jul 2015, at 17:44, noreply at r-forge.r-project.org wrote:
+> >
+> > Author: nd_0001
+> > Date: 2015-07-08 17:44:48 +0200 (Wed, 08 Jul 2015)
+> > New Revision: 2000
+> >
+> > Modified:
+> >   pkg/GenABEL/R/VIFGC_ovdom.R
+> > Log:
+> > Minor changes in GC functions, need to rewrite. Also catched 2000th
+> revision=)
+> >
+> > Modified: pkg/GenABEL/R/VIFGC_ovdom.R
+> > ===================================================================
+> > --- pkg/GenABEL/R/VIFGC_ovdom.R       2015-07-08 07:36:58 UTC (rev 1999)
+> > +++ pkg/GenABEL/R/VIFGC_ovdom.R       2015-07-08 15:44:48 UTC (rev 2000)
+> > @@ -136,8 +136,9 @@
+> >     if (ntp < 1)
+> >         stop("no valid measurments")
+> >     if (ntp == 1) {
+> > -        warning(paste("One measurment, Lambda = 1 returned"))
+> > -        return(list(estimate = 1, se = 999.99))
+> > +        stop("Only one measurment. Stoped.")
+> > +        #warning(paste("One measurment, Lambda = 1 returned"))
+> > +        #return(list(estimate = 1, se = 999.99))
+> >     }
+> >     if (ntp < 10)
+> >         warning(paste("number of points is too small:", ntp))
+> >
+> > _______________________________________________
+> > Genabel-commits mailing list
+> > Genabel-commits at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+>
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150708/9b7f3bb1/attachment.html>
+
+From l.c.karssen at polyomica.com  Wed Jul  8 22:46:22 2015
+From: l.c.karssen at polyomica.com (L.C. Karssen)
+Date: Wed, 08 Jul 2015 22:46:22 +0200
+Subject: [GenABEL-dev] The GenABEL tutorial now has a DOI
+Message-ID: <559D8C1E.2050703@polyomica.com>
+
+Dear GenABEL followers,
+
+We are pleased to announce that today we uploaded the current version of
+the GenABEL tutorial to Zenodo [1], a service for sharing
+multidisciplinary research results (data and publications).
+As a result, the tutorial has been given a DOI (Digital Object
+Identifier) and is more easily citable [2].
+
+So if you need to cite the tutorial in a paper or on a poster, or if
+you'd like to point it out to a colleague, please use the DOI. Moreover,
+I've also created a "The GenABEL Project" community on Zenodo, so please
+enter that community when uploading GenABEL-related materials to Zenodo.
+
+
+Best regards,
+
+Lennart Karssen.
+
+
+[1] http://www.zenodo.org
+[2] http://dx.doi.org/10.5281/zenodo.19738
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+Lennart C. Karssen
+PolyOmica
+Groningen
+The Netherlands
+
+l.c.karssen at polyomica.com
+GPG key ID: 1A15AF2A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150708/ebe4bbee/attachment.sig>
+
+From yurii.aulchenko at gmail.com  Thu Jul  9 09:45:58 2015
+From: yurii.aulchenko at gmail.com (Yury Aulchenko)
+Date: Thu, 9 Jul 2015 09:45:58 +0200
+Subject: [GenABEL-dev] The GenABEL tutorial now has a DOI
+In-Reply-To: <559D8C1E.2050703@polyomica.com>
+References: <559D8C1E.2050703@polyomica.com>
+Message-ID: <E475F345-B1B1-42C1-8062-047C8F011A2E@gmail.com>
+
+Great! Thank you very much, Lennart, for arranging this! So would the proper reference now look like:
+
+Yurii S Aulchenko, Lennart C. Karssen, the GenABEL project developers: "The GenABEL Tutorial", doi:10.5281/zenodo.19738
+
+Should we also add this reference to http://www.genabel.org/tutorials?
+
+Yurii
+
+----------------
+Sent from mobile device, please excuse possible typos
+
+> On 08 Jul 2015, at 22:46, L.C. Karssen <l.c.karssen at polyomica.com> wrote:
+> 
+> Dear GenABEL followers,
+> 
+> We are pleased to announce that today we uploaded the current version of
+> the GenABEL tutorial to Zenodo [1], a service for sharing
+> multidisciplinary research results (data and publications).
+> As a result, the tutorial has been given a DOI (Digital Object
+> Identifier) and is more easily citable [2].
+> 
+> So if you need to cite the tutorial in a paper or on a poster, or if
+> you'd like to point it out to a colleague, please use the DOI. Moreover,
+> I've also created a "The GenABEL Project" community on Zenodo, so please
+> enter that community when uploading GenABEL-related materials to Zenodo.
+> 
+> 
+> Best regards,
+> 
+> Lennart Karssen.
+> 
+> 
+> [1] http://www.zenodo.org
+> [2] http://dx.doi.org/10.5281/zenodo.19738
+> -- 
+> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+> Lennart C. Karssen
+> PolyOmica
+> Groningen
+> The Netherlands
+> 
+> l.c.karssen at polyomica.com
+> GPG key ID: 1A15AF2A
+> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+
+From yurii.aulchenko at gmail.com  Thu Jul  9 09:54:04 2015
+From: yurii.aulchenko at gmail.com (Yury Aulchenko)
+Date: Thu, 9 Jul 2015 09:54:04 +0200
+Subject: [GenABEL-dev] The GenABEL tutorial now has a DOI
+In-Reply-To: <559D8C1E.2050703@polyomica.com>
+References: <559D8C1E.2050703@polyomica.com>
+Message-ID: <6AB70C46-FC20-4E9D-AEC9-DABCCE4CE0FE@gmail.com>
+
+Great! Thank you very much, Lennart, for arranging this! So would the proper reference now look like:
+
+Yurii S. Aulchenko, Lennart C. Karssen, the GenABEL project developers: "The GenABEL Tutorial", doi:10.5281/zenodo.19738
+
+Should we also add this reference to http://www.genabel.org/tutorials?
+
+Yurii
+
+----------------
+Sent from mobile device, please excuse possible typos
+
+> On 08 Jul 2015, at 22:46, L.C. Karssen <l.c.karssen at polyomica.com> wrote:
+> 
+> Dear GenABEL followers,
+> 
+> We are pleased to announce that today we uploaded the current version of
+> the GenABEL tutorial to Zenodo [1], a service for sharing
+> multidisciplinary research results (data and publications).
+> As a result, the tutorial has been given a DOI (Digital Object
+> Identifier) and is more easily citable [2].
+> 
+> So if you need to cite the tutorial in a paper or on a poster, or if
+> you'd like to point it out to a colleague, please use the DOI. Moreover,
+> I've also created a "The GenABEL Project" community on Zenodo, so please
+> enter that community when uploading GenABEL-related materials to Zenodo.
+> 
+> 
+> Best regards,
+> 
+> Lennart Karssen.
+> 
+> 
+> [1] http://www.zenodo.org
+> [2] http://dx.doi.org/10.5281/zenodo.19738
+> -- 
+> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+> Lennart C. Karssen
+> PolyOmica
+> Groningen
+> The Netherlands
+> 
+> l.c.karssen at polyomica.com
+> GPG key ID: 1A15AF2A
+> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150709/5172f892/attachment.html>
+
+From lennart at karssen.org  Thu Jul  9 22:22:16 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Thu, 09 Jul 2015 22:22:16 +0200
+Subject: [GenABEL-dev] The GenABEL tutorial now has a DOI
+In-Reply-To: <6AB70C46-FC20-4E9D-AEC9-DABCCE4CE0FE@gmail.com>
+References: <559D8C1E.2050703@polyomica.com>
+ <6AB70C46-FC20-4E9D-AEC9-DABCCE4CE0FE@gmail.com>
+Message-ID: <559ED7F8.2020509@karssen.org>
+
+On 09-07-15 09:54, Yury Aulchenko wrote:
+> Great! Thank you very much, Lennart, for arranging this! 
+
+You're welcome!
+
+> So would the
+> proper reference now look like:
+> 
+> Yurii S. Aulchenko, Lennart C. Karssen, the GenABEL project developers:
+> "The GenABEL Tutorial", doi:10.5281/zenodo.19738
+
+Yes. See also the "Cite as" box in the menu on the right (below the
+social media icons). There you can select your citation style or do an
+export to e.g. BibTeX or EndNote.
+
+> 
+> Should we also add this reference to http://www.genabel.org/tutorials?
+
+Done.
+
+
+Lennart.
+
+> 
+> Yurii
+> 
+> ----------------
+> Sent from mobile device, please excuse possible typos
+> 
+> On 08 Jul 2015, at 22:46, L.C. Karssen <l.c.karssen at polyomica.com
+> <mailto:l.c.karssen at polyomica.com>> wrote:
+> 
+>> Dear GenABEL followers,
+>>
+>> We are pleased to announce that today we uploaded the current version of
+>> the GenABEL tutorial to Zenodo [1], a service for sharing
+>> multidisciplinary research results (data and publications).
+>> As a result, the tutorial has been given a DOI (Digital Object
+>> Identifier) and is more easily citable [2].
+>>
+>> So if you need to cite the tutorial in a paper or on a poster, or if
+>> you'd like to point it out to a colleague, please use the DOI. Moreover,
+>> I've also created a "The GenABEL Project" community on Zenodo, so please
+>> enter that community when uploading GenABEL-related materials to Zenodo.
+>>
+>>
+>> Best regards,
+>>
+>> Lennart Karssen.
+>>
+>>
+>> [1] http://www.zenodo.org
+>> [2] http://dx.doi.org/10.5281/zenodo.19738
+>> -- 
+>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>> Lennart C. Karssen
+>> PolyOmica
+>> Groningen
+>> The Netherlands
+>>
+>> l.c.karssen at polyomica.com <mailto:l.c.karssen at polyomica.com>
+>> GPG key ID: 1A15AF2A
+>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> <mailto:genabel-devel at lists.r-forge.r-project.org>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150709/c56f7cef/attachment.sig>
+

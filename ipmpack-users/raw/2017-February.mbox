@@ -1,0 +1,98 @@
+From ciwhite at tcd.ie  Wed Feb  8 23:49:19 2017
+From: ciwhite at tcd.ie (Cian White)
+Date: Wed, 8 Feb 2017 22:49:19 +0000
+Subject: [Ipmpack-users] Potential Bug in sensParams
+Message-ID: <CAJvF0+zoCabmM6sLehEZEbfoFOX7KtfDJg8e_7Pai=aZysA-3Q@mail.gmail.com>
+
+Hi all,
+
+I think I have found a bug in the sensParams function. I am modelling a
+population of *Plantago lanceolata *and at one site there is changing
+variance in the size of individuals, more variance in smaller plants and
+less variance in larger plants.
+
+I specify this in the *makeGrowthObject *function as follows:
+CHgo <- makeGrowthObj(dataf = CH1, Formula = sizeNext ~ size, *regType =
+"changingVar"*, Family = "gaussian")
+
+I am able to build an IPM, plot sensitivity & elasticity matrices, stable
+size distributions, extract lambda etc but when I try to examine the
+sensitivities and elasticities of parameters I get an error.
+
+> CHres <- sensParams(growObj = CHgo,
++                     survObj = CHso, fecObj = CHfo, discreteTrans =
+CHdiscTrans,
++                     nBigMatrix = 100, minSize = CHminSize,
++                     maxSize = CHmaxSize)
+
+Error in sensParams(growObj = CHgo, survObj = CHso, fecObj = CHfo,
+discreteTrans = CHdiscTrans,  :
+  no slot of name "sd" for this object of class "growthObjDeclineVar"
+
+The sensParams function works fine when constantVar is specified.
+
+I think it comes down to the fact that when the regression type is
+specified as changingVar, a gls is used as opposed to a glm. It seems a
+slot wasn't created for standard deviation when a gls is used and so when
+the sensParams function goes looking for it, this error results.
+
+I'll be happily pointed out the error in what I am doing but I can't find a
+way around it. I'd also like to thank the creators of IPMpack, it's an
+amazing tool and the appendix is extremely helpful.
+
+Thanks,
+
+Cian White
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20170208/e0c718b0/attachment.html>
+
+From kathryn.baer at umconnect.umt.edu  Thu Feb 23 05:56:57 2017
+From: kathryn.baer at umconnect.umt.edu (Baer, Kathryn)
+Date: Thu, 23 Feb 2017 04:56:57 +0000
+Subject: [Ipmpack-users] Bootstrapping IPMs with Discrete Stages --
+ Troubleshooting High Estimates of Lambda
+Message-ID: <BN6PR01MB2402E82EE7251432010F201DCD530@BN6PR01MB2402.prod.exchangelabs.com>
+
+Hello IPMpack users!
+
+I have a fairly specific question, although I imagine the answer might be useful to others, as well.
+
+I am attempting to build distributions of estimated lambda from 500 IPMs constructed using 500 bootstrapped datasets for demography in a perennial plant. The goal is to use these models in randomization tests to determine the population-scale significance of an experimental treatment. The bootstrapped datasets were built by sampling even numbers of individuals at random from each of the four quartiles of the range of sizes in the original dataframe (to avoid erroneous distributions of size arising by chance). I then built IPMs for each bootstrapped dataset and calculated an estimate of lambda for each, using the minimum and maximum values of ln-transformed size in each dataset to define the minimum and maximum sizes for building the IPM for that dataset. While this generally resulted in reasonable values for lambda, there are a few models that produced astronomically high estimates (somewhere in the vicinity of 15-50/500 models).
+
+My question is: how to troubleshoot this? I've checked the diagnostics on the models giving high estimates for lambda but the models appear to fit well and the P matrices all look good (and the distribution of values look very similar to models giving reasonable estimates of lambda). There are no gaps in sizes due to the manner in which I bootstrapped the data. I've tried changing the maximum sizes by multiplying them by a constant, and increasing the bin numbers. I've played around with different model structures (adding in or deleting squared and cubed values for size). I also tried increasing or decreasing the number of draws for each bootstrapped dataset. I haven't had much luck with any of these approaches, although the number of models estimating unrealistic values of lambda decreased when I calculated separate maximum and minimum values of size for each model based on the maximum or minimum in the dataset.
+
+Any ideas of other things to try in order to address this problem? I'm stumped!
+
+A very abbreviated form of the models is as follows (all measures of size are natural log-transformed):
+
+P Matrix:
+
+survival~size
+
+growth~size+size^2+size^3
+
+- there are also 2 discrete stages: a seed bank (into which most seeds go if they do not germinate the spring after they fall), and a seedling stage, which can come from seeds germinating from the seedbank or the spring after they fall (all seedlings are roughly the same size so not included in the continuous model). Only surviving seedlings enter the continuous stage, and their size when they do so is modeled by a constant mean and standard deviation.
+
+F Matrix:
+
+probability of flowering (fec.0)~size
+
+number of seeds if the plant did flower (fec.1)~size+size^2+size^3
+
+-Constants describe the proportion of seeds that gerinate in the following spring vs. entering the seed bank.
+
+
+Thanks in advance for any ideas or suggestions you might have!
+
+Cheers,
+
+Katie Baer
+kathryn.baer at umconnect.umt.edu
+PhD Candidate - Maron Lab<http://cas.umt.edu/dbs/labs/maron/>
+Department of Biological Sciences<http://cas.umt.edu/dbs/>
+University of Montana
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20170223/4bd6905e/attachment.html>
+

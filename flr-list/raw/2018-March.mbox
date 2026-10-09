@@ -1,0 +1,917 @@
+From luisr at hav.fo  Mon Mar  5 11:35:10 2018
+From: luisr at hav.fo (Luis Ridao)
+Date: Mon, 5 Mar 2018 10:35:10 +0000
+Subject: [FLR-list] Release of FLCore 2.6.6
+In-Reply-To: <371CB7A1EFC2F14CADD9AC271507075608F0013A@S-DC-ESTC01-J.net1.cec.eu.int>
+References: <371CB7A1EFC2F14CADD9AC271507075608F0013A@S-DC-ESTC01-J.net1.cec.eu.int>
+Message-ID: <96cc4e63-1eab-9c13-733d-a8455c87c349@hav.fo>
+
+Dear all,
+
+I'm trying to set up a MSE in which the assessment model is neither 
+FLXSA nor FLa4a.
+
+The SAM model (stockassessment.org implemented in R) is used as the 
+basis of the advice.
+
+Can anyone inform me whether it's possible to incorporate this into the 
+'mse' package in FLR
+and conduct simulations or another way around it?
+
+thanks in advance,
+Luis
+
+
+On 02/22/2018 02:51 PM, Iago.MOSQUEIRA at ec.europa.eu wrote:
+> Dear all,
+>
+> A new release of FLCore, version 2.6.6, has made it to the FLR repository. Source packages (Linux) as well as binary packages for Windows and Mac OSX El Capitan (10.11.6) are available. Please install using the usual
+>
+> install.packages(repos="http://flr-project.org/R")
+>
+> and test with your code. Please do not hesitate reporting any problem by filling an issue at
+>
+> https://github.com/flr/flcore/issues
+>
+> These are the most notable changes in FLCore 2.6.6:
+>
+> FLCore 2.6.6
+>
+>   NEW FEATURES
+>
+> - window(FLStocks) method to apply same window call across all elements.
+> - combine(FLStocks) method collapses all elements into a single FLStock object.
+>    with as many iters as elements in the list, must all have 1 iter.
+> - combine(FLQuants, FLQuants) merges them one element at a time.
+> - drop(FLQuant) returns the result of a call to base::drop on @.Data.
+> - New verify() method for complex classes evaluates object against a set of
+>    rules. Checks content rather than structure, as validity functions do.
+> - New ruleset method to return standard verify rules per class.
+> - window() and expand() methods for FLPar.
+> - iter() method for FLlst, lapplies it along the list
+>
+>   USER-VISIBLE CHANGES
+>
+> - propagate(FLPar) to return object if iter == iters #45.
+> - Ratios of numbers written in alternative ways now also return an empty character.
+>
+>   BUG FIXES
+>
+> - dimnames<- for FLStock with no ages failed when changing age name #42.
+> - uom can now handle better products with units containing divisions.
+> - coerce(FLBiol, FLBiolcpp) will now extend srparam to have as many years as the
+>    object, to allow params per time period to be passed and used.
+> - coerce(FLBiol, FLBiolcpp) now windows FLPar if year is given.
+> - trim(FLBiol) is able to handle predictModel slots.
+> - [[<- and $<- FLlst now work on extended classes, like predictModel.
+> - predict(predictModel) now handles correctly iters and extra FLPar dimensions.
+>
+>   DEPRECATED & DEFUNCT
+> - catchSel is to be substituted by catch.sel, use the later instead
+> - wt<-(FLStock) is to be deprecated, use the individual accessor methods instead
+>
+>
+> Iago
+>
+> --
+> Dr Iago Mosqueira
+>
+> European Commission
+> DG Joint Research Centre
+> Directorate D - Sustainable Resources
+> Unit D.02 Water and Marine Resources
+>
+> TP 051, Via Enrico Fermi 2749
+> I-21027 Ispra (VA), Italy
+>
+> Phone : +39 0332 785413
+>
+> iago.mosqueira at ec.europa.eu
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+-- 
+***********************************
+Luis Ridao Cruz
+Faroe Marine Research Institute
+N?at?n 1, P.O. Box 3051
+FO-110 T?rshavn
+Faroe Islands
+Tel:    +298 353900
+Mob:  +298 503214
+Fax :   +298 353901
+e-mail: luisr at hav.fo
+            luridao at gmail.com
+***********************************
+
+
+From Ernesto.JARDIM at ec.europa.eu  Mon Mar  5 12:00:45 2018
+From: Ernesto.JARDIM at ec.europa.eu (Ernesto.JARDIM at ec.europa.eu)
+Date: Mon, 5 Mar 2018 11:00:45 +0000
+Subject: [FLR-list] Release of FLCore 2.6.6
+References: <371CB7A1EFC2F14CADD9AC271507075608F0013A@S-DC-ESTC01-J.net1.cec.eu.int>
+ <96cc4e63-1eab-9c13-733d-a8455c87c349@hav.fo>
+Message-ID: <59BD404FF219D64BB7DBAE2DD6A13AAA03460827@S-DC-ESTE02-J.net1.cec.eu.int>
+
+Hi Luis,
+
+The MSE code developed within a4a can take any assessment model, as long
+as it can be called from R. You'll need to code your estimation function
+to deal with it.
+
+The sca wrapper is
+
+sca.wrapper <- function(stk, idx, ...){
+
+    args <- list(...)
+    args$stock <- stk
+    args$indices <- idx
+    if(is.null(args$fit)) args$fit <- 'MP'
+    tracking <- args$tracking
+    args$tracking <- NULL
+    fit <- do.call('a4aSCA', args)
+    stk <- stk + fit
+    tracking["convergence",ac(range(stk)["maxyear"]+1)] <-
+fit at fitSumm["maxgrad",]
+    list(stk = stk, tracking = tracking)
+}
+
+Adding a SAM model is just about changing the call to "a4aSCA" by the
+call to SAM and fixing the arguments. Convergence flags will need to be
+extracted from the right place, here it's in fitSumm.
+
+Best
+
+EJ
+
+
+On 05/03/2018 11:35, Luis Ridao wrote:
+> Dear all,
+>
+> I'm trying to set up a MSE in which the assessment model is neither 
+> FLXSA nor FLa4a.
+>
+> The SAM model (stockassessment.org implemented in R) is used as the 
+> basis of the advice.
+>
+> Can anyone inform me whether it's possible to incorporate this into the 
+> 'mse' package in FLR
+> and conduct simulations or another way around it?
+>
+> thanks in advance,
+> Luis
+>
+>
+> On 02/22/2018 02:51 PM, Iago.MOSQUEIRA at ec.europa.eu wrote:
+>> Dear all,
+>>
+>> A new release of FLCore, version 2.6.6, has made it to the FLR repository. Source packages (Linux) as well as binary packages for Windows and Mac OSX El Capitan (10.11.6) are available. Please install using the usual
+>>
+>> install.packages(repos="http://flr-project.org/R")
+>>
+>> and test with your code. Please do not hesitate reporting any problem by filling an issue at
+>>
+>> https://github.com/flr/flcore/issues
+>>
+>> These are the most notable changes in FLCore 2.6.6:
+>>
+>> FLCore 2.6.6
+>>
+>>   NEW FEATURES
+>>
+>> - window(FLStocks) method to apply same window call across all elements.
+>> - combine(FLStocks) method collapses all elements into a single FLStock object.
+>>    with as many iters as elements in the list, must all have 1 iter.
+>> - combine(FLQuants, FLQuants) merges them one element at a time.
+>> - drop(FLQuant) returns the result of a call to base::drop on @.Data.
+>> - New verify() method for complex classes evaluates object against a set of
+>>    rules. Checks content rather than structure, as validity functions do.
+>> - New ruleset method to return standard verify rules per class.
+>> - window() and expand() methods for FLPar.
+>> - iter() method for FLlst, lapplies it along the list
+>>
+>>   USER-VISIBLE CHANGES
+>>
+>> - propagate(FLPar) to return object if iter == iters #45.
+>> - Ratios of numbers written in alternative ways now also return an empty character.
+>>
+>>   BUG FIXES
+>>
+>> - dimnames<- for FLStock with no ages failed when changing age name #42.
+>> - uom can now handle better products with units containing divisions.
+>> - coerce(FLBiol, FLBiolcpp) will now extend srparam to have as many years as the
+>>    object, to allow params per time period to be passed and used.
+>> - coerce(FLBiol, FLBiolcpp) now windows FLPar if year is given.
+>> - trim(FLBiol) is able to handle predictModel slots.
+>> - [[<- and $<- FLlst now work on extended classes, like predictModel.
+>> - predict(predictModel) now handles correctly iters and extra FLPar dimensions.
+>>
+>>   DEPRECATED & DEFUNCT
+>> - catchSel is to be substituted by catch.sel, use the later instead
+>> - wt<-(FLStock) is to be deprecated, use the individual accessor methods instead
+>>
+>>
+>> Iago
+>>
+>> --
+>> Dr Iago Mosqueira
+>>
+>> European Commission
+>> DG Joint Research Centre
+>> Directorate D - Sustainable Resources
+>> Unit D.02 Water and Marine Resources
+>>
+>> TP 051, Via Enrico Fermi 2749
+>> I-21027 Ispra (VA), Italy
+>>
+>> Phone : +39 0332 785413
+>>
+>> iago.mosqueira at ec.europa.eu
+>> _______________________________________________
+>> flr-list mailing list
+>> flr-list at flr-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+
+-- 
+Ernesto Jardim <ernesto.jardim at ec.europa.eu>
+Fisheries Scientist
+Joint Research Centre (JRC), Sustainable resources directorate, Water and Marine Resources unit
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+Office : +39 0332 785311
+Fax: +39 0332 789658
+
+
+From Ernesto.JARDIM at ec.europa.eu  Mon Mar  5 13:00:33 2018
+From: Ernesto.JARDIM at ec.europa.eu (Ernesto.JARDIM at ec.europa.eu)
+Date: Mon, 5 Mar 2018 12:00:33 +0000
+Subject: [FLR-list] Release of FLCore 2.6.6
+References: <371CB7A1EFC2F14CADD9AC271507075608F0013A@S-DC-ESTC01-J.net1.cec.eu.int>
+ <96cc4e63-1eab-9c13-733d-a8455c87c349@hav.fo>
+ <59BD404FF219D64BB7DBAE2DD6A13AAA03460827@S-DC-ESTE02-J.net1.cec.eu.int>
+Message-ID: <59BD404FF219D64BB7DBAE2DD6A13AAA034608E5@S-DC-ESTE02-J.net1.cec.eu.int>
+
+BTW that code is not in any package yet. If you'd like to try it please
+mail me and I'll make it available.
+
+Best
+
+EJ
+
+
+On 05/03/2018 12:00, JARDIM Ernesto (JRC-ISPRA) wrote:
+> Hi Luis,
+>
+> The MSE code developed within a4a can take any assessment model, as long
+> as it can be called from R. You'll need to code your estimation function
+> to deal with it.
+>
+> The sca wrapper is
+>
+> sca.wrapper <- function(stk, idx, ...){
+>
+>     args <- list(...)
+>     args$stock <- stk
+>     args$indices <- idx
+>     if(is.null(args$fit)) args$fit <- 'MP'
+>     tracking <- args$tracking
+>     args$tracking <- NULL
+>     fit <- do.call('a4aSCA', args)
+>     stk <- stk + fit
+>     tracking["convergence",ac(range(stk)["maxyear"]+1)] <-
+> fit at fitSumm["maxgrad",]
+>     list(stk = stk, tracking = tracking)
+> }
+>
+> Adding a SAM model is just about changing the call to "a4aSCA" by the
+> call to SAM and fixing the arguments. Convergence flags will need to be
+> extracted from the right place, here it's in fitSumm.
+>
+> Best
+>
+> EJ
+>
+>
+> On 05/03/2018 11:35, Luis Ridao wrote:
+>> Dear all,
+>>
+>> I'm trying to set up a MSE in which the assessment model is neither 
+>> FLXSA nor FLa4a.
+>>
+>> The SAM model (stockassessment.org implemented in R) is used as the 
+>> basis of the advice.
+>>
+>> Can anyone inform me whether it's possible to incorporate this into the 
+>> 'mse' package in FLR
+>> and conduct simulations or another way around it?
+>>
+>> thanks in advance,
+>> Luis
+>>
+>>
+>> On 02/22/2018 02:51 PM, Iago.MOSQUEIRA at ec.europa.eu wrote:
+>>> Dear all,
+>>>
+>>> A new release of FLCore, version 2.6.6, has made it to the FLR repository. Source packages (Linux) as well as binary packages for Windows and Mac OSX El Capitan (10.11.6) are available. Please install using the usual
+>>>
+>>> install.packages(repos="http://flr-project.org/R")
+>>>
+>>> and test with your code. Please do not hesitate reporting any problem by filling an issue at
+>>>
+>>> https://github.com/flr/flcore/issues
+>>>
+>>> These are the most notable changes in FLCore 2.6.6:
+>>>
+>>> FLCore 2.6.6
+>>>
+>>>   NEW FEATURES
+>>>
+>>> - window(FLStocks) method to apply same window call across all elements.
+>>> - combine(FLStocks) method collapses all elements into a single FLStock object.
+>>>    with as many iters as elements in the list, must all have 1 iter.
+>>> - combine(FLQuants, FLQuants) merges them one element at a time.
+>>> - drop(FLQuant) returns the result of a call to base::drop on @.Data.
+>>> - New verify() method for complex classes evaluates object against a set of
+>>>    rules. Checks content rather than structure, as validity functions do.
+>>> - New ruleset method to return standard verify rules per class.
+>>> - window() and expand() methods for FLPar.
+>>> - iter() method for FLlst, lapplies it along the list
+>>>
+>>>   USER-VISIBLE CHANGES
+>>>
+>>> - propagate(FLPar) to return object if iter == iters #45.
+>>> - Ratios of numbers written in alternative ways now also return an empty character.
+>>>
+>>>   BUG FIXES
+>>>
+>>> - dimnames<- for FLStock with no ages failed when changing age name #42.
+>>> - uom can now handle better products with units containing divisions.
+>>> - coerce(FLBiol, FLBiolcpp) will now extend srparam to have as many years as the
+>>>    object, to allow params per time period to be passed and used.
+>>> - coerce(FLBiol, FLBiolcpp) now windows FLPar if year is given.
+>>> - trim(FLBiol) is able to handle predictModel slots.
+>>> - [[<- and $<- FLlst now work on extended classes, like predictModel.
+>>> - predict(predictModel) now handles correctly iters and extra FLPar dimensions.
+>>>
+>>>   DEPRECATED & DEFUNCT
+>>> - catchSel is to be substituted by catch.sel, use the later instead
+>>> - wt<-(FLStock) is to be deprecated, use the individual accessor methods instead
+>>>
+>>>
+>>> Iago
+>>>
+>>> --
+>>> Dr Iago Mosqueira
+>>>
+>>> European Commission
+>>> DG Joint Research Centre
+>>> Directorate D - Sustainable Resources
+>>> Unit D.02 Water and Marine Resources
+>>>
+>>> TP 051, Via Enrico Fermi 2749
+>>> I-21027 Ispra (VA), Italy
+>>>
+>>> Phone : +39 0332 785413
+>>>
+>>> iago.mosqueira at ec.europa.eu
+>>> _______________________________________________
+>>> flr-list mailing list
+>>> flr-list at flr-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>
+
+-- 
+Ernesto Jardim <ernesto.jardim at ec.europa.eu>
+Fisheries Scientist
+Joint Research Centre (JRC), Sustainable resources directorate, Water and Marine Resources unit
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+Office : +39 0332 785311
+Fax: +39 0332 789658
+
+
+From Iago.MOSQUEIRA at ec.europa.eu  Mon Mar  5 11:54:42 2018
+From: Iago.MOSQUEIRA at ec.europa.eu (Iago.MOSQUEIRA at ec.europa.eu)
+Date: Mon, 5 Mar 2018 10:54:42 +0000
+Subject: [FLR-list] Release of FLCore 2.6.6
+In-Reply-To: <96cc4e63-1eab-9c13-733d-a8455c87c349@hav.fo>
+References: <371CB7A1EFC2F14CADD9AC271507075608F0013A@S-DC-ESTC01-J.net1.cec.eu.int>,
+ <96cc4e63-1eab-9c13-733d-a8455c87c349@hav.fo>
+Message-ID: <371CB7A1EFC2F14CADD9AC271507075608F0D773@S-DC-ESTC01-J.net1.cec.eu.int>
+
+Hello Luis,
+
+What code base are you using for the simulations? By mse package you mean the one under that name in my github repository?
+
+You should be able to call FLSAM inside the MP, of course. But it all depends how you have this coded.
+
+Best,
+
+
+Iago
+
+--
+Dr Iago Mosqueira
+
+European Commission
+DG Joint Research Centre
+Directorate D - Sustainable Resources
+Unit D.02 Water and Marine Resources
+
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Phone : +39 0332 785413
+
+iago.mosqueira at ec.europa.eu
+
+________________________________________
+From: flr-list-bounces at lists.r-forge.r-project.org [flr-list-bounces at lists.r-forge.r-project.org] on behalf of Luis Ridao [luisr at hav.fo]
+Sent: 05 March 2018 11:35
+To: flr-list at flr-project.org
+Subject: Re: [FLR-list] Release of FLCore 2.6.6
+
+Dear all,
+
+I'm trying to set up a MSE in which the assessment model is neither
+FLXSA nor FLa4a.
+
+The SAM model (stockassessment.org implemented in R) is used as the
+basis of the advice.
+
+Can anyone inform me whether it's possible to incorporate this into the
+'mse' package in FLR
+and conduct simulations or another way around it?
+
+thanks in advance,
+Luis
+
+
+On 02/22/2018 02:51 PM, Iago.MOSQUEIRA at ec.europa.eu wrote:
+> Dear all,
+>
+> A new release of FLCore, version 2.6.6, has made it to the FLR repository. Source packages (Linux) as well as binary packages for Windows and Mac OSX El Capitan (10.11.6) are available. Please install using the usual
+>
+> install.packages(repos="http://flr-project.org/R")
+>
+> and test with your code. Please do not hesitate reporting any problem by filling an issue at
+>
+> https://github.com/flr/flcore/issues
+>
+> These are the most notable changes in FLCore 2.6.6:
+>
+> FLCore 2.6.6
+>
+>   NEW FEATURES
+>
+> - window(FLStocks) method to apply same window call across all elements.
+> - combine(FLStocks) method collapses all elements into a single FLStock object.
+>    with as many iters as elements in the list, must all have 1 iter.
+> - combine(FLQuants, FLQuants) merges them one element at a time.
+> - drop(FLQuant) returns the result of a call to base::drop on @.Data.
+> - New verify() method for complex classes evaluates object against a set of
+>    rules. Checks content rather than structure, as validity functions do.
+> - New ruleset method to return standard verify rules per class.
+> - window() and expand() methods for FLPar.
+> - iter() method for FLlst, lapplies it along the list
+>
+>   USER-VISIBLE CHANGES
+>
+> - propagate(FLPar) to return object if iter == iters #45.
+> - Ratios of numbers written in alternative ways now also return an empty character.
+>
+>   BUG FIXES
+>
+> - dimnames<- for FLStock with no ages failed when changing age name #42.
+> - uom can now handle better products with units containing divisions.
+> - coerce(FLBiol, FLBiolcpp) will now extend srparam to have as many years as the
+>    object, to allow params per time period to be passed and used.
+> - coerce(FLBiol, FLBiolcpp) now windows FLPar if year is given.
+> - trim(FLBiol) is able to handle predictModel slots.
+> - [[<- and $<- FLlst now work on extended classes, like predictModel.
+> - predict(predictModel) now handles correctly iters and extra FLPar dimensions.
+>
+>   DEPRECATED & DEFUNCT
+> - catchSel is to be substituted by catch.sel, use the later instead
+> - wt<-(FLStock) is to be deprecated, use the individual accessor methods instead
+>
+>
+> Iago
+>
+> --
+> Dr Iago Mosqueira
+>
+> European Commission
+> DG Joint Research Centre
+> Directorate D - Sustainable Resources
+> Unit D.02 Water and Marine Resources
+>
+> TP 051, Via Enrico Fermi 2749
+> I-21027 Ispra (VA), Italy
+>
+> Phone : +39 0332 785413
+>
+> iago.mosqueira at ec.europa.eu
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+--
+***********************************
+Luis Ridao Cruz
+Faroe Marine Research Institute
+N?at?n 1, P.O. Box 3051
+FO-110 T?rshavn
+Faroe Islands
+Tel:    +298 353900
+Mob:  +298 503214
+Fax :   +298 353901
+e-mail: luisr at hav.fo
+            luridao at gmail.com
+***********************************
+
+_______________________________________________
+flr-list mailing list
+flr-list at flr-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+From Iago.MOSQUEIRA at ec.europa.eu  Mon Mar  5 13:16:46 2018
+From: Iago.MOSQUEIRA at ec.europa.eu (Iago.MOSQUEIRA at ec.europa.eu)
+Date: Mon, 5 Mar 2018 12:16:46 +0000
+Subject: [FLR-list] Release of FLCore 2.6.6
+In-Reply-To: <371CB7A1EFC2F14CADD9AC271507075608F0D773@S-DC-ESTC01-J.net1.cec.eu.int>
+References: <371CB7A1EFC2F14CADD9AC271507075608F0013A@S-DC-ESTC01-J.net1.cec.eu.int>, 
+ <96cc4e63-1eab-9c13-733d-a8455c87c349@hav.fo>,
+ <371CB7A1EFC2F14CADD9AC271507075608F0D773@S-DC-ESTC01-J.net1.cec.eu.int>
+Message-ID: <371CB7A1EFC2F14CADD9AC271507075608F0D81F@S-DC-ESTC01-J.net1.cec.eu.int>
+
+Hi,
+
+Just to clarify, that package has mostly functions and methods useful on almost any mse run, like computing indicators and such.
+
+
+Iago
+
+--
+Dr Iago Mosqueira
+
+European Commission
+DG Joint Research Centre
+Directorate D - Sustainable Resources
+Unit D.02 Water and Marine Resources
+
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Phone : +39 0332 785413
+
+iago.mosqueira at ec.europa.eu
+
+________________________________________
+From: flr-list-bounces at lists.r-forge.r-project.org [flr-list-bounces at lists.r-forge.r-project.org] on behalf of Iago.MOSQUEIRA at ec.europa.eu [Iago.MOSQUEIRA at ec.europa.eu]
+Sent: 05 March 2018 11:54
+To: flr-list at flr-project.org
+Subject: Re: [FLR-list] Release of FLCore 2.6.6
+
+Hello Luis,
+
+What code base are you using for the simulations? By mse package you mean the one under that name in my github repository?
+
+You should be able to call FLSAM inside the MP, of course. But it all depends how you have this coded.
+
+Best,
+
+
+Iago
+
+--
+Dr Iago Mosqueira
+
+European Commission
+DG Joint Research Centre
+Directorate D - Sustainable Resources
+Unit D.02 Water and Marine Resources
+
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Phone : +39 0332 785413
+
+iago.mosqueira at ec.europa.eu
+
+________________________________________
+From: flr-list-bounces at lists.r-forge.r-project.org [flr-list-bounces at lists.r-forge.r-project.org] on behalf of Luis Ridao [luisr at hav.fo]
+Sent: 05 March 2018 11:35
+To: flr-list at flr-project.org
+Subject: Re: [FLR-list] Release of FLCore 2.6.6
+
+Dear all,
+
+I'm trying to set up a MSE in which the assessment model is neither
+FLXSA nor FLa4a.
+
+The SAM model (stockassessment.org implemented in R) is used as the
+basis of the advice.
+
+Can anyone inform me whether it's possible to incorporate this into the
+'mse' package in FLR
+and conduct simulations or another way around it?
+
+thanks in advance,
+Luis
+
+
+On 02/22/2018 02:51 PM, Iago.MOSQUEIRA at ec.europa.eu wrote:
+> Dear all,
+>
+> A new release of FLCore, version 2.6.6, has made it to the FLR repository. Source packages (Linux) as well as binary packages for Windows and Mac OSX El Capitan (10.11.6) are available. Please install using the usual
+>
+> install.packages(repos="http://flr-project.org/R")
+>
+> and test with your code. Please do not hesitate reporting any problem by filling an issue at
+>
+> https://github.com/flr/flcore/issues
+>
+> These are the most notable changes in FLCore 2.6.6:
+>
+> FLCore 2.6.6
+>
+>   NEW FEATURES
+>
+> - window(FLStocks) method to apply same window call across all elements.
+> - combine(FLStocks) method collapses all elements into a single FLStock object.
+>    with as many iters as elements in the list, must all have 1 iter.
+> - combine(FLQuants, FLQuants) merges them one element at a time.
+> - drop(FLQuant) returns the result of a call to base::drop on @.Data.
+> - New verify() method for complex classes evaluates object against a set of
+>    rules. Checks content rather than structure, as validity functions do.
+> - New ruleset method to return standard verify rules per class.
+> - window() and expand() methods for FLPar.
+> - iter() method for FLlst, lapplies it along the list
+>
+>   USER-VISIBLE CHANGES
+>
+> - propagate(FLPar) to return object if iter == iters #45.
+> - Ratios of numbers written in alternative ways now also return an empty character.
+>
+>   BUG FIXES
+>
+> - dimnames<- for FLStock with no ages failed when changing age name #42.
+> - uom can now handle better products with units containing divisions.
+> - coerce(FLBiol, FLBiolcpp) will now extend srparam to have as many years as the
+>    object, to allow params per time period to be passed and used.
+> - coerce(FLBiol, FLBiolcpp) now windows FLPar if year is given.
+> - trim(FLBiol) is able to handle predictModel slots.
+> - [[<- and $<- FLlst now work on extended classes, like predictModel.
+> - predict(predictModel) now handles correctly iters and extra FLPar dimensions.
+>
+>   DEPRECATED & DEFUNCT
+> - catchSel is to be substituted by catch.sel, use the later instead
+> - wt<-(FLStock) is to be deprecated, use the individual accessor methods instead
+>
+>
+> Iago
+>
+> --
+> Dr Iago Mosqueira
+>
+> European Commission
+> DG Joint Research Centre
+> Directorate D - Sustainable Resources
+> Unit D.02 Water and Marine Resources
+>
+> TP 051, Via Enrico Fermi 2749
+> I-21027 Ispra (VA), Italy
+>
+> Phone : +39 0332 785413
+>
+> iago.mosqueira at ec.europa.eu
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+--
+***********************************
+Luis Ridao Cruz
+Faroe Marine Research Institute
+N?at?n 1, P.O. Box 3051
+FO-110 T?rshavn
+Faroe Islands
+Tel:    +298 353900
+Mob:  +298 503214
+Fax :   +298 353901
+e-mail: luisr at hav.fo
+            luridao at gmail.com
+***********************************
+
+_______________________________________________
+flr-list mailing list
+flr-list at flr-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+_______________________________________________
+flr-list mailing list
+flr-list at flr-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+From luridao at gmail.com  Mon Mar  5 13:49:19 2018
+From: luridao at gmail.com (Luis Ridao)
+Date: Mon, 5 Mar 2018 12:49:19 +0000
+Subject: [FLR-list] Release of FLCore 2.6.6
+In-Reply-To: <59BD404FF219D64BB7DBAE2DD6A13AAA034608E5@S-DC-ESTE02-J.net1.cec.eu.int>
+References: <371CB7A1EFC2F14CADD9AC271507075608F0013A@S-DC-ESTC01-J.net1.cec.eu.int>
+ <96cc4e63-1eab-9c13-733d-a8455c87c349@hav.fo>
+ <59BD404FF219D64BB7DBAE2DD6A13AAA03460827@S-DC-ESTE02-J.net1.cec.eu.int>
+ <59BD404FF219D64BB7DBAE2DD6A13AAA034608E5@S-DC-ESTE02-J.net1.cec.eu.int>
+Message-ID: <CAL09-Efb+wwgSB6QT0dkBrP_f+BgTRM7crPJKduL0S31YBvp8w@mail.gmail.com>
+
+thanks Iago and Ernesto for your prompt responses
+
+i will start by incorporating the data into FLR and see how far i get
+
+best,
+Luis
+
+
+
+
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+*   Luis Ridao Cruz
+*   Faroe Marine Research Institute
+*   N?at?n 1, P.O. Box 3051
+*   FO-110 T?rshavn
+*   Faroe Islands
+*   Tel    : (+298) 353900
+*   Fax: : (+298) 353901
+*   e-mail: luisr at hav.fo
+*              luridao at gmail.com
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+
+On Mon, Mar 5, 2018 at 12:00 PM, <Ernesto.JARDIM at ec.europa.eu> wrote:
+
+> BTW that code is not in any package yet. If you'd like to try it please
+> mail me and I'll make it available.
+>
+> Best
+>
+> EJ
+>
+>
+> On 05/03/2018 12:00, JARDIM Ernesto (JRC-ISPRA) wrote:
+> > Hi Luis,
+> >
+> > The MSE code developed within a4a can take any assessment model, as long
+> > as it can be called from R. You'll need to code your estimation function
+> > to deal with it.
+> >
+> > The sca wrapper is
+> >
+> > sca.wrapper <- function(stk, idx, ...){
+> >
+> >     args <- list(...)
+> >     args$stock <- stk
+> >     args$indices <- idx
+> >     if(is.null(args$fit)) args$fit <- 'MP'
+> >     tracking <- args$tracking
+> >     args$tracking <- NULL
+> >     fit <- do.call('a4aSCA', args)
+> >     stk <- stk + fit
+> >     tracking["convergence",ac(range(stk)["maxyear"]+1)] <-
+> > fit at fitSumm["maxgrad",]
+> >     list(stk = stk, tracking = tracking)
+> > }
+> >
+> > Adding a SAM model is just about changing the call to "a4aSCA" by the
+> > call to SAM and fixing the arguments. Convergence flags will need to be
+> > extracted from the right place, here it's in fitSumm.
+> >
+> > Best
+> >
+> > EJ
+> >
+> >
+> > On 05/03/2018 11:35, Luis Ridao wrote:
+> >> Dear all,
+> >>
+> >> I'm trying to set up a MSE in which the assessment model is neither
+> >> FLXSA nor FLa4a.
+> >>
+> >> The SAM model (stockassessment.org implemented in R) is used as the
+> >> basis of the advice.
+> >>
+> >> Can anyone inform me whether it's possible to incorporate this into the
+> >> 'mse' package in FLR
+> >> and conduct simulations or another way around it?
+> >>
+> >> thanks in advance,
+> >> Luis
+> >>
+> >>
+> >> On 02/22/2018 02:51 PM, Iago.MOSQUEIRA at ec.europa.eu wrote:
+> >>> Dear all,
+> >>>
+> >>> A new release of FLCore, version 2.6.6, has made it to the FLR
+> repository. Source packages (Linux) as well as binary packages for Windows
+> and Mac OSX El Capitan (10.11.6) are available. Please install using the
+> usual
+> >>>
+> >>> install.packages(repos="http://flr-project.org/R")
+> >>>
+> >>> and test with your code. Please do not hesitate reporting any problem
+> by filling an issue at
+> >>>
+> >>> https://github.com/flr/flcore/issues
+> >>>
+> >>> These are the most notable changes in FLCore 2.6.6:
+> >>>
+> >>> FLCore 2.6.6
+> >>>
+> >>>   NEW FEATURES
+> >>>
+> >>> - window(FLStocks) method to apply same window call across all
+> elements.
+> >>> - combine(FLStocks) method collapses all elements into a single
+> FLStock object.
+> >>>    with as many iters as elements in the list, must all have 1 iter.
+> >>> - combine(FLQuants, FLQuants) merges them one element at a time.
+> >>> - drop(FLQuant) returns the result of a call to base::drop on @.Data.
+> >>> - New verify() method for complex classes evaluates object against a
+> set of
+> >>>    rules. Checks content rather than structure, as validity functions
+> do.
+> >>> - New ruleset method to return standard verify rules per class.
+> >>> - window() and expand() methods for FLPar.
+> >>> - iter() method for FLlst, lapplies it along the list
+> >>>
+> >>>   USER-VISIBLE CHANGES
+> >>>
+> >>> - propagate(FLPar) to return object if iter == iters #45.
+> >>> - Ratios of numbers written in alternative ways now also return an
+> empty character.
+> >>>
+> >>>   BUG FIXES
+> >>>
+> >>> - dimnames<- for FLStock with no ages failed when changing age name
+> #42.
+> >>> - uom can now handle better products with units containing divisions.
+> >>> - coerce(FLBiol, FLBiolcpp) will now extend srparam to have as many
+> years as the
+> >>>    object, to allow params per time period to be passed and used.
+> >>> - coerce(FLBiol, FLBiolcpp) now windows FLPar if year is given.
+> >>> - trim(FLBiol) is able to handle predictModel slots.
+> >>> - [[<- and $<- FLlst now work on extended classes, like predictModel.
+> >>> - predict(predictModel) now handles correctly iters and extra FLPar
+> dimensions.
+> >>>
+> >>>   DEPRECATED & DEFUNCT
+> >>> - catchSel is to be substituted by catch.sel, use the later instead
+> >>> - wt<-(FLStock) is to be deprecated, use the individual accessor
+> methods instead
+> >>>
+> >>>
+> >>> Iago
+> >>>
+> >>> --
+> >>> Dr Iago Mosqueira
+> >>>
+> >>> European Commission
+> >>> DG Joint Research Centre
+> >>> Directorate D - Sustainable Resources
+> >>> Unit D.02 Water and Marine Resources
+> >>>
+> >>> TP 051, Via Enrico Fermi 2749
+> >>> I-21027 Ispra (VA), Italy
+> >>>
+> >>> Phone : +39 0332 785413
+> >>>
+> >>> iago.mosqueira at ec.europa.eu
+> >>> _______________________________________________
+> >>> flr-list mailing list
+> >>> flr-list at flr-project.org
+> >>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+> >
+>
+> --
+> Ernesto Jardim <ernesto.jardim at ec.europa.eu>
+> Fisheries Scientist
+> Joint Research Centre (JRC), Sustainable resources directorate, Water and
+> Marine Resources unit
+> TP 051, Via Enrico Fermi 2749
+> I-21027 Ispra (VA), Italy
+> Office : +39 0332 785311
+> Fax: +39 0332 789658
+>
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/flr-list/attachments/20180305/06b79c23/attachment.html>
+

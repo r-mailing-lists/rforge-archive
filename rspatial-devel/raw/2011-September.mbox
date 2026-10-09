@@ -1,0 +1,179 @@
+From edzer.pebesma at uni-muenster.de  Sun Sep 18 19:54:19 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Sun, 18 Sep 2011 19:54:19 +0200
+Subject: [Rspatial-devel] sp: SpatialGrid now directly inherits from Spatial
+	(only)
+Message-ID: <4E76304B.4070405@uni-muenster.de>
+
+I committed a largish edit to sp today.
+
+In particular, following my investigations reported here:
+https://stat.ethz.ch/pipermail/r-devel/2011-September/062037.html
+having SpatialGrid directly inheriting from SpatialPixels does not work,
+as it needs an explicit coerce (coordinates are not there!), and setting
+this coerce with setAs() does lead to unexpected results (essentially,
+objects becoming "Spatial").
+
+Now, SpatialGrid inherits from Spatial, and an explicit setIs() makes it
+SpatialPixels too, and sets the right coerce function.
+
+The following methods were moved from functions to S4 generics:
+proj4string, proj4string<-, gridded, gridded<-, is.projected.
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From Roger.Bivand at nhh.no  Mon Sep 19 10:19:06 2011
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Mon, 19 Sep 2011 10:19:06 +0200 (CEST)
+Subject: [Rspatial-devel] sp: SpatialGrid now directly inherits from
+ Spatial (only)
+In-Reply-To: <4E76304B.4070405@uni-muenster.de>
+References: <4E76304B.4070405@uni-muenster.de>
+Message-ID: <alpine.LRH.2.00.1109191010450.8307@reclus.nhh.no>
+
+On Sun, 18 Sep 2011, Edzer Pebesma wrote:
+
+> I committed a largish edit to sp today.
+>
+> In particular, following my investigations reported here:
+> https://stat.ethz.ch/pipermail/r-devel/2011-September/062037.html
+> having SpatialGrid directly inheriting from SpatialPixels does not work,
+> as it needs an explicit coerce (coordinates are not there!), and setting
+> this coerce with setAs() does lead to unexpected results (essentially,
+> objects becoming "Spatial").
+>
+> Now, SpatialGrid inherits from Spatial, and an explicit setIs() makes it
+> SpatialPixels too, and sets the right coerce function.
+>
+> The following methods were moved from functions to S4 generics:
+> proj4string, proj4string<-, gridded, gridded<-, is.projected.
+>
+
+Edzer,
+
+I see a failure in Ch 3 with the new code:
+
+> ###################################################
+> ### chunk number 11:
+> ###################################################
+> data(meuse.grid .... [TRUNCATED]
+
+> coordinates(meuse.grid) <- c("x", "y")
+
+> meuse.grid <- as(meuse.grid, "SpatialPixels")
+
+> image(meuse.grid, col = "grey")
+Error in image.default(meuse.grid, col = "grey") :
+   argument must be matrix-like
+
+
+And one in in Ch 4 that I made myself. Both could be related to rev 1139 
+in image.R:
+
+https://r-forge.r-project.org/scm/viewvc.php/pkg/sp/R/image.R?root=rspatial&r1=1026&r2=1139
+
+This was motivated by an off-list request to suppress the warning given 
+when image(, breaks= ) is used as breaks is not an argument in 
+plot.window, which gets the ... send through.
+
+I'll try to fix this myself, and test again on the book code.
+
+Roger
+
+
+-- 
+Roger Bivand
+Department of Economics, NHH Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 95 43
+e-mail: Roger.Bivand at nhh.no
+
+
+From Roger.Bivand at nhh.no  Mon Sep 19 10:52:53 2011
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Mon, 19 Sep 2011 10:52:53 +0200 (CEST)
+Subject: [Rspatial-devel] sp: SpatialGrid now directly inherits from
+ Spatial (only)
+In-Reply-To: <alpine.LRH.2.00.1109191010450.8307@reclus.nhh.no>
+References: <4E76304B.4070405@uni-muenster.de>
+	<alpine.LRH.2.00.1109191010450.8307@reclus.nhh.no>
+Message-ID: <alpine.LRH.2.00.1109191026320.8307@reclus.nhh.no>
+
+On Mon, 19 Sep 2011, Roger Bivand wrote:
+
+> On Sun, 18 Sep 2011, Edzer Pebesma wrote:
+>
+>> I committed a largish edit to sp today.
+>> 
+>> In particular, following my investigations reported here:
+>> https://stat.ethz.ch/pipermail/r-devel/2011-September/062037.html
+>> having SpatialGrid directly inheriting from SpatialPixels does not work,
+>> as it needs an explicit coerce (coordinates are not there!), and setting
+>> this coerce with setAs() does lead to unexpected results (essentially,
+>> objects becoming "Spatial").
+>> 
+>> Now, SpatialGrid inherits from Spatial, and an explicit setIs() makes it
+>> SpatialPixels too, and sets the right coerce function.
+>> 
+>> The following methods were moved from functions to S4 generics:
+>> proj4string, proj4string<-, gridded, gridded<-, is.projected.
+>> 
+>
+> Edzer,
+>
+> I see a failure in Ch 3 with the new code:
+>
+>> ###################################################
+>> ### chunk number 11:
+>> ###################################################
+>> data(meuse.grid .... [TRUNCATED]
+>
+>> coordinates(meuse.grid) <- c("x", "y")
+>
+>> meuse.grid <- as(meuse.grid, "SpatialPixels")
+>
+>> image(meuse.grid, col = "grey")
+> Error in image.default(meuse.grid, col = "grey") :
+>  argument must be matrix-like
+>
+>
+> And one in in Ch 4 that I made myself. Both could be related to rev 1139 in 
+> image.R:
+>
+> https://r-forge.r-project.org/scm/viewvc.php/pkg/sp/R/image.R?root=rspatial&r1=1026&r2=1139
+
+Only the Ch 4 error was from my revision.
+
+The code is on p. 59 for Fig 3.1, the problem is that image() gets a 
+SpatialPixels object, and as there is no image method, it goes to 
+image.default. I've added image.SpatialPixels() to image.R, added it to 
+NAMESPACE and the help page, and now things work. I think that something 
+was inheriting backwards before, wasn't it, and that your revisions 
+blocked that route? Revisions committed.
+
+Roger
+
+>
+> This was motivated by an off-list request to suppress the warning given when 
+> image(, breaks= ) is used as breaks is not an argument in plot.window, which 
+> gets the ... send through.
+>
+> I'll try to fix this myself, and test again on the book code.
+>
+> Roger
+>
+>
+>
+
+-- 
+Roger Bivand
+Department of Economics, NHH Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 95 43
+e-mail: Roger.Bivand at nhh.no
+
+

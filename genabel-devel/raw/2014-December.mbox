@@ -1,0 +1,352 @@
+From lennart at karssen.org  Sun Dec 21 23:31:29 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Sun, 21 Dec 2014 23:31:29 +0100
+Subject: [GenABEL-dev] [Genabel-commits] r1898 - in pkg/OmicABEL: . src
+In-Reply-To: <20141221141500.521D7183672@r-forge.r-project.org>
+References: <20141221141500.521D7183672@r-forge.r-project.org>
+Message-ID: <54974A41.7030104@karssen.org>
+
+Hi Diego,
+
+
+On 21-12-14 15:15, noreply at r-forge.r-project.org wrote:
+> Author: dfabregat
+> Date: 2014-12-21 15:14:59 +0100 (Sun, 21 Dec 2014)
+> New Revision: 1898
+> 
+> Modified:
+>    pkg/OmicABEL/make.inc
+>    pkg/OmicABEL/src/GWAS.c
+>    pkg/OmicABEL/src/databel.c
+>    pkg/OmicABEL/src/double_buffering.c
+>    pkg/OmicABEL/src/fgls_chol.c
+>    pkg/OmicABEL/src/fgls_eigen.c
+>    pkg/OmicABEL/src/ooc_BLAS.c
+>    pkg/OmicABEL/src/utils.c
+> Log:
+> Fixed a bug (and other potential sources of bugs) due to overflows of integers when not using castings to size_t.
+> Thanks to Maksim Struchalin for pointing it out.
+> 
+> 
+
+Thank you for fixing the bug! And thanks indeed to Maksim for reporting it.
+
+
+> 
+> Modified: pkg/OmicABEL/make.inc
+> ===================================================================
+> --- pkg/OmicABEL/make.inc	2014-12-05 11:30:19 UTC (rev 1897)
+> +++ pkg/OmicABEL/make.inc	2014-12-21 14:14:59 UTC (rev 1898)
+> @@ -2,4 +2,4 @@
+>  CFLAGS = -D_FILE_OFFSET_BITS=64 -pthread -fopenmp -DGOTO -DLINUX
+>  
+>  LDFLAGS =
+> -LDLIBS = -llapack -lblas -lgfortran -gfortranbegin -lpthread -lrt
+> +LDLIBS = /home/dfabregat/libs/lapack/lapack_LINUX.a /home/dfabregat/libs/GotoBLAS2/libgoto2.a -lgfortran -gfortranbegin -lpthread -lrt
+> 
+
+I guess the changes in make.inc inadvertently entered the commit as they
+point to your local installation. Could you roll back this file?
+
+
+Thanks a lot,
+
+Lennart.
+
+
+
+> Modified: pkg/OmicABEL/src/GWAS.c
+> ===================================================================
+> --- pkg/OmicABEL/src/GWAS.c	2014-12-05 11:30:19 UTC (rev 1897)
+> +++ pkg/OmicABEL/src/GWAS.c	2014-12-21 14:14:59 UTC (rev 1898)
+> @@ -118,7 +118,7 @@
+>  	// Sanity check (Phi)
+>  	checkNoNans(cf->n * cf->n, cf->Phi, "[ERROR] NaNs not allowed in Phi\n");
+>  	cf->XL   = (double *) fgls_malloc ( cf->n * cf->wXL * sizeof(double) );
+> -	load_file ( cf->XL_data_path,   "rb", cf->XL,   cf->n * cf->wXL );
+> +	load_file ( cf->XL_data_path, "rb", cf->XL, cf->n * cf->wXL );
+>  	// Sanity check (XL)
+>  	average( cf->XL, cf->n, cf->wXL, cf->threshold, "Covariate", 
+>  			&cf->XL_fvi->fvi_data[cf->n*NAMELENGTH], NAMELENGTH, 1, cf->num_threads );
+> 
+> Modified: pkg/OmicABEL/src/databel.c
+> ===================================================================
+> --- pkg/OmicABEL/src/databel.c	2014-12-05 11:30:19 UTC (rev 1897)
+> +++ pkg/OmicABEL/src/databel.c	2014-12-21 14:14:59 UTC (rev 1898)
+> @@ -39,7 +39,7 @@
+>  	// Header
+>  	fread( &fvi->fvi_header, sizeof(databel_fvi_header), 1, f );
+>  	// Labels
+> -	data_size = (fvi->fvi_header.numVariables +fvi->fvi_header.numObservations ) * 
+> +	data_size = ((size_t)fvi->fvi_header.numVariables + fvi->fvi_header.numObservations ) * 
+>  		         fvi->fvi_header.namelength * sizeof(char);
+>  	fvi->fvi_data = (char *) fgls_malloc ( data_size );
+>  	// Load labels
+> 
+> Modified: pkg/OmicABEL/src/double_buffering.c
+> ===================================================================
+> --- pkg/OmicABEL/src/double_buffering.c	2014-12-05 11:30:19 UTC (rev 1897)
+> +++ pkg/OmicABEL/src/double_buffering.c	2014-12-21 14:14:59 UTC (rev 1898)
+> @@ -161,7 +161,7 @@
+>  	// Which buffer
+>  	/*aiocb_list *buff = wh_buff == IO_BUFF ? b->io_l : b->comp_l;*/
+>  	// Still buff_size available?
+> -	size_t nbytes = (to - from + 1) * cf->n * sizeof(double);
+> +	size_t nbytes = (size_t)(to - from + 1) * cf->n * sizeof(double);
+>  	// Number of chunks to read
+>  	/*int chunks_to_read = size_t_ceil( nbytes, (size_t)MAX_AIO_SIZE );*/
+>  	// offset
+> @@ -181,7 +181,7 @@
+>  	// Which buffer
+>  	/*aiocb_list *buff = wh_buff == IO_BUFF ? b->io_l : b->comp_l;*/
+>  	// Still buff_size available?
+> -	size_t nbytes = (to - from + 1) * cf->n * cf->wXR * sizeof(double);
+> +	size_t nbytes = (size_t)(to - from + 1) * cf->n * cf->wXR * sizeof(double);
+>  	// Number of chunks to read
+>  	/*int chunks_to_read = size_t_ceil( nbytes, (size_t)MAX_AIO_SIZE );*/
+>  	// offset
+> @@ -203,7 +203,7 @@
+>  	// Which buffer
+>  	/*aiocb_list *buff = wh_buff == IO_BUFF ? b->io_l : b->comp_l;*/
+>  	// Still buff_size available?
+> -	size_t nbytes = (to_i - from_i + 1) * size_one_b *
+> +	size_t nbytes = (size_t)(to_i - from_i + 1) * size_one_b *
+>  	                (to_j - from_j + 1) * sizeof(double);
+>  	// Number of chunks to write
+>  	/*int chunks_to_write = size_t_ceil( nbytes, (size_t)MAX_AIO_SIZE );*/
+> @@ -225,7 +225,7 @@
+>  	// Which buffer
+>  	/*aiocb_list *buff = wh_buff == IO_BUFF ? b->io_l : b->comp_l;*/
+>  	// Still buff_size available?
+> -	size_t nbytes = ((to_i - from_i + 1) * cf->p * cf->p *
+> +	size_t nbytes = (size_t)((to_i - from_i + 1) * cf->p * cf->p *
+>  	                 (to_j - from_j + 1)) * sizeof(double);
+>  	// Number of chunks to write
+>  	/*int chunks_to_write = size_t_ceil( nbytes, (size_t)MAX_AIO_SIZE );*/
+> 
+> Modified: pkg/OmicABEL/src/fgls_chol.c
+> ===================================================================
+> --- pkg/OmicABEL/src/fgls_chol.c	2014-12-05 11:30:19 UTC (rev 1897)
+> +++ pkg/OmicABEL/src/fgls_chol.c	2014-12-21 14:14:59 UTC (rev 1898)
+> @@ -188,7 +188,7 @@
+>          beta  = res_sigma[j] * (1 - h2[j]);
+>          dscal_(&nn, &alpha, M, &iONE);
+>          for ( i = 0; i < n; i++ )
+> -            M[i*n + i] = M[i*n + i] + beta;
+> +            M[i*n + i] = M[i*n + i] + beta; // size_t?
+>  
+>          /* L * L' = M */
+>          dpotrf_(LOWER, &n, M, &n, &info);
+> @@ -234,7 +234,7 @@
+>              VT_USER_START("READ_X");
+>  #endif
+>              /* Read next block of XR's */
+> -			size_t next_x_from = ((size_t)ib + x_b) >= m ?  0 : (size_t)ib + x_b;
+> +			size_t next_x_from = ((size_t)ib + x_b) >= m ?  0 : (size_t)ib + (size_t)x_b;
+>  			size_t next_x_to   = ((size_t)ib + x_b) >= m ? MIN( (size_t)x_b, (size_t)m ) - 1 : 
+>  				                                           next_x_from + MIN( (size_t)x_b, (size_t)m - next_x_from ) - 1;
+>  			double_buffering_read_XR( &db_XR, IO_BUFF, next_x_from, next_x_to );
+> @@ -424,7 +424,7 @@
+>  		   *tmp;
+>  	int i, j;
+>  
+> -	tmp = fgls_malloc( n * n * sizeof(double) );
+> +    tmp = fgls_malloc( (size_t)n * n * sizeof(double) );
+>  
+>  	// tmp = Z * W
+>  	for ( j = 0; j < n; j++ )
+> 
+> Modified: pkg/OmicABEL/src/fgls_eigen.c
+> ===================================================================
+> --- pkg/OmicABEL/src/fgls_eigen.c	2014-12-05 11:30:19 UTC (rev 1897)
+> +++ pkg/OmicABEL/src/fgls_eigen.c	2014-12-21 14:14:59 UTC (rev 1898)
+> @@ -102,7 +102,6 @@
+>  
+>  void ooc_loops( eigen_loops_t *loops_t ) 
+>  {
+> -	/*eigen_loops_t *loops_t = ( eigen_loops_t* ) in;*/
+>      FGLS_config_t *cf = loops_t->cf;
+>    
+>      /* Dimensions of the problem */
+> @@ -292,7 +291,7 @@
+>  									for ( l = 0; l < n; l++ )
+>  										XR_copy[ l ] = XR_comp[ i * n + l ] * Winv[j*n + l];
+>  							
+> -								Bij = &B_comp[ j*size_one_b_record*x_inc   + i*size_one_b_record];
+> +								Bij = &B_comp[ j*size_one_b_record*x_inc + i*size_one_b_record];
+>  			  
+>  								/* Building B */
+>  								// Copy B_T
+> @@ -442,11 +441,11 @@
+>      loops->oneB = ( double * ) fgls_malloc ( cf->p * cf->num_threads * sizeof(double) );
+>      loops->oneV = ( double * ) fgls_malloc ( cf->p * cf->p * cf->num_threads * sizeof(double) );
+>  
+> -	double_buffering_init( &loops->db_XR, (size_t)cf->n * cf->wXR * cf->x_b * sizeof(double),
+> +	double_buffering_init( &loops->db_XR, cf->n * cf->wXR * cf->x_b * sizeof(double),
+>  			                cf->ZtXR, cf ); // _fp
+> -	double_buffering_init( &loops->db_Y,  (size_t)cf->n * cf->y_b * sizeof(double),
+> +	double_buffering_init( &loops->db_Y,  cf->n * cf->y_b * sizeof(double),
+>  			                cf->ZtY,  cf );
+> -	double_buffering_init( &loops->db_B,  (size_t)size_one_b_record * cf->x_b * cf->y_b * sizeof(double),
+> +	double_buffering_init( &loops->db_B,  size_one_b_record * cf->x_b * cf->y_b * sizeof(double),
+>  			                cf->B,  cf );
+>  
+>  	loops->cf = cf;
+> 
+> Modified: pkg/OmicABEL/src/ooc_BLAS.c
+> ===================================================================
+> --- pkg/OmicABEL/src/ooc_BLAS.c	2014-12-05 11:30:19 UTC (rev 1897)
+> +++ pkg/OmicABEL/src/ooc_BLAS.c	2014-12-21 14:14:59 UTC (rev 1898)
+> @@ -67,9 +67,9 @@
+>      /* Asynchronous IO data structures */
+>  	double *in_comp, *out_comp;
+>  	double_buffering db_in, db_out; // B, C
+> -	double_buffering_init( &db_in, ooc_b * m * sizeof(double),
+> +	double_buffering_init( &db_in, (size_t)ooc_b * m * sizeof(double),
+>  			                fp_in, NULL ); // _fp, cf not needed in this case
+> -	double_buffering_init( &db_out, ooc_b * m * sizeof(double),
+> +	double_buffering_init( &db_out, (size_t)ooc_b * m * sizeof(double),
+>  			                fp_out, NULL ); // _fp, cf not needed in this case
+>  
+>      /* BLAS constants */
+> @@ -86,7 +86,7 @@
+>      for ( i = 0; i < n; i += ooc_b ) 
+>      {
+>          /* Read next piece of "in" */
+> -        size_t nbytes = i + ooc_b > n ? 1 : MIN( ooc_b * m, ( n - (size_t)( i + ooc_b ) ) * m ) * sizeof(double);
+> +        size_t nbytes = i + ooc_b > n ? 1 : MIN( (size_t)ooc_b * m, ( n - (size_t)( i + ooc_b ) ) * m ) * sizeof(double);
+>  		off_t  offset = i + ooc_b > n ? 0 : (off_t)(i + ooc_b) * m * sizeof(double);
+>          double_buffering_read( &db_in, IO_BUFF, nbytes, offset );
+>  
+> @@ -123,7 +123,7 @@
+>  
+>          /* Write current piece of "out" */
+>  		double_buffering_write( &db_out, COMP_BUFF,
+> -				                MIN( ooc_b * m, (size_t)(n - i) * m ) * sizeof(double),
+> +				                MIN( (size_t)ooc_b * m, (size_t)(n - i) * m ) * sizeof(double),
+>                                  (off_t)i * m * sizeof(double) );
+>  
+>          /* Swap buffers */
+> 
+> Modified: pkg/OmicABEL/src/utils.c
+> ===================================================================
+> --- pkg/OmicABEL/src/utils.c	2014-12-05 11:30:19 UTC (rev 1897)
+> +++ pkg/OmicABEL/src/utils.c	2014-12-21 14:14:59 UTC (rev 1898)
+> @@ -328,6 +328,7 @@
+>  	double sum, avg;
+>  	int nans, infs;
+>  
+> +    // size_t n and n_cols?
+>  	#pragma omp parallel for private(j, sum, nans, infs, i, avg) schedule(static, 4) num_threads(nths)
+>  	for ( j = 0; j < ncols; j++ )
+>  	{
+> 
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20141221/4b640b26/attachment.sig>
+
+From fabregat at aices.rwth-aachen.de  Sun Dec 21 23:49:03 2014
+From: fabregat at aices.rwth-aachen.de (Diego Fabregat)
+Date: Sun, 21 Dec 2014 23:49:03 +0100
+Subject: [GenABEL-dev] [Genabel-commits] r1898 - in pkg/OmicABEL: . src
+In-Reply-To: <54974A41.7030104@karssen.org>
+References: <20141221141500.521D7183672@r-forge.r-project.org>
+ <54974A41.7030104@karssen.org>
+Message-ID: <54974E5F.6090204@aices.rwth-aachen.de>
+
+
+>> Modified: pkg/OmicABEL/make.inc
+>> ===================================================================
+>> --- pkg/OmicABEL/make.inc	2014-12-05 11:30:19 UTC (rev 1897)
+>> +++ pkg/OmicABEL/make.inc	2014-12-21 14:14:59 UTC (rev 1898)
+>> @@ -2,4 +2,4 @@
+>>   CFLAGS = -D_FILE_OFFSET_BITS=64 -pthread -fopenmp -DGOTO -DLINUX
+>>   
+>>   LDFLAGS =
+>> -LDLIBS = -llapack -lblas -lgfortran -gfortranbegin -lpthread -lrt
+>> +LDLIBS = /home/dfabregat/libs/lapack/lapack_LINUX.a /home/dfabregat/libs/GotoBLAS2/libgoto2.a -lgfortran -gfortranbegin -lpthread -lrt
+>>
+> I guess the changes in make.inc inadvertently entered the commit as they
+> point to your local installation. Could you roll back this file?
+Damn! Done. Thanks for the heads up.
+
+From lennart at karssen.org  Mon Dec 22 10:20:48 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Mon, 22 Dec 2014 10:20:48 +0100
+Subject: [GenABEL-dev] [Genabel-commits] r1899 - pkg/OmicABEL
+In-Reply-To: <20141221224648.B2D07187887@r-forge.r-project.org>
+References: <20141221224648.B2D07187887@r-forge.r-project.org>
+Message-ID: <5497E270.7000005@karssen.org>
+
+Thanks Diego!
+
+
+Lennart.
+
+On 21-12-14 23:46, noreply at r-forge.r-project.org wrote:
+> Author: dfabregat
+> Date: 2014-12-21 23:46:48 +0100 (Sun, 21 Dec 2014)
+> New Revision: 1899
+> 
+> Modified:
+>    pkg/OmicABEL/make.inc
+> Log:
+> Commited by mistake. Rolling back.
+> 
+> Modified: pkg/OmicABEL/make.inc
+> ===================================================================
+> --- pkg/OmicABEL/make.inc	2014-12-21 14:14:59 UTC (rev 1898)
+> +++ pkg/OmicABEL/make.inc	2014-12-21 22:46:48 UTC (rev 1899)
+> @@ -2,4 +2,4 @@
+>  CFLAGS = -D_FILE_OFFSET_BITS=64 -pthread -fopenmp -DGOTO -DLINUX
+>  
+>  LDFLAGS =
+> -LDLIBS = /home/dfabregat/libs/lapack/lapack_LINUX.a /home/dfabregat/libs/GotoBLAS2/libgoto2.a -lgfortran -gfortranbegin -lpthread -lrt
+> +LDLIBS = -llapack -lblas -lgfortran -gfortranbegin -lpthread -lrt
+> 
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20141222/488f0e3f/attachment.sig>
+

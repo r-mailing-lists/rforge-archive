@@ -1,0 +1,176 @@
+From lukas.gudmundsson at geo.uio.no  Wed Nov  5 17:32:19 2008
+From: lukas.gudmundsson at geo.uio.no (lukas.gudmundsson at geo.uio.no)
+Date: Wed, 5 Nov 2008 17:32:19 +0100 (CET)
+Subject: [Simsalabim-communicate] Design issues
+Message-ID: <494144b7b7a35c46dae4c74345554a39.squirrel@webmail.uio.no>
+
+Hello Anton,
+(@all others: this is a reply to a previous mail from Anton. You find it
+at the end of this mail.)
+
+thank you very much for the detailed descriptions on your ideas for
+improving SSA in R. In the following I try to go through some of your last
+mail and try to comment as good as possible on this.
+
+As far as I understand, you are mostly concerned about performance and
+numerical stability. As you already found out I have been ?ignoring? both
+important issues in some way, but had always the wish of these things
+being tackled. I guess that you have already found out that I am solving
+the problem of negative eigenvalues in a naive way by setting them
+artificially to a small positive value. Some of the inefficiencies come
+from certain design decisions, related to application patterns.
+
+A.
+As you probably know I am a geoscientist, using SSA for identification and
+extraction of low frequency patterns. Here I follow the tradition of using
+eigenvectors and eigenvalues to identify signals (based i.e. on
+significance testing or dominant frequencies of eigenvectors). This
+approach is somewhat different from the w-correlation approach, but has
+the advantage of full automation and less computations (for the RC's). In
+addition it is often of interest only to consider signals with certain
+time scales (based on spectra of eigenvectors). Any changes in
+architecture should either still enable the usage of the according methods
+or adopt them to new object structures.
+
+B.
+One goal was to make the usage of SSA and SSA with missings as close as
+possible. I tried to keep the object structure of decompSSA and decompSSAM
+as close as possible. With the usage of svd in the ?complete? case this
+was not very straightforward. The reason is that the factor ? vectors do
+not appear naturally in some of the algorithms for SSA with missing values
+(and if they can be calculated that is numerically inefficient if one uses
+only R [ * - operator]). However one could easily think about putting an
+optional slot in the output of decompSSA that enables us to include the
+factor vectors (this would also imply additional methods for reconSSA,
+depending on the availability   of the factor ? vectors.
+
+C.
+Finally I think it is worth to think about how much one gains from certain
+improvements (relative vs. absolute speedup). The thing that is
+computationally by far most expensive in the current implementation is the
+diagonal averaging procedure as this is fully implemented in R and I have
+found no way to vectorize that. If I have it right in mind this accounts
+for more than 80% of the system time. I do not want to say that other
+approaches are not worth considering, but changing this (porting to C or
+vectorize) absolute computation time (for large datasets) could drop from
+hours to minutes.
+
+I am as well sorry for that long and messy mail and the late reply, but I
+hope I made some of my design decisions (based on usage patterns) clear. I
+am looking forward to improve SSA in R together with you and other people
+interested in this method.
+
+Best,
+
+Lukas
+
+
+---------------------------- Original Message ----------------------------
+Subject: Re: [Simsalabim-communicate] test
+From:    "Anton Korobeynikov" <asl at math.spbu.ru>
+Date:    Wed, October 29, 2008 23:35
+To:      "Lukas Gudmundsson" <lukas.gudmundsson at geo.uio.no>
+--------------------------------------------------------------------------
+
+Hello, Lukas
+
+> I am looking forward to here about the outcome of your meeting
+We discussed thoroughly possible problems & bottlenecks of the
+(possible) R implementation of basic SSA algorithms having in mind all
+known to us users & problems being solved with SSA.
+
+Currently we're interested only in 'basic SSA', since it forms the base
+for huge amount of other methods. Also, this allows us to have hands
+clean and think about all possible solutions without dealing with
+backward compatibility problems, etc.
+
+One can easily consider all steps of algorithm either time consuming or
+memory consuming (or both), thus flexible approach should be
+introduced.
+
+As an example, let us consider the mentioned problem with factor
+vectors.
+
+I. Singular decomposition.
+There are different approaches here:
+ 1. Compute eigevalues and eigenvectors of covariance matrix. But:
+   - This is known to be numericaly unstable [1], especially if
+trajectory matrix is rank-deficient (you can easily obtain, for example,
+negative eigenvalues even with standard LAPACK routines, and thus - R's
+eigen() routine) or if there are some noticable amount of small
+eigenvalues (this is exactly the case of SSA!).
+   - You need to compute covariance matrix. The complexity for this is
+O(L*K^2) for naive approach (series => hankel => covariance matrix) and
+O(L*K) for direct approach (seris => covariance matrix).
+   - You will need to compute factor vectos separately, or implicitely
+later, with O(L*K^2) complexity.
+ 2. Use singular value decomposition. But:
+   - Fast methods are usually numerically unstable due to finite
+precision of computer arithmetics and special care should be made for
+keeping set of singular vectors orthogonal.
+   - Stable & robust methods (Jacobi method, or Householder
+bidiagonalization) are slow.
+   - We obtain set of factor vectors for free as a side effect of the
+algorithm.
+
+Fortunately, here have only 1 clear usage patter and shouldn't think
+about how users will invoke singular decomposition routine, thus we can
+end with some sane solution (or combination of different approaches
+depending on size of input, etc).
+
+II. Reconstruction
+Reconstruction itself in general costs alot, since we need to multiply 2
+matrices here if factor vectors are known, or construct again trajectory
+matrix and compute factor vectors implicitely (which will add to
+complexity alot!).
+
+One typical reconstruction usage pattern when we're looking for best
+grouping for eigentriples usually involves construction of w-correlation
+matrix, which costs O(N*M^2) (M - number of reconstructed series), if we
+already have reconstructed series and... much more if we only have sets
+of eigentriples. Add to this the need of computation of factor vectors
+and you'll end with rather computation hog thing.
+
+Surely, we have another problem, when factor vectors are big enough not
+to keep them all in memory. Thus, we've ended with classical time/memory
+tradeoff.
+
+There also other patterns, with similar results. I won't mention it here
+to save your and my time :)
+
+After studying of the problems we decided, that computations should be
+as lazy as possible: for example, factor vectors need to be computed
+only, when needed, BUT: saved for later use.
+
+Lazyness should be also flexible: user should have ability to control,
+how much data is saved & reused.
+
+Functions need to provide some sane interface to specify, how much data
+user wants to be precomputed (for example, "compute only first 20
+eigentriples", or "compute series reconstructions based on first 5
+eigentriples").
+
+I'm currently working on proof-of-concept implementation of our ideas.
+Some of them are pretty straightforward, but others look tricky to
+implement within R.
+
+We plan to use simsalabim as 'reference implementation' and after
+complete of proof-of-concept project start to port current simsalabim
+algorithms to new base. This WILL break backward compatibility, but it
+seems, that user-visible benefits will provide much more.
+
+Sorry for such long and a bit messy e-mail, but I tried to nail down
+problems and possible ways to solve them :)
+
+I'm open to any comments, suggestions & questions.
+
+[1] Bau III, David; Trefethen, Lloyd N. Numerical linear algebra,
+Philadelphia: Society for Industrial and Applied Mathematics. 1997.
+-- 
+With best regards, Anton Korobeynikov.
+
+Faculty of Mathematics & Mechanics, Saint Petersburg State University.
+
+
+
+

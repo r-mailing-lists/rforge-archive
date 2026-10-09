@@ -1,0 +1,3278 @@
+From mailinglist.honeypot at gmail.com  Tue Nov  2 20:14:12 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 2 Nov 2010 15:14:12 -0400
+Subject: [datatable-help] Something strange with scoping(?) when data.table
+ is used inside a package I'm developing.
+Message-ID: <AANLkTimzGUnPBncs-qHCT7oHpAAngZvsuHHp_Uem9kK6@mail.gmail.com>
+
+Hi,
+
+Sorry for what is about to be a vaguely described problem I'm having,
+but here goes.
+
+I'm developing some R/bioconductor packages and have been using
+data.table for a few things in them quite happily. Although my
+packages are written to be properly installed, as I develop with them,
+I just source their "R" directories to make my life easier so I can
+easily modify them and update my R environment when I find something
+wrong (w/o having to restart R, then call library(MyPackage), etc ..)
+
+So, I just went through my package to make sure my NAMESPACE stuffs
+are kosher -- that I export the classes, methods, and functions I need
+to export.
+
+In my DESCRIPTION file, data.table is listed in the "Depends" section.
+
+I'm only mentioning this because now that I've successfully done all
+that, I installed my package and am now using it by calling
+library(MyPackage). Now there is something strange happening with my
+data.table stuff.
+
+The column names of my data.table are no longer recognized in my j
+functions. For instance:,
+
+R> library(data.table)
+R> df <- structure(list(seqnames = c("chr22", "chr22", "chr22", "chr22",
+"chr22", "chr22", "chr22", "chr22", "chr22", "chr22"), start = c(22639026L,
+22639103L, 22639574L, 22643475L, 22643596L, 28059152L, 15897460L,
+15905763L, 15908214L, 15917963L), end = c(22639102L, 22639210L,
+22639749L, 22643595L, 22644748L, 28059247L, 15898234L, 15905890L,
+15908316L, 15919682L), width = c(77L, 108L, 176L, 121L, 1153L,
+96L, 775L, 128L, 103L, 1720L), strand = structure(c(1L, 1L, 1L,
+1L, 1L, 2L, 1L, 1L, 1L, 1L), .Label = c("+", "-", "*"), class = "factor"),
+    exon.anno = structure(c(5L, 1L, 1L, 1L, 4L, 3L, 3L, 3L, 3L,
+    3L), .Label = c("cds", "overlap", "utr", "utr3", "utr5"), class =
+"factor"),
+    symbol = c("DDTL", "DDTL", "DDTL", "DDTL", "DDTL", "SNORD125",
+    "CECR7", "CECR7", "CECR7", "CECR7"), entrez.id = c("100037417",
+    "100037417", "100037417", "100037417", "100037417", "100113380",
+    "100130418", "100130418", "100130418", "100130418")), .Names =
+c("seqnames",
+"start", "end", "width", "strand", "exon.anno", "symbol", "entrez.id"
+), row.names = c(NA, -10L), class = "data.frame")
+R> dt <- data.table(df, key='entrez.id')
+
+Now, something like this should work (and in fact does when I have a
+clean environment like you would by just starting R and pasting the
+above code):
+
+R> bounds <- dt[, list(start=min(start), end=min(end)), by='entrez.id']
+
+But when the "bowels" of my code in my package are running this (only
+when it's attached with library(MyLibrary), I'm not getting this
+error:
+   Error in min(start) : invalid 'type' (closure) of argument
+
+If I try to use the .SD object in the same place, I also get an other error:
+
+R> bounds2 <- dt[, {
+  .sd <- .SD[1]
+  .sd$start <- min(start)
+  .sd$end <- max(end)
+  .sd
+}, by='entrez.id']
+
+(The code here is simplified, but assume I need to use .SD -- I want
+to get the rest of the columns in the dt data.table w/o referencing
+them explicitly)
+
+The error when the code is run from within my package is:
+
+   Error in `[.data.frame`(x, i, j) : object '.SD' not found
+
+Even though it works in a "clean" R environment.
+
+Can anyone take a stab at why this might be happening? I'm at a bit of a loss.
+
+For what it's worth, this is the sessionInfo of my R environment when
+my package is installed (my package is called GenomicFeaturesX). Most
+of the packages in "other attached packages" are from biocondutcor.
+
+R version 2.12.0 (2010-10-15)
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+ [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+ [5] LC_MONETARY=C              LC_MESSAGES=en_US.UTF-8
+ [7] LC_PAPER=en_US.UTF-8       LC_NAME=C
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C
+[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+ [1] BSgenome.Hsapiens.UCSC.hg18_1.3.16 BSgenome_1.18.0
+ [3] Biostrings_2.18.0                  doMC_1.2.1
+ [5] multicore_0.1-3                    foreach_1.3.0
+ [7] codetools_0.2-2                    iterators_1.0.3
+ [9] GenomicFeaturesX_0.2               data.table_1.5
+[11] GenomicFeatures_1.2.0              GenomicRanges_1.2.1
+[13] IRanges_1.8.2
+
+loaded via a namespace (and not attached):
+ [1] annotate_1.28.0      AnnotationDbi_1.12.0 Biobase_2.10.0
+ [4] biomaRt_2.6.0        DBI_0.2-5            RCurl_1.4-3
+ [7] RSQLite_0.9-2        rtracklayer_1.10.2   tools_2.12.0
+[10] XML_3.2-0            xtable_1.5-6
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Tue Nov  2 23:20:34 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 2 Nov 2010 18:20:34 -0400
+Subject: [datatable-help] Something strange with scoping(?) when
+ data.table is used inside a package I'm developing.
+In-Reply-To: <AANLkTimzGUnPBncs-qHCT7oHpAAngZvsuHHp_Uem9kK6@mail.gmail.com>
+References: <AANLkTimzGUnPBncs-qHCT7oHpAAngZvsuHHp_Uem9kK6@mail.gmail.com>
+Message-ID: <AANLkTin+Nm-9OKwwAondeH1SHtOHAMfRX3rpZKU52R-Y@mail.gmail.com>
+
+More info on my problem:
+
+I'm loading my package, and passing an object to a function defined
+(and exported) in my library that does the fast dt[, SOMETHING,
+by='entrez.id']. I call this function, and it bombs when I try to
+access "things" (columns) of the data.table in my SOMEHTING
+expression.
+
+Given the same object, I then execute the lines of the function that
+failing one by one (I don't call the function), and it executes
+normally.
+
+I wonder if this is relevant:
+
+(I). After the functions bombs, this is the result of traceback() --
+is it normal for the deepest call to actually be to `[.data.frame`?
+
+R> traceback()
+4: `[.data.frame`(x, i, j)
+3: `[.data.table`(dt, , list(seqnames = seqnames[1], strand = strand[1],
+       start = min(start), end = max(end)), by = "entrez.id")
+2: dt[, list(seqnames = seqnames[1], strand = strand[1], start = min(start),
+       end = max(end)), by = "entrez.id"]
+1: annotatedTxBounds(annotated)
+
+(II) Bioconductor packages use the S4 system. I've defined some
+conversion functions on objects in my package so that I can convert
+them to data.table's in the "expected way", a la:
+
+R> my.dt <- as(MyOwnClass, 'data.table')
+
+In order for me to do that, I've had to S4-ize the S3 data.table class, like so:
+
+setOldClass("data.table")
+(I also had `setOldClass(c('data.table', 'data.frame'))`, both have
+the same error)
+
+So ... it has something to do with my function as its run from within
+my package's environment -- but I don't know what to do about it.
+
+I tried adding `import(data.table)` into NAMESPACE file as well, but no dice.
+
+Thanks,
+-steve
+
+On Tue, Nov 2, 2010 at 3:14 PM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Hi,
+>
+> Sorry for what is about to be a vaguely described problem I'm having,
+> but here goes.
+>
+> I'm developing some R/bioconductor packages and have been using
+> data.table for a few things in them quite happily. Although my
+> packages are written to be properly installed, as I develop with them,
+> I just source their "R" directories to make my life easier so I can
+> easily modify them and update my R environment when I find something
+> wrong (w/o having to restart R, then call library(MyPackage), etc ..)
+>
+> So, I just went through my package to make sure my NAMESPACE stuffs
+> are kosher -- that I export the classes, methods, and functions I need
+> to export.
+>
+> In my DESCRIPTION file, data.table is listed in the "Depends" section.
+>
+> I'm only mentioning this because now that I've successfully done all
+> that, I installed my package and am now using it by calling
+> library(MyPackage). Now there is something strange happening with my
+> data.table stuff.
+>
+> The column names of my data.table are no longer recognized in my j
+> functions. For instance:,
+>
+> R> library(data.table)
+> R> df <- structure(list(seqnames = c("chr22", "chr22", "chr22", "chr22",
+> "chr22", "chr22", "chr22", "chr22", "chr22", "chr22"), start = c(22639026L,
+> 22639103L, 22639574L, 22643475L, 22643596L, 28059152L, 15897460L,
+> 15905763L, 15908214L, 15917963L), end = c(22639102L, 22639210L,
+> 22639749L, 22643595L, 22644748L, 28059247L, 15898234L, 15905890L,
+> 15908316L, 15919682L), width = c(77L, 108L, 176L, 121L, 1153L,
+> 96L, 775L, 128L, 103L, 1720L), strand = structure(c(1L, 1L, 1L,
+> 1L, 1L, 2L, 1L, 1L, 1L, 1L), .Label = c("+", "-", "*"), class = "factor"),
+> ? ?exon.anno = structure(c(5L, 1L, 1L, 1L, 4L, 3L, 3L, 3L, 3L,
+> ? ?3L), .Label = c("cds", "overlap", "utr", "utr3", "utr5"), class =
+> "factor"),
+> ? ?symbol = c("DDTL", "DDTL", "DDTL", "DDTL", "DDTL", "SNORD125",
+> ? ?"CECR7", "CECR7", "CECR7", "CECR7"), entrez.id = c("100037417",
+> ? ?"100037417", "100037417", "100037417", "100037417", "100113380",
+> ? ?"100130418", "100130418", "100130418", "100130418")), .Names =
+> c("seqnames",
+> "start", "end", "width", "strand", "exon.anno", "symbol", "entrez.id"
+> ), row.names = c(NA, -10L), class = "data.frame")
+> R> dt <- data.table(df, key='entrez.id')
+>
+> Now, something like this should work (and in fact does when I have a
+> clean environment like you would by just starting R and pasting the
+> above code):
+>
+> R> bounds <- dt[, list(start=min(start), end=min(end)), by='entrez.id']
+>
+> But when the "bowels" of my code in my package are running this (only
+> when it's attached with library(MyLibrary), I'm not getting this
+> error:
+> ? Error in min(start) : invalid 'type' (closure) of argument
+>
+> If I try to use the .SD object in the same place, I also get an other error:
+>
+> R> bounds2 <- dt[, {
+> ?.sd <- .SD[1]
+> ?.sd$start <- min(start)
+> ?.sd$end <- max(end)
+> ?.sd
+> }, by='entrez.id']
+>
+> (The code here is simplified, but assume I need to use .SD -- I want
+> to get the rest of the columns in the dt data.table w/o referencing
+> them explicitly)
+>
+> The error when the code is run from within my package is:
+>
+> ? Error in `[.data.frame`(x, i, j) : object '.SD' not found
+>
+> Even though it works in a "clean" R environment.
+>
+> Can anyone take a stab at why this might be happening? I'm at a bit of a loss.
+>
+> For what it's worth, this is the sessionInfo of my R environment when
+> my package is installed (my package is called GenomicFeaturesX). Most
+> of the packages in "other attached packages" are from biocondutcor.
+>
+> R version 2.12.0 (2010-10-15)
+> Platform: x86_64-unknown-linux-gnu (64-bit)
+>
+> locale:
+> ?[1] LC_CTYPE=en_US.UTF-8 ? ? ? LC_NUMERIC=C
+> ?[3] LC_TIME=en_US.UTF-8 ? ? ? ?LC_COLLATE=en_US.UTF-8
+> ?[5] LC_MONETARY=C ? ? ? ? ? ? ?LC_MESSAGES=en_US.UTF-8
+> ?[7] LC_PAPER=en_US.UTF-8 ? ? ? LC_NAME=C
+> ?[9] LC_ADDRESS=C ? ? ? ? ? ? ? LC_TELEPHONE=C
+> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>
+> attached base packages:
+> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>
+> other attached packages:
+> ?[1] BSgenome.Hsapiens.UCSC.hg18_1.3.16 BSgenome_1.18.0
+> ?[3] Biostrings_2.18.0 ? ? ? ? ? ? ? ? ?doMC_1.2.1
+> ?[5] multicore_0.1-3 ? ? ? ? ? ? ? ? ? ?foreach_1.3.0
+> ?[7] codetools_0.2-2 ? ? ? ? ? ? ? ? ? ?iterators_1.0.3
+> ?[9] GenomicFeaturesX_0.2 ? ? ? ? ? ? ? data.table_1.5
+> [11] GenomicFeatures_1.2.0 ? ? ? ? ? ? ?GenomicRanges_1.2.1
+> [13] IRanges_1.8.2
+>
+> loaded via a namespace (and not attached):
+> ?[1] annotate_1.28.0 ? ? ?AnnotationDbi_1.12.0 Biobase_2.10.0
+> ?[4] biomaRt_2.6.0 ? ? ? ?DBI_0.2-5 ? ? ? ? ? ?RCurl_1.4-3
+> ?[7] RSQLite_0.9-2 ? ? ? ?rtracklayer_1.10.2 ? tools_2.12.0
+> [10] XML_3.2-0 ? ? ? ? ? ?xtable_1.5-6
+>
+> Thanks,
+> -steve
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Tue Nov  2 23:29:24 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 2 Nov 2010 18:29:24 -0400
+Subject: [datatable-help] [SOLVED] Something strange with scoping(?)
+ when data.table is used inside a package I'm developing.
+In-Reply-To: <AANLkTin+Nm-9OKwwAondeH1SHtOHAMfRX3rpZKU52R-Y@mail.gmail.com>
+References: <AANLkTimzGUnPBncs-qHCT7oHpAAngZvsuHHp_Uem9kK6@mail.gmail.com>
+	<AANLkTin+Nm-9OKwwAondeH1SHtOHAMfRX3rpZKU52R-Y@mail.gmail.com>
+Message-ID: <AANLkTimgHw8d8uHRFZnGLyULb64yXFLyEE-=oWYwZayL@mail.gmail.com>
+
+I just `svn up`'ed my data.table package to see if I can dig into the
+code and I noticed that this issue was previously reported and fixed
+in 1.5.1.
+
+Seems like I stumbled on the same issue ... sorry, I didn't see this
+in the mailing list.
+
+Thanks,
+-steve
+
+On Tue, Nov 2, 2010 at 6:20 PM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> More info on my problem:
+>
+> I'm loading my package, and passing an object to a function defined
+> (and exported) in my library that does the fast dt[, SOMETHING,
+> by='entrez.id']. I call this function, and it bombs when I try to
+> access "things" (columns) of the data.table in my SOMEHTING
+> expression.
+>
+> Given the same object, I then execute the lines of the function that
+> failing one by one (I don't call the function), and it executes
+> normally.
+>
+> I wonder if this is relevant:
+>
+> (I). After the functions bombs, this is the result of traceback() --
+> is it normal for the deepest call to actually be to `[.data.frame`?
+>
+> R> traceback()
+> 4: `[.data.frame`(x, i, j)
+> 3: `[.data.table`(dt, , list(seqnames = seqnames[1], strand = strand[1],
+> ? ? ? start = min(start), end = max(end)), by = "entrez.id")
+> 2: dt[, list(seqnames = seqnames[1], strand = strand[1], start = min(start),
+> ? ? ? end = max(end)), by = "entrez.id"]
+> 1: annotatedTxBounds(annotated)
+>
+> (II) Bioconductor packages use the S4 system. I've defined some
+> conversion functions on objects in my package so that I can convert
+> them to data.table's in the "expected way", a la:
+>
+> R> my.dt <- as(MyOwnClass, 'data.table')
+>
+> In order for me to do that, I've had to S4-ize the S3 data.table class, like so:
+>
+> setOldClass("data.table")
+> (I also had `setOldClass(c('data.table', 'data.frame'))`, both have
+> the same error)
+>
+> So ... it has something to do with my function as its run from within
+> my package's environment -- but I don't know what to do about it.
+>
+> I tried adding `import(data.table)` into NAMESPACE file as well, but no dice.
+>
+> Thanks,
+> -steve
+>
+> On Tue, Nov 2, 2010 at 3:14 PM, Steve Lianoglou
+> <mailinglist.honeypot at gmail.com> wrote:
+>> Hi,
+>>
+>> Sorry for what is about to be a vaguely described problem I'm having,
+>> but here goes.
+>>
+>> I'm developing some R/bioconductor packages and have been using
+>> data.table for a few things in them quite happily. Although my
+>> packages are written to be properly installed, as I develop with them,
+>> I just source their "R" directories to make my life easier so I can
+>> easily modify them and update my R environment when I find something
+>> wrong (w/o having to restart R, then call library(MyPackage), etc ..)
+>>
+>> So, I just went through my package to make sure my NAMESPACE stuffs
+>> are kosher -- that I export the classes, methods, and functions I need
+>> to export.
+>>
+>> In my DESCRIPTION file, data.table is listed in the "Depends" section.
+>>
+>> I'm only mentioning this because now that I've successfully done all
+>> that, I installed my package and am now using it by calling
+>> library(MyPackage). Now there is something strange happening with my
+>> data.table stuff.
+>>
+>> The column names of my data.table are no longer recognized in my j
+>> functions. For instance:,
+>>
+>> R> library(data.table)
+>> R> df <- structure(list(seqnames = c("chr22", "chr22", "chr22", "chr22",
+>> "chr22", "chr22", "chr22", "chr22", "chr22", "chr22"), start = c(22639026L,
+>> 22639103L, 22639574L, 22643475L, 22643596L, 28059152L, 15897460L,
+>> 15905763L, 15908214L, 15917963L), end = c(22639102L, 22639210L,
+>> 22639749L, 22643595L, 22644748L, 28059247L, 15898234L, 15905890L,
+>> 15908316L, 15919682L), width = c(77L, 108L, 176L, 121L, 1153L,
+>> 96L, 775L, 128L, 103L, 1720L), strand = structure(c(1L, 1L, 1L,
+>> 1L, 1L, 2L, 1L, 1L, 1L, 1L), .Label = c("+", "-", "*"), class = "factor"),
+>> ? ?exon.anno = structure(c(5L, 1L, 1L, 1L, 4L, 3L, 3L, 3L, 3L,
+>> ? ?3L), .Label = c("cds", "overlap", "utr", "utr3", "utr5"), class =
+>> "factor"),
+>> ? ?symbol = c("DDTL", "DDTL", "DDTL", "DDTL", "DDTL", "SNORD125",
+>> ? ?"CECR7", "CECR7", "CECR7", "CECR7"), entrez.id = c("100037417",
+>> ? ?"100037417", "100037417", "100037417", "100037417", "100113380",
+>> ? ?"100130418", "100130418", "100130418", "100130418")), .Names =
+>> c("seqnames",
+>> "start", "end", "width", "strand", "exon.anno", "symbol", "entrez.id"
+>> ), row.names = c(NA, -10L), class = "data.frame")
+>> R> dt <- data.table(df, key='entrez.id')
+>>
+>> Now, something like this should work (and in fact does when I have a
+>> clean environment like you would by just starting R and pasting the
+>> above code):
+>>
+>> R> bounds <- dt[, list(start=min(start), end=min(end)), by='entrez.id']
+>>
+>> But when the "bowels" of my code in my package are running this (only
+>> when it's attached with library(MyLibrary), I'm not getting this
+>> error:
+>> ? Error in min(start) : invalid 'type' (closure) of argument
+>>
+>> If I try to use the .SD object in the same place, I also get an other error:
+>>
+>> R> bounds2 <- dt[, {
+>> ?.sd <- .SD[1]
+>> ?.sd$start <- min(start)
+>> ?.sd$end <- max(end)
+>> ?.sd
+>> }, by='entrez.id']
+>>
+>> (The code here is simplified, but assume I need to use .SD -- I want
+>> to get the rest of the columns in the dt data.table w/o referencing
+>> them explicitly)
+>>
+>> The error when the code is run from within my package is:
+>>
+>> ? Error in `[.data.frame`(x, i, j) : object '.SD' not found
+>>
+>> Even though it works in a "clean" R environment.
+>>
+>> Can anyone take a stab at why this might be happening? I'm at a bit of a loss.
+>>
+>> For what it's worth, this is the sessionInfo of my R environment when
+>> my package is installed (my package is called GenomicFeaturesX). Most
+>> of the packages in "other attached packages" are from biocondutcor.
+>>
+>> R version 2.12.0 (2010-10-15)
+>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>
+>> locale:
+>> ?[1] LC_CTYPE=en_US.UTF-8 ? ? ? LC_NUMERIC=C
+>> ?[3] LC_TIME=en_US.UTF-8 ? ? ? ?LC_COLLATE=en_US.UTF-8
+>> ?[5] LC_MONETARY=C ? ? ? ? ? ? ?LC_MESSAGES=en_US.UTF-8
+>> ?[7] LC_PAPER=en_US.UTF-8 ? ? ? LC_NAME=C
+>> ?[9] LC_ADDRESS=C ? ? ? ? ? ? ? LC_TELEPHONE=C
+>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>>
+>> attached base packages:
+>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>
+>> other attached packages:
+>> ?[1] BSgenome.Hsapiens.UCSC.hg18_1.3.16 BSgenome_1.18.0
+>> ?[3] Biostrings_2.18.0 ? ? ? ? ? ? ? ? ?doMC_1.2.1
+>> ?[5] multicore_0.1-3 ? ? ? ? ? ? ? ? ? ?foreach_1.3.0
+>> ?[7] codetools_0.2-2 ? ? ? ? ? ? ? ? ? ?iterators_1.0.3
+>> ?[9] GenomicFeaturesX_0.2 ? ? ? ? ? ? ? data.table_1.5
+>> [11] GenomicFeatures_1.2.0 ? ? ? ? ? ? ?GenomicRanges_1.2.1
+>> [13] IRanges_1.8.2
+>>
+>> loaded via a namespace (and not attached):
+>> ?[1] annotate_1.28.0 ? ? ?AnnotationDbi_1.12.0 Biobase_2.10.0
+>> ?[4] biomaRt_2.6.0 ? ? ? ?DBI_0.2-5 ? ? ? ? ? ?RCurl_1.4-3
+>> ?[7] RSQLite_0.9-2 ? ? ? ?rtracklayer_1.10.2 ? tools_2.12.0
+>> [10] XML_3.2-0 ? ? ? ? ? ?xtable_1.5-6
+>>
+>> Thanks,
+>> -steve
+>>
+>> --
+>> Steve Lianoglou
+>> Graduate Student: Computational Systems Biology
+>> ?| Memorial Sloan-Kettering Cancer Center
+>> ?| Weill Medical College of Cornell University
+>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>
+>
+>
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Thu Nov  4 14:36:36 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 4 Nov 2010 13:36:36 -0000
+Subject: [datatable-help] [SOLVED] Something strange with scoping(?)
+ when data.table is used inside a package I'm developing.
+In-Reply-To: <AANLkTimgHw8d8uHRFZnGLyULb64yXFLyEE-=oWYwZayL@mail.gmail.com>
+References: <AANLkTimzGUnPBncs-qHCT7oHpAAngZvsuHHp_Uem9kK6@mail.gmail.com>
+	<AANLkTin+Nm-9OKwwAondeH1SHtOHAMfRX3rpZKU52R-Y@mail.gmail.com>
+	<AANLkTimgHw8d8uHRFZnGLyULb64yXFLyEE-=oWYwZayL@mail.gmail.com>
+Message-ID: <08139b25d31830f275a1245e8382c5a0.squirrel@webmail.plus.net>
+
+
+Yes that was an off list fix for importing data.table (Imports field in
+DESCRIPTON). There is still likely a problem with the Depends field of
+DESCRIPTION, though. If you need to Depend rather than Import then let me
+know and I'll try again to fix it.
+
+Note also that data.table queries don't work from a browser prompt (bug
+#1131).
+
+Matthew
+
+
+> I just `svn up`'ed my data.table package to see if I can dig into the
+> code and I noticed that this issue was previously reported and fixed
+> in 1.5.1.
+>
+> Seems like I stumbled on the same issue ... sorry, I didn't see this
+> in the mailing list.
+>
+> Thanks,
+> -steve
+>
+> On Tue, Nov 2, 2010 at 6:20 PM, Steve Lianoglou
+> <mailinglist.honeypot at gmail.com> wrote:
+>> More info on my problem:
+>>
+>> I'm loading my package, and passing an object to a function defined
+>> (and exported) in my library that does the fast dt[, SOMETHING,
+>> by='entrez.id']. I call this function, and it bombs when I try to
+>> access "things" (columns) of the data.table in my SOMEHTING
+>> expression.
+>>
+>> Given the same object, I then execute the lines of the function that
+>> failing one by one (I don't call the function), and it executes
+>> normally.
+>>
+>> I wonder if this is relevant:
+>>
+>> (I). After the functions bombs, this is the result of traceback() --
+>> is it normal for the deepest call to actually be to `[.data.frame`?
+>>
+>> R> traceback()
+>> 4: `[.data.frame`(x, i, j)
+>> 3: `[.data.table`(dt, , list(seqnames = seqnames[1], strand = strand[1],
+>> ? ? ? start = min(start), end = max(end)), by = "entrez.id")
+>> 2: dt[, list(seqnames = seqnames[1], strand = strand[1], start =
+>> min(start),
+>> ? ? ? end = max(end)), by = "entrez.id"]
+>> 1: annotatedTxBounds(annotated)
+>>
+>> (II) Bioconductor packages use the S4 system. I've defined some
+>> conversion functions on objects in my package so that I can convert
+>> them to data.table's in the "expected way", a la:
+>>
+>> R> my.dt <- as(MyOwnClass, 'data.table')
+>>
+>> In order for me to do that, I've had to S4-ize the S3 data.table class,
+>> like so:
+>>
+>> setOldClass("data.table")
+>> (I also had `setOldClass(c('data.table', 'data.frame'))`, both have
+>> the same error)
+>>
+>> So ... it has something to do with my function as its run from within
+>> my package's environment -- but I don't know what to do about it.
+>>
+>> I tried adding `import(data.table)` into NAMESPACE file as well, but no
+>> dice.
+>>
+>> Thanks,
+>> -steve
+>>
+>> On Tue, Nov 2, 2010 at 3:14 PM, Steve Lianoglou
+>> <mailinglist.honeypot at gmail.com> wrote:
+>>> Hi,
+>>>
+>>> Sorry for what is about to be a vaguely described problem I'm having,
+>>> but here goes.
+>>>
+>>> I'm developing some R/bioconductor packages and have been using
+>>> data.table for a few things in them quite happily. Although my
+>>> packages are written to be properly installed, as I develop with them,
+>>> I just source their "R" directories to make my life easier so I can
+>>> easily modify them and update my R environment when I find something
+>>> wrong (w/o having to restart R, then call library(MyPackage), etc ..)
+>>>
+>>> So, I just went through my package to make sure my NAMESPACE stuffs
+>>> are kosher -- that I export the classes, methods, and functions I need
+>>> to export.
+>>>
+>>> In my DESCRIPTION file, data.table is listed in the "Depends" section.
+>>>
+>>> I'm only mentioning this because now that I've successfully done all
+>>> that, I installed my package and am now using it by calling
+>>> library(MyPackage). Now there is something strange happening with my
+>>> data.table stuff.
+>>>
+>>> The column names of my data.table are no longer recognized in my j
+>>> functions. For instance:,
+>>>
+>>> R> library(data.table)
+>>> R> df <- structure(list(seqnames = c("chr22", "chr22", "chr22",
+>>> "chr22",
+>>> "chr22", "chr22", "chr22", "chr22", "chr22", "chr22"), start =
+>>> c(22639026L,
+>>> 22639103L, 22639574L, 22643475L, 22643596L, 28059152L, 15897460L,
+>>> 15905763L, 15908214L, 15917963L), end = c(22639102L, 22639210L,
+>>> 22639749L, 22643595L, 22644748L, 28059247L, 15898234L, 15905890L,
+>>> 15908316L, 15919682L), width = c(77L, 108L, 176L, 121L, 1153L,
+>>> 96L, 775L, 128L, 103L, 1720L), strand = structure(c(1L, 1L, 1L,
+>>> 1L, 1L, 2L, 1L, 1L, 1L, 1L), .Label = c("+", "-", "*"), class =
+>>> "factor"),
+>>> ? ?exon.anno = structure(c(5L, 1L, 1L, 1L, 4L, 3L, 3L, 3L, 3L,
+>>> ? ?3L), .Label = c("cds", "overlap", "utr", "utr3", "utr5"), class =
+>>> "factor"),
+>>> ? ?symbol = c("DDTL", "DDTL", "DDTL", "DDTL", "DDTL", "SNORD125",
+>>> ? ?"CECR7", "CECR7", "CECR7", "CECR7"), entrez.id = c("100037417",
+>>> ? ?"100037417", "100037417", "100037417", "100037417", "100113380",
+>>> ? ?"100130418", "100130418", "100130418", "100130418")), .Names =
+>>> c("seqnames",
+>>> "start", "end", "width", "strand", "exon.anno", "symbol", "entrez.id"
+>>> ), row.names = c(NA, -10L), class = "data.frame")
+>>> R> dt <- data.table(df, key='entrez.id')
+>>>
+>>> Now, something like this should work (and in fact does when I have a
+>>> clean environment like you would by just starting R and pasting the
+>>> above code):
+>>>
+>>> R> bounds <- dt[, list(start=min(start), end=min(end)), by='entrez.id']
+>>>
+>>> But when the "bowels" of my code in my package are running this (only
+>>> when it's attached with library(MyLibrary), I'm not getting this
+>>> error:
+>>> ? Error in min(start) : invalid 'type' (closure) of argument
+>>>
+>>> If I try to use the .SD object in the same place, I also get an other
+>>> error:
+>>>
+>>> R> bounds2 <- dt[, {
+>>> ?.sd <- .SD[1]
+>>> ?.sd$start <- min(start)
+>>> ?.sd$end <- max(end)
+>>> ?.sd
+>>> }, by='entrez.id']
+>>>
+>>> (The code here is simplified, but assume I need to use .SD -- I want
+>>> to get the rest of the columns in the dt data.table w/o referencing
+>>> them explicitly)
+>>>
+>>> The error when the code is run from within my package is:
+>>>
+>>> ? Error in `[.data.frame`(x, i, j) : object '.SD' not found
+>>>
+>>> Even though it works in a "clean" R environment.
+>>>
+>>> Can anyone take a stab at why this might be happening? I'm at a bit of
+>>> a loss.
+>>>
+>>> For what it's worth, this is the sessionInfo of my R environment when
+>>> my package is installed (my package is called GenomicFeaturesX). Most
+>>> of the packages in "other attached packages" are from biocondutcor.
+>>>
+>>> R version 2.12.0 (2010-10-15)
+>>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>>
+>>> locale:
+>>> ?[1] LC_CTYPE=en_US.UTF-8 ? ? ? LC_NUMERIC=C
+>>> ?[3] LC_TIME=en_US.UTF-8 ? ? ? ?LC_COLLATE=en_US.UTF-8
+>>> ?[5] LC_MONETARY=C ? ? ? ? ? ? ?LC_MESSAGES=en_US.UTF-8
+>>> ?[7] LC_PAPER=en_US.UTF-8 ? ? ? LC_NAME=C
+>>> ?[9] LC_ADDRESS=C ? ? ? ? ? ? ? LC_TELEPHONE=C
+>>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>>>
+>>> attached base packages:
+>>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>>
+>>> other attached packages:
+>>> ?[1] BSgenome.Hsapiens.UCSC.hg18_1.3.16 BSgenome_1.18.0
+>>> ?[3] Biostrings_2.18.0 ? ? ? ? ? ? ? ? ?doMC_1.2.1
+>>> ?[5] multicore_0.1-3 ? ? ? ? ? ? ? ? ? ?foreach_1.3.0
+>>> ?[7] codetools_0.2-2 ? ? ? ? ? ? ? ? ? ?iterators_1.0.3
+>>> ?[9] GenomicFeaturesX_0.2 ? ? ? ? ? ? ? data.table_1.5
+>>> [11] GenomicFeatures_1.2.0 ? ? ? ? ? ? ?GenomicRanges_1.2.1
+>>> [13] IRanges_1.8.2
+>>>
+>>> loaded via a namespace (and not attached):
+>>> ?[1] annotate_1.28.0 ? ? ?AnnotationDbi_1.12.0 Biobase_2.10.0
+>>> ?[4] biomaRt_2.6.0 ? ? ? ?DBI_0.2-5 ? ? ? ? ? ?RCurl_1.4-3
+>>> ?[7] RSQLite_0.9-2 ? ? ? ?rtracklayer_1.10.2 ? tools_2.12.0
+>>> [10] XML_3.2-0 ? ? ? ? ? ?xtable_1.5-6
+>>>
+>>> Thanks,
+>>> -steve
+>>>
+>>> --
+>>> Steve Lianoglou
+>>> Graduate Student: Computational Systems Biology
+>>> ?| Memorial Sloan-Kettering Cancer Center
+>>> ?| Weill Medical College of Cornell University
+>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>>
+>>
+>>
+>>
+>> --
+>> Steve Lianoglou
+>> Graduate Student: Computational Systems Biology
+>> ?| Memorial Sloan-Kettering Cancer Center
+>> ?| Weill Medical College of Cornell University
+>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>
+>
+>
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From mailinglist.honeypot at gmail.com  Thu Nov  4 15:11:45 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Thu, 4 Nov 2010 10:11:45 -0400
+Subject: [datatable-help] [SOLVED] Something strange with scoping(?)
+ when data.table is used inside a package I'm developing.
+In-Reply-To: <08139b25d31830f275a1245e8382c5a0.squirrel@webmail.plus.net>
+References: <AANLkTimzGUnPBncs-qHCT7oHpAAngZvsuHHp_Uem9kK6@mail.gmail.com>
+	<AANLkTin+Nm-9OKwwAondeH1SHtOHAMfRX3rpZKU52R-Y@mail.gmail.com>
+	<AANLkTimgHw8d8uHRFZnGLyULb64yXFLyEE-=oWYwZayL@mail.gmail.com>
+	<08139b25d31830f275a1245e8382c5a0.squirrel@webmail.plus.net>
+Message-ID: <AANLkTimRjUz=Yu1ajLKJPzPJfy-oYuBZURG0CCt99A-m@mail.gmail.com>
+
+Thanks for the reply ... I actually moved it over to the Imports
+anyway .. but still, it's probably a good thing to fix at some point
+:-)
+
+It's kind of weird though ... do you know what "the nut" of the problem is?
+-steve
+
+On Thu, Nov 4, 2010 at 9:36 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> Yes that was an off list fix for importing data.table (Imports field in
+> DESCRIPTON). There is still likely a problem with the Depends field of
+> DESCRIPTION, though. If you need to Depend rather than Import then let me
+> know and I'll try again to fix it.
+>
+> Note also that data.table queries don't work from a browser prompt (bug
+> #1131).
+>
+> Matthew
+>
+>
+>> I just `svn up`'ed my data.table package to see if I can dig into the
+>> code and I noticed that this issue was previously reported and fixed
+>> in 1.5.1.
+>>
+>> Seems like I stumbled on the same issue ... sorry, I didn't see this
+>> in the mailing list.
+>>
+>> Thanks,
+>> -steve
+>>
+>> On Tue, Nov 2, 2010 at 6:20 PM, Steve Lianoglou
+>> <mailinglist.honeypot at gmail.com> wrote:
+>>> More info on my problem:
+>>>
+>>> I'm loading my package, and passing an object to a function defined
+>>> (and exported) in my library that does the fast dt[, SOMETHING,
+>>> by='entrez.id']. I call this function, and it bombs when I try to
+>>> access "things" (columns) of the data.table in my SOMEHTING
+>>> expression.
+>>>
+>>> Given the same object, I then execute the lines of the function that
+>>> failing one by one (I don't call the function), and it executes
+>>> normally.
+>>>
+>>> I wonder if this is relevant:
+>>>
+>>> (I). After the functions bombs, this is the result of traceback() --
+>>> is it normal for the deepest call to actually be to `[.data.frame`?
+>>>
+>>> R> traceback()
+>>> 4: `[.data.frame`(x, i, j)
+>>> 3: `[.data.table`(dt, , list(seqnames = seqnames[1], strand = strand[1],
+>>> ? ? ? start = min(start), end = max(end)), by = "entrez.id")
+>>> 2: dt[, list(seqnames = seqnames[1], strand = strand[1], start =
+>>> min(start),
+>>> ? ? ? end = max(end)), by = "entrez.id"]
+>>> 1: annotatedTxBounds(annotated)
+>>>
+>>> (II) Bioconductor packages use the S4 system. I've defined some
+>>> conversion functions on objects in my package so that I can convert
+>>> them to data.table's in the "expected way", a la:
+>>>
+>>> R> my.dt <- as(MyOwnClass, 'data.table')
+>>>
+>>> In order for me to do that, I've had to S4-ize the S3 data.table class,
+>>> like so:
+>>>
+>>> setOldClass("data.table")
+>>> (I also had `setOldClass(c('data.table', 'data.frame'))`, both have
+>>> the same error)
+>>>
+>>> So ... it has something to do with my function as its run from within
+>>> my package's environment -- but I don't know what to do about it.
+>>>
+>>> I tried adding `import(data.table)` into NAMESPACE file as well, but no
+>>> dice.
+>>>
+>>> Thanks,
+>>> -steve
+>>>
+>>> On Tue, Nov 2, 2010 at 3:14 PM, Steve Lianoglou
+>>> <mailinglist.honeypot at gmail.com> wrote:
+>>>> Hi,
+>>>>
+>>>> Sorry for what is about to be a vaguely described problem I'm having,
+>>>> but here goes.
+>>>>
+>>>> I'm developing some R/bioconductor packages and have been using
+>>>> data.table for a few things in them quite happily. Although my
+>>>> packages are written to be properly installed, as I develop with them,
+>>>> I just source their "R" directories to make my life easier so I can
+>>>> easily modify them and update my R environment when I find something
+>>>> wrong (w/o having to restart R, then call library(MyPackage), etc ..)
+>>>>
+>>>> So, I just went through my package to make sure my NAMESPACE stuffs
+>>>> are kosher -- that I export the classes, methods, and functions I need
+>>>> to export.
+>>>>
+>>>> In my DESCRIPTION file, data.table is listed in the "Depends" section.
+>>>>
+>>>> I'm only mentioning this because now that I've successfully done all
+>>>> that, I installed my package and am now using it by calling
+>>>> library(MyPackage). Now there is something strange happening with my
+>>>> data.table stuff.
+>>>>
+>>>> The column names of my data.table are no longer recognized in my j
+>>>> functions. For instance:,
+>>>>
+>>>> R> library(data.table)
+>>>> R> df <- structure(list(seqnames = c("chr22", "chr22", "chr22",
+>>>> "chr22",
+>>>> "chr22", "chr22", "chr22", "chr22", "chr22", "chr22"), start =
+>>>> c(22639026L,
+>>>> 22639103L, 22639574L, 22643475L, 22643596L, 28059152L, 15897460L,
+>>>> 15905763L, 15908214L, 15917963L), end = c(22639102L, 22639210L,
+>>>> 22639749L, 22643595L, 22644748L, 28059247L, 15898234L, 15905890L,
+>>>> 15908316L, 15919682L), width = c(77L, 108L, 176L, 121L, 1153L,
+>>>> 96L, 775L, 128L, 103L, 1720L), strand = structure(c(1L, 1L, 1L,
+>>>> 1L, 1L, 2L, 1L, 1L, 1L, 1L), .Label = c("+", "-", "*"), class =
+>>>> "factor"),
+>>>> ? ?exon.anno = structure(c(5L, 1L, 1L, 1L, 4L, 3L, 3L, 3L, 3L,
+>>>> ? ?3L), .Label = c("cds", "overlap", "utr", "utr3", "utr5"), class =
+>>>> "factor"),
+>>>> ? ?symbol = c("DDTL", "DDTL", "DDTL", "DDTL", "DDTL", "SNORD125",
+>>>> ? ?"CECR7", "CECR7", "CECR7", "CECR7"), entrez.id = c("100037417",
+>>>> ? ?"100037417", "100037417", "100037417", "100037417", "100113380",
+>>>> ? ?"100130418", "100130418", "100130418", "100130418")), .Names =
+>>>> c("seqnames",
+>>>> "start", "end", "width", "strand", "exon.anno", "symbol", "entrez.id"
+>>>> ), row.names = c(NA, -10L), class = "data.frame")
+>>>> R> dt <- data.table(df, key='entrez.id')
+>>>>
+>>>> Now, something like this should work (and in fact does when I have a
+>>>> clean environment like you would by just starting R and pasting the
+>>>> above code):
+>>>>
+>>>> R> bounds <- dt[, list(start=min(start), end=min(end)), by='entrez.id']
+>>>>
+>>>> But when the "bowels" of my code in my package are running this (only
+>>>> when it's attached with library(MyLibrary), I'm not getting this
+>>>> error:
+>>>> ? Error in min(start) : invalid 'type' (closure) of argument
+>>>>
+>>>> If I try to use the .SD object in the same place, I also get an other
+>>>> error:
+>>>>
+>>>> R> bounds2 <- dt[, {
+>>>> ?.sd <- .SD[1]
+>>>> ?.sd$start <- min(start)
+>>>> ?.sd$end <- max(end)
+>>>> ?.sd
+>>>> }, by='entrez.id']
+>>>>
+>>>> (The code here is simplified, but assume I need to use .SD -- I want
+>>>> to get the rest of the columns in the dt data.table w/o referencing
+>>>> them explicitly)
+>>>>
+>>>> The error when the code is run from within my package is:
+>>>>
+>>>> ? Error in `[.data.frame`(x, i, j) : object '.SD' not found
+>>>>
+>>>> Even though it works in a "clean" R environment.
+>>>>
+>>>> Can anyone take a stab at why this might be happening? I'm at a bit of
+>>>> a loss.
+>>>>
+>>>> For what it's worth, this is the sessionInfo of my R environment when
+>>>> my package is installed (my package is called GenomicFeaturesX). Most
+>>>> of the packages in "other attached packages" are from biocondutcor.
+>>>>
+>>>> R version 2.12.0 (2010-10-15)
+>>>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>>>
+>>>> locale:
+>>>> ?[1] LC_CTYPE=en_US.UTF-8 ? ? ? LC_NUMERIC=C
+>>>> ?[3] LC_TIME=en_US.UTF-8 ? ? ? ?LC_COLLATE=en_US.UTF-8
+>>>> ?[5] LC_MONETARY=C ? ? ? ? ? ? ?LC_MESSAGES=en_US.UTF-8
+>>>> ?[7] LC_PAPER=en_US.UTF-8 ? ? ? LC_NAME=C
+>>>> ?[9] LC_ADDRESS=C ? ? ? ? ? ? ? LC_TELEPHONE=C
+>>>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>>>>
+>>>> attached base packages:
+>>>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>>>
+>>>> other attached packages:
+>>>> ?[1] BSgenome.Hsapiens.UCSC.hg18_1.3.16 BSgenome_1.18.0
+>>>> ?[3] Biostrings_2.18.0 ? ? ? ? ? ? ? ? ?doMC_1.2.1
+>>>> ?[5] multicore_0.1-3 ? ? ? ? ? ? ? ? ? ?foreach_1.3.0
+>>>> ?[7] codetools_0.2-2 ? ? ? ? ? ? ? ? ? ?iterators_1.0.3
+>>>> ?[9] GenomicFeaturesX_0.2 ? ? ? ? ? ? ? data.table_1.5
+>>>> [11] GenomicFeatures_1.2.0 ? ? ? ? ? ? ?GenomicRanges_1.2.1
+>>>> [13] IRanges_1.8.2
+>>>>
+>>>> loaded via a namespace (and not attached):
+>>>> ?[1] annotate_1.28.0 ? ? ?AnnotationDbi_1.12.0 Biobase_2.10.0
+>>>> ?[4] biomaRt_2.6.0 ? ? ? ?DBI_0.2-5 ? ? ? ? ? ?RCurl_1.4-3
+>>>> ?[7] RSQLite_0.9-2 ? ? ? ?rtracklayer_1.10.2 ? tools_2.12.0
+>>>> [10] XML_3.2-0 ? ? ? ? ? ?xtable_1.5-6
+>>>>
+>>>> Thanks,
+>>>> -steve
+>>>>
+>>>> --
+>>>> Steve Lianoglou
+>>>> Graduate Student: Computational Systems Biology
+>>>> ?| Memorial Sloan-Kettering Cancer Center
+>>>> ?| Weill Medical College of Cornell University
+>>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>>>
+>>>
+>>>
+>>>
+>>> --
+>>> Steve Lianoglou
+>>> Graduate Student: Computational Systems Biology
+>>> ?| Memorial Sloan-Kettering Cancer Center
+>>> ?| Weill Medical College of Cornell University
+>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>>
+>>
+>>
+>>
+>> --
+>> Steve Lianoglou
+>> Graduate Student: Computational Systems Biology
+>> ?| Memorial Sloan-Kettering Cancer Center
+>> ?| Weill Medical College of Cornell University
+>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Thu Nov  4 15:32:35 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 4 Nov 2010 14:32:35 -0000
+Subject: [datatable-help] [SOLVED] Something strange with scoping(?)
+ when data.table is used inside a package I'm developing.
+In-Reply-To: <AANLkTimRjUz=Yu1ajLKJPzPJfy-oYuBZURG0CCt99A-m@mail.gmail.com>
+References: <AANLkTimzGUnPBncs-qHCT7oHpAAngZvsuHHp_Uem9kK6@mail.gmail.com>
+	<AANLkTin+Nm-9OKwwAondeH1SHtOHAMfRX3rpZKU52R-Y@mail.gmail.com>
+	<AANLkTimgHw8d8uHRFZnGLyULb64yXFLyEE-=oWYwZayL@mail.gmail.com>
+	<08139b25d31830f275a1245e8382c5a0.squirrel@webmail.plus.net>
+	<AANLkTimRjUz=Yu1ajLKJPzPJfy-oYuBZURG0CCt99A-m@mail.gmail.com>
+Message-ID: <ec5f9312326eb082b0ae6dedd5351e9e.squirrel@webmail.plus.net>
+
+
+When cedta (Calling Environment Data.Table Aware) runs it finds the
+namespace calling data.table no problem. getNamespaceImports() on that
+namespace will then return "data.table" if that package Imports it,
+distinguishing it as a data.table aware package. So far so good. For
+Depends though, .Depends is (I think) not in the namespace environment but
+the corresponding package environment for that namespace. The nut is going
+from namespace to package environment.
+
+I tried a more robust version of the following but it doesn't seem very
+neat, and it didn't work. Might be just a case of trying again with fresh
+eyes :
+
+  name = getNamespaceName(te)
+  pkg = as.environment(paste("package:",name,sep=""))
+  "data.table" %in% get(".Depends",envir=pkg)
+
+Also R changed in this area fairly recently (name change from .required to
+.Depends).
+
+
+
+> Thanks for the reply ... I actually moved it over to the Imports
+> anyway .. but still, it's probably a good thing to fix at some point
+> :-)
+>
+> It's kind of weird though ... do you know what "the nut" of the problem
+> is?
+> -steve
+>
+> On Thu, Nov 4, 2010 at 9:36 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> wrote:
+>>
+>> Yes that was an off list fix for importing data.table (Imports field in
+>> DESCRIPTON). There is still likely a problem with the Depends field of
+>> DESCRIPTION, though. If you need to Depend rather than Import then let
+>> me
+>> know and I'll try again to fix it.
+>>
+>> Note also that data.table queries don't work from a browser prompt (bug
+>> #1131).
+>>
+>> Matthew
+>>
+>>
+>>> I just `svn up`'ed my data.table package to see if I can dig into the
+>>> code and I noticed that this issue was previously reported and fixed
+>>> in 1.5.1.
+>>>
+>>> Seems like I stumbled on the same issue ... sorry, I didn't see this
+>>> in the mailing list.
+>>>
+>>> Thanks,
+>>> -steve
+>>>
+>>> On Tue, Nov 2, 2010 at 6:20 PM, Steve Lianoglou
+>>> <mailinglist.honeypot at gmail.com> wrote:
+>>>> More info on my problem:
+>>>>
+>>>> I'm loading my package, and passing an object to a function defined
+>>>> (and exported) in my library that does the fast dt[, SOMETHING,
+>>>> by='entrez.id']. I call this function, and it bombs when I try to
+>>>> access "things" (columns) of the data.table in my SOMEHTING
+>>>> expression.
+>>>>
+>>>> Given the same object, I then execute the lines of the function that
+>>>> failing one by one (I don't call the function), and it executes
+>>>> normally.
+>>>>
+>>>> I wonder if this is relevant:
+>>>>
+>>>> (I). After the functions bombs, this is the result of traceback() --
+>>>> is it normal for the deepest call to actually be to `[.data.frame`?
+>>>>
+>>>> R> traceback()
+>>>> 4: `[.data.frame`(x, i, j)
+>>>> 3: `[.data.table`(dt, , list(seqnames = seqnames[1], strand =
+>>>> strand[1],
+>>>> ? ? ? start = min(start), end = max(end)), by = "entrez.id")
+>>>> 2: dt[, list(seqnames = seqnames[1], strand = strand[1], start =
+>>>> min(start),
+>>>> ? ? ? end = max(end)), by = "entrez.id"]
+>>>> 1: annotatedTxBounds(annotated)
+>>>>
+>>>> (II) Bioconductor packages use the S4 system. I've defined some
+>>>> conversion functions on objects in my package so that I can convert
+>>>> them to data.table's in the "expected way", a la:
+>>>>
+>>>> R> my.dt <- as(MyOwnClass, 'data.table')
+>>>>
+>>>> In order for me to do that, I've had to S4-ize the S3 data.table
+>>>> class,
+>>>> like so:
+>>>>
+>>>> setOldClass("data.table")
+>>>> (I also had `setOldClass(c('data.table', 'data.frame'))`, both have
+>>>> the same error)
+>>>>
+>>>> So ... it has something to do with my function as its run from within
+>>>> my package's environment -- but I don't know what to do about it.
+>>>>
+>>>> I tried adding `import(data.table)` into NAMESPACE file as well, but
+>>>> no
+>>>> dice.
+>>>>
+>>>> Thanks,
+>>>> -steve
+>>>>
+>>>> On Tue, Nov 2, 2010 at 3:14 PM, Steve Lianoglou
+>>>> <mailinglist.honeypot at gmail.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> Sorry for what is about to be a vaguely described problem I'm having,
+>>>>> but here goes.
+>>>>>
+>>>>> I'm developing some R/bioconductor packages and have been using
+>>>>> data.table for a few things in them quite happily. Although my
+>>>>> packages are written to be properly installed, as I develop with
+>>>>> them,
+>>>>> I just source their "R" directories to make my life easier so I can
+>>>>> easily modify them and update my R environment when I find something
+>>>>> wrong (w/o having to restart R, then call library(MyPackage), etc ..)
+>>>>>
+>>>>> So, I just went through my package to make sure my NAMESPACE stuffs
+>>>>> are kosher -- that I export the classes, methods, and functions I
+>>>>> need
+>>>>> to export.
+>>>>>
+>>>>> In my DESCRIPTION file, data.table is listed in the "Depends"
+>>>>> section.
+>>>>>
+>>>>> I'm only mentioning this because now that I've successfully done all
+>>>>> that, I installed my package and am now using it by calling
+>>>>> library(MyPackage). Now there is something strange happening with my
+>>>>> data.table stuff.
+>>>>>
+>>>>> The column names of my data.table are no longer recognized in my j
+>>>>> functions. For instance:,
+>>>>>
+>>>>> R> library(data.table)
+>>>>> R> df <- structure(list(seqnames = c("chr22", "chr22", "chr22",
+>>>>> "chr22",
+>>>>> "chr22", "chr22", "chr22", "chr22", "chr22", "chr22"), start =
+>>>>> c(22639026L,
+>>>>> 22639103L, 22639574L, 22643475L, 22643596L, 28059152L, 15897460L,
+>>>>> 15905763L, 15908214L, 15917963L), end = c(22639102L, 22639210L,
+>>>>> 22639749L, 22643595L, 22644748L, 28059247L, 15898234L, 15905890L,
+>>>>> 15908316L, 15919682L), width = c(77L, 108L, 176L, 121L, 1153L,
+>>>>> 96L, 775L, 128L, 103L, 1720L), strand = structure(c(1L, 1L, 1L,
+>>>>> 1L, 1L, 2L, 1L, 1L, 1L, 1L), .Label = c("+", "-", "*"), class =
+>>>>> "factor"),
+>>>>> ? ?exon.anno = structure(c(5L, 1L, 1L, 1L, 4L, 3L, 3L, 3L, 3L,
+>>>>> ? ?3L), .Label = c("cds", "overlap", "utr", "utr3", "utr5"), class =
+>>>>> "factor"),
+>>>>> ? ?symbol = c("DDTL", "DDTL", "DDTL", "DDTL", "DDTL", "SNORD125",
+>>>>> ? ?"CECR7", "CECR7", "CECR7", "CECR7"), entrez.id = c("100037417",
+>>>>> ? ?"100037417", "100037417", "100037417", "100037417", "100113380",
+>>>>> ? ?"100130418", "100130418", "100130418", "100130418")), .Names =
+>>>>> c("seqnames",
+>>>>> "start", "end", "width", "strand", "exon.anno", "symbol", "entrez.id"
+>>>>> ), row.names = c(NA, -10L), class = "data.frame")
+>>>>> R> dt <- data.table(df, key='entrez.id')
+>>>>>
+>>>>> Now, something like this should work (and in fact does when I have a
+>>>>> clean environment like you would by just starting R and pasting the
+>>>>> above code):
+>>>>>
+>>>>> R> bounds <- dt[, list(start=min(start), end=min(end)),
+>>>>> by='entrez.id']
+>>>>>
+>>>>> But when the "bowels" of my code in my package are running this (only
+>>>>> when it's attached with library(MyLibrary), I'm not getting this
+>>>>> error:
+>>>>> ? Error in min(start) : invalid 'type' (closure) of argument
+>>>>>
+>>>>> If I try to use the .SD object in the same place, I also get an other
+>>>>> error:
+>>>>>
+>>>>> R> bounds2 <- dt[, {
+>>>>> ?.sd <- .SD[1]
+>>>>> ?.sd$start <- min(start)
+>>>>> ?.sd$end <- max(end)
+>>>>> ?.sd
+>>>>> }, by='entrez.id']
+>>>>>
+>>>>> (The code here is simplified, but assume I need to use .SD -- I want
+>>>>> to get the rest of the columns in the dt data.table w/o referencing
+>>>>> them explicitly)
+>>>>>
+>>>>> The error when the code is run from within my package is:
+>>>>>
+>>>>> ? Error in `[.data.frame`(x, i, j) : object '.SD' not found
+>>>>>
+>>>>> Even though it works in a "clean" R environment.
+>>>>>
+>>>>> Can anyone take a stab at why this might be happening? I'm at a bit
+>>>>> of
+>>>>> a loss.
+>>>>>
+>>>>> For what it's worth, this is the sessionInfo of my R environment when
+>>>>> my package is installed (my package is called GenomicFeaturesX). Most
+>>>>> of the packages in "other attached packages" are from biocondutcor.
+>>>>>
+>>>>> R version 2.12.0 (2010-10-15)
+>>>>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>>>>
+>>>>> locale:
+>>>>> ?[1] LC_CTYPE=en_US.UTF-8 ? ? ? LC_NUMERIC=C
+>>>>> ?[3] LC_TIME=en_US.UTF-8 ? ? ? ?LC_COLLATE=en_US.UTF-8
+>>>>> ?[5] LC_MONETARY=C ? ? ? ? ? ? ?LC_MESSAGES=en_US.UTF-8
+>>>>> ?[7] LC_PAPER=en_US.UTF-8 ? ? ? LC_NAME=C
+>>>>> ?[9] LC_ADDRESS=C ? ? ? ? ? ? ? LC_TELEPHONE=C
+>>>>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>>>>>
+>>>>> attached base packages:
+>>>>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>>>>
+>>>>> other attached packages:
+>>>>> ?[1] BSgenome.Hsapiens.UCSC.hg18_1.3.16 BSgenome_1.18.0
+>>>>> ?[3] Biostrings_2.18.0 ? ? ? ? ? ? ? ? ?doMC_1.2.1
+>>>>> ?[5] multicore_0.1-3 ? ? ? ? ? ? ? ? ? ?foreach_1.3.0
+>>>>> ?[7] codetools_0.2-2 ? ? ? ? ? ? ? ? ? ?iterators_1.0.3
+>>>>> ?[9] GenomicFeaturesX_0.2 ? ? ? ? ? ? ? data.table_1.5
+>>>>> [11] GenomicFeatures_1.2.0 ? ? ? ? ? ? ?GenomicRanges_1.2.1
+>>>>> [13] IRanges_1.8.2
+>>>>>
+>>>>> loaded via a namespace (and not attached):
+>>>>> ?[1] annotate_1.28.0 ? ? ?AnnotationDbi_1.12.0 Biobase_2.10.0
+>>>>> ?[4] biomaRt_2.6.0 ? ? ? ?DBI_0.2-5 ? ? ? ? ? ?RCurl_1.4-3
+>>>>> ?[7] RSQLite_0.9-2 ? ? ? ?rtracklayer_1.10.2 ? tools_2.12.0
+>>>>> [10] XML_3.2-0 ? ? ? ? ? ?xtable_1.5-6
+>>>>>
+>>>>> Thanks,
+>>>>> -steve
+>>>>>
+>>>>> --
+>>>>> Steve Lianoglou
+>>>>> Graduate Student: Computational Systems Biology
+>>>>> ?| Memorial Sloan-Kettering Cancer Center
+>>>>> ?| Weill Medical College of Cornell University
+>>>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>>>>
+>>>>
+>>>>
+>>>>
+>>>> --
+>>>> Steve Lianoglou
+>>>> Graduate Student: Computational Systems Biology
+>>>> ?| Memorial Sloan-Kettering Cancer Center
+>>>> ?| Weill Medical College of Cornell University
+>>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>>>
+>>>
+>>>
+>>>
+>>> --
+>>> Steve Lianoglou
+>>> Graduate Student: Computational Systems Biology
+>>> ?| Memorial Sloan-Kettering Cancer Center
+>>> ?| Weill Medical College of Cornell University
+>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>>
+>>
+>
+>
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+
+
+From mailinglist.honeypot at gmail.com  Tue Nov 23 16:33:46 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 23 Nov 2010 10:33:46 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+Message-ID: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+
+Hi all,
+
+Can we include some functions/declarations so that data.table objects
+can be used in S4 classes?
+
+One could do this simply by adding an "R/AllS4.R" file with the
+following contents:
+
+====== R/AllS4.R ======
+setOldClass(c('data.table', 'data.frame'))
+
+setAs("data.frame", "data.table", function(from) {
+  data.table(from)
+})
+
+====================
+
+Apparently there's no need to modify NAMESPACE. Now the following works:
+
+
+R> df <- data.frame(a=1:10, b=11:20)
+R> dt <- as(df, 'data.table') ## Via setAs(..)
+
+And classes can include data.table objects:
+
+R> setClass("Something",
+         representation(name="character",
+                        info="data.table"),
+         prototype(name=character(),
+                   info=data.table(height=0, weight=0)))
+R> s = new("Something")
+
+I currently have these two definitions/declarations embedded in a
+package I'm developing that imports data.table, but I figure it makes
+more sense to have in data.table itself ...
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From tshort.rlists at gmail.com  Tue Nov 23 16:53:05 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 23 Nov 2010 10:53:05 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+Message-ID: <AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+
+On Tue, Nov 23, 2010 at 10:33 AM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Hi all,
+>
+> Can we include some functions/declarations so that data.table objects
+> can be used in S4 classes?
+
+Steve, S4 has always scared me off, but if we can do something easy
+like that to help users, we probably should. Do we have to require any
+other packages?
+
+My only comment is related to the data.table(from) in the setAs
+function. Do you want that to be as.data.table(from)? The latter is
+probably faster but does less error checking and auto-conversions of
+columns.
+
+> One could do this simply by adding an "R/AllS4.R" file with the
+> following contents:
+>
+> ====== R/AllS4.R ======
+> setOldClass(c('data.table', 'data.frame'))
+>
+> setAs("data.frame", "data.table", function(from) {
+> ?data.table(from)
+> })
+>
+> ====================
+>
+> Apparently there's no need to modify NAMESPACE. Now the following works:
+>
+>
+> R> df <- data.frame(a=1:10, b=11:20)
+> R> dt <- as(df, 'data.table') ## Via setAs(..)
+>
+> And classes can include data.table objects:
+>
+> R> setClass("Something",
+> ? ? ? ? representation(name="character",
+> ? ? ? ? ? ? ? ? ? ? ? ?info="data.table"),
+> ? ? ? ? prototype(name=character(),
+> ? ? ? ? ? ? ? ? ? info=data.table(height=0, weight=0)))
+> R> s = new("Something")
+>
+> I currently have these two definitions/declarations embedded in a
+> package I'm developing that imports data.table, but I figure it makes
+> more sense to have in data.table itself ...
+>
+> Thanks,
+> -steve
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+From mailinglist.honeypot at gmail.com  Tue Nov 23 17:14:13 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 23 Nov 2010 11:14:13 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+Message-ID: <AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+
+Hi Tom,
+
+On Tue, Nov 23, 2010 at 10:53 AM, Tom Short <tshort.rlists at gmail.com> wrote:
+> On Tue, Nov 23, 2010 at 10:33 AM, Steve Lianoglou
+> <mailinglist.honeypot at gmail.com> wrote:
+>> Hi all,
+>>
+>> Can we include some functions/declarations so that data.table objects
+>> can be used in S4 classes?
+>
+> Steve, S4 has always scared me off, but if we can do something easy
+> like that to help users, we probably should.
+
+At the start, it did for me as well, but I think I (largely) have the
+hang of it ... I wouldn't say I'm an expert, though.
+
+> Do we have to require any other packages?
+
+Not as far as I know. Usually a package that defines S4 classes and
+such is required to import the 'methods' package, but I'm not sure if
+it's necessary here.
+
+I simply just `svn up`d my data.table repo and added the AllS4.R as
+written above, then `R CMD INSTALL`ed it, and everything was kosher --
+no warnings or anything and it works as expected.
+
+> My only comment is related to the data.table(from) in the setAs
+> function. Do you want that to be as.data.table(from)? The latter is
+> probably faster but does less error checking and auto-conversions of
+> columns.
+
+Sure -- I'm largely indifferent on that, so whatever is more idiomatic
+for the data.table devs probably will make the most sense.
+
+Maybe for consistency sake, one would add:
+
+setAs("data.table", "data.frame"), function(from) {
+  as.data.frame(from) ## or whatever
+})
+
+So we can go back the other way and convert a data.table back to a
+data.frame via `as(dt, "data.frame")`
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Tue Nov 23 17:35:46 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 23 Nov 2010 16:35:46 -0000
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+Message-ID: <8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+
+
+Hi Steve,
+
+I don't know much about S4 but seems like a good idea, no objections from
+me either.
+
+Please click 'request to join' button on R-Forge project page for
+data.table, add some tests to the end of test.data.table.R, add something
+to the NEWS file, run 'R CMD build' and 'R CMD check', and (if ok) commit.
+
+Matthew
+
+
+> Hi Tom,
+>
+> On Tue, Nov 23, 2010 at 10:53 AM, Tom Short <tshort.rlists at gmail.com>
+> wrote:
+>> On Tue, Nov 23, 2010 at 10:33 AM, Steve Lianoglou
+>> <mailinglist.honeypot at gmail.com> wrote:
+>>> Hi all,
+>>>
+>>> Can we include some functions/declarations so that data.table objects
+>>> can be used in S4 classes?
+>>
+>> Steve, S4 has always scared me off, but if we can do something easy
+>> like that to help users, we probably should.
+>
+> At the start, it did for me as well, but I think I (largely) have the
+> hang of it ... I wouldn't say I'm an expert, though.
+>
+>> Do we have to require any other packages?
+>
+> Not as far as I know. Usually a package that defines S4 classes and
+> such is required to import the 'methods' package, but I'm not sure if
+> it's necessary here.
+>
+> I simply just `svn up`d my data.table repo and added the AllS4.R as
+> written above, then `R CMD INSTALL`ed it, and everything was kosher --
+> no warnings or anything and it works as expected.
+>
+>> My only comment is related to the data.table(from) in the setAs
+>> function. Do you want that to be as.data.table(from)? The latter is
+>> probably faster but does less error checking and auto-conversions of
+>> columns.
+>
+> Sure -- I'm largely indifferent on that, so whatever is more idiomatic
+> for the data.table devs probably will make the most sense.
+>
+> Maybe for consistency sake, one would add:
+>
+> setAs("data.table", "data.frame"), function(from) {
+>   as.data.frame(from) ## or whatever
+> })
+>
+> So we can go back the other way and convert a data.table back to a
+> data.frame via `as(dt, "data.frame")`
+>
+> -steve
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From mdowle at mdowle.plus.com  Tue Nov 23 19:32:17 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 23 Nov 2010 18:32:17 -0000
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+Message-ID: <7b61cd4c695667cf016ba8a7a5fb5ae1.squirrel@webmail.plus.net>
+
+
+Hi Tom,
+
+About as.data.table I had to remind myself about auto-conversion.
+
+data.table(df) drops through to as.data.table() anyway so doesn't do
+auto-conversions of character to factor. There is some overhead checking
+names and probably a copy is taken, so yes agree as.data.table is the
+right one for setAs.
+
+It seems it's just the 'data.table(letters[1:5],letters[6:10])' form that
+does do auto-conversion of atomic character vectors to factor. Should we
+remove the auto-conversion in that form then, for consistency? I think we
+said setkey() would be the only place auto-conversion happens going
+forward since that's where it's required.
+
+Matthew
+
+
+> On Tue, Nov 23, 2010 at 10:33 AM, Steve Lianoglou
+> <mailinglist.honeypot at gmail.com> wrote:
+>> Hi all,
+>>
+>> Can we include some functions/declarations so that data.table objects
+>> can be used in S4 classes?
+>
+> Steve, S4 has always scared me off, but if we can do something easy
+> like that to help users, we probably should. Do we have to require any
+> other packages?
+>
+> My only comment is related to the data.table(from) in the setAs
+> function. Do you want that to be as.data.table(from)? The latter is
+> probably faster but does less error checking and auto-conversions of
+> columns.
+>
+>> One could do this simply by adding an "R/AllS4.R" file with the
+>> following contents:
+>>
+>> ====== R/AllS4.R ======
+>> setOldClass(c('data.table', 'data.frame'))
+>>
+>> setAs("data.frame", "data.table", function(from) {
+>> ?data.table(from)
+>> })
+>>
+>> ====================
+>>
+>> Apparently there's no need to modify NAMESPACE. Now the following works:
+>>
+>>
+>> R> df <- data.frame(a=1:10, b=11:20)
+>> R> dt <- as(df, 'data.table') ## Via setAs(..)
+>>
+>> And classes can include data.table objects:
+>>
+>> R> setClass("Something",
+>> ? ? ? ? representation(name="character",
+>> ? ? ? ? ? ? ? ? ? ? ? ?info="data.table"),
+>> ? ? ? ? prototype(name=character(),
+>> ? ? ? ? ? ? ? ? ? info=data.table(height=0, weight=0)))
+>> R> s = new("Something")
+>>
+>> I currently have these two definitions/declarations embedded in a
+>> package I'm developing that imports data.table, but I figure it makes
+>> more sense to have in data.table itself ...
+>>
+>> Thanks,
+>> -steve
+>>
+>> --
+>> Steve Lianoglou
+>> Graduate Student: Computational Systems Biology
+>> ?| Memorial Sloan-Kettering Cancer Center
+>> ?| Weill Medical College of Cornell University
+>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From tshort.rlists at gmail.com  Tue Nov 23 19:56:46 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 23 Nov 2010 13:56:46 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <7b61cd4c695667cf016ba8a7a5fb5ae1.squirrel@webmail.plus.net>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<7b61cd4c695667cf016ba8a7a5fb5ae1.squirrel@webmail.plus.net>
+Message-ID: <AANLkTinaTnXaopDV7E1XWtAyOEBW27un88hKO_+VAze1@mail.gmail.com>
+
+> About as.data.table I had to remind myself about auto-conversion.
+
+Matthew, I'm glad you checked as I was just going from memory.
+
+> It seems it's just the
+> 'data.table(letters[1:5],letters[6:10])' form that does do
+> auto-conversion of atomic character vectors to factor. Should
+> we remove the auto-conversion in that form then, for
+> consistency? I think we said setkey() would be the only place
+> auto-conversion happens going forward since that's where it's
+> required.
+
+That would probably work fine for most of my uses, but I'm worried
+about consistency with data frames. data.frame defaults to
+auto-conversion and has a stringsAsFactors argument that defaults to
+default.stringsAsFactors() that in turn uses
+options('stringsAsFactors'). Here's a tentative vote for adding a
+stringsAsFactors argument that works like data.frame's. The down sides
+are an added argument and use of a global option.
+
+Also, I sometimes want factors mainly for grouping operations, and
+that doesn't involve setkey.
+
+- Tom
+
+From mailinglist.honeypot at gmail.com  Tue Nov 23 20:25:41 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 23 Nov 2010 14:25:41 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTinaTnXaopDV7E1XWtAyOEBW27un88hKO_+VAze1@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<7b61cd4c695667cf016ba8a7a5fb5ae1.squirrel@webmail.plus.net>
+	<AANLkTinaTnXaopDV7E1XWtAyOEBW27un88hKO_+VAze1@mail.gmail.com>
+Message-ID: <AANLkTimKxZUSQ0FUsJ2qtTtPKx5=2dR6h--7WotBF0PS@mail.gmail.com>
+
+On Tue, Nov 23, 2010 at 1:56 PM, Tom Short <tshort.rlists at gmail.com> wrote:
+[snip]
+> That would probably work fine for most of my uses, but I'm worried
+> about consistency with data frames. data.frame defaults to
+> auto-conversion and has a stringsAsFactors argument that defaults to
+> default.stringsAsFactors() that in turn uses
+> options('stringsAsFactors'). Here's a tentative vote for adding a
+> stringsAsFactors argument that works like data.frame's. The down sides
+> are an added argument and use of a global option.
+
+I'm not sure I see the same pitfalls of having an extra argument,
+since it has a (reasonable) default value and I think it can largely
+be ignored by the user w/o really changing how data.table(...) works
+now in any surprising way.
+
+Anyway, I think I'm a +1 for the stringsAsFactors param.
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Wed Nov 24 17:31:26 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 24 Nov 2010 11:31:26 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+Message-ID: <AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+
+Hi,
+
+Just an update: I'm working on adding this to package.
+
+When it's all said an done, I think we might actually have to add an
+`Imports: methods` clause to the DESCRIPTION file, as well as an
+`exportClass(data.table)` to the NAMESPACE.
+
+Would that be OK?
+
+I'm getting some strange warnings with R CMD check, so will sort that
+out over the next few days when I can find the time.
+
+Thanks,
+-steve
+
+
+On Tue, Nov 23, 2010 at 11:35 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> Hi Steve,
+>
+> I don't know much about S4 but seems like a good idea, no objections from
+> me either.
+>
+> Please click 'request to join' button on R-Forge project page for
+> data.table, add some tests to the end of test.data.table.R, add something
+> to the NEWS file, run 'R CMD build' and 'R CMD check', and (if ok) commit.
+>
+> Matthew
+>
+>
+>> Hi Tom,
+>>
+>> On Tue, Nov 23, 2010 at 10:53 AM, Tom Short <tshort.rlists at gmail.com>
+>> wrote:
+>>> On Tue, Nov 23, 2010 at 10:33 AM, Steve Lianoglou
+>>> <mailinglist.honeypot at gmail.com> wrote:
+>>>> Hi all,
+>>>>
+>>>> Can we include some functions/declarations so that data.table objects
+>>>> can be used in S4 classes?
+>>>
+>>> Steve, S4 has always scared me off, but if we can do something easy
+>>> like that to help users, we probably should.
+>>
+>> At the start, it did for me as well, but I think I (largely) have the
+>> hang of it ... I wouldn't say I'm an expert, though.
+>>
+>>> Do we have to require any other packages?
+>>
+>> Not as far as I know. Usually a package that defines S4 classes and
+>> such is required to import the 'methods' package, but I'm not sure if
+>> it's necessary here.
+>>
+>> I simply just `svn up`d my data.table repo and added the AllS4.R as
+>> written above, then `R CMD INSTALL`ed it, and everything was kosher --
+>> no warnings or anything and it works as expected.
+>>
+>>> My only comment is related to the data.table(from) in the setAs
+>>> function. Do you want that to be as.data.table(from)? The latter is
+>>> probably faster but does less error checking and auto-conversions of
+>>> columns.
+>>
+>> Sure -- I'm largely indifferent on that, so whatever is more idiomatic
+>> for the data.table devs probably will make the most sense.
+>>
+>> Maybe for consistency sake, one would add:
+>>
+>> setAs("data.table", "data.frame"), function(from) {
+>> ? as.data.frame(from) ## or whatever
+>> })
+>>
+>> So we can go back the other way and convert a data.table back to a
+>> data.frame via `as(dt, "data.frame")`
+>>
+>> -steve
+>>
+>> --
+>> Steve Lianoglou
+>> Graduate Student: Computational Systems Biology
+>> ?| Memorial Sloan-Kettering Cancer Center
+>> ?| Weill Medical College of Cornell University
+>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Wed Nov 24 17:51:02 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 24 Nov 2010 16:51:02 -0000
+Subject: [datatable-help] Playing nice(r) with S4?
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com><AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com><AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com><8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+Message-ID: <icjfpp$fda$1@dough.gmane.org>
+
+Additions sound fine to me.
+
+Feel free to post the strange warnings. It's the least we can
+do to help you contribute !
+
+Matthew
+
+"Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote in message 
+news:AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y at mail.gmail.com...
+Hi,
+
+Just an update: I'm working on adding this to package.
+
+When it's all said an done, I think we might actually have to add an
+`Imports: methods` clause to the DESCRIPTION file, as well as an
+`exportClass(data.table)` to the NAMESPACE.
+
+Would that be OK?
+
+I'm getting some strange warnings with R CMD check, so will sort that
+out over the next few days when I can find the time.
+
+Thanks,
+-steve
+
+
+On Tue, Nov 23, 2010 at 11:35 AM, Matthew Dowle <mdowle at mdowle.plus.com> 
+wrote:
+>
+> Hi Steve,
+>
+> I don't know much about S4 but seems like a good idea, no objections from
+> me either.
+>
+> Please click 'request to join' button on R-Forge project page for
+> data.table, add some tests to the end of test.data.table.R, add something
+> to the NEWS file, run 'R CMD build' and 'R CMD check', and (if ok) commit.
+>
+> Matthew
+>
+>
+>> Hi Tom,
+>>
+>> On Tue, Nov 23, 2010 at 10:53 AM, Tom Short <tshort.rlists at gmail.com>
+>> wrote:
+>>> On Tue, Nov 23, 2010 at 10:33 AM, Steve Lianoglou
+>>> <mailinglist.honeypot at gmail.com> wrote:
+>>>> Hi all,
+>>>>
+>>>> Can we include some functions/declarations so that data.table objects
+>>>> can be used in S4 classes?
+>>>
+>>> Steve, S4 has always scared me off, but if we can do something easy
+>>> like that to help users, we probably should.
+>>
+>> At the start, it did for me as well, but I think I (largely) have the
+>> hang of it ... I wouldn't say I'm an expert, though.
+>>
+>>> Do we have to require any other packages?
+>>
+>> Not as far as I know. Usually a package that defines S4 classes and
+>> such is required to import the 'methods' package, but I'm not sure if
+>> it's necessary here.
+>>
+>> I simply just `svn up`d my data.table repo and added the AllS4.R as
+>> written above, then `R CMD INSTALL`ed it, and everything was kosher --
+>> no warnings or anything and it works as expected.
+>>
+>>> My only comment is related to the data.table(from) in the setAs
+>>> function. Do you want that to be as.data.table(from)? The latter is
+>>> probably faster but does less error checking and auto-conversions of
+>>> columns.
+>>
+>> Sure -- I'm largely indifferent on that, so whatever is more idiomatic
+>> for the data.table devs probably will make the most sense.
+>>
+>> Maybe for consistency sake, one would add:
+>>
+>> setAs("data.table", "data.frame"), function(from) {
+>> as.data.frame(from) ## or whatever
+>> })
+>>
+>> So we can go back the other way and convert a data.table back to a
+>> data.frame via `as(dt, "data.frame")`
+>>
+>> -steve
+>>
+>> --
+>> Steve Lianoglou
+>> Graduate Student: Computational Systems Biology
+>> | Memorial Sloan-Kettering Cancer Center
+>> | Weill Medical College of Cornell University
+>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+| Memorial Sloan-Kettering Cancer Center
+| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact 
+
+
+
+
+From mailinglist.honeypot at gmail.com  Wed Nov 24 19:03:39 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 24 Nov 2010 13:03:39 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <icjfpp$fda$1@dough.gmane.org>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+Message-ID: <AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+
+Ok,
+
+The "strange" warnings had to be fixed, I just needed to
+`import(methods)` in the NAMESPACE file.
+
+These are the changes made:
+
+DESCRIPTION (added Imports and bumped version to 1.5.2):
+https://github.com/lianos/datatable/blob/master/pkg/DESCRIPTION
+
+NAMESPACE (see the S4-ization block up top):
+https://github.com/lianos/datatable/blob/master/pkg/NAMESPACE
+
+R/AllS4.R
+https://github.com/lianos/datatable/blob/master/pkg/R/AllS4.R
+
+test.data.table.R (tests 226-228)
+https://github.com/lianos/datatable/blob/master/pkg/R/test.data.table.R
+
+Problems:
+I can't get my test 228 to work when it is run through `R CMD check`.
+I keep getting the following problem:
+
+Test 228 ran without errors but failed check:
+[1] FALSE
+
+But if I load the new data.table library into an R session, then
+source() the test.data.table.R file, and run the test.data.table()
+function, everything works as expected.
+
+Not quite sure what's going on -- somehow the `x` in `if (x) return()`
+isn't evaluating to TRUE when it's run from the command line.
+
+Anyway, I'm going to see if this plays nice with the package I'm
+dev'ing that actually uses the S4-iztion of data.table to see if
+anything breaks further ...
+
+Thanks,
+-steve
+On Wed, Nov 24, 2010 at 11:51 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Additions sound fine to me.
+>
+> Feel free to post the strange warnings. It's the least we can
+> do to help you contribute !
+>
+> Matthew
+>
+> "Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote in message
+> news:AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y at mail.gmail.com...
+> Hi,
+>
+> Just an update: I'm working on adding this to package.
+>
+> When it's all said an done, I think we might actually have to add an
+> `Imports: methods` clause to the DESCRIPTION file, as well as an
+> `exportClass(data.table)` to the NAMESPACE.
+>
+> Would that be OK?
+>
+> I'm getting some strange warnings with R CMD check, so will sort that
+> out over the next few days when I can find the time.
+>
+> Thanks,
+> -steve
+>
+>
+> On Tue, Nov 23, 2010 at 11:35 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> wrote:
+>>
+>> Hi Steve,
+>>
+>> I don't know much about S4 but seems like a good idea, no objections from
+>> me either.
+>>
+>> Please click 'request to join' button on R-Forge project page for
+>> data.table, add some tests to the end of test.data.table.R, add something
+>> to the NEWS file, run 'R CMD build' and 'R CMD check', and (if ok) commit.
+>>
+>> Matthew
+>>
+>>
+>>> Hi Tom,
+>>>
+>>> On Tue, Nov 23, 2010 at 10:53 AM, Tom Short <tshort.rlists at gmail.com>
+>>> wrote:
+>>>> On Tue, Nov 23, 2010 at 10:33 AM, Steve Lianoglou
+>>>> <mailinglist.honeypot at gmail.com> wrote:
+>>>>> Hi all,
+>>>>>
+>>>>> Can we include some functions/declarations so that data.table objects
+>>>>> can be used in S4 classes?
+>>>>
+>>>> Steve, S4 has always scared me off, but if we can do something easy
+>>>> like that to help users, we probably should.
+>>>
+>>> At the start, it did for me as well, but I think I (largely) have the
+>>> hang of it ... I wouldn't say I'm an expert, though.
+>>>
+>>>> Do we have to require any other packages?
+>>>
+>>> Not as far as I know. Usually a package that defines S4 classes and
+>>> such is required to import the 'methods' package, but I'm not sure if
+>>> it's necessary here.
+>>>
+>>> I simply just `svn up`d my data.table repo and added the AllS4.R as
+>>> written above, then `R CMD INSTALL`ed it, and everything was kosher --
+>>> no warnings or anything and it works as expected.
+>>>
+>>>> My only comment is related to the data.table(from) in the setAs
+>>>> function. Do you want that to be as.data.table(from)? The latter is
+>>>> probably faster but does less error checking and auto-conversions of
+>>>> columns.
+>>>
+>>> Sure -- I'm largely indifferent on that, so whatever is more idiomatic
+>>> for the data.table devs probably will make the most sense.
+>>>
+>>> Maybe for consistency sake, one would add:
+>>>
+>>> setAs("data.table", "data.frame"), function(from) {
+>>> as.data.frame(from) ## or whatever
+>>> })
+>>>
+>>> So we can go back the other way and convert a data.table back to a
+>>> data.frame via `as(dt, "data.frame")`
+>>>
+>>> -steve
+>>>
+>>> --
+>>> Steve Lianoglou
+>>> Graduate Student: Computational Systems Biology
+>>> | Memorial Sloan-Kettering Cancer Center
+>>> | Weill Medical College of Cornell University
+>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>>
+>>
+>
+>
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> | Memorial Sloan-Kettering Cancer Center
+> | Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Wed Nov 24 20:13:34 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 24 Nov 2010 19:13:34 -0000
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+Message-ID: <3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+
+Try
+
+  test(228, setClass("DTS4", representation(info="data.table")), "DTS4")
+
+Then test() should print the error nicely that setClass is returning.
+
+In test.data.table we only use try() for when the correct result is an
+error and the test is that we get the right error message with a grep in
+another test just afterwards. Otherwise we can leave test() to try().
+
+Code that shouldn't fail can just be written (and would cause
+test.data.table to stop then and there on error) or inside a test(). All
+code returns something even if just NULL is the 3rd argument to test().
+
+> Ok,
+>
+> The "strange" warnings had to be fixed, I just needed to
+> `import(methods)` in the NAMESPACE file.
+>
+> These are the changes made:
+>
+> DESCRIPTION (added Imports and bumped version to 1.5.2):
+> https://github.com/lianos/datatable/blob/master/pkg/DESCRIPTION
+>
+> NAMESPACE (see the S4-ization block up top):
+> https://github.com/lianos/datatable/blob/master/pkg/NAMESPACE
+>
+> R/AllS4.R
+> https://github.com/lianos/datatable/blob/master/pkg/R/AllS4.R
+>
+> test.data.table.R (tests 226-228)
+> https://github.com/lianos/datatable/blob/master/pkg/R/test.data.table.R
+>
+> Problems:
+> I can't get my test 228 to work when it is run through `R CMD check`.
+> I keep getting the following problem:
+>
+> Test 228 ran without errors but failed check:
+> [1] FALSE
+>
+> But if I load the new data.table library into an R session, then
+> source() the test.data.table.R file, and run the test.data.table()
+> function, everything works as expected.
+>
+> Not quite sure what's going on -- somehow the `x` in `if (x) return()`
+> isn't evaluating to TRUE when it's run from the command line.
+>
+> Anyway, I'm going to see if this plays nice with the package I'm
+> dev'ing that actually uses the S4-iztion of data.table to see if
+> anything breaks further ...
+>
+> Thanks,
+> -steve
+> On Wed, Nov 24, 2010 at 11:51 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> wrote:
+>> Additions sound fine to me.
+>>
+>> Feel free to post the strange warnings. It's the least we can
+>> do to help you contribute !
+>>
+>> Matthew
+>>
+>> "Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote in message
+>> news:AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y at mail.gmail.com...
+>> Hi,
+>>
+>> Just an update: I'm working on adding this to package.
+>>
+>> When it's all said an done, I think we might actually have to add an
+>> `Imports: methods` clause to the DESCRIPTION file, as well as an
+>> `exportClass(data.table)` to the NAMESPACE.
+>>
+>> Would that be OK?
+>>
+>> I'm getting some strange warnings with R CMD check, so will sort that
+>> out over the next few days when I can find the time.
+>>
+>> Thanks,
+>> -steve
+>>
+>>
+>> On Tue, Nov 23, 2010 at 11:35 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+>> wrote:
+>>>
+>>> Hi Steve,
+>>>
+>>> I don't know much about S4 but seems like a good idea, no objections
+>>> from
+>>> me either.
+>>>
+>>> Please click 'request to join' button on R-Forge project page for
+>>> data.table, add some tests to the end of test.data.table.R, add
+>>> something
+>>> to the NEWS file, run 'R CMD build' and 'R CMD check', and (if ok)
+>>> commit.
+>>>
+>>> Matthew
+>>>
+>>>
+>>>> Hi Tom,
+>>>>
+>>>> On Tue, Nov 23, 2010 at 10:53 AM, Tom Short <tshort.rlists at gmail.com>
+>>>> wrote:
+>>>>> On Tue, Nov 23, 2010 at 10:33 AM, Steve Lianoglou
+>>>>> <mailinglist.honeypot at gmail.com> wrote:
+>>>>>> Hi all,
+>>>>>>
+>>>>>> Can we include some functions/declarations so that data.table
+>>>>>> objects
+>>>>>> can be used in S4 classes?
+>>>>>
+>>>>> Steve, S4 has always scared me off, but if we can do something easy
+>>>>> like that to help users, we probably should.
+>>>>
+>>>> At the start, it did for me as well, but I think I (largely) have the
+>>>> hang of it ... I wouldn't say I'm an expert, though.
+>>>>
+>>>>> Do we have to require any other packages?
+>>>>
+>>>> Not as far as I know. Usually a package that defines S4 classes and
+>>>> such is required to import the 'methods' package, but I'm not sure if
+>>>> it's necessary here.
+>>>>
+>>>> I simply just `svn up`d my data.table repo and added the AllS4.R as
+>>>> written above, then `R CMD INSTALL`ed it, and everything was kosher --
+>>>> no warnings or anything and it works as expected.
+>>>>
+>>>>> My only comment is related to the data.table(from) in the setAs
+>>>>> function. Do you want that to be as.data.table(from)? The latter is
+>>>>> probably faster but does less error checking and auto-conversions of
+>>>>> columns.
+>>>>
+>>>> Sure -- I'm largely indifferent on that, so whatever is more idiomatic
+>>>> for the data.table devs probably will make the most sense.
+>>>>
+>>>> Maybe for consistency sake, one would add:
+>>>>
+>>>> setAs("data.table", "data.frame"), function(from) {
+>>>> as.data.frame(from) ## or whatever
+>>>> })
+>>>>
+>>>> So we can go back the other way and convert a data.table back to a
+>>>> data.frame via `as(dt, "data.frame")`
+>>>>
+>>>> -steve
+>>>>
+>>>> --
+>>>> Steve Lianoglou
+>>>> Graduate Student: Computational Systems Biology
+>>>> | Memorial Sloan-Kettering Cancer Center
+>>>> | Weill Medical College of Cornell University
+>>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>>> _______________________________________________
+>>>> datatable-help mailing list
+>>>> datatable-help at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>>
+>>>
+>>>
+>>>
+>>
+>>
+>>
+>> --
+>> Steve Lianoglou
+>> Graduate Student: Computational Systems Biology
+>> | Memorial Sloan-Kettering Cancer Center
+>> | Weill Medical College of Cornell University
+>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+
+
+From mailinglist.honeypot at gmail.com  Wed Nov 24 20:26:43 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 24 Nov 2010 14:26:43 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+Message-ID: <AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+
+Hi,
+
+On Wed, Nov 24, 2010 at 2:13 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Try
+>
+> ?test(228, setClass("DTS4", representation(info="data.table")), "DTS4")
+
+I tried that at first, but you get an error from (I think) defining a
+new class in the wrong place, specifically:
+
+Test 228 Error in assign(mname, def, where) :
+  cannot add bindings to a locked environment
+
+> In test.data.table we only use try() for when the correct result is an
+> error and the test is that we get the right error message with a grep in
+> another test just afterwards. Otherwise we can leave test() to try().
+>
+> Code that shouldn't fail can just be written (and would cause
+> test.data.table to stop then and there on error) or inside a test().
+
+So, in light of the above problem, would you rather I just write the
+code that defines the new S4 class and not test that "it worked" since
+we assume implicitly it works if no error stops test.data.table() form
+completing?
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Thu Nov 25 00:01:31 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 24 Nov 2010 23:01:31 +0000
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+	<AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+Message-ID: <1290639691.2179.93.camel@Adam>
+
+
+For the setClass call itself that would be ok, and then use the class
+somehow, to test it worked?
+
+setClass("DTS4", representation(info="data.table"))
+test(228, is.data.table(new("DTS4")))
+
+
+On Wed, 2010-11-24 at 14:26 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> On Wed, Nov 24, 2010 at 2:13 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > Try
+> >
+> >  test(228, setClass("DTS4", representation(info="data.table")), "DTS4")
+> 
+> I tried that at first, but you get an error from (I think) defining a
+> new class in the wrong place, specifically:
+> 
+> Test 228 Error in assign(mname, def, where) :
+>   cannot add bindings to a locked environment
+> 
+> > In test.data.table we only use try() for when the correct result is an
+> > error and the test is that we get the right error message with a grep in
+> > another test just afterwards. Otherwise we can leave test() to try().
+> >
+> > Code that shouldn't fail can just be written (and would cause
+> > test.data.table to stop then and there on error) or inside a test().
+> 
+> So, in light of the above problem, would you rather I just write the
+> code that defines the new S4 class and not test that "it worked" since
+> we assume implicitly it works if no error stops test.data.table() form
+> completing?
+> 
+> -steve
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Tue Nov 30 06:03:11 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 30 Nov 2010 00:03:11 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <1290639691.2179.93.camel@Adam>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+	<AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+	<1290639691.2179.93.camel@Adam>
+Message-ID: <AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+
+Hi,
+
+I think running the tests by invoking the test.data.table from inside
+an "Examples" section of an .Rd file are causing some pain.
+
+There are complaints of locked environments:
+
+Error in assign(mname, def, where) :
+  cannot add bindings to a locked environment
+
+when defining S4 classes and methods inside the test.data.table function.
+
+Defining the class outside of the function works and lets the tests
+pass. Defining functions out there doesn't help, so those tests are
+commented out (see lines 552 - 556):
+
+https://github.com/lianos/datatable/blob/master/pkg/R/test.data.table.R
+
+I'm not sure how you feel about this approach, but these work.
+
+IMHO it would be better to use something like testthat or RUnit and
+run the test harness for the package with those. I have a feeling we'd
+avoid these problems that way. If the devs are willing to consider
+that, I'd volunteer to port the tests over.
+
+At any rate, let me know if you're OK with these S4 modifications and
+I can commit back to the svn repo.
+
+In summary, I've:
+
+* Added an AllS4.R file to add the setOldClass stuff to include
+data.table's in S4 "slots" and defined as(...) methods to convert
+data.table to data.frame, and vice versa.
+
+* Modified the namespace to export the data.table class for other
+packages to use it.
+
+* Bumped version number in DESCRIPTION to 1.5.2, and added an Imports:
+methods to it.
+
+* Made changes to the NEWS file
+
+* Added some tests to test.data.table() function.
+
+I've used this updated package as an import to another package I'm
+dev'ing and things seem to work as expected ...
+
+Thanks,
+-steve
+
+
+On Wed, Nov 24, 2010 at 6:01 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> For the setClass call itself that would be ok, and then use the class
+> somehow, to test it worked?
+>
+> setClass("DTS4", representation(info="data.table"))
+> test(228, is.data.table(new("DTS4")))
+>
+>
+> On Wed, 2010-11-24 at 14:26 -0500, Steve Lianoglou wrote:
+>> Hi,
+>>
+>> On Wed, Nov 24, 2010 at 2:13 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> > Try
+>> >
+>> > ?test(228, setClass("DTS4", representation(info="data.table")), "DTS4")
+>>
+>> I tried that at first, but you get an error from (I think) defining a
+>> new class in the wrong place, specifically:
+>>
+>> Test 228 Error in assign(mname, def, where) :
+>> ? cannot add bindings to a locked environment
+>>
+>> > In test.data.table we only use try() for when the correct result is an
+>> > error and the test is that we get the right error message with a grep in
+>> > another test just afterwards. Otherwise we can leave test() to try().
+>> >
+>> > Code that shouldn't fail can just be written (and would cause
+>> > test.data.table to stop then and there on error) or inside a test().
+>>
+>> So, in light of the above problem, would you rather I just write the
+>> code that defines the new S4 class and not test that "it worked" since
+>> we assume implicitly it works if no error stops test.data.table() form
+>> completing?
+>>
+>> -steve
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Tue Nov 30 06:04:53 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 30 Nov 2010 00:04:53 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+	<AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+	<1290639691.2179.93.camel@Adam>
+	<AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+Message-ID: <AANLkTikkWZNGzitV0ApGRXr6MY+ckOKWoytUihEWLi5T@mail.gmail.com>
+
+Almost forgot ... I also added a minimal *.Rd file for the S4-class definition:
+
+https://github.com/lianos/datatable/blob/master/pkg/man/data.table-class.Rd
+
+-steve
+
+
+
+On Tue, Nov 30, 2010 at 12:03 AM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Hi,
+>
+> I think running the tests by invoking the test.data.table from inside
+> an "Examples" section of an .Rd file are causing some pain.
+>
+> There are complaints of locked environments:
+>
+> Error in assign(mname, def, where) :
+> ?cannot add bindings to a locked environment
+>
+> when defining S4 classes and methods inside the test.data.table function.
+>
+> Defining the class outside of the function works and lets the tests
+> pass. Defining functions out there doesn't help, so those tests are
+> commented out (see lines 552 - 556):
+>
+> https://github.com/lianos/datatable/blob/master/pkg/R/test.data.table.R
+>
+> I'm not sure how you feel about this approach, but these work.
+>
+> IMHO it would be better to use something like testthat or RUnit and
+> run the test harness for the package with those. I have a feeling we'd
+> avoid these problems that way. If the devs are willing to consider
+> that, I'd volunteer to port the tests over.
+>
+> At any rate, let me know if you're OK with these S4 modifications and
+> I can commit back to the svn repo.
+>
+> In summary, I've:
+>
+> * Added an AllS4.R file to add the setOldClass stuff to include
+> data.table's in S4 "slots" and defined as(...) methods to convert
+> data.table to data.frame, and vice versa.
+>
+> * Modified the namespace to export the data.table class for other
+> packages to use it.
+>
+> * Bumped version number in DESCRIPTION to 1.5.2, and added an Imports:
+> methods to it.
+>
+> * Made changes to the NEWS file
+>
+> * Added some tests to test.data.table() function.
+>
+> I've used this updated package as an import to another package I'm
+> dev'ing and things seem to work as expected ...
+>
+> Thanks,
+> -steve
+>
+>
+> On Wed, Nov 24, 2010 at 6:01 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>>
+>> For the setClass call itself that would be ok, and then use the class
+>> somehow, to test it worked?
+>>
+>> setClass("DTS4", representation(info="data.table"))
+>> test(228, is.data.table(new("DTS4")))
+>>
+>>
+>> On Wed, 2010-11-24 at 14:26 -0500, Steve Lianoglou wrote:
+>>> Hi,
+>>>
+>>> On Wed, Nov 24, 2010 at 2:13 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>>> > Try
+>>> >
+>>> > ?test(228, setClass("DTS4", representation(info="data.table")), "DTS4")
+>>>
+>>> I tried that at first, but you get an error from (I think) defining a
+>>> new class in the wrong place, specifically:
+>>>
+>>> Test 228 Error in assign(mname, def, where) :
+>>> ? cannot add bindings to a locked environment
+>>>
+>>> > In test.data.table we only use try() for when the correct result is an
+>>> > error and the test is that we get the right error message with a grep in
+>>> > another test just afterwards. Otherwise we can leave test() to try().
+>>> >
+>>> > Code that shouldn't fail can just be written (and would cause
+>>> > test.data.table to stop then and there on error) or inside a test().
+>>>
+>>> So, in light of the above problem, would you rather I just write the
+>>> code that defines the new S4 class and not test that "it worked" since
+>>> we assume implicitly it works if no error stops test.data.table() form
+>>> completing?
+>>>
+>>> -steve
+>>>
+>>
+>>
+>>
+>
+>
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From tshort.rlists at gmail.com  Tue Nov 30 13:38:31 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 30 Nov 2010 07:38:31 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+	<AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+	<1290639691.2179.93.camel@Adam>
+	<AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+Message-ID: <AANLkTi=bXJNS-=ufwu_qFgKYzMb8SycwC_aAgiVyvGqZ@mail.gmail.com>
+
+On Tue, Nov 30, 2010 at 12:03 AM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> IMHO it would be better to use something like testthat or RUnit and
+> run the test harness for the package with those. I have a feeling we'd
+> avoid these problems that way. If the devs are willing to consider
+> that, I'd volunteer to port the tests over.
+
+Steve, thanks a lot for your work here. As far as tests go, someone
+converted the tests to RUnit at one time. I couldn't figure out how to
+use it or how to add tests. Eventually, it got dropped from lack of
+use. So, if you do convert the tests, please include a short document
+describing how to add tests and how to run the tests.
+
+- Tom
+
+From mailinglist.honeypot at gmail.com  Tue Nov 30 16:10:50 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 30 Nov 2010 10:10:50 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTi=bXJNS-=ufwu_qFgKYzMb8SycwC_aAgiVyvGqZ@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+	<AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+	<1290639691.2179.93.camel@Adam>
+	<AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+	<AANLkTi=bXJNS-=ufwu_qFgKYzMb8SycwC_aAgiVyvGqZ@mail.gmail.com>
+Message-ID: <AANLkTinHf71LC_Sj_+UYqcXOpz4StQe+ApPg5EyE-Saz@mail.gmail.com>
+
+On Tue, Nov 30, 2010 at 7:38 AM, Tom Short <tshort.rlists at gmail.com> wrote:
+> On Tue, Nov 30, 2010 at 12:03 AM, Steve Lianoglou
+> <mailinglist.honeypot at gmail.com> wrote:
+>> IMHO it would be better to use something like testthat or RUnit and
+>> run the test harness for the package with those. I have a feeling we'd
+>> avoid these problems that way. If the devs are willing to consider
+>> that, I'd volunteer to port the tests over.
+>
+> Steve, thanks a lot for your work here. As far as tests go, someone
+> converted the tests to RUnit at one time. I couldn't figure out how to
+> use it or how to add tests. Eventually, it got dropped from lack of
+> use. So, if you do convert the tests, please include a short document
+> describing how to add tests and how to run the tests.
+
+Well, if it pleases the court, I'd probably use test_that:
+https://github.com/hadley/test_that
+
+I'd be happy to write a document on how to run the tests.
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From tshort.rlists at gmail.com  Tue Nov 30 16:36:35 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 30 Nov 2010 10:36:35 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTinHf71LC_Sj_+UYqcXOpz4StQe+ApPg5EyE-Saz@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+	<AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+	<1290639691.2179.93.camel@Adam>
+	<AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+	<AANLkTi=bXJNS-=ufwu_qFgKYzMb8SycwC_aAgiVyvGqZ@mail.gmail.com>
+	<AANLkTinHf71LC_Sj_+UYqcXOpz4StQe+ApPg5EyE-Saz@mail.gmail.com>
+Message-ID: <AANLkTikhhn6aGSm1qW4mZXsqk2uVS7OhbQ9nmBC1A+Jk@mail.gmail.com>
+
+On Tue, Nov 30, 2010 at 10:10 AM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Well, if it pleases the court, I'd probably use test_that:
+> https://github.com/hadley/test_that
+>
+> I'd be happy to write a document on how to run the tests.
+
+It's worth a try, Steve. It'd help with test organization, and we
+wouldn't have to worry about renumbering tests. Since Matthew has
+already wrapped the tests in a test() function, it's probably easy to
+do a quick-and-dirty conversion.
+
+- Tom
+
+From mailinglist.honeypot at gmail.com  Tue Nov 30 16:40:56 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 30 Nov 2010 10:40:56 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTikhhn6aGSm1qW4mZXsqk2uVS7OhbQ9nmBC1A+Jk@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+	<AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+	<1290639691.2179.93.camel@Adam>
+	<AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+	<AANLkTi=bXJNS-=ufwu_qFgKYzMb8SycwC_aAgiVyvGqZ@mail.gmail.com>
+	<AANLkTinHf71LC_Sj_+UYqcXOpz4StQe+ApPg5EyE-Saz@mail.gmail.com>
+	<AANLkTikhhn6aGSm1qW4mZXsqk2uVS7OhbQ9nmBC1A+Jk@mail.gmail.com>
+Message-ID: <AANLkTikEyhwnT6m1TU7EWseYMbRMksno4en04rp7KzEx@mail.gmail.com>
+
+Yeah, actually playing with it now ;-)
+
+I'll send an update when it's done.
+
+On Tue, Nov 30, 2010 at 10:36 AM, Tom Short <tshort.rlists at gmail.com> wrote:
+> On Tue, Nov 30, 2010 at 10:10 AM, Steve Lianoglou
+> <mailinglist.honeypot at gmail.com> wrote:
+>> Well, if it pleases the court, I'd probably use test_that:
+>> https://github.com/hadley/test_that
+>>
+>> I'd be happy to write a document on how to run the tests.
+>
+> It's worth a try, Steve. It'd help with test organization, and we
+> wouldn't have to worry about renumbering tests. Since Matthew has
+> already wrapped the tests in a test() function, it's probably easy to
+> do a quick-and-dirty conversion.
+>
+> - Tom
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Tue Nov 30 18:00:57 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 30 Nov 2010 12:00:57 -0500
+Subject: [datatable-help] Playing nice(r) with S4?
+In-Reply-To: <AANLkTikEyhwnT6m1TU7EWseYMbRMksno4en04rp7KzEx@mail.gmail.com>
+References: <AANLkTintUWS4jQA_wH1YQaXZ6caS3ayJ-3bKsrK_2XbS@mail.gmail.com>
+	<AANLkTin40t+MhtuPfc9TDbpPSZ7i96H77u8dSESA5LU7@mail.gmail.com>
+	<AANLkTi=w7c5Db_GdjKu4PheYiH3vmkJke54uBhgCaEN2@mail.gmail.com>
+	<8b167203a8486f8472d5943e69d5458c.squirrel@webmail.plus.net>
+	<AANLkTimCy6zFcL3SXCVWewsCtrZL8OJkC79Eru8XBG-Y@mail.gmail.com>
+	<icjfpp$fda$1@dough.gmane.org>
+	<AANLkTi=QgJ_yY_GUX3Vkg-DHByHvRAWYFW89_nLm2XTZ@mail.gmail.com>
+	<3e351745bc9ed44028d7780ad24a44ef.squirrel@webmail.plus.net>
+	<AANLkTimxuNmiu8LkuTTtV2AnqWmrz70XYnLxgawp0UU3@mail.gmail.com>
+	<1290639691.2179.93.camel@Adam>
+	<AANLkTi=rKDRx+PWApFqOedQk+L=g6stG4kxQ-RL6o+SF@mail.gmail.com>
+	<AANLkTi=bXJNS-=ufwu_qFgKYzMb8SycwC_aAgiVyvGqZ@mail.gmail.com>
+	<AANLkTinHf71LC_Sj_+UYqcXOpz4StQe+ApPg5EyE-Saz@mail.gmail.com>
+	<AANLkTikhhn6aGSm1qW4mZXsqk2uVS7OhbQ9nmBC1A+Jk@mail.gmail.com>
+	<AANLkTikEyhwnT6m1TU7EWseYMbRMksno4en04rp7KzEx@mail.gmail.com>
+Message-ID: <AANLkTim8iHO6aMoX729jSnNPNSm42777bQjzWO3NSHzw@mail.gmail.com>
+
+This is veering to OT for this subject, but I'll just add that I think
+I'm running into the same problem raised in my previous (thread on
+this ML) of data.table's `[` function "dropping down" to use the
+`[.data.frame` function and the "cedta" stuff ...
+
+I'll look into this further a bit later since I can't sink much more
+time into this right now ...
+
+-steve
+
+On Tue, Nov 30, 2010 at 10:40 AM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Yeah, actually playing with it now ;-)
+>
+> I'll send an update when it's done.
+>
+> On Tue, Nov 30, 2010 at 10:36 AM, Tom Short <tshort.rlists at gmail.com> wrote:
+>> On Tue, Nov 30, 2010 at 10:10 AM, Steve Lianoglou
+>> <mailinglist.honeypot at gmail.com> wrote:
+>>> Well, if it pleases the court, I'd probably use test_that:
+>>> https://github.com/hadley/test_that
+>>>
+>>> I'd be happy to write a document on how to run the tests.
+>>
+>> It's worth a try, Steve. It'd help with test organization, and we
+>> wouldn't have to worry about renumbering tests. Since Matthew has
+>> already wrapped the tests in a test() function, it's probably easy to
+>> do a quick-and-dirty conversion.
+>>
+>> - Tom
+>>
+>
+>
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Tue Nov 30 20:45:39 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 30 Nov 2010 14:45:39 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+Message-ID: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+
+Hi,
+
+So I mentioned in my last email that I'm going to get back to this
+later, but I'm a bit OCD when I have what seems like low-hanging-fruit
+so I'm trying to figure this out.
+
+I also mentioned I think the problem I'm seeing has something to do
+with the "cedta" business. While fixing this case will help me move
+the test over, perhaps it will also help to better address the
+side-effects cedta has with other things like Imports, Depends,
+etc.(?)
+
+So, download this simple test file:
+
+http://cbio.mskcc.org/~lianos/files/scratch/datatable-test.R
+
+Note that the first call to sys.source works fine, but I think it
+should work with the second case.
+
+Start an R session, and:
+
+R> library(data.table)
+R> sys.source("/path/to/datatable-test.R", .GlobalEnv) ## this works
+R> sys.source("/path/to/datatable-test.R", new.env(parent=.GlobalEnv))
+Error in `[.data.frame`(x, i, j) : object 'v' not found
+
+Does it seem reasonable to you that it should work in the second example?
+
+I tried doing some trickery in the datatable-test.R function by
+unloading and reloading namespaces ... `require`-ing the package in
+that file, etc. but to no avail. Instead of continuing stabbing at the
+dark, I was hoping I could see if you guys could think of a fix.
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From tshort.rlists at gmail.com  Tue Nov 30 21:13:30 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 30 Nov 2010 15:13:30 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+Message-ID: <AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+
+On Tue, Nov 30, 2010 at 2:45 PM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> Hi,
+>
+> So I mentioned in my last email that I'm going to get back to this
+> later, but I'm a bit OCD when I have what seems like low-hanging-fruit
+> so I'm trying to figure this out.
+>
+> I also mentioned I think the problem I'm seeing has something to do
+> with the "cedta" business. While fixing this case will help me move
+> the test over, perhaps it will also help to better address the
+> side-effects cedta has with other things like Imports, Depends,
+> etc.(?)
+>
+> So, download this simple test file:
+>
+> http://cbio.mskcc.org/~lianos/files/scratch/datatable-test.R
+>
+> Note that the first call to sys.source works fine, but I think it
+> should work with the second case.
+>
+> Start an R session, and:
+>
+> R> library(data.table)
+> R> sys.source("/path/to/datatable-test.R", .GlobalEnv) ## this works
+> R> sys.source("/path/to/datatable-test.R", new.env(parent=.GlobalEnv))
+> Error in `[.data.frame`(x, i, j) : object 'v' not found
+>
+> Does it seem reasonable to you that it should work in the second example?
+
+Yes, it does. It's due to cedta. If you put the following into the
+datatable-test.R file, you'll find that the top environment (topenv)
+is not R_GlobalEnv as needed for cedta to work right. I'm not sure of
+a fix or workaround.
+
+print( topenv() )
+
+- Tom
+
+print(topenv())
+
+From tshort.rlists at gmail.com  Tue Nov 30 21:35:28 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 30 Nov 2010 15:35:28 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+Message-ID: <AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+
+On Tue, Nov 30, 2010 at 3:13 PM, Tom Short <tshort.rlists at gmail.com> wrote:
+> On Tue, Nov 30, 2010 at 2:45 PM, Steve Lianoglou
+> <mailinglist.honeypot at gmail.com> wrote:
+>> Hi,
+>>
+>> So I mentioned in my last email that I'm going to get back to this
+>> later, but I'm a bit OCD when I have what seems like low-hanging-fruit
+>> so I'm trying to figure this out.
+>>
+>> I also mentioned I think the problem I'm seeing has something to do
+>> with the "cedta" business. While fixing this case will help me move
+>> the test over, perhaps it will also help to better address the
+>> side-effects cedta has with other things like Imports, Depends,
+>> etc.(?)
+>>
+>> So, download this simple test file:
+>>
+>> http://cbio.mskcc.org/~lianos/files/scratch/datatable-test.R
+>>
+>> Note that the first call to sys.source works fine, but I think it
+>> should work with the second case.
+>>
+>> Start an R session, and:
+>>
+>> R> library(data.table)
+>> R> sys.source("/path/to/datatable-test.R", .GlobalEnv) ## this works
+>> R> sys.source("/path/to/datatable-test.R", new.env(parent=.GlobalEnv))
+>> Error in `[.data.frame`(x, i, j) : object 'v' not found
+>>
+>> Does it seem reasonable to you that it should work in the second example?
+
+It looks like library() uses sys.source, and topenv() ends up pointing
+at the environment enclosing the package. If test_that also uses
+sys.source, I'm not sure cedta work. topenv() can't tell if it's in a
+package or some other environment. Maybe we could include a hidden
+variable in the top-level environment that lets cedta know that it's
+aware of data.tables.
+
+- Tom
+
+From tshort.rlists at gmail.com  Tue Nov 30 21:48:39 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 30 Nov 2010 15:48:39 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+Message-ID: <AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+
+On Tue, Nov 30, 2010 at 3:35 PM, Tom Short <tshort.rlists at gmail.com> wrote:
+> On Tue, Nov 30, 2010 at 3:13 PM, Tom Short <tshort.rlists at gmail.com> wrote:
+>> On Tue, Nov 30, 2010 at 2:45 PM, Steve Lianoglou
+>> <mailinglist.honeypot at gmail.com> wrote:
+>>> Hi,
+>>>
+>>> So I mentioned in my last email that I'm going to get back to this
+>>> later, but I'm a bit OCD when I have what seems like low-hanging-fruit
+>>> so I'm trying to figure this out.
+>>>
+>>> I also mentioned I think the problem I'm seeing has something to do
+>>> with the "cedta" business. While fixing this case will help me move
+>>> the test over, perhaps it will also help to better address the
+>>> side-effects cedta has with other things like Imports, Depends,
+>>> etc.(?)
+>>>
+>>> So, download this simple test file:
+>>>
+>>> http://cbio.mskcc.org/~lianos/files/scratch/datatable-test.R
+>>>
+>>> Note that the first call to sys.source works fine, but I think it
+>>> should work with the second case.
+>>>
+>>> Start an R session, and:
+>>>
+>>> R> library(data.table)
+>>> R> sys.source("/path/to/datatable-test.R", .GlobalEnv) ## this works
+>>> R> sys.source("/path/to/datatable-test.R", new.env(parent=.GlobalEnv))
+>>> Error in `[.data.frame`(x, i, j) : object 'v' not found
+>>>
+>>> Does it seem reasonable to you that it should work in the second example?
+>
+> It looks like library() uses sys.source, and topenv() ends up pointing
+> at the environment enclosing the package. If test_that also uses
+> sys.source, I'm not sure cedta work. topenv() can't tell if it's in a
+> package or some other environment. Maybe we could include a hidden
+> variable in the top-level environment that lets cedta know that it's
+> aware of data.tables.
+
+Cludgy, but this datatable-test.R works:
+
+assign(".Depends", "data.table", envir = topenv())
+TESTDT = data.table(a=as.integer(c(1,3,4,4,4,4,7)),
+                    b=as.integer(c(5,5,6,6,9,9,2)),
+                    v=1:7)
+setkey(TESTDT,a,b)
+x <- TESTDT[SJ(4,6), v, mult="first"]
+
+- Tom
+
+From mailinglist.honeypot at gmail.com  Tue Nov 30 23:03:25 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 30 Nov 2010 17:03:25 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+Message-ID: <AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+
+On Tue, Nov 30, 2010 at 3:48 PM, Tom Short <tshort.rlists at gmail.com> wrote:
+
+> Cludgy, but this datatable-test.R works:
+>
+> assign(".Depends", "data.table", envir = topenv())
+> TESTDT = data.table(a=as.integer(c(1,3,4,4,4,4,7)),
+> ? ? ? ? ? ? ? ? ? ?b=as.integer(c(5,5,6,6,9,9,2)),
+> ? ? ? ? ? ? ? ? ? ?v=1:7)
+> setkey(TESTDT,a,b)
+> x <- TESTDT[SJ(4,6), v, mult="first"]
+
+Hmm ... that's not working for me:
+
+R> sys.source("~/Desktop/datatable-test.R", new.env(parent=.GlobalEnv))
+Error in `[.data.frame`(x, i, j) : object 'v' not found
+
+I'm using R 2.12 (sessionInfo below).
+
+I was thinking about something along the lines of your toplevel hidden
+variable idea, but thought it might be a bit sloppy.
+
+I guess the cedta stuff is necessary when the user passes a data.table
+into a function (perhaps defined in a package) that expects a
+data.frame?
+
+I guess one starts to tread in some of the arcane aspects of R when
+one needs to test/manipulate namespaces and things.
+
+I wonder if there's another way to implement cedta? Would checking the
+values/order of `searchpaths` from within cedta work? (Assuming the
+values/order of the elements in searchpahts() changes from within
+packages, etc.)
+
+-steve
+
+R> sessionInfo()
+R version 2.12.0 (2010-10-15)
+Platform: i386-apple-darwin9.8.0/i386 (32-bit)
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/C/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] data.table_1.5.1
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From tshort.rlists at gmail.com  Tue Nov 30 23:41:49 2010
+From: tshort.rlists at gmail.com (Tom Short)
+Date: Tue, 30 Nov 2010 17:41:49 -0500
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+Message-ID: <AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+
+On Tue, Nov 30, 2010 at 5:03 PM, Steve Lianoglou
+<mailinglist.honeypot at gmail.com> wrote:
+> On Tue, Nov 30, 2010 at 3:48 PM, Tom Short <tshort.rlists at gmail.com> wrote:
+>
+>> Cludgy, but this datatable-test.R works:
+>>
+>> assign(".Depends", "data.table", envir = topenv())
+>> TESTDT = data.table(a=as.integer(c(1,3,4,4,4,4,7)),
+>> ? ? ? ? ? ? ? ? ? ?b=as.integer(c(5,5,6,6,9,9,2)),
+>> ? ? ? ? ? ? ? ? ? ?v=1:7)
+>> setkey(TESTDT,a,b)
+>> x <- TESTDT[SJ(4,6), v, mult="first"]
+>
+> Hmm ... that's not working for me:
+>
+
+It looks like I haven't updated my installed version of data.table in
+a while. With an older version of cedta, my workaround worked, but
+cedta no longer looks at the .Depends variable.
+
+- Tom
+

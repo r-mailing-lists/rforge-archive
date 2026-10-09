@@ -1,0 +1,328 @@
+From lawrence.michael at gene.com  Fri Jul  2 19:53:59 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 2 Jul 2010 10:53:59 -0700
+Subject: [RQt-devel] Fwd: [Rd] support for polygons with holes
+In-Reply-To: <4C27C5D0.5010801@auckland.ac.nz>
+References: <4C27C5D0.5010801@auckland.ac.nz>
+Message-ID: <AANLkTikvdJDYXXZoJzF9Lk-6kr-GsQ5MxTPE4crQuLs3@mail.gmail.com>
+
+Does anyone think this would be useful to have in qtpaint? It would mean
+adding a new primitive type, the path.
+
+---------- Forwarded message ----------
+From: Paul Murrell <p.murrell at auckland.ac.nz>
+Date: Sun, Jun 27, 2010 at 2:42 PM
+Subject: [Rd] support for polygons with holes
+To: "r-devel at r-project.org" <r-devel at r-project.org>
+
+
+Hi
+
+This is for developers of extension packages that provide extra
+*graphics devices* for R.
+
+In the *development* version of R, support has been added to the
+graphics engine for rendering polygons with holes (e.g., maps with lakes
+with islands ...).
+
+The API change is a new dev_Path() function for graphics devices.
+
+The R_GE_version constant (in GraphicsEngine.h) has been bumped up to 8
+as a marker of this change.
+
+This means that, at a minimum, all graphics devices should be updated to
+provide dummy implementations of the new functions to just say that the
+feature is not yet implemented (see for example the PicTeX and XFig
+devices in the 'grDevices' package).
+
+A full implementation of dev_Path() should be able to render paths that
+consist of multiple sub-paths which can be filled using either the even-odd
+rule or the non-zero winding rule (see the examples in polypath() from
+'graphics' or grid.path() from 'grid').
+
+Paul
+-- 
+Dr Paul Murrell
+Department of Statistics
+The University of Auckland
+Private Bag 92019
+Auckland
+New Zealand
+64 9 3737599 x85392
+paul at stat.auckland.ac.nz
+http://www.stat.auckland.ac.nz/~paul/<http://www.stat.auckland.ac.nz/%7Epaul/>
+
+______________________________________________
+R-devel at r-project.org mailing list
+https://stat.ethz.ch/mailman/listinfo/r-devel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100702/64b3c386/attachment.htm>
+
+From verzani at math.csi.cuny.edu  Sun Jul 11 00:28:53 2010
+From: verzani at math.csi.cuny.edu (John Verzani)
+Date: Sat, 10 Jul 2010 18:28:53 -0400
+Subject: [RQt-devel] Question about validation with QLineEdit
+Message-ID: <AANLkTilmY-KAC6fSpqgX3gN43hxd9KLhENESHKbeOjl2@mail.gmail.com>
+
+I know I can do this a different way, but was thinking this should work:
+
+library(qtbase)
+
+qsetClass("positiveValidator", Qt$QValidator, function(parent = NULL) {
+  super(parent)
+})
+
+qsetMethod("validate", positiveValidator, function(input, pos) {
+  val <- as.integer(input) > 0
+  if(val)
+    return(Qt$QValidator$Acceptable)
+  else
+    return(Qt$QValidator$Invalid)
+})
+
+
+e <- Qt$QLineEdit()
+v <- positiveValidator(e)
+e$setValidator(v)
+
+e$text=-1
+
+## Gives this error:
+Error in e$text = 1 :
+  Cannot convert argument of type 'QString&' to SEXP in
+R::.GlobalEnv::positiveValidator::validate
+
+
+I guessing there is a conversion that needs to take place, but it
+seems like it should happen prior to the
+call to the validate method.
+
+Any help is appreciated. --John
+
+
+-- 
+John Verzani
+Chair, Department of Mathematics
+College of Staten Island, CUNY
+verzani at math.csi.cuny.edu
+
+From lawrence.michael at gene.com  Sun Jul 11 01:20:55 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sat, 10 Jul 2010 16:20:55 -0700
+Subject: [RQt-devel] Question about validation with QLineEdit
+In-Reply-To: <AANLkTilmY-KAC6fSpqgX3gN43hxd9KLhENESHKbeOjl2@mail.gmail.com>
+References: <AANLkTilmY-KAC6fSpqgX3gN43hxd9KLhENESHKbeOjl2@mail.gmail.com>
+Message-ID: <AANLkTikX_ebPTeiTWFJVLfrpZpIgMBkpDo6rBHbS3hZ1@mail.gmail.com>
+
+Went ahead and added QString& -> character version. But note that it's not
+possible to modify the string in place, as it would be in C++. Not sure I
+see the point in that method, but it would be necessary in
+QValidator::fixup(). Non-const reference parameters are rare in the Qt API,
+so support for 'out' parameters has not been implemented. I'm guessing the
+logic could be that if the method returns 'void', any return value from R
+should be interpreted as the new value for the QString& parameter. If the
+function were non-void, or if there were multiple out parameters, a list
+would be returned.
+
+Michael
+
+On Sat, Jul 10, 2010 at 3:28 PM, John Verzani <verzani at math.csi.cuny.edu>wrote:
+
+> I know I can do this a different way, but was thinking this should work:
+>
+> library(qtbase)
+>
+> qsetClass("positiveValidator", Qt$QValidator, function(parent = NULL) {
+>  super(parent)
+> })
+>
+> qsetMethod("validate", positiveValidator, function(input, pos) {
+>  val <- as.integer(input) > 0
+>  if(val)
+>    return(Qt$QValidator$Acceptable)
+>  else
+>    return(Qt$QValidator$Invalid)
+> })
+>
+>
+> e <- Qt$QLineEdit()
+> v <- positiveValidator(e)
+> e$setValidator(v)
+>
+> e$text=-1
+>
+> ## Gives this error:
+> Error in e$text = 1 :
+>  Cannot convert argument of type 'QString&' to SEXP in
+> R::.GlobalEnv::positiveValidator::validate
+>
+>
+> I guessing there is a conversion that needs to take place, but it
+> seems like it should happen prior to the
+> call to the validate method.
+>
+> Any help is appreciated. --John
+>
+>
+> --
+> John Verzani
+> Chair, Department of Mathematics
+> College of Staten Island, CUNY
+> verzani at math.csi.cuny.edu
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100710/9ab010a8/attachment.htm>
+
+From lawrence.michael at gene.com  Sun Jul 11 03:09:01 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sat, 10 Jul 2010 18:09:01 -0700
+Subject: [RQt-devel] Question about validation with QLineEdit
+In-Reply-To: <AANLkTilmY-KAC6fSpqgX3gN43hxd9KLhENESHKbeOjl2@mail.gmail.com>
+References: <AANLkTilmY-KAC6fSpqgX3gN43hxd9KLhENESHKbeOjl2@mail.gmail.com>
+Message-ID: <AANLkTikCmr8hfcPGASBd0R9ijpHEelmeH2AXC-YqWQjV@mail.gmail.com>
+
+Just fixed it so that the return value is actually... returned. Guess that
+was never tested. Anyway, btw, setting the text property directly will NOT
+validate. You'll need to test by directly interacting with the widget.
+
+Michael
+
+On Sat, Jul 10, 2010 at 3:28 PM, John Verzani <verzani at math.csi.cuny.edu>wrote:
+
+> I know I can do this a different way, but was thinking this should work:
+>
+> library(qtbase)
+>
+> qsetClass("positiveValidator", Qt$QValidator, function(parent = NULL) {
+>  super(parent)
+> })
+>
+> qsetMethod("validate", positiveValidator, function(input, pos) {
+>  val <- as.integer(input) > 0
+>  if(val)
+>    return(Qt$QValidator$Acceptable)
+>  else
+>    return(Qt$QValidator$Invalid)
+> })
+>
+>
+> e <- Qt$QLineEdit()
+> v <- positiveValidator(e)
+> e$setValidator(v)
+>
+> e$text=-1
+>
+> ## Gives this error:
+> Error in e$text = 1 :
+>  Cannot convert argument of type 'QString&' to SEXP in
+> R::.GlobalEnv::positiveValidator::validate
+>
+>
+> I guessing there is a conversion that needs to take place, but it
+> seems like it should happen prior to the
+> call to the validate method.
+>
+> Any help is appreciated. --John
+>
+>
+> --
+> John Verzani
+> Chair, Department of Mathematics
+> College of Staten Island, CUNY
+> verzani at math.csi.cuny.edu
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100710/c8d4c63e/attachment.htm>
+
+From verzani at math.csi.cuny.edu  Sun Jul 11 04:58:23 2010
+From: verzani at math.csi.cuny.edu (John Verzani)
+Date: Sat, 10 Jul 2010 22:58:23 -0400
+Subject: [RQt-devel] Question about validation with QLineEdit
+In-Reply-To: <AANLkTikCmr8hfcPGASBd0R9ijpHEelmeH2AXC-YqWQjV@mail.gmail.com>
+References: <AANLkTilmY-KAC6fSpqgX3gN43hxd9KLhENESHKbeOjl2@mail.gmail.com>
+	<AANLkTikCmr8hfcPGASBd0R9ijpHEelmeH2AXC-YqWQjV@mail.gmail.com>
+Message-ID: <AANLkTim8oehRjXluR3vMrexJaq_7zH4FV_letGctAysX@mail.gmail.com>
+
+Thanks for both fixing this and saving me my next question ;) --John
+
+On Sat, Jul 10, 2010 at 9:09 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Just fixed it so that the return value is actually... returned. Guess that
+> was never tested. Anyway, btw, setting the text property directly will NOT
+> validate. You'll need to test by directly interacting with the widget.
+>
+> Michael
+>
+> On Sat, Jul 10, 2010 at 3:28 PM, John Verzani <verzani at math.csi.cuny.edu>
+> wrote:
+>>
+>> I know I can do this a different way, but was thinking this should work:
+>>
+>> library(qtbase)
+>>
+>> qsetClass("positiveValidator", Qt$QValidator, function(parent = NULL) {
+>> ?super(parent)
+>> })
+>>
+>> qsetMethod("validate", positiveValidator, function(input, pos) {
+>> ?val <- as.integer(input) > 0
+>> ?if(val)
+>> ? ?return(Qt$QValidator$Acceptable)
+>> ?else
+>> ? ?return(Qt$QValidator$Invalid)
+>> })
+>>
+>>
+>> e <- Qt$QLineEdit()
+>> v <- positiveValidator(e)
+>> e$setValidator(v)
+>>
+>> e$text=-1
+>>
+>> ## Gives this error:
+>> Error in e$text = 1 :
+>> ?Cannot convert argument of type 'QString&' to SEXP in
+>> R::.GlobalEnv::positiveValidator::validate
+>>
+>>
+>> I guessing there is a conversion that needs to take place, but it
+>> seems like it should happen prior to the
+>> call to the validate method.
+>>
+>> Any help is appreciated. --John
+>>
+>>
+>> --
+>> John Verzani
+>> Chair, Department of Mathematics
+>> College of Staten Island, CUNY
+>> verzani at math.csi.cuny.edu
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+
+
+-- 
+John Verzani
+Chair, Department of Mathematics
+College of Staten Island, CUNY
+verzani at math.csi.cuny.edu
+

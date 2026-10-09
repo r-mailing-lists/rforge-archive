@@ -1,0 +1,1106 @@
+From lennart at karssen.org  Sun Apr 12 21:14:33 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Sun, 12 Apr 2015 21:14:33 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1943 -
+	pkg/OmicABEL/src/reshuffle
+In-Reply-To: <20150412065433.699F51876B4@r-forge.r-project.org>
+References: <20150412065433.699F51876B4@r-forge.r-project.org>
+Message-ID: <552AC419.1090406@karssen.org>
+
+Hi Sodbo,
+
+Thanks for your bugfix! I've added some minor comments below.
+
+On 12-04-15 08:54, noreply at r-forge.r-project.org wrote:
+> Author: sharapovsodbo
+> Date: 2015-04-12 08:54:30 +0200 (Sun, 12 Apr 2015)
+> New Revision: 1943
+> 
+> Modified:
+>    pkg/OmicABEL/src/reshuffle/Parameters.cpp
+>    pkg/OmicABEL/src/reshuffle/main.cpp
+>    pkg/OmicABEL/src/reshuffle/makefile
+>    pkg/OmicABEL/src/reshuffle/reshuffle.cpp
+> Log:
+> Version 0.34
+> 	fixed bug with "--chi" options fixed (before "--chi=0" or "--chi" extracted SNPs with chi>=1)
+> 	fixed same bug with "--chi" "--dataslim" options fixed
+> 	fixed bug with "--outfile" option (before "--outfile" didn't work if "--chi" was used)
+> 	fixed bug with trait names output format
+> 	minor changes
+> 	
+> 
+> 
+> Modified: pkg/OmicABEL/src/reshuffle/Parameters.cpp
+> ===================================================================
+> --- pkg/OmicABEL/src/reshuffle/Parameters.cpp	2015-03-31 13:05:51 UTC (rev 1942)
+> +++ pkg/OmicABEL/src/reshuffle/Parameters.cpp	2015-04-12 06:54:30 UTC (rev 1943)
+> @@ -136,7 +136,7 @@
+>  			{"traits",optional_argument,NULL,'t'},
+>  			{"snps",optional_argument,NULL,'s'},
+>  			{"herit",optional_argument,NULL,'e'},
+> -			{"chi",required_argument,NULL,'c'},
+> +			{"chi",optional_argument,NULL,'c'},
+>  			{"dataslim",no_argument,NULL,'l'},
+>  			{"outfile",required_argument,NULL,'o'},
+>  			{NULL,0,NULL,0}
+> @@ -179,10 +179,12 @@
+>  			}
+>  			case 'c':{
+>  				chi = Parameter(optarg,"chi");
+> -				if (chi.numbersset.size()==0){
+> -					cout<<"\nChi value is not a number. Please, set correct Chi value";
+
+I would change "Chi" to "Chi^2" in the printed text (both here and
+further down) if I were you in order to avoid any confusion (I assume
+this is a Chi^2 cut-off value).
+
+You may want to consider changing the option name from --chi to --chi2,
+although I certainly understand it if you don't want to break existing
+scripts. Up to you.
+
+
+Thanks again for your contributions to the GenABEL project.
+
+
+Lennart.
+
+> +				//cout << "\n\nchi.numbersset = " << chi<<"\n\n";
+> +				/*if (chi.numbersset.size()==0){
+> +					cout<<"\nChi value is not a number. Please, set correct Chi value\n";
+>  					exit(1);
+> -				}
+> +				}*/
+> +				//cout <<"\nChi is yopta " << chi;
+>  
+>  				break;
+>  			}
+> @@ -193,6 +195,7 @@
+>  			case 'o':{
+>  				default_outfile = false;
+>  				outfile=optarg;
+> +				//cout << "\n\nOutfile name os yopta = " << outfile<<"\n\n";
+>  				break;
+>  			}
+>  			}
+> 
+> Modified: pkg/OmicABEL/src/reshuffle/main.cpp
+> ===================================================================
+> --- pkg/OmicABEL/src/reshuffle/main.cpp	2015-03-31 13:05:51 UTC (rev 1942)
+> +++ pkg/OmicABEL/src/reshuffle/main.cpp	2015-04-12 06:54:30 UTC (rev 1943)
+> @@ -49,7 +49,7 @@
+>  
+>  		cout<<"\nStart reshuffeling";
+>  		iout_file iout_F(Params);
+> -		cout << "\nFinish iout_file read\t" << double(clock()) / CLOCKS_PER_SEC <<" sec";
+> +		cout << "\nFinish iout_file read " << double(clock()) / CLOCKS_PER_SEC <<" sec";
+>  
+>  		if(Params.traits.use)
+>  			Params.traits.setbynames(*(iout_F.labels.trait_names));
+> @@ -59,7 +59,7 @@
+>  			Params.herit.setbynames(*(iout_F.labels.trait_names));
+>  		Reshuffle reshh(iout_F,Params);
+>  		reshh.run();
+> -		cout << "\nFinish reshuffling " << double(clock()) / CLOCKS_PER_SEC <<" sec";
+> -	}
+> +		cout << "\nFinish reshuffling " << double(clock()) / CLOCKS_PER_SEC <<" sec\n\n";
+> +	}
+>  	return (0);
+>  }
+> 
+> Modified: pkg/OmicABEL/src/reshuffle/makefile
+> ===================================================================
+> --- pkg/OmicABEL/src/reshuffle/makefile	2015-03-31 13:05:51 UTC (rev 1942)
+> +++ pkg/OmicABEL/src/reshuffle/makefile	2015-04-12 06:54:30 UTC (rev 1943)
+> @@ -3,12 +3,8 @@
+>  	g++ -O3 -Wall -c -fmessage-length=0 -o reshuffle_obj.o reshuffle.cpp
+>  	g++ -O3 -Wall -c -fmessage-length=0 -o Parameters.o Parameters.cpp
+>  	g++ -O3 -Wall -c -fmessage-length=0 -o main.o main.cpp
+> -	g++ -o reshuffle "reshuffle_obj.o" "main.o" "iout_file.o" "Parameters.o
+> +	g++ -o reshuffle reshuffle_obj.o main.o iout_file.o Parameters.o
+>  	
+>  clean:
+>  
+> -	del iout_file.o
+> -	del reshuffle_obj.o
+> -	del Parameters.o
+> -	del main.o
+> -	del reshuffle
+> \ No newline at end of file
+> +	rm -rf *.o reshuffle
+> \ No newline at end of file
+> 
+> Modified: pkg/OmicABEL/src/reshuffle/reshuffle.cpp
+> ===================================================================
+> --- pkg/OmicABEL/src/reshuffle/reshuffle.cpp	2015-03-31 13:05:51 UTC (rev 1942)
+> +++ pkg/OmicABEL/src/reshuffle/reshuffle.cpp	2015-04-12 06:54:30 UTC (rev 1943)
+> @@ -25,7 +25,7 @@
+>  	txt_datadims << "Number of traits\t" << (*p_iout_file).header.t << endl;
+>  	txt_datadims << "Number of SNP\t" << (*p_iout_file).header.m << endl;
+>  	txt_datadims << "Number of covariates\t" << ((*p_iout_file).header.p - 2);
+> -	cout<<"\nEnd write data dimension\t"<< double(clock()) / CLOCKS_PER_SEC <<" sec";
+> +	cout<<"\nEnd write data dimension "<< double(clock()) / CLOCKS_PER_SEC <<" sec";
+>  }
+>  
+>  void Reshuffle::write_snpnames(ofstream& txt_snpnames){
+> @@ -36,8 +36,8 @@
+>  		cout<<"\nWriting all SNP's names";
+>  	}
+>  	for(set<int>::iterator it= (*p_Parameters).snpnames.numbersset.begin();it!=(*p_Parameters).snpnames.numbersset.end();++it)
+> -		txt_snpnames << "\nSNP #"<<(*it+1)<<"\t"<<(*(*p_iout_file).labels.snp_names)[*it];
+> -	cout<<"\nEnd write SNP's names\t" << double(clock()) / CLOCKS_PER_SEC <<" sec";
+> +		txt_snpnames << "\nSNP#"<<(*it+1)<<"\t"<<(*(*p_iout_file).labels.snp_names)[*it];
+> +	cout<<"\nEnd write SNP's names " << double(clock()) / CLOCKS_PER_SEC <<" sec";
+>  }
+>  
+>  void Reshuffle::write_traitnames(ofstream& txt_traitnames){
+> @@ -48,13 +48,13 @@
+>  		cout<<"\nWriting all trait's names";
+>  	}
+>  	for(std::set<int>::iterator it= (*p_Parameters).traitnames.numbersset.begin();it!=p_Parameters->traitnames.numbersset.end();++it)
+> -		txt_traitnames<<"TRAIT #"<<(*it+1)<<"\t"<<(*(*p_iout_file).labels.trait_names)[*it];
+> -	cout<<"\nEnd write trait's names\t" << double(clock()) / CLOCKS_PER_SEC <<" sec" << endl;
+> +		txt_traitnames<<"\nTRAIT#"<<(*it+1)<<"\t"<<(*(*p_iout_file).labels.trait_names)[*it];
+> +	cout<<"\nEnd write trait's names " << double(clock()) / CLOCKS_PER_SEC <<" sec" << endl;
+>  }
+>  
+>  void Reshuffle::write_data(ifstream& out_file,ofstream& data){
+>  	out_file.seekg(0, ios_base::beg);
+> -	cout << "\nStart write data\t" << double(clock()) / CLOCKS_PER_SEC <<" sec";
+> +	cout << "\nStart write data " << double(clock()) / CLOCKS_PER_SEC <<" sec";
+>  	data.precision(PRECISION_DOUBLE);
+>  	data<<"SNP\t";
+>  	data<<	"Trait\t";
+> @@ -98,8 +98,13 @@
+>  	out_file.seekg(0, ios_base::beg);
+>  	double chi = 0;
+>  	set<int>::iterator chi_val = (*p_Parameters).chi.numbersset.begin();
+> -	double CheckChi = *chi_val+1;
+> -	cout << "\nStart write chi data=" << double(clock()) / CLOCKS_PER_SEC <<" sec";
+> +	double CheckChi = 0;
+> +	if((*p_Parameters).chi.numbersset.size()==0){
+> +		CheckChi = 0;
+> +	}else{
+> +		CheckChi = *chi_val+1;
+> +	}
+> +	cout << "\nStart write chi data " << double(clock()) / CLOCKS_PER_SEC <<" sec";
+>  	txt_chi.precision(PRECISION_DOUBLE);
+>  	txt_chi << "SNP\t";
+>  	txt_chi << "Trait\t";
+> @@ -139,22 +144,27 @@
+>  		ostr.clear();
+>  	}
+>  	delete buf;
+> -	cout << "\nFinish write chi data\t" << double(clock()) / CLOCKS_PER_SEC <<" sec";
+> +	cout << "\nFinish write chi data " << double(clock()) / CLOCKS_PER_SEC <<" sec";
+>  }
+>  
+>  void Reshuffle::write_slim_data(ifstream& out_file, ofstream& txt_slim){
+> -	cout << "\nStart write slim data=" << double(clock()) / CLOCKS_PER_SEC <<" sec";
+> +	cout << "\nStart write slim data " << double(clock()) / CLOCKS_PER_SEC <<" sec";
+>  	out_file.seekg(0, ios_base::beg);
+>  	set<int> goodtraits;
+>  	set<int> goodsnps;
+>  	double chi = 0;
+>  	if((*p_Parameters).chi.def_value||(!(*p_Parameters).chi.use)){
+>  		cout << "\nERROR: " << "Chi value doesn't exist";
+> -		cout << "\nPlease, set Chi value to get slim data";
+> +		cout << "\nPlease, set Chi value to get slim data\n";
+>  		exit(1);
+>  	}
+>  	set<int>::iterator chi_val = (*p_Parameters).chi.numbersset.begin();
+> -	double CheckChi = *chi_val+1;
+> +	double CheckChi = 0;
+> +	if((*p_Parameters).chi.numbersset.size()==0){
+> +		CheckChi = 0;
+> +	}else{
+> +		CheckChi = *chi_val+1;
+> +	}
+>  	double* buf = new double[per_trait_per_snp];
+>  	for (set<int>::iterator trait= (*p_Parameters).traits.numbersset.begin();trait!=(*p_Parameters).traits.numbersset.end();trait++) {
+>  		long long oldPos=0,pos = 0;
+> @@ -211,7 +221,7 @@
+>  		ostr.clear();
+>  	}
+>  	delete buf;
+> -	cout <<"\nEnd write slim data\t" << double(clock()) / CLOCKS_PER_SEC <<" sec";
+> +	cout <<"\nEnd write slim data " << double(clock()) / CLOCKS_PER_SEC <<" sec";
+>  }
+>  
+>  int Reshuffle::est_shift(int counter){
+> @@ -256,7 +266,7 @@
+>  		out_file.seekg(est_shift(counter), ios_base::beg);
+>  	}
+>  	out_file.seekg(est_shift(3), ios_base::beg);
+> -	for (unsigned int beta=0;beta<(*(p_iout_file->labels.beta)).size()-1;beta++) {
+> +	for (unsigned int beta=0;beta<(*(p_iout_file->labels.beta)).size()-1;beta++) {
+>  		herest << (*(p_iout_file->labels).beta)[beta] << "\t";
+>  		for (std::set<int>::iterator trait= p_Parameters->herit.numbersset.begin();trait!=p_Parameters->herit.numbersset.end();trait++) {
+>  			out_file.read((char *) &tmp_number, sizeof(double));
+> 
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150412/176a01b5/attachment.sig>
+
+From k.zhong at erasmusmc.nl  Mon Apr 13 10:05:54 2015
+From: k.zhong at erasmusmc.nl (K. Zhong)
+Date: Mon, 13 Apr 2015 08:05:54 +0000
+Subject: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+In-Reply-To: <D110EB4E.1801%k.zhong@erasmusmc.nl>
+References: <D10BA349.17E9%k.zhong@erasmusmc.nl>
+ <54EA473A.8040104@karssen.org> <D110EB4E.1801%k.zhong@erasmusmc.nl>
+Message-ID: <D151435F.19C8%k.zhong@erasmusmc.nl>
+
+Dear all,
+
+I have read through the technical review guidelines and I think
+CollapsABEL satisfies all requirements except that `R CMD check` and `R
+CMD check -as-cran` both produces one warning and two notes. The warning
+is about my .git folder, which is for version control, and won?t be
+present once a binary package is built, so this is a non-issue. The notes
+are about some ?global variable? that are not global at all, and this is a
+known bug of `R CMD check` (see http://tinyurl.com/o9p6vxf for an
+example). 
+
+So could anyone please review this package? The submission of our paper is
+waiting on this. Thanks!
+
+
+Best regards,
+Kaiyin ZHONG
+------------------
+FMB, Erasmus MC
+kaiyin.co.vu <http://kaiyin.co.vu>
+k.zhong at erasmusmc.nl
+kindlychung at gmail.com
+
+
+
+
+
+
+
+
+On 23/02/15 14:42, "K. Zhong" <k.zhong at erasmusmc.nl> wrote:
+
+>Dear Lennart,
+>
+>At the moment I think it would be nice to keep the function as it is for
+>current users of it and show them a message about the new package. Thank
+>you for bringing this up.
+>
+>Best regards,
+>Kaiyin ZHONG
+>------------------
+>FMB, Erasmus MC
+>kaiyin.co.vu <http://kaiyin.co.vu>
+>k.zhong at erasmusmc.nl
+>kindlychung at gmail.com
+>
+>
+>
+>
+>
+>
+>
+>
+>On 22/02/15 22:16, "L.C. Karssen" <lennart at karssen.org> wrote:
+>
+>>Dear Kaiyin,
+>>
+>>Thank you for your willingness to contribute to the GenABEL project.
+>>
+>>On 19-02-15 14:27, K. Zhong wrote:
+>>> Dear all,
+>>> 
+>>> I have recently finished an R package for compound heterozygosity
+>>> analysis for microarray/NGS data. This package (named CollapsABEL)
+>>> implements an extended version of the CDH test
+>>> 
+>>><http://journals.plos.org/plosone/article?id=10.1371/journal.pone.002814
+>>>5
+>>>> (see
+>>> DOI: 10.1371/journal.pone.0028145) in a flexible, efficient and user
+>>> friendly way  and has already proved useful for our analysis with
+>>> certain dermatology traits.
+>>
+>>That sounds interesting indeed! To me it sounds like a useful addition
+>>to the GenABEL suite.
+>>
+>>> CDH test has been implemented before as a
+>>> function in the GenABEL package, but due to the simplicity of the
+>>>method
+>>> itself and restriction from the data format it uses, it is practically
+>>> not very useful. CollapsABEL overcomes these limitations and provides a
+>>> nice streamlined solution in your hands, for which reason I think it
+>>> would be a nice addition to the GenABEL family.
+>>
+>>Do you have a suggestion on what to do with the current CDH test in the
+>>GenABEL package? Is it worth to spend time maintaining it, or should we
+>>replace it with a message pointing people to CollapsABEL (of course
+>>assuming CollapsABEL gets accepted into the GenaBEL suite)?
+>>
+>>> 
+>>> The project is hosted on
+>>> bitbucket: https://bitbucket.org/kindlychung/collapsabel/overview
+>>> The R manual and an extensive tutorial can be found here:
+>>> https://bitbucket.org/kindlychung/collapsabel/downloads
+>>
+>>Thank you for providing these links.
+>>
+>>> 
+>>> If you are willing to review this package, please let me know.
+>>
+>>I hope someone will step forward to do this. If you don't get a reaction
+>>in the coming few weeks, please feel free to send a reminder to the list.
+>>
+>>
+>>Best regards,
+>>
+>>Lennart Karssen.
+>>
+>>> 
+>>> 
+>>> Best regards,
+>>> 
+>>> Kaiyin ZHONG
+>>> ------------------
+>>> FMB, Erasmus MC
+>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>> k.zhong at erasmusmc.nl <mailto:k.zhong at erasmusmc.nl>
+>>> kindlychung at gmail.com <mailto:kindlychung at gmail.com>
+>>> 
+>>> 
+>>> 
+>>> 
+>>> 
+>>> _______________________________________________
+>>> genabel-devel mailing list
+>>> genabel-devel at lists.r-forge.r-project.org
+>>> 
+>>>https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-dev
+>>>e
+>>>l
+>>> 
+>>
+>>-- 
+>>*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>L.C. Karssen
+>>Utrecht
+>>The Netherlands
+>>
+>>lennart at karssen.org
+>>http://blog.karssen.org
+>>GPG key ID: A88F554A
+>>-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>
+>
+
+
+From lennart at karssen.org  Tue Apr 14 11:24:17 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Tue, 14 Apr 2015 11:24:17 +0200
+Subject: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+In-Reply-To: <D151435F.19C8%k.zhong@erasmusmc.nl>
+References: <D10BA349.17E9%k.zhong@erasmusmc.nl>
+ <54EA473A.8040104@karssen.org> <D110EB4E.1801%k.zhong@erasmusmc.nl>
+ <D151435F.19C8%k.zhong@erasmusmc.nl>
+Message-ID: <552CDCC1.2020802@karssen.org>
+
+Dear Kaiyin,
+
+
+On 13-04-15 10:05, K. Zhong wrote:
+> Dear all,
+> 
+> I have read through the technical review guidelines 
+
+Thank you for that. Also thanks for bringing CollapsABEL back to our
+attention, unfortunately it fell of my radar.
+
+> and I think
+> CollapsABEL satisfies all requirements except that `R CMD check` and `R
+> CMD check -as-cran` both produces one warning and two notes. The warning
+> is about my .git folder, which is for version control, and won?t be
+> present once a binary package is built, so this is a non-issue. 
+
+I agree.
+
+> The notes
+> are about some ?global variable? that are not global at all, and this is a
+> known bug of `R CMD check` (see http://tinyurl.com/o9p6vxf for an
+> example). 
+
+Aha. This is more reason for concern. From my own experience the CRAN
+staff is quite strickt. Thanks for looking into "prior art". Since the
+SE post you refer to is three years old and the GranovaGG package it
+relates to is now in CRAN, I agree that we should see if it gets
+accepted. However, be prepared to act in case of comments from CRAN.
+
+> 
+> So could anyone please review this package? The submission of our paper is
+> waiting on this. Thanks!
+
+I will review the package today. I will also try to contact other
+potential reviewers directly.
+
+
+Best regards,
+
+Lennart.
+
+> 
+> 
+> Best regards,
+> Kaiyin ZHONG
+> ------------------
+> FMB, Erasmus MC
+> kaiyin.co.vu <http://kaiyin.co.vu>
+> k.zhong at erasmusmc.nl
+> kindlychung at gmail.com
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> On 23/02/15 14:42, "K. Zhong" <k.zhong at erasmusmc.nl> wrote:
+> 
+>> Dear Lennart,
+>>
+>> At the moment I think it would be nice to keep the function as it is for
+>> current users of it and show them a message about the new package. Thank
+>> you for bringing this up.
+>>
+>> Best regards,
+>> Kaiyin ZHONG
+>> ------------------
+>> FMB, Erasmus MC
+>> kaiyin.co.vu <http://kaiyin.co.vu>
+>> k.zhong at erasmusmc.nl
+>> kindlychung at gmail.com
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> On 22/02/15 22:16, "L.C. Karssen" <lennart at karssen.org> wrote:
+>>
+>>> Dear Kaiyin,
+>>>
+>>> Thank you for your willingness to contribute to the GenABEL project.
+>>>
+>>> On 19-02-15 14:27, K. Zhong wrote:
+>>>> Dear all,
+>>>>
+>>>> I have recently finished an R package for compound heterozygosity
+>>>> analysis for microarray/NGS data. This package (named CollapsABEL)
+>>>> implements an extended version of the CDH test
+>>>>
+>>>> <http://journals.plos.org/plosone/article?id=10.1371/journal.pone.002814
+>>>> 5
+>>>>> (see
+>>>> DOI: 10.1371/journal.pone.0028145) in a flexible, efficient and user
+>>>> friendly way  and has already proved useful for our analysis with
+>>>> certain dermatology traits.
+>>>
+>>> That sounds interesting indeed! To me it sounds like a useful addition
+>>> to the GenABEL suite.
+>>>
+>>>> CDH test has been implemented before as a
+>>>> function in the GenABEL package, but due to the simplicity of the
+>>>> method
+>>>> itself and restriction from the data format it uses, it is practically
+>>>> not very useful. CollapsABEL overcomes these limitations and provides a
+>>>> nice streamlined solution in your hands, for which reason I think it
+>>>> would be a nice addition to the GenABEL family.
+>>>
+>>> Do you have a suggestion on what to do with the current CDH test in the
+>>> GenABEL package? Is it worth to spend time maintaining it, or should we
+>>> replace it with a message pointing people to CollapsABEL (of course
+>>> assuming CollapsABEL gets accepted into the GenaBEL suite)?
+>>>
+>>>>
+>>>> The project is hosted on
+>>>> bitbucket: https://bitbucket.org/kindlychung/collapsabel/overview
+>>>> The R manual and an extensive tutorial can be found here:
+>>>> https://bitbucket.org/kindlychung/collapsabel/downloads
+>>>
+>>> Thank you for providing these links.
+>>>
+>>>>
+>>>> If you are willing to review this package, please let me know.
+>>>
+>>> I hope someone will step forward to do this. If you don't get a reaction
+>>> in the coming few weeks, please feel free to send a reminder to the list.
+>>>
+>>>
+>>> Best regards,
+>>>
+>>> Lennart Karssen.
+>>>
+>>>>
+>>>>
+>>>> Best regards,
+>>>>
+>>>> Kaiyin ZHONG
+>>>> ------------------
+>>>> FMB, Erasmus MC
+>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>> k.zhong at erasmusmc.nl <mailto:k.zhong at erasmusmc.nl>
+>>>> kindlychung at gmail.com <mailto:kindlychung at gmail.com>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> genabel-devel mailing list
+>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-dev
+>>>> e
+>>>> l
+>>>>
+>>>
+>>> -- 
+>>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>> L.C. Karssen
+>>> Utrecht
+>>> The Netherlands
+>>>
+>>> lennart at karssen.org
+>>> http://blog.karssen.org
+>>> GPG key ID: A88F554A
+>>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>>
+>>
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150414/99df5493/attachment.sig>
+
+From lennart at karssen.org  Thu Apr 16 15:09:49 2015
+From: lennart at karssen.org (L.C. Karssen)
+Date: Thu, 16 Apr 2015 15:09:49 +0200
+Subject: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+In-Reply-To: <552CDCC1.2020802@karssen.org>
+References: <D10BA349.17E9%k.zhong@erasmusmc.nl>
+ <54EA473A.8040104@karssen.org> <D110EB4E.1801%k.zhong@erasmusmc.nl>
+ <D151435F.19C8%k.zhong@erasmusmc.nl> <552CDCC1.2020802@karssen.org>
+Message-ID: <552FB49D.2030400@karssen.org>
+
+Dear Kaiyin,
+
+A quick update on the package review: I'm having some troubles with my R
+development environment. I hope to resolve them today so that I can
+continue with my review of your package.
+
+
+Lennart.
+
+On 14-04-15 11:24, L.C. Karssen wrote:
+> Dear Kaiyin,
+> 
+> 
+> On 13-04-15 10:05, K. Zhong wrote:
+>> Dear all,
+>>
+>> I have read through the technical review guidelines 
+> 
+> Thank you for that. Also thanks for bringing CollapsABEL back to our
+> attention, unfortunately it fell of my radar.
+> 
+>> and I think
+>> CollapsABEL satisfies all requirements except that `R CMD check` and `R
+>> CMD check -as-cran` both produces one warning and two notes. The warning
+>> is about my .git folder, which is for version control, and won?t be
+>> present once a binary package is built, so this is a non-issue. 
+> 
+> I agree.
+> 
+>> The notes
+>> are about some ?global variable? that are not global at all, and this is a
+>> known bug of `R CMD check` (see http://tinyurl.com/o9p6vxf for an
+>> example). 
+> 
+> Aha. This is more reason for concern. From my own experience the CRAN
+> staff is quite strickt. Thanks for looking into "prior art". Since the
+> SE post you refer to is three years old and the GranovaGG package it
+> relates to is now in CRAN, I agree that we should see if it gets
+> accepted. However, be prepared to act in case of comments from CRAN.
+> 
+>>
+>> So could anyone please review this package? The submission of our paper is
+>> waiting on this. Thanks!
+> 
+> I will review the package today. I will also try to contact other
+> potential reviewers directly.
+> 
+> 
+> Best regards,
+> 
+> Lennart.
+> 
+>>
+>>
+>> Best regards,
+>> Kaiyin ZHONG
+>> ------------------
+>> FMB, Erasmus MC
+>> kaiyin.co.vu <http://kaiyin.co.vu>
+>> k.zhong at erasmusmc.nl
+>> kindlychung at gmail.com
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> On 23/02/15 14:42, "K. Zhong" <k.zhong at erasmusmc.nl> wrote:
+>>
+>>> Dear Lennart,
+>>>
+>>> At the moment I think it would be nice to keep the function as it is for
+>>> current users of it and show them a message about the new package. Thank
+>>> you for bringing this up.
+>>>
+>>> Best regards,
+>>> Kaiyin ZHONG
+>>> ------------------
+>>> FMB, Erasmus MC
+>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>> k.zhong at erasmusmc.nl
+>>> kindlychung at gmail.com
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> On 22/02/15 22:16, "L.C. Karssen" <lennart at karssen.org> wrote:
+>>>
+>>>> Dear Kaiyin,
+>>>>
+>>>> Thank you for your willingness to contribute to the GenABEL project.
+>>>>
+>>>> On 19-02-15 14:27, K. Zhong wrote:
+>>>>> Dear all,
+>>>>>
+>>>>> I have recently finished an R package for compound heterozygosity
+>>>>> analysis for microarray/NGS data. This package (named CollapsABEL)
+>>>>> implements an extended version of the CDH test
+>>>>>
+>>>>> <http://journals.plos.org/plosone/article?id=10.1371/journal.pone.002814
+>>>>> 5
+>>>>>> (see
+>>>>> DOI: 10.1371/journal.pone.0028145) in a flexible, efficient and user
+>>>>> friendly way  and has already proved useful for our analysis with
+>>>>> certain dermatology traits.
+>>>>
+>>>> That sounds interesting indeed! To me it sounds like a useful addition
+>>>> to the GenABEL suite.
+>>>>
+>>>>> CDH test has been implemented before as a
+>>>>> function in the GenABEL package, but due to the simplicity of the
+>>>>> method
+>>>>> itself and restriction from the data format it uses, it is practically
+>>>>> not very useful. CollapsABEL overcomes these limitations and provides a
+>>>>> nice streamlined solution in your hands, for which reason I think it
+>>>>> would be a nice addition to the GenABEL family.
+>>>>
+>>>> Do you have a suggestion on what to do with the current CDH test in the
+>>>> GenABEL package? Is it worth to spend time maintaining it, or should we
+>>>> replace it with a message pointing people to CollapsABEL (of course
+>>>> assuming CollapsABEL gets accepted into the GenaBEL suite)?
+>>>>
+>>>>>
+>>>>> The project is hosted on
+>>>>> bitbucket: https://bitbucket.org/kindlychung/collapsabel/overview
+>>>>> The R manual and an extensive tutorial can be found here:
+>>>>> https://bitbucket.org/kindlychung/collapsabel/downloads
+>>>>
+>>>> Thank you for providing these links.
+>>>>
+>>>>>
+>>>>> If you are willing to review this package, please let me know.
+>>>>
+>>>> I hope someone will step forward to do this. If you don't get a reaction
+>>>> in the coming few weeks, please feel free to send a reminder to the list.
+>>>>
+>>>>
+>>>> Best regards,
+>>>>
+>>>> Lennart Karssen.
+>>>>
+>>>>>
+>>>>>
+>>>>> Best regards,
+>>>>>
+>>>>> Kaiyin ZHONG
+>>>>> ------------------
+>>>>> FMB, Erasmus MC
+>>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>>> k.zhong at erasmusmc.nl <mailto:k.zhong at erasmusmc.nl>
+>>>>> kindlychung at gmail.com <mailto:kindlychung at gmail.com>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>> _______________________________________________
+>>>>> genabel-devel mailing list
+>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>>
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-dev
+>>>>> e
+>>>>> l
+>>>>>
+>>>>
+>>>> -- 
+>>>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>>> L.C. Karssen
+>>>> Utrecht
+>>>> The Netherlands
+>>>>
+>>>> lennart at karssen.org
+>>>> http://blog.karssen.org
+>>>> GPG key ID: A88F554A
+>>>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>>>
+>>>
+>>
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150416/8a2f3e1e/attachment.sig>
+
+From k.zhong at erasmusmc.nl  Thu Apr 16 18:40:40 2015
+From: k.zhong at erasmusmc.nl (K. Zhong)
+Date: Thu, 16 Apr 2015 16:40:40 +0000
+Subject: [GenABEL-dev] Proposing the CollapsABEL R package for inclusion
+In-Reply-To: <552FB49D.2030400@karssen.org>
+References: <D10BA349.17E9%k.zhong@erasmusmc.nl>
+ <54EA473A.8040104@karssen.org> <D110EB4E.1801%k.zhong@erasmusmc.nl>
+ <D151435F.19C8%k.zhong@erasmusmc.nl> <552CDCC1.2020802@karssen.org>
+ <552FB49D.2030400@karssen.org>
+Message-ID: <D155B245.19F4%k.zhong@erasmusmc.nl>
+
+Dear Lennart, 
+
+Concerning the R CMD check notes I reported last time, they are solved by
+some hack found on stack overflow. The latest package passes all checks:
+
+https://bitbucket.org/kindlychung/collapsabel/downloads/CollapsABEL_0.9.2.t
+ar.gz
+
+Best regards,
+Kaiyin ZHONG
+------------------
+FMB, Erasmus MC
+kaiyin.co.vu <http://kaiyin.co.vu>
+k.zhong at erasmusmc.nl
+kindlychung at gmail.com
+
+
+
+
+
+
+
+
+On 16/04/15 15:09, "L.C. Karssen" <lennart at karssen.org> wrote:
+
+>Dear Kaiyin,
+>
+>A quick update on the package review: I'm having some troubles with my R
+>development environment. I hope to resolve them today so that I can
+>continue with my review of your package.
+>
+>
+>Lennart.
+>
+>On 14-04-15 11:24, L.C. Karssen wrote:
+>> Dear Kaiyin,
+>> 
+>> 
+>> On 13-04-15 10:05, K. Zhong wrote:
+>>> Dear all,
+>>>
+>>> I have read through the technical review guidelines
+>> 
+>> Thank you for that. Also thanks for bringing CollapsABEL back to our
+>> attention, unfortunately it fell of my radar.
+>> 
+>>> and I think
+>>> CollapsABEL satisfies all requirements except that `R CMD check` and `R
+>>> CMD check -as-cran` both produces one warning and two notes. The
+>>>warning
+>>> is about my .git folder, which is for version control, and won?t be
+>>> present once a binary package is built, so this is a non-issue.
+>> 
+>> I agree.
+>> 
+>>> The notes
+>>> are about some ?global variable? that are not global at all, and this
+>>>is a
+>>> known bug of `R CMD check` (see http://tinyurl.com/o9p6vxf for an
+>>> example). 
+>> 
+>> Aha. This is more reason for concern. From my own experience the CRAN
+>> staff is quite strickt. Thanks for looking into "prior art". Since the
+>> SE post you refer to is three years old and the GranovaGG package it
+>> relates to is now in CRAN, I agree that we should see if it gets
+>> accepted. However, be prepared to act in case of comments from CRAN.
+>> 
+>>>
+>>> So could anyone please review this package? The submission of our
+>>>paper is
+>>> waiting on this. Thanks!
+>> 
+>> I will review the package today. I will also try to contact other
+>> potential reviewers directly.
+>> 
+>> 
+>> Best regards,
+>> 
+>> Lennart.
+>> 
+>>>
+>>>
+>>> Best regards,
+>>> Kaiyin ZHONG
+>>> ------------------
+>>> FMB, Erasmus MC
+>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>> k.zhong at erasmusmc.nl
+>>> kindlychung at gmail.com
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> On 23/02/15 14:42, "K. Zhong" <k.zhong at erasmusmc.nl> wrote:
+>>>
+>>>> Dear Lennart,
+>>>>
+>>>> At the moment I think it would be nice to keep the function as it is
+>>>>for
+>>>> current users of it and show them a message about the new package.
+>>>>Thank
+>>>> you for bringing this up.
+>>>>
+>>>> Best regards,
+>>>> Kaiyin ZHONG
+>>>> ------------------
+>>>> FMB, Erasmus MC
+>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>> k.zhong at erasmusmc.nl
+>>>> kindlychung at gmail.com
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>>
+>>>> On 22/02/15 22:16, "L.C. Karssen" <lennart at karssen.org> wrote:
+>>>>
+>>>>> Dear Kaiyin,
+>>>>>
+>>>>> Thank you for your willingness to contribute to the GenABEL project.
+>>>>>
+>>>>> On 19-02-15 14:27, K. Zhong wrote:
+>>>>>> Dear all,
+>>>>>>
+>>>>>> I have recently finished an R package for compound heterozygosity
+>>>>>> analysis for microarray/NGS data. This package (named CollapsABEL)
+>>>>>> implements an extended version of the CDH test
+>>>>>>
+>>>>>> 
+>>>>>><http://journals.plos.org/plosone/article?id=10.1371/journal.pone.002
+>>>>>>814
+>>>>>> 5
+>>>>>>> (see
+>>>>>> DOI: 10.1371/journal.pone.0028145) in a flexible, efficient and user
+>>>>>> friendly way  and has already proved useful for our analysis with
+>>>>>> certain dermatology traits.
+>>>>>
+>>>>> That sounds interesting indeed! To me it sounds like a useful
+>>>>>addition
+>>>>> to the GenABEL suite.
+>>>>>
+>>>>>> CDH test has been implemented before as a
+>>>>>> function in the GenABEL package, but due to the simplicity of the
+>>>>>> method
+>>>>>> itself and restriction from the data format it uses, it is
+>>>>>>practically
+>>>>>> not very useful. CollapsABEL overcomes these limitations and
+>>>>>>provides a
+>>>>>> nice streamlined solution in your hands, for which reason I think it
+>>>>>> would be a nice addition to the GenABEL family.
+>>>>>
+>>>>> Do you have a suggestion on what to do with the current CDH test in
+>>>>>the
+>>>>> GenABEL package? Is it worth to spend time maintaining it, or should
+>>>>>we
+>>>>> replace it with a message pointing people to CollapsABEL (of course
+>>>>> assuming CollapsABEL gets accepted into the GenaBEL suite)?
+>>>>>
+>>>>>>
+>>>>>> The project is hosted on
+>>>>>> bitbucket: https://bitbucket.org/kindlychung/collapsabel/overview
+>>>>>> The R manual and an extensive tutorial can be found here:
+>>>>>> https://bitbucket.org/kindlychung/collapsabel/downloads
+>>>>>
+>>>>> Thank you for providing these links.
+>>>>>
+>>>>>>
+>>>>>> If you are willing to review this package, please let me know.
+>>>>>
+>>>>> I hope someone will step forward to do this. If you don't get a
+>>>>>reaction
+>>>>> in the coming few weeks, please feel free to send a reminder to the
+>>>>>list.
+>>>>>
+>>>>>
+>>>>> Best regards,
+>>>>>
+>>>>> Lennart Karssen.
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Best regards,
+>>>>>>
+>>>>>> Kaiyin ZHONG
+>>>>>> ------------------
+>>>>>> FMB, Erasmus MC
+>>>>>> kaiyin.co.vu <http://kaiyin.co.vu>
+>>>>>> k.zhong at erasmusmc.nl <mailto:k.zhong at erasmusmc.nl>
+>>>>>> kindlychung at gmail.com <mailto:kindlychung at gmail.com>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> _______________________________________________
+>>>>>> genabel-devel mailing list
+>>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>>>
+>>>>>> 
+>>>>>>https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-
+>>>>>>dev
+>>>>>> e
+>>>>>> l
+>>>>>>
+>>>>>
+>>>>> -- 
+>>>>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>>>> L.C. Karssen
+>>>>> Utrecht
+>>>>> The Netherlands
+>>>>>
+>>>>> lennart at karssen.org
+>>>>> http://blog.karssen.org
+>>>>> GPG key ID: A88F554A
+>>>>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>>>>
+>>>>
+>>>
+>> 
+>> 
+>> 
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> 
+>>https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-deve
+>>l
+>> 
+>
+>-- 
+>*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>L.C. Karssen
+>Utrecht
+>The Netherlands
+>
+>lennart at karssen.org
+>http://blog.karssen.org
+>GPG key ID: A88F554A
+>-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>
+
+

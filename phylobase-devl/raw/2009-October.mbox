@@ -1,0 +1,1145 @@
+From regetz at nceas.ucsb.edu  Fri Oct  2 00:20:12 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Thu, 01 Oct 2009 15:20:12 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <1254311732.3883.42.camel@francois-laptop>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>	<4AB285CF.7020006@nceas.ucsb.edu>
+	<4ABA6A40.7040203@nceas.ucsb.edu>	<4ABD5321.1060700@nceas.ucsb.edu>
+	<1254311732.3883.42.camel@francois-laptop>
+Message-ID: <4AC52B1C.2090204@nceas.ucsb.edu>
+
+Thanks Fran?ois!
+
+On a related note, did you see my comments in ticket #671 about tdata 
+changes? It's basically a continuation of our discussion in feature 
+request #571. Just curious if you or anyone else had any thoughts before 
+I commit anything.
+
+One additional question: The presence of the .phylo4Data and formatData 
+helpers made the changes to tdata MUCH easier than they would have been, 
+thanks! However, one slight complication is that .phylo4Data currently 
+calls formatData on each of its input data frames, using the same "..." 
+arguments for each one. In the revised tdata method, I pass the new data 
+to .phylo4Data along with a subset of the existing slot data, and I 
+*don't* want formatData to be called with the same arguments on both. 
+I've solved the problem by first calling formatData as needed to make 
+everything consistent, then passing them to .phylo4Data. Works fine, but 
+it results in formatData being called a second time (inside .phylo4Data) 
+on data that I know are already formatted properly.
+
+Anyway, would you mind if I pulled the formatData() calls out of 
+.phylo4Data, and instead leave it up to functions that use .phylo4Data 
+to first call formatData() if needed?
+
+This would mean phylo4d constructor and addData method that call 
+.phylo4Data first have to call formatData on the inputs, like so:
+
+td <- formatData(phy, td, "tip", ...)
+nd <- formatData(phy, nd, "internal", ...)
+ad <- formatData(phy, ad, "all", ...)
+.phylo4Data(phy, td, nd, ad, merge.data)
+
+As indicated above, an additional tweak is that .phylo4Data will only 
+need arguments for the tree, the three data frames, and merge.data. All 
+the other arguments are needed only for formatData.
+
+Let me know if that didn't make any sense...
+
+Thanks,
+Jim
+
+Fran?ois Michonneau wrote:
+>> As part of this process, I did make some user-level changes. Details are 
+>> below for anyone interested. How should we proceed on determining 
+>> whether to apply these changes to trunk? We also have Peter's NA->0 
+>> changes in the queue, and if we adopt both, we'll need to coordinate our 
+>> merges-to-trunk in a sensible way.
+> 
+>   I haven't really had a chance to test the new functionalities but the
+> changes you introduce look great, so I agree for merging your branch
+> into the trunk.
+> 
+>   I also read over the user-visible changes, and I think the choices you
+> made are all sensible. Thanks for fixing the behavior of merge.data
+> (this was on my TODO list).
+> 
+>   I enforced the size of the data frames in checkPhylo4Data mainly
+> because it's what was expected to be returned by the phylo4d
+> constructor. So, if we would have to use this assumption, then it was a
+> test to make sure that the user doesn't modify the slots. However, as
+> the behavior of the constructor has changed, I think it's OK to remove
+> the code you commented out.
+> 
+>> One somewhat superficial question -- I called the new slot 'data'. Any 
+>> strong feelings on whether it should be 'tdata' instead?
+> 
+> I slightly prefer 'data'.
+> 
+>   -- Fran?ois
+> 
+>> Cheers,
+>> Jim
+>>
+>> ------------------------------------------------------------------------
+>>
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+From francois.michonneau at gmail.com  Fri Oct  2 18:01:58 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Fri, 02 Oct 2009 12:01:58 -0400
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AC52B1C.2090204@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>
+	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+	<4AB285CF.7020006@nceas.ucsb.edu> <4ABA6A40.7040203@nceas.ucsb.edu>
+	<4ABD5321.1060700@nceas.ucsb.edu>
+	<1254311732.3883.42.camel@francois-laptop>
+	<4AC52B1C.2090204@nceas.ucsb.edu>
+Message-ID: <1254499318.8920.19.camel@francois-laptop>
+
+
+Hi Jim,
+
+ The changes you propose in ticket #671 sound reasonable to me. We'll
+indeed need some testing but I don't see any particular issues with
+them.
+
+  I designed formatData and .phylo4Data when the slots were separated,
+so if it makes more sense to change the order in which they are called
+with a single slots for 'data' then go ahead! I also really like the
+idea of reducing the redundancy of the arguments between formatData
+and .phylo4Data.
+
+  I'm really swamped and don't have much time to code. I'll be happy to
+run the new version on a couple of projects using phylobase functions
+though.
+
+  Cheers,
+  -- Fran?ois
+
+
+On Thu, 2009-10-01 at 15:20 -0700, Jim Regetz wrote:
+> Thanks Fran?ois!
+> 
+> On a related note, did you see my comments in ticket #671 about tdata 
+> changes? It's basically a continuation of our discussion in feature 
+> request #571. Just curious if you or anyone else had any thoughts before 
+> I commit anything.
+> 
+> One additional question: The presence of the .phylo4Data and formatData 
+> helpers made the changes to tdata MUCH easier than they would have been, 
+> thanks! However, one slight complication is that .phylo4Data currently 
+> calls formatData on each of its input data frames, using the same "..." 
+> arguments for each one. In the revised tdata method, I pass the new data 
+> to .phylo4Data along with a subset of the existing slot data, and I 
+> *don't* want formatData to be called with the same arguments on both. 
+> I've solved the problem by first calling formatData as needed to make 
+> everything consistent, then passing them to .phylo4Data. Works fine, but 
+> it results in formatData being called a second time (inside .phylo4Data) 
+> on data that I know are already formatted properly.
+> 
+> Anyway, would you mind if I pulled the formatData() calls out of 
+> .phylo4Data, and instead leave it up to functions that use .phylo4Data 
+> to first call formatData() if needed?
+> 
+> This would mean phylo4d constructor and addData method that call 
+> .phylo4Data first have to call formatData on the inputs, like so:
+> 
+> td <- formatData(phy, td, "tip", ...)
+> nd <- formatData(phy, nd, "internal", ...)
+> ad <- formatData(phy, ad, "all", ...)
+> .phylo4Data(phy, td, nd, ad, merge.data)
+> 
+> As indicated above, an additional tweak is that .phylo4Data will only 
+> need arguments for the tree, the three data frames, and merge.data. All 
+> the other arguments are needed only for formatData.
+> 
+> Let me know if that didn't make any sense...
+> 
+> Thanks,
+> Jim
+> 
+> Fran?ois Michonneau wrote:
+> >> As part of this process, I did make some user-level changes. Details are 
+> >> below for anyone interested. How should we proceed on determining 
+> >> whether to apply these changes to trunk? We also have Peter's NA->0 
+> >> changes in the queue, and if we adopt both, we'll need to coordinate our 
+> >> merges-to-trunk in a sensible way.
+> > 
+> >   I haven't really had a chance to test the new functionalities but the
+> > changes you introduce look great, so I agree for merging your branch
+> > into the trunk.
+> > 
+> >   I also read over the user-visible changes, and I think the choices you
+> > made are all sensible. Thanks for fixing the behavior of merge.data
+> > (this was on my TODO list).
+> > 
+> >   I enforced the size of the data frames in checkPhylo4Data mainly
+> > because it's what was expected to be returned by the phylo4d
+> > constructor. So, if we would have to use this assumption, then it was a
+> > test to make sure that the user doesn't modify the slots. However, as
+> > the behavior of the constructor has changed, I think it's OK to remove
+> > the code you commented out.
+> > 
+> >> One somewhat superficial question -- I called the new slot 'data'. Any 
+> >> strong feelings on whether it should be 'tdata' instead?
+> > 
+> > I slightly prefer 'data'.
+> > 
+> >   -- Fran?ois
+> > 
+> >> Cheers,
+> >> Jim
+> >>
+> >> ------------------------------------------------------------------------
+> >>
+> >> _______________________________________________
+> >> Phylobase-devl mailing list
+> >> Phylobase-devl at lists.r-forge.r-project.org
+> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091002/cf32148d/attachment.pgp 
+
+From omeara.brian at gmail.com  Tue Oct  6 18:21:33 2009
+From: omeara.brian at gmail.com (Brian O'Meara)
+Date: Tue, 6 Oct 2009 12:21:33 -0400
+Subject: [Phylobase-devl] Fwd: [R-sig-phylo] Tree manipulations (pruning and
+	grafting)
+References: <a06240804c6f119e2ee80@[192.168.0.133]>
+Message-ID: <4B2AF2A4-D3DC-4D16-900D-D8F62B417CDD@gmail.com>
+
+A question that might of interest for phylobase (i.e., should we try  
+to advocate for mesquite<->phylo4 interactions rather than just  
+mesquite<->phylo, will this change the priority of any features in  
+phylobase, etc.).
+
+Brian
+
+Begin forwarded message:
+
+> From: Wayne Maddison <wmaddisn at interchange.ubc.ca>
+> Date: October 6, 2009 12:10:42 PM EDT
+> To: Sam Brown <s_d_j_brown at hotmail.com>
+> Cc: r-sig-phylo at r-project.org
+> Subject: Re: [R-sig-phylo] Tree manipulations (pruning and grafting)
+>
+> This and the previous query about importing a phylogeny into R  
+> raises a question that was embedded in an email several months ago:   
+> How useful would it be for you to be able to call a function like  
+> newphylo <- mesquite.editTree(phylo) that would put a tree from R  
+> into a Mesquite window, you would edit it there, hit a button, and  
+> then the modified tree would be returned as the function result in R?
+>
+> We might be able to offer a test version of that soon, if there is  
+> interest.
+>
+> Wayne
+>
+>
+> At 12:37 PM +1300 6.10.2009, Sam Brown wrote:
+>> Dear all
+>>
+>> To prepare for SH tests between optimised and "expected" trees,  
+>> I've been attempting to do tree manipulations in R. Pruning is easy  
+>> with the dual functions of extract.clade() and drop.tip(), however  
+>> grafting the clade into a different place using bind.tree() is  
+>> proving much more difficult.
+>>
+>> What seems to be happening is that during the tree binding process,  
+>> some tips are becoming nodes and vice versa.
+>>
+>> Any help is much appreciated!
+>>
+>> Thank you!
+>>
+>> Sam
+>>
+>>
+>> Some code:
+>>
+>> library(ape)
+>> data(bird.orders)
+>> phy<-bird.orders
+>>
+>> node<-43                                  #Node with taxa of  
+>> interest (Columbiformes:Passeriformes)
+>> site<-21                                   #Where above group is  
+>> expected to be (In a clade with Struthioniformes:Anseriformes)
+>>
+>> j<-allDesc(node)                        #See function definition  
+>> below
+>> grp<-extract.clade(phy, node)
+>> rest<-drop.tip(phy, j)
+>>
+>> tr<-bind.tree(rest, grp, where=site)
+>>
+>> plot(tr)                                    #Should get an error:  
+>> "Error in plot.phylo(tr) : NA/NaN/Inf in foreign function call (arg  
+>> 6)"
+>>
+>> write.tree(tr)                             #Can see Upupiformes as  
+>> sister to NODE11, among others.
+>>
+>>
+>>
+>> where:
+>>
+>> allDesc<-function(node){
+>>    N<-length(phy$tip.label)
+>>
+>>    index<-which(phy$edge[,1]==node)
+>>    desc<-phy$edge[index,2]
+>>
+>>    taxa<-desc[desc<=N]
+>>
+>>    desc<-desc[desc>N]
+>>
+>>    while(length(desc)>=1){
+>>        ind<-NULL
+>>        for(i in 1:length(desc)){
+>>            ind<-c(ind,which(phy$edge[,1]==desc[i]))
+>>        }
+>>        desc<-phy$edge[ind,2]
+>>        taxa<-c(taxa,desc[desc<=N])
+>>        desc<-desc[desc>N]
+>>    }
+>>    taxa
+>> }
+>> 			  		  
+>> _________________________________________________________________
+>>
+>> Facebook.
+>>
+>> k-basics.aspx?ocid=PID23461::T:WLMTAGL:ON:WL:en-nz:SI_SB_2:092010
+>> 	[[alternative HTML version deleted]]
+>>
+>> _______________________________________________
+>> R-sig-phylo mailing list
+>> R-sig-phylo at r-project.org
+>> https://stat.ethz.ch/mailman/listinfo/r-sig-phylo
+>
+>
+> -- 
+> --------------------------------------------------------
+> Wayne Maddison
+> Professor and Canada Research Chair
+>         Depts. of Zoology and Botany and
+>         Biodiversity Research Centre
+> & Director
+>         Beaty Biodiversity Museum
+> 6270 University Boulevard
+> University of British Columbia
+> Vancouver, BC  V6T 1Z4   Canada
+>
+> email: wmaddisn at interchange.ubc.ca   FAX: +1 604 822-2416
+>
+> Mesquite: http://mesquiteproject.org
+> MacClade: http://macclade.org
+> Salticidae:  http://salticidae.org
+> Tree of Life: http://tolweb.org
+> Beaty Biodiversity Museum: http://beatymuseum.ubc.ca
+> Home page: http://salticidae.org/wpm/home.html
+>
+> _______________________________________________
+> R-sig-phylo mailing list
+> R-sig-phylo at r-project.org
+> https://stat.ethz.ch/mailman/listinfo/r-sig-phylo
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091006/f92d102f/attachment.htm 
+
+From hlapp at duke.edu  Tue Oct  6 18:32:16 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Tue, 6 Oct 2009 12:32:16 -0400
+Subject: [Phylobase-devl] Fwd: [R-sig-phylo] Tree manipulations (pruning
+	and grafting)
+In-Reply-To: <4B2AF2A4-D3DC-4D16-900D-D8F62B417CDD@gmail.com>
+References: <a06240804c6f119e2ee80@[192.168.0.133]>
+	<4B2AF2A4-D3DC-4D16-900D-D8F62B417CDD@gmail.com>
+Message-ID: <A4DB3AD0-62EC-470B-99E7-DE3C2EEC12D2@duke.edu>
+
+I've actually been waiting for the phylo4 API to stabilize so that I  
+can add conversion to Rmesquite. Rmesquite does already convert from  
+Mesquite to phylo.
+
+	-hilmar
+
+On Oct 6, 2009, at 12:21 PM, Brian O'Meara wrote:
+
+> A question that might of interest for phylobase (i.e., should we try  
+> to advocate for mesquite<->phylo4 interactions rather than just  
+> mesquite<->phylo, will this change the priority of any features in  
+> phylobase, etc.).
+>
+> Brian
+>
+> Begin forwarded message:
+>
+>> From: Wayne Maddison <wmaddisn at interchange.ubc.ca>
+>> Date: October 6, 2009 12:10:42 PM EDT
+>> To: Sam Brown <s_d_j_brown at hotmail.com>
+>> Cc: r-sig-phylo at r-project.org
+>> Subject: Re: [R-sig-phylo] Tree manipulations (pruning and grafting)
+>>
+>> This and the previous query about importing a phylogeny into R  
+>> raises a question that was embedded in an email several months  
+>> ago:  How useful would it be for you to be able to call a function  
+>> like newphylo <- mesquite.editTree(phylo) that would put a tree  
+>> from R into a Mesquite window, you would edit it there, hit a  
+>> button, and then the modified tree would be returned as the  
+>> function result in R?
+>>
+>> We might be able to offer a test version of that soon, if there is  
+>> interest.
+>>
+>> Wayne
+>>
+>>
+>> At 12:37 PM +1300 6.10.2009, Sam Brown wrote:
+>>> Dear all
+>>>
+>>> To prepare for SH tests between optimised and "expected" trees,  
+>>> I've been attempting to do tree manipulations in R. Pruning is  
+>>> easy with the dual functions of extract.clade() and drop.tip(),  
+>>> however grafting the clade into a different place using  
+>>> bind.tree() is proving much more difficult.
+>>>
+>>> What seems to be happening is that during the tree binding  
+>>> process, some tips are becoming nodes and vice versa.
+>>>
+>>> Any help is much appreciated!
+>>>
+>>> Thank you!
+>>>
+>>> Sam
+>>>
+>>>
+>>> Some code:
+>>>
+>>> library(ape)
+>>> data(bird.orders)
+>>> phy<-bird.orders
+>>>
+>>> node<-43                                  #Node with taxa of  
+>>> interest (Columbiformes:Passeriformes)
+>>> site<-21                                   #Where above group is  
+>>> expected to be (In a clade with Struthioniformes:Anseriformes)
+>>>
+>>> j<-allDesc(node)                        #See function definition  
+>>> below
+>>> grp<-extract.clade(phy, node)
+>>> rest<-drop.tip(phy, j)
+>>>
+>>> tr<-bind.tree(rest, grp, where=site)
+>>>
+>>> plot(tr)                                    #Should get an error:  
+>>> "Error in plot.phylo(tr) : NA/NaN/Inf in foreign function call  
+>>> (arg 6)"
+>>>
+>>> write.tree(tr)                             #Can see Upupiformes as  
+>>> sister to NODE11, among others.
+>>>
+>>>
+>>>
+>>> where:
+>>>
+>>> allDesc<-function(node){
+>>>    N<-length(phy$tip.label)
+>>>
+>>>    index<-which(phy$edge[,1]==node)
+>>>    desc<-phy$edge[index,2]
+>>>
+>>>    taxa<-desc[desc<=N]
+>>>
+>>>    desc<-desc[desc>N]
+>>>
+>>>    while(length(desc)>=1){
+>>>        ind<-NULL
+>>>        for(i in 1:length(desc)){
+>>>            ind<-c(ind,which(phy$edge[,1]==desc[i]))
+>>>        }
+>>>        desc<-phy$edge[ind,2]
+>>>        taxa<-c(taxa,desc[desc<=N])
+>>>        desc<-desc[desc>N]
+>>>    }
+>>>    taxa
+>>> }
+>>> 			  		  
+>>> _________________________________________________________________
+>>>
+>>> Facebook.
+>>>
+>>> k-basics.aspx?ocid=PID23461::T:WLMTAGL:ON:WL:en-nz:SI_SB_2:092010
+>>> 	[[alternative HTML version deleted]]
+>>>
+>>> _______________________________________________
+>>> R-sig-phylo mailing list
+>>> R-sig-phylo at r-project.org
+>>> https://stat.ethz.ch/mailman/listinfo/r-sig-phylo
+>>
+>>
+>> -- 
+>> --------------------------------------------------------
+>> Wayne Maddison
+>> Professor and Canada Research Chair
+>>         Depts. of Zoology and Botany and
+>>         Biodiversity Research Centre
+>> & Director
+>>         Beaty Biodiversity Museum
+>> 6270 University Boulevard
+>> University of British Columbia
+>> Vancouver, BC  V6T 1Z4   Canada
+>>
+>> email: wmaddisn at interchange.ubc.ca   FAX: +1 604 822-2416
+>>
+>> Mesquite: http://mesquiteproject.org
+>> MacClade: http://macclade.org
+>> Salticidae:  http://salticidae.org
+>> Tree of Life: http://tolweb.org
+>> Beaty Biodiversity Museum: http://beatymuseum.ubc.ca
+>> Home page: http://salticidae.org/wpm/home.html
+>>
+>> _______________________________________________
+>> R-sig-phylo mailing list
+>> R-sig-phylo at r-project.org
+>> https://stat.ethz.ch/mailman/listinfo/r-sig-phylo
+>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091006/2e57a4ae/attachment-0001.htm 
+
+From pdc at berkeley.edu  Mon Oct 26 23:59:29 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Mon, 26 Oct 2009 15:59:29 -0700
+Subject: [Phylobase-devl] CRAN release
+Message-ID: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+
+I suggest we do a beta release of phylobase to CRAN.  We seem to have  
+tackled most of the architectural issues and bugs that we wanted to.   
+This and a lack of time has caused development to be notably slower  
+over the last month.
+
+To the best of my knowledge all planned but unimplmented code, falls  
+into the category of enhancements that would not break code produced  
+w/ the current version.
+
+I think there would be great value in getting the package out to a  
+wider audience (just this week I was asked how to do things in ape  
+that are trivial w/ phylobase).  More eyes will make bugs and gaps in  
+the documentation more obvious.  Furthermore, package developers will  
+shy away from phylobase until it is available to them on CRAN.
+
+R-core has also just released 2.10.0 (which should make some mac  
+issues a bit better.)
+
+Any objections?
+
+Peter
+
+From regetz at nceas.ucsb.edu  Tue Oct 27 01:42:27 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Mon, 26 Oct 2009 17:42:27 -0700
+Subject: [Phylobase-devl] CRAN release
+In-Reply-To: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+References: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+Message-ID: <4AE641F3.4070904@nceas.ucsb.edu>
+
+Releasing sounds like a great idea to me! I absolute agree about having 
+more eyes to uncover issues and such. Also, expanding the pool of folks 
+who use and build on phylobase should be a positive force for setting 
+development priorities.
+
+FYI, earlier today we discovered a problem with src/*.c files not being 
+compiled during the Windows build process. I believe it was caused by an 
+overly aggressive Makefile.win (created specifically for the ncl code), 
+and have my fingers crossed that the switch to a Makevars.win will do 
+the trick. It now builds properly for me on an XP VM with the Windows 
+toolset, and I'll check to see how it fares during the next R-forge 
+build/check cycle.
+
+Jim
+
+Peter Cowan wrote:
+> I suggest we do a beta release of phylobase to CRAN.  We seem to have  
+> tackled most of the architectural issues and bugs that we wanted to.   
+> This and a lack of time has caused development to be notably slower  
+> over the last month.
+> 
+> To the best of my knowledge all planned but unimplmented code, falls  
+> into the category of enhancements that would not break code produced  
+> w/ the current version.
+> 
+> I think there would be great value in getting the package out to a  
+> wider audience (just this week I was asked how to do things in ape  
+> that are trivial w/ phylobase).  More eyes will make bugs and gaps in  
+> the documentation more obvious.  Furthermore, package developers will  
+> shy away from phylobase until it is available to them on CRAN.
+> 
+> R-core has also just released 2.10.0 (which should make some mac  
+> issues a bit better.)
+> 
+> Any objections?
+> 
+> Peter
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+From bolker at ufl.edu  Tue Oct 27 15:40:18 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Tue, 27 Oct 2009 10:40:18 -0400
+Subject: [Phylobase-devl] CRAN release
+In-Reply-To: <4AE641F3.4070904@nceas.ucsb.edu>
+References: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+	<4AE641F3.4070904@nceas.ucsb.edu>
+Message-ID: <4AE70652.7090404@ufl.edu>
+
+  sounds good to me.
+  Thanks to Jim, Peter, and Fran?ois for doing all the heavy lifting
+during this phase ...
+
+  cheers
+   Ben
+
+Jim Regetz wrote:
+> Releasing sounds like a great idea to me! I absolute agree about having 
+> more eyes to uncover issues and such. Also, expanding the pool of folks 
+> who use and build on phylobase should be a positive force for setting 
+> development priorities.
+> 
+> FYI, earlier today we discovered a problem with src/*.c files not being 
+> compiled during the Windows build process. I believe it was caused by an 
+> overly aggressive Makefile.win (created specifically for the ncl code), 
+> and have my fingers crossed that the switch to a Makevars.win will do 
+> the trick. It now builds properly for me on an XP VM with the Windows 
+> toolset, and I'll check to see how it fares during the next R-forge 
+> build/check cycle.
+> 
+> Jim
+> 
+> Peter Cowan wrote:
+>> I suggest we do a beta release of phylobase to CRAN.  We seem to have  
+>> tackled most of the architectural issues and bugs that we wanted to.   
+>> This and a lack of time has caused development to be notably slower  
+>> over the last month.
+>>
+>> To the best of my knowledge all planned but unimplmented code, falls  
+>> into the category of enhancements that would not break code produced  
+>> w/ the current version.
+>>
+>> I think there would be great value in getting the package out to a  
+>> wider audience (just this week I was asked how to do things in ape  
+>> that are trivial w/ phylobase).  More eyes will make bugs and gaps in  
+>> the documentation more obvious.  Furthermore, package developers will  
+>> shy away from phylobase until it is available to them on CRAN.
+>>
+>> R-core has also just released 2.10.0 (which should make some mac  
+>> issues a bit better.)
+>>
+>> Any objections?
+>>
+>> Peter
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091027/989039a9/attachment.pgp 
+
+From francois.michonneau at gmail.com  Tue Oct 27 16:25:23 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Tue, 27 Oct 2009 11:25:23 -0400
+Subject: [Phylobase-devl] CRAN release
+In-Reply-To: <4AE70652.7090404@ufl.edu>
+References: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+	<4AE641F3.4070904@nceas.ucsb.edu>  <4AE70652.7090404@ufl.edu>
+Message-ID: <1256657123.6953.19.camel@francois-laptop>
+
+
+  I agree, I think we can do a beta release. I had started to go through
+the documentation some time ago, but it might be worthwhile to read over
+it again to make sure that there isn't anything left that is totally out
+of date.
+
+  Cheers,
+  -- Fran?ois 
+
+On Tue, 2009-10-27 at 10:40 -0400, Ben Bolker wrote:
+> sounds good to me.
+>   Thanks to Jim, Peter, and Fran?ois for doing all the heavy lifting
+> during this phase ...
+> 
+>   cheers
+>    Ben
+> 
+> Jim Regetz wrote:
+> > Releasing sounds like a great idea to me! I absolute agree about having 
+> > more eyes to uncover issues and such. Also, expanding the pool of folks 
+> > who use and build on phylobase should be a positive force for setting 
+> > development priorities.
+> > 
+> > FYI, earlier today we discovered a problem with src/*.c files not being 
+> > compiled during the Windows build process. I believe it was caused by an 
+> > overly aggressive Makefile.win (created specifically for the ncl code), 
+> > and have my fingers crossed that the switch to a Makevars.win will do 
+> > the trick. It now builds properly for me on an XP VM with the Windows 
+> > toolset, and I'll check to see how it fares during the next R-forge 
+> > build/check cycle.
+> > 
+> > Jim
+> > 
+> > Peter Cowan wrote:
+> >> I suggest we do a beta release of phylobase to CRAN.  We seem to have  
+> >> tackled most of the architectural issues and bugs that we wanted to.   
+> >> This and a lack of time has caused development to be notably slower  
+> >> over the last month.
+> >>
+> >> To the best of my knowledge all planned but unimplmented code, falls  
+> >> into the category of enhancements that would not break code produced  
+> >> w/ the current version.
+> >>
+> >> I think there would be great value in getting the package out to a  
+> >> wider audience (just this week I was asked how to do things in ape  
+> >> that are trivial w/ phylobase).  More eyes will make bugs and gaps in  
+> >> the documentation more obvious.  Furthermore, package developers will  
+> >> shy away from phylobase until it is available to them on CRAN.
+> >>
+> >> R-core has also just released 2.10.0 (which should make some mac  
+> >> issues a bit better.)
+> >>
+> >> Any objections?
+> >>
+> >> Peter
+> >> _______________________________________________
+> >> Phylobase-devl mailing list
+> >> Phylobase-devl at lists.r-forge.r-project.org
+> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> > _______________________________________________
+> > Phylobase-devl mailing list
+> > Phylobase-devl at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091027/519eaab7/attachment.pgp 
+
+From steve.kembel at gmail.com  Tue Oct 27 17:14:01 2009
+From: steve.kembel at gmail.com (Steven Kembel)
+Date: Tue, 27 Oct 2009 09:14:01 -0700
+Subject: [Phylobase-devl] CRAN release
+In-Reply-To: <4AE70652.7090404@ufl.edu>
+References: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+	<4AE641F3.4070904@nceas.ucsb.edu> <4AE70652.7090404@ufl.edu>
+Message-ID: <7483BE9E-CE07-44A6-B148-D6AA7859F9BA@gmail.com>
+
+Sounds good to me as well. Thanks to everyone who did the work to get  
+the package into great shape.
+Cheers,
+Steve
+On Oct 27, 2009, at 7:40 AM, Ben Bolker wrote:
+
+>  sounds good to me.
+>  Thanks to Jim, Peter, and Fran?ois for doing all the heavy lifting
+> during this phase ...
+>
+>  cheers
+>   Ben
+>
+> Jim Regetz wrote:
+>> Releasing sounds like a great idea to me! I absolute agree about  
+>> having
+>> more eyes to uncover issues and such. Also, expanding the pool of  
+>> folks
+>> who use and build on phylobase should be a positive force for setting
+>> development priorities.
+>>
+>> FYI, earlier today we discovered a problem with src/*.c files not  
+>> being
+>> compiled during the Windows build process. I believe it was caused  
+>> by an
+>> overly aggressive Makefile.win (created specifically for the ncl  
+>> code),
+>> and have my fingers crossed that the switch to a Makevars.win will do
+>> the trick. It now builds properly for me on an XP VM with the Windows
+>> toolset, and I'll check to see how it fares during the next R-forge
+>> build/check cycle.
+>>
+>> Jim
+>>
+>> Peter Cowan wrote:
+>>> I suggest we do a beta release of phylobase to CRAN.  We seem to  
+>>> have
+>>> tackled most of the architectural issues and bugs that we wanted to.
+>>> This and a lack of time has caused development to be notably slower
+>>> over the last month.
+>>>
+>>> To the best of my knowledge all planned but unimplmented code, falls
+>>> into the category of enhancements that would not break code produced
+>>> w/ the current version.
+>>>
+>>> I think there would be great value in getting the package out to a
+>>> wider audience (just this week I was asked how to do things in ape
+>>> that are trivial w/ phylobase).  More eyes will make bugs and gaps  
+>>> in
+>>> the documentation more obvious.  Furthermore, package developers  
+>>> will
+>>> shy away from phylobase until it is available to them on CRAN.
+>>>
+>>> R-core has also just released 2.10.0 (which should make some mac
+>>> issues a bit better.)
+>>>
+>>> Any objections?
+>>>
+>>> Peter
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>
+>
+> -- 
+> Ben Bolker
+> Associate professor, Biology Dep't, Univ. of Florida
+> bolker at ufl.edu / www.zoology.ufl.edu/bolker
+> GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From pdc at berkeley.edu  Tue Oct 27 21:07:59 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Tue, 27 Oct 2009 13:07:59 -0700
+Subject: [Phylobase-devl] CRAN release
+In-Reply-To: <1256657123.6953.19.camel@francois-laptop>
+References: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+	<4AE641F3.4070904@nceas.ucsb.edu> <4AE70652.7090404@ufl.edu>
+	<1256657123.6953.19.camel@francois-laptop>
+Message-ID: <95A73D69-7F5B-46A0-991C-AF84B6D536C0@berkeley.edu>
+
+
+On Oct 27, 2009, at 8:25 AM, Fran?ois Michonneau wrote:
+
+>
+>  I agree, I think we can do a beta release. I had started to go  
+> through
+> the documentation some time ago, but it might be worthwhile to read  
+> over
+> it again to make sure that there isn't anything left that is totally  
+> out
+> of date.
+
+I agree that the docs are in need of attention.  I fear that if we  
+wait for them to meet our standards it will delay the package greatly,  
+especially given everyones time constraints.
+
+How about a code freeze, with Friday as the release date. That gives  
+us the rest of the week to burnish the docs and test for show-stopping  
+bugs.  In the meantime, I'll try to come up with a NEWS file.
+
+Peter
+
+>
+>  Cheers,
+>  -- Fran?ois
+>
+> On Tue, 2009-10-27 at 10:40 -0400, Ben Bolker wrote:
+>> sounds good to me.
+>>  Thanks to Jim, Peter, and Fran?ois for doing all the heavy lifting
+>> during this phase ...
+>>
+>>  cheers
+>>   Ben
+>>
+>> Jim Regetz wrote:
+>>> Releasing sounds like a great idea to me! I absolute agree about  
+>>> having
+>>> more eyes to uncover issues and such. Also, expanding the pool of  
+>>> folks
+>>> who use and build on phylobase should be a positive force for  
+>>> setting
+>>> development priorities.
+>>>
+>>> FYI, earlier today we discovered a problem with src/*.c files not  
+>>> being
+>>> compiled during the Windows build process. I believe it was caused  
+>>> by an
+>>> overly aggressive Makefile.win (created specifically for the ncl  
+>>> code),
+>>> and have my fingers crossed that the switch to a Makevars.win will  
+>>> do
+>>> the trick. It now builds properly for me on an XP VM with the  
+>>> Windows
+>>> toolset, and I'll check to see how it fares during the next R-forge
+>>> build/check cycle.
+>>>
+>>> Jim
+>>>
+>>> Peter Cowan wrote:
+>>>> I suggest we do a beta release of phylobase to CRAN.  We seem to  
+>>>> have
+>>>> tackled most of the architectural issues and bugs that we wanted  
+>>>> to.
+>>>> This and a lack of time has caused development to be notably slower
+>>>> over the last month.
+>>>>
+>>>> To the best of my knowledge all planned but unimplmented code,  
+>>>> falls
+>>>> into the category of enhancements that would not break code  
+>>>> produced
+>>>> w/ the current version.
+>>>>
+>>>> I think there would be great value in getting the package out to a
+>>>> wider audience (just this week I was asked how to do things in ape
+>>>> that are trivial w/ phylobase).  More eyes will make bugs and  
+>>>> gaps in
+>>>> the documentation more obvious.  Furthermore, package developers  
+>>>> will
+>>>> shy away from phylobase until it is available to them on CRAN.
+>>>>
+>>>> R-core has also just released 2.10.0 (which should make some mac
+>>>> issues a bit better.)
+>>>>
+>>>> Any objections?
+>>>>
+>>>> Peter
+>>>> _______________________________________________
+>>>> Phylobase-devl mailing list
+>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>
+>>
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From hlapp at duke.edu  Wed Oct 28 00:01:21 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Tue, 27 Oct 2009 19:01:21 -0400
+Subject: [Phylobase-devl] CRAN release
+In-Reply-To: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+References: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+Message-ID: <92E1A88F-E51F-4E7B-8137-FC153D0EE77D@duke.edu>
+
+
+On Oct 26, 2009, at 6:59 PM, Peter Cowan wrote:
+
+> I think there would be great value in getting the package out to a
+> wider audience (just this week I was asked how to do things in ape
+> that are trivial w/ phylobase).  More eyes will make bugs and gaps in
+> the documentation more obvious.  Furthermore, package developers will
+> shy away from phylobase until it is available to them on CRAN.
+
+
+I would fully agree. I'm kind of waiting for that (in reality it's an  
+excuse of course) for Rmesquite.
+
+	-hilmar
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+
+From t.jombart at imperial.ac.uk  Wed Oct 28 09:52:19 2009
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Wed, 28 Oct 2009 08:52:19 +0000
+Subject: [Phylobase-devl] CRAN release
+In-Reply-To: <95A73D69-7F5B-46A0-991C-AF84B6D536C0@berkeley.edu>
+References: <227AD61B-5F9C-408B-9FEA-90069CF186F1@berkeley.edu>
+	<4AE641F3.4070904@nceas.ucsb.edu> <4AE70652.7090404@ufl.edu>
+	<1256657123.6953.19.camel@francois-laptop>,
+	<95A73D69-7F5B-46A0-991C-AF84B6D536C0@berkeley.edu>
+Message-ID: <0B75A6276180B546A1CA8D2B46E75805031DBEB222@ICEXM3.ic.ac.uk>
+
+Hi all, 
+
+Friday as a release date sounds great. Congratulations to those who invested huge amounts of time in the recent developments/fixes of the package.
+
+Best, 
+
+Thibaut. 
+________________________________________
+From: phylobase-devl-bounces at lists.r-forge.r-project.org [phylobase-devl-bounces at lists.r-forge.r-project.org] On Behalf Of Peter Cowan [pdc at berkeley.edu]
+Sent: 27 October 2009 20:07
+To: Fran?ois Michonneau; Phylobase Devs
+Subject: Re: [Phylobase-devl] CRAN release
+
+On Oct 27, 2009, at 8:25 AM, Fran?ois Michonneau wrote:
+
+>
+>  I agree, I think we can do a beta release. I had started to go
+> through
+> the documentation some time ago, but it might be worthwhile to read
+> over
+> it again to make sure that there isn't anything left that is totally
+> out
+> of date.
+
+I agree that the docs are in need of attention.  I fear that if we
+wait for them to meet our standards it will delay the package greatly,
+especially given everyones time constraints.
+
+How about a code freeze, with Friday as the release date. That gives
+us the rest of the week to burnish the docs and test for show-stopping
+bugs.  In the meantime, I'll try to come up with a NEWS file.
+
+Peter
+
+>
+>  Cheers,
+>  -- Fran?ois
+>
+> On Tue, 2009-10-27 at 10:40 -0400, Ben Bolker wrote:
+>> sounds good to me.
+>>  Thanks to Jim, Peter, and Fran?ois for doing all the heavy lifting
+>> during this phase ...
+>>
+>>  cheers
+>>   Ben
+>>
+>> Jim Regetz wrote:
+>>> Releasing sounds like a great idea to me! I absolute agree about
+>>> having
+>>> more eyes to uncover issues and such. Also, expanding the pool of
+>>> folks
+>>> who use and build on phylobase should be a positive force for
+>>> setting
+>>> development priorities.
+>>>
+>>> FYI, earlier today we discovered a problem with src/*.c files not
+>>> being
+>>> compiled during the Windows build process. I believe it was caused
+>>> by an
+>>> overly aggressive Makefile.win (created specifically for the ncl
+>>> code),
+>>> and have my fingers crossed that the switch to a Makevars.win will
+>>> do
+>>> the trick. It now builds properly for me on an XP VM with the
+>>> Windows
+>>> toolset, and I'll check to see how it fares during the next R-forge
+>>> build/check cycle.
+>>>
+>>> Jim
+>>>
+>>> Peter Cowan wrote:
+>>>> I suggest we do a beta release of phylobase to CRAN.  We seem to
+>>>> have
+>>>> tackled most of the architectural issues and bugs that we wanted
+>>>> to.
+>>>> This and a lack of time has caused development to be notably slower
+>>>> over the last month.
+>>>>
+>>>> To the best of my knowledge all planned but unimplmented code,
+>>>> falls
+>>>> into the category of enhancements that would not break code
+>>>> produced
+>>>> w/ the current version.
+>>>>
+>>>> I think there would be great value in getting the package out to a
+>>>> wider audience (just this week I was asked how to do things in ape
+>>>> that are trivial w/ phylobase).  More eyes will make bugs and
+>>>> gaps in
+>>>> the documentation more obvious.  Furthermore, package developers
+>>>> will
+>>>> shy away from phylobase until it is available to them on CRAN.
+>>>>
+>>>> R-core has also just released 2.10.0 (which should make some mac
+>>>> issues a bit better.)
+>>>>
+>>>> Any objections?
+>>>>
+>>>> Peter
+>>>> _______________________________________________
+>>>> Phylobase-devl mailing list
+>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>
+>>
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+_______________________________________________
+Phylobase-devl mailing list
+Phylobase-devl at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+

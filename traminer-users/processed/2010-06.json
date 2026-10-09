@@ -1,0 +1,411 @@
+{
+  "list": "traminer-users",
+  "description": "",
+  "month": "2010-06",
+  "messages": [
+    {
+      "id": "msg-930066b9b67c",
+      "message_id": "<4C04C75E.1030800@unige.ch>",
+      "from_name": "Matthias Studer",
+      "from_email_hash": "54d4164a8ffb9683cb367813dca90351ea4f3390e7bcdd2cc0c953bb6189fef6",
+      "date": "2010-06-01T08:39:58Z",
+      "subject": "[Traminer-users] suggestion on storing large dissimilarity matrix?",
+      "subject_clean": "[Traminer-users] suggestion on storing large dissimilarity matrix?",
+      "in_reply_to": "<E811A8741221CE489F966ACBD8717CCE16192BAC5F@SCSU81.campus.stcloudstate.edu>",
+      "references": [
+        "<E811A8741221CE489F966ACBD8717CCE16192BAC5F@SCSU81.campus.stcloudstate.edu>"
+      ],
+      "body_plain": "Dear Juan Zuluaga,\n\nThis is indeed a common question and there is no simple answer. The \nfirst thing to do is to try to set the \"full.matrix\" argument to FALSE. \nIn the latter case, seqdist return a \"dist\" object (see help on dist). \nThat is, it only stores the lower triangle of the matrix (since the \ndistances are symmetric the whole matrix is redundant).\n\nwide.om<- seqdist(wide.seq,method=\"OM\",indel=2,sm=couts,with.missing=TRUE, full.matrix=FALSE)\n\n\nAll algorithms from the cluster package accept \"dist\" object as input. \nIf you have a great number of sequences, \"pam\" should be much more \nefficient than \"agnes\".\n\nHowever, I bet that the latter solution will not be sufficient depending \non your computer. You may need to find an access to a computer with more \nmemory, running on windows 64 bit or Linux (see the R FAQ on this \ntopic). To give you an idea, I have run an analysis on 18'000 sequences \non a Linux computer with 8GB of memory.\n\nFinally, there is another solution. You may consider using a random \nsample of your sequences and then assign each sequence to the closest \nmedoids of each cluster. I would suggest you to use PAM in this case, \nsince this is more or less what PAM does anyway.\n\nFor instance, using the biofam data set and sampling 573 sequences\n\nlibrary(TraMineR)\n\ndata(biofam)\nbiofam.lab<- c(\"Parent\", \"Left\", \"Married\", \"Left+Marr\",\n\"Child\", \"Left+Child\", \"Left+Marr+Child\", \"Divorced\")\nbiofam.seq<- seqdef(biofam, 10:25, labels=biofam.lab)\n\nmysample<- sample(nrow(biofam), 573)\n\n## Select the sequences\n\nsampledseq<- biofam.seq[mysample,]\n\n## Compute distance on the sample using constant costs\n\nbiofam.om<- seqdist(sampledseq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, full.matrix=FALSE)\n\n## PAM clustering\n\nlibrary(cluster)\nmyclustering<- pam(biofam.om, diss=T, k=2)\n\n## Recover medoids\n\nmedoids<- disscenter(biofam.om, medoids.index=\"first\", group=myclustering$clustering)\n\n## Compute distance to each medoids using refseq\n\ndist.medoid1<- seqdist(biofam.seq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, refseq=sampledseq[medoids[1], ])\n\ndist.medoid2<- seqdist(biofam.seq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, refseq=sampledseq[medoids[2], ])\n\n## Storing the new cluster solution\n\nnewcluster<- numeric(nrow(biofam.seq))\nfor(i in 1:nrow(biofam.seq)){\n\tnewcluster[i]<- which.min(c(dist.medoid1[i],dist.medoid2[i]))\n}\n\nYou may want to repeat the whole procedure several times to be sure that \nthe solution is stable enough. You may also compute the medoids of the \nnew cluster (with all the cases) and compare them to the solutions with \nonly the samples.\n\nbiofam.om.cl1 <- seqdist(biofam.seq[newcluster==1,] \n,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE)\n\nmedoid1<- disscenter(biofam.om.cl1, medoids.index=\"first\")\nprint(biofam.seq[newcluster==1,][medoid1,])\n\n\nIf you have further questions or if some things remain unclear, please \nfeel free to ask.\n\nAll the best!\n\nMatthias Studer\n\nLe 01.06.2010 02:15, Zuluaga, Juan [zuju0701 at stcloudstate.edu] a ?crit :\n> Hello TraMineR people,\n> great package, awesome effort.\n>\n> I realize that this is not really a TraMineR question, but I bet it will be a common question of interest for many TraMineR users.\n>\n> What would you suggest to be able to store large matrices?\n>\n>    \n>> wide.om<- seqdist(wide.seq,method=\"OM\",indel=2,sm=couts,with.missing=TRUE)\n>>      \n>   [>] 14625 sequences with 21 distinct events/states\n>   [>] including missing value as additional state\n>   [>] 4316 distinct sequences\n>   [>] min/max sequence length: 1/22\n>   [>] computing distances using OM metric\n> Error: cannot allocate vector of size 815.9 Mb\n>\n> I tried\n> wide.om<- big.matrix(seqdist ...))\n> from package bigmemory, but still produces the same result.\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users\n>",
+      "body_snippet": "Dear Juan Zuluaga,\n\nThis is indeed a common question and there is no simple answer. The \nfirst thing to do is to try to set the \"full.matrix\" argument to FALSE. \nIn the latter case, seqdist return a \"",
+      "thread_id": "thread-930066b9b67c",
+      "thread_depth": 0,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-5e7e0b6a07ec",
+      "message_id": "<E811A8741221CE489F966ACBD8717CCE161CDE624A@SCSU81.campus.stcloudstate.edu>",
+      "from_name": "Zuluaga, Juan [zuju0701@stcloudstate.edu]",
+      "from_email_hash": "8cbd630c608a6bf924b5d17f0ef30afc60b8bfbf05a9a4f0e07d6dabed5e2e88",
+      "date": "2010-06-01T15:31:56Z",
+      "subject": "[Traminer-users] suggestion on storing large dissimilarity\tmatrix?",
+      "subject_clean": "[Traminer-users] suggestion on storing large dissimilarity\tmatrix?",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Mr. Studer, thanks a million for your very useful answer. \n\nI should read more about the exploration of clusters via medoids, since it seems useful in general.  \n\nAs you said, a more powerful machine (a Mac with 4Gb, running R64) calculated the OM distance matrix -- in 14 seconds. Amazing. \n\nThe full.matrix=FALSE option, for some reason, did not work -- it complained about not being able to allocate 815.9 Mb of memory, same as before, as if the  large matrix still had to exist somewhere before becoming a half-sized dist object.  \n\nMerci beaucoup, and keep up the good work. \n\n-j\n\n\n________________________________________\nFrom: traminer-users-bounces at lists.r-forge.r-project.org [traminer-users-bounces at lists.r-forge.r-project.org] On Behalf Of Matthias Studer [Matthias.Studer at unige.ch]\nSent: Tuesday, June 01, 2010 3:39 AM\nTo: traminer-users at lists.r-forge.r-project.org\nSubject: Re: [Traminer-users] suggestion on storing large dissimilarity matrix?\n\nDear Juan Zuluaga,\n\nThis is indeed a common question and there is no simple answer. The\nfirst thing to do is to try to set the \"full.matrix\" argument to FALSE.\nIn the latter case, seqdist return a \"dist\" object (see help on dist).\nThat is, it only stores the lower triangle of the matrix (since the\ndistances are symmetric the whole matrix is redundant).\n\nwide.om<- seqdist(wide.seq,method=\"OM\",indel=2,sm=couts,with.missing=TRUE, full.matrix=FALSE)\n\n\nAll algorithms from the cluster package accept \"dist\" object as input.\nIf you have a great number of sequences, \"pam\" should be much more\nefficient than \"agnes\".\n\nHowever, I bet that the latter solution will not be sufficient depending\non your computer. You may need to find an access to a computer with more\nmemory, running on windows 64 bit or Linux (see the R FAQ on this\ntopic). To give you an idea, I have run an analysis on 18'000 sequences\non a Linux computer with 8GB of memory.\n\nFinally, there is another solution. You may consider using a random\nsample of your sequences and then assign each sequence to the closest\nmedoids of each cluster. I would suggest you to use PAM in this case,\nsince this is more or less what PAM does anyway.\n\nFor instance, using the biofam data set and sampling 573 sequences\n\nlibrary(TraMineR)\n\ndata(biofam)\nbiofam.lab<- c(\"Parent\", \"Left\", \"Married\", \"Left+Marr\",\n\"Child\", \"Left+Child\", \"Left+Marr+Child\", \"Divorced\")\nbiofam.seq<- seqdef(biofam, 10:25, labels=biofam.lab)\n\nmysample<- sample(nrow(biofam), 573)\n\n## Select the sequences\n\nsampledseq<- biofam.seq[mysample,]\n\n## Compute distance on the sample using constant costs\n\nbiofam.om<- seqdist(sampledseq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, full.matrix=FALSE)\n\n## PAM clustering\n\nlibrary(cluster)\nmyclustering<- pam(biofam.om, diss=T, k=2)\n\n## Recover medoids\n\nmedoids<- disscenter(biofam.om, medoids.index=\"first\", group=myclustering$clustering)\n\n## Compute distance to each medoids using refseq\n\ndist.medoid1<- seqdist(biofam.seq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, refseq=sampledseq[medoids[1], ])\n\ndist.medoid2<- seqdist(biofam.seq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, refseq=sampledseq[medoids[2], ])\n\n## Storing the new cluster solution\n\nnewcluster<- numeric(nrow(biofam.seq))\nfor(i in 1:nrow(biofam.seq)){\n        newcluster[i]<- which.min(c(dist.medoid1[i],dist.medoid2[i]))\n}\n\nYou may want to repeat the whole procedure several times to be sure that\nthe solution is stable enough. You may also compute the medoids of the\nnew cluster (with all the cases) and compare them to the solutions with\nonly the samples.\n\nbiofam.om.cl1 <- seqdist(biofam.seq[newcluster==1,]\n,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE)\n\nmedoid1<- disscenter(biofam.om.cl1, medoids.index=\"first\")\nprint(biofam.seq[newcluster==1,][medoid1,])\n\n\nIf you have further questions or if some things remain unclear, please\nfeel free to ask.\n\nAll the best!\n\nMatthias Studer\n\nLe 01.06.2010 02:15, Zuluaga, Juan [zuju0701 at stcloudstate.edu] a ?crit :\n> Hello TraMineR people,\n> great package, awesome effort.\n>\n> I realize that this is not really a TraMineR question, but I bet it will be a common question of interest for many TraMineR users.\n>\n> What would you suggest to be able to store large matrices?\n>\n>\n>> wide.om<- seqdist(wide.seq,method=\"OM\",indel=2,sm=couts,with.missing=TRUE)\n>>\n>   [>] 14625 sequences with 21 distinct events/states\n>   [>] including missing value as additional state\n>   [>] 4316 distinct sequences\n>   [>] min/max sequence length: 1/22\n>   [>] computing distances using OM metric\n> Error: cannot allocate vector of size 815.9 Mb\n>\n> I tried\n> wide.om<- big.matrix(seqdist ...))\n> from package bigmemory, but still produces the same result.\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users\n>\n\n_______________________________________________\nTraminer-users mailing list\nTraminer-users at lists.r-forge.r-project.org\nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users",
+      "body_snippet": "Mr. Studer, thanks a million for your very useful answer. \n\nI should read more about the exploration of clusters via medoids, since it seems useful in general.  \n\nAs you said, a more powerful machine ",
+      "thread_id": "thread-5e7e0b6a07ec",
+      "thread_depth": 0,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-9d90d0b8b69a",
+      "message_id": "<4C061C89.1090407@unige.ch>",
+      "from_name": "Matthias Studer",
+      "from_email_hash": "54d4164a8ffb9683cb367813dca90351ea4f3390e7bcdd2cc0c953bb6189fef6",
+      "date": "2010-06-02T08:55:37Z",
+      "subject": "[Traminer-users] suggestion on storing large\tdissimilarity\tmatrix?",
+      "subject_clean": "[Traminer-users] suggestion on storing large\tdissimilarity\tmatrix?",
+      "in_reply_to": "<E811A8741221CE489F966ACBD8717CCE161CDE624A@SCSU81.campus.stcloudstate.edu>",
+      "references": [
+        "<E811A8741221CE489F966ACBD8717CCE161CDE624A@SCSU81.campus.stcloudstate.edu>"
+      ],
+      "body_plain": "Dear Juan,\nIn fact, when full.matrix=TRUE, seqdist copies the dist object into a \nfull matrix (and not the reverse). Maybe you add a previous distance \nmatrix in your R environnement, that makes use of all available memory ?\nI would be interested to know more about this issue.\nAll the best\nMatthias\n\nLe 01.06.2010 17:31, Zuluaga, Juan [zuju0701 at stcloudstate.edu] a ?crit :\n> Mr. Studer, thanks a million for your very useful answer.\n>\n> I should read more about the exploration of clusters via medoids, since it seems useful in general.\n>\n> As you said, a more powerful machine (a Mac with 4Gb, running R64) calculated the OM distance matrix -- in 14 seconds. Amazing.\n>\n> The full.matrix=FALSE option, for some reason, did not work -- it complained about not being able to allocate 815.9 Mb of memory, same as before, as if the  large matrix still had to exist somewhere before becoming a half-sized dist object.\n>\n> Merci beaucoup, and keep up the good work.\n>\n> -j\n>\n>\n> ________________________________________\n> From: traminer-users-bounces at lists.r-forge.r-project.org [traminer-users-bounces at lists.r-forge.r-project.org] On Behalf Of Matthias Studer [Matthias.Studer at unige.ch]\n> Sent: Tuesday, June 01, 2010 3:39 AM\n> To: traminer-users at lists.r-forge.r-project.org\n> Subject: Re: [Traminer-users] suggestion on storing large dissimilarity matrix?\n>\n> Dear Juan Zuluaga,\n>\n> This is indeed a common question and there is no simple answer. The\n> first thing to do is to try to set the \"full.matrix\" argument to FALSE.\n> In the latter case, seqdist return a \"dist\" object (see help on dist).\n> That is, it only stores the lower triangle of the matrix (since the\n> distances are symmetric the whole matrix is redundant).\n>\n> wide.om<- seqdist(wide.seq,method=\"OM\",indel=2,sm=couts,with.missing=TRUE, full.matrix=FALSE)\n>\n>\n> All algorithms from the cluster package accept \"dist\" object as input.\n> If you have a great number of sequences, \"pam\" should be much more\n> efficient than \"agnes\".\n>\n> However, I bet that the latter solution will not be sufficient depending\n> on your computer. You may need to find an access to a computer with more\n> memory, running on windows 64 bit or Linux (see the R FAQ on this\n> topic). To give you an idea, I have run an analysis on 18'000 sequences\n> on a Linux computer with 8GB of memory.\n>\n> Finally, there is another solution. You may consider using a random\n> sample of your sequences and then assign each sequence to the closest\n> medoids of each cluster. I would suggest you to use PAM in this case,\n> since this is more or less what PAM does anyway.\n>\n> For instance, using the biofam data set and sampling 573 sequences\n>\n> library(TraMineR)\n>\n> data(biofam)\n> biofam.lab<- c(\"Parent\", \"Left\", \"Married\", \"Left+Marr\",\n> \"Child\", \"Left+Child\", \"Left+Marr+Child\", \"Divorced\")\n> biofam.seq<- seqdef(biofam, 10:25, labels=biofam.lab)\n>\n> mysample<- sample(nrow(biofam), 573)\n>\n> ## Select the sequences\n>\n> sampledseq<- biofam.seq[mysample,]\n>\n> ## Compute distance on the sample using constant costs\n>\n> biofam.om<- seqdist(sampledseq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, full.matrix=FALSE)\n>\n> ## PAM clustering\n>\n> library(cluster)\n> myclustering<- pam(biofam.om, diss=T, k=2)\n>\n> ## Recover medoids\n>\n> medoids<- disscenter(biofam.om, medoids.index=\"first\", group=myclustering$clustering)\n>\n> ## Compute distance to each medoids using refseq\n>\n> dist.medoid1<- seqdist(biofam.seq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, refseq=sampledseq[medoids[1], ])\n>\n> dist.medoid2<- seqdist(biofam.seq,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE, refseq=sampledseq[medoids[2], ])\n>\n> ## Storing the new cluster solution\n>\n> newcluster<- numeric(nrow(biofam.seq))\n> for(i in 1:nrow(biofam.seq)){\n>          newcluster[i]<- which.min(c(dist.medoid1[i],dist.medoid2[i]))\n> }\n>\n> You may want to repeat the whole procedure several times to be sure that\n> the solution is stable enough. You may also compute the medoids of the\n> new cluster (with all the cases) and compare them to the solutions with\n> only the samples.\n>\n> biofam.om.cl1<- seqdist(biofam.seq[newcluster==1,]\n> ,method=\"OM\",indel=1,sm=\"CONSTANT\",with.missing=TRUE)\n>\n> medoid1<- disscenter(biofam.om.cl1, medoids.index=\"first\")\n> print(biofam.seq[newcluster==1,][medoid1,])\n>\n>\n> If you have further questions or if some things remain unclear, please\n> feel free to ask.\n>\n> All the best!\n>\n> Matthias Studer\n>\n> Le 01.06.2010 02:15, Zuluaga, Juan [zuju0701 at stcloudstate.edu] a ?crit :\n>    \n>> Hello TraMineR people,\n>> great package, awesome effort.\n>>\n>> I realize that this is not really a TraMineR question, but I bet it will be a common question of interest for many TraMineR users.\n>>\n>> What would you suggest to be able to store large matrices?\n>>\n>>\n>>      \n>>> wide.om<- seqdist(wide.seq,method=\"OM\",indel=2,sm=couts,with.missing=TRUE)\n>>>\n>>>        \n>>    [>] 14625 sequences with 21 distinct events/states\n>>    [>] including missing value as additional state\n>>    [>] 4316 distinct sequences\n>>    [>] min/max sequence length: 1/22\n>>    [>] computing distances using OM metric\n>> Error: cannot allocate vector of size 815.9 Mb\n>>\n>> I tried\n>> wide.om<- big.matrix(seqdist ...))\n>> from package bigmemory, but still produces the same result.\n>> _______________________________________________\n>> Traminer-users mailing list\n>> Traminer-users at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users\n>>\n>>      \n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users\n>",
+      "body_snippet": "Dear Juan,\nIn fact, when full.matrix=TRUE, seqdist copies the dist object into a \nfull matrix (and not the reverse). Maybe you add a previous distance \nmatrix in your R environnement, that makes use o",
+      "thread_id": "thread-5e7e0b6a07ec",
+      "thread_depth": 1,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-c08c3dde6e94",
+      "message_id": "<4C10AE47.3090106@ens.fr>",
+      "from_name": "Claire Zalc",
+      "from_email_hash": "08008b877ffd8c526617423d294fd0631ab479ad7f649f9beaabd1e780508f5d",
+      "date": "2010-06-10T09:20:07Z",
+      "subject": "[Traminer-users] Questions",
+      "subject_clean": "[Traminer-users] Questions",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Bonjour,\nQuelques questions concernant la mise en forme de donn?es.\nAvant de nous lancer dans l?adaptation de donn?es ? un traitement avec \nTRAMineR, nous nous interrogeons, justement, sur la meilleure mani?re de \nles mettre en forme. Nous avons d?j? compris, ? partir de la \ndocumentation, et en fonction de l??tat actuel de nos donn?es, qu?il \nnous fallait plut?t opter pour un format de type SPELL, autrement dit \nautant de lignes par individus que d??tats successifs constituant sa \ntrajectoire. Cette formule nous permet en effet de traiter de fa?on \nhomog?ne des ?tats ayant des dur?es extr?mement diff?rentes, de \nplusieurs ann?es (comme la r?sidence dans une ville donn?e) ? seulement \nquelques jours (comme le passage par tel ou tel camp).\n\nCette fa?on de proc?der soul?ve toutefois quelques questions li?es ? \ncertaines particularit?s de nos donn?es, et nous voudrions savoir si \nvous pouviez nous ?clairer sur ces points, avant de nous lancer dans la \nfabrication de la base\n1. Est-il possible, dans le format de type SPELL, d?avoir des nombres \ntr?s ?lev?s comme dates de d?but et de fin (par exemple, en nombre de \njours ?coul?s depuis 1900, soit des nombre de l?ordre de 15000 ? 20000 \npour la p?riode de la guerre) ?\n\n2. Nous avons de nombreuses trajectoires ? trou?es ?, dans lesquelles \ndes ?tats sont ind?termin?s pendant des p?riodes plus ou moins longues. \nPar exemple, apr?s une naissance en Pologne dont nous connaissons la \ndate (1909 par exemple), nous ne savons plus rien, jusqu?? retrouver la \npersonne dans une liste de recensement de personnes r?sidant ? Lens en \n1939, qu?elle quitte ensuite en 1941. Nous imaginions d?crire ce type de \nmorceau de trajectoire de la fa?on suivante :\n\nid index start end status\n1 272 1 19/01/1909 20/01/1909 Varsovie\n2 272 2 20/01/1909 07/06/1939 Unknown\n3 272 3 07/06/1939 06/04/1941 Lens\n\nEst-ce la bonne fa?on de proc?der ? En recommandez-vous une autre, qui \nvous semblerait mieux correspondre ? notre cas ? Globalement, comment \nfaut-il traiter ce qu?on pourrait appeler ici de la ? non-r?ponse ? ?\n\n3. Nos dates de d?but et de fin d??tat sont de pr?cisions tr?s variables \n: parfois nous savons le jour exact de d?but ou de fin d?un ?tat, \nparfois seulement le mois, parfois m?me souvent seulement l?ann?e. Pour \ncontinuer l?exemple pr?c?dent, nous pouvons conna?tre pr?cis?ment la \ndate de naissance, mais conna?tre seulement le mois et l?ann?e du d?part \nde Lens? Comment faut-il traiter cette h?t?rog?n?it? ? Faut-il affecter \narbitrairement les dates impr?cises au 1er jour du mois (quand le mois \net l?ann?e sont connus) ou au 1er jour de l?ann?e (quand seule l?ann?e \nest connue) ? Ou bien faut-il proc?der autrement ?\nEn vous remerciant pour vos r?ponses,\nAmicalement\nNicolas Pierre et Claire",
+      "body_snippet": "Bonjour,\nQuelques questions concernant la mise en forme de donn?es.\nAvant de nous lancer dans l?adaptation de donn?es ? un traitement avec \nTRAMineR, nous nous interrogeons, justement, sur la meilleur",
+      "thread_id": "thread-c08c3dde6e94",
+      "thread_depth": 0,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-9c82041f1fb9",
+      "message_id": "<2F127579-9A9D-46E1-B545-B120C6C9A7DF@sciences-po.fr>",
+      "from_name": "Laurent Lesnard",
+      "from_email_hash": "946a5e21ee5c07508645771ed261e824ce2bcec857bcbdee84fbc7076d01a462",
+      "date": "2010-06-10T14:05:25Z",
+      "subject": "[Traminer-users] seqrep and distance matrix",
+      "subject_clean": "[Traminer-users] seqrep and distance matrix",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Dear TraMineR makers and users\n\nIs it correct that seqrep does not accept distance matrix produced by  \nseqdist with the option full.matrix=FALSE? If so, what to you suggest  \nto circumvent this problem: rerun the OM analysis with full.matrix=TRUE?\n\nAnother unrelated question: my experience is that TraMineR is very  \nfast but cluster analysis is not. Any plan to introduce mixed  \nclustering method (partitioning then ascending cluster analysis)?\n\nThanks a lot\n\nLaurent",
+      "body_snippet": "Dear TraMineR makers and users\n\nIs it correct that seqrep does not accept distance matrix produced by  \nseqdist with the option full.matrix=FALSE? If so, what to you suggest  \nto circumvent this probl",
+      "thread_id": "thread-9c82041f1fb9",
+      "thread_depth": 0,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-d35e4e8eebe7",
+      "message_id": "<4C110154.4040102@unige.ch>",
+      "from_name": "Alexis Gabadinho",
+      "from_email_hash": "f266eb5dc564422b73c163c3575ea632a6b7c79c4b5126673755776c8b963b20",
+      "date": "2010-06-10T15:14:28Z",
+      "subject": "[Traminer-users] seqrep and distance matrix",
+      "subject_clean": "[Traminer-users] seqrep and distance matrix",
+      "in_reply_to": "<2F127579-9A9D-46E1-B545-B120C6C9A7DF@sciences-po.fr>",
+      "references": [
+        "<2F127579-9A9D-46E1-B545-B120C6C9A7DF@sciences-po.fr>"
+      ],
+      "body_plain": "Hi Laurent,\n\nHere is the answer to your first question. \"seqrep\" works fine with \n\"half\" matrices produced with the full.matrix=FALSE option. However, the \nplot function, \"seqrplot\", does not work. This is fixed (thanks to your \nmail). The feature will be available as of tomorrow in the development \nversion of TraMiner which you can install by following these instructions:\n\nhttp://mephisto.unige.ch/traminer/install.shtml#devel\n\nNevertheless, if you don't want grouped plots you can plot the \nrepresentative sequences with the current (1.6) version, by using the \nplot() method:\n\nmvad.om <- seqdist(mvad.seq, method=\"OM\", sm=\"TRATE\", full.matrix=FALSE)\nmvad.rep <- seqrep(mvad.seq, dist.matrix=mvad.om)\nplot(mvad.rep)\n\nNotice also that there is a minor bug in the seqrplot function \nconcerning the displayed coverage statistics if you use another \nneighborhood diameter than the default 0.10. This is fixed in the \ndevelopment version as well.\n\nBest,\nAlexis.\n\n\nLaurent Lesnard a ?crit :\n> Dear TraMineR makers and users\n>\n> Is it correct that seqrep does not accept distance matrix produced by \n> seqdist with the option full.matrix=FALSE? If so, what to you suggest \n> to circumvent this problem: rerun the OM analysis with full.matrix=TRUE?\n>\n> Another unrelated question: my experience is that TraMineR is very \n> fast but cluster analysis is not. Any plan to introduce mixed \n> clustering method (partitioning then ascending cluster analysis)?\n>\n> Thanks a lot\n>\n> Laurent\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users \n>",
+      "body_snippet": "Hi Laurent,\n\nHere is the answer to your first question. \"seqrep\" works fine with \n\"half\" matrices produced with the full.matrix=FALSE option. However, the \nplot function, \"seqrplot\", does not work. Th",
+      "thread_id": "thread-9c82041f1fb9",
+      "thread_depth": 1,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-9b49c31ec140",
+      "message_id": "<4C1106A8.1090107@unige.ch>",
+      "from_name": "\"Nicolas S. Müller\"",
+      "from_email_hash": "a790f3a4ba7a105ae36578fe9212f8d24daa12e88c9b5cdf4d064cfcfafe92d4",
+      "date": "2010-06-10T15:37:12Z",
+      "subject": "[Traminer-users] Questions",
+      "subject_clean": "[Traminer-users] Questions",
+      "in_reply_to": "<4C10AE47.3090106@ens.fr>",
+      "references": [
+        "<4C10AE47.3090106@ens.fr>"
+      ],
+      "body_plain": "Bonjour,\n\npour r?pondre ? vos questions, dans l'ordre :\n\n1) Les valeurs de dates de d?but et de fin peuvent ?tre des entiers de \nn'importe quelle taille\n\n2) La mani?re de proc?der que vous proposez n'est pas mauvaise, mais si \nvous voulez ?viter de cr?er un ?pisode pour chaque \"trou\", il existe \nl'argument \"fillblanks\"  de la fonction \"seqdef\". Si par exemple vous \nsp?cifiez dans la commande \"seqdef\" l'argument \"fillblanks=NA\", alors \nles trous seront automatiquement remplis dans les s?quences par le \nsymbole \"NA\".\n\n3) En ce qui concerne votre derni?re pr?occupation, je vois deux \npossibilit?s : soit, comme vous le mentionnez, choisir le 1er jour du \nmois, soit r?duire la pr?cision ? l'unit? de temps qui est toujours \nconnu (p.ex. le mois ou l'ann?e).\n\nEn esp?rant avoir r?pondu efficacement ? vos questions,\nmeilleurs messages.\n\nNicolas\n\n\nOn 10.06.2010 11:20, Claire Zalc wrote:\n> Bonjour,\n> Quelques questions concernant la mise en forme de donn?es.\n> Avant de nous lancer dans l?adaptation de donn?es ? un traitement avec \n> TRAMineR, nous nous interrogeons, justement, sur la meilleure mani?re \n> de les mettre en forme. Nous avons d?j? compris, ? partir de la \n> documentation, et en fonction de l??tat actuel de nos donn?es, qu?il \n> nous fallait plut?t opter pour un format de type SPELL, autrement dit \n> autant de lignes par individus que d??tats successifs constituant sa \n> trajectoire. Cette formule nous permet en effet de traiter de fa?on \n> homog?ne des ?tats ayant des dur?es extr?mement diff?rentes, de \n> plusieurs ann?es (comme la r?sidence dans une ville donn?e) ? \n> seulement quelques jours (comme le passage par tel ou tel camp).\n>\n> Cette fa?on de proc?der soul?ve toutefois quelques questions li?es ? \n> certaines particularit?s de nos donn?es, et nous voudrions savoir si \n> vous pouviez nous ?clairer sur ces points, avant de nous lancer dans \n> la fabrication de la base\n> 1. Est-il possible, dans le format de type SPELL, d?avoir des nombres \n> tr?s ?lev?s comme dates de d?but et de fin (par exemple, en nombre de \n> jours ?coul?s depuis 1900, soit des nombre de l?ordre de 15000 ? 20000 \n> pour la p?riode de la guerre) ?\n>\n> 2. Nous avons de nombreuses trajectoires ? trou?es ?, dans lesquelles \n> des ?tats sont ind?termin?s pendant des p?riodes plus ou moins \n> longues. Par exemple, apr?s une naissance en Pologne dont nous \n> connaissons la date (1909 par exemple), nous ne savons plus rien, \n> jusqu?? retrouver la personne dans une liste de recensement de \n> personnes r?sidant ? Lens en 1939, qu?elle quitte ensuite en 1941. \n> Nous imaginions d?crire ce type de morceau de trajectoire de la fa?on \n> suivante :\n>\n> id index start end status\n> 1 272 1 19/01/1909 20/01/1909 Varsovie\n> 2 272 2 20/01/1909 07/06/1939 Unknown\n> 3 272 3 07/06/1939 06/04/1941 Lens\n>\n> Est-ce la bonne fa?on de proc?der ? En recommandez-vous une autre, qui \n> vous semblerait mieux correspondre ? notre cas ? Globalement, comment \n> faut-il traiter ce qu?on pourrait appeler ici de la ? non-r?ponse ? ?\n>\n> 3. Nos dates de d?but et de fin d??tat sont de pr?cisions tr?s \n> variables : parfois nous savons le jour exact de d?but ou de fin d?un \n> ?tat, parfois seulement le mois, parfois m?me souvent seulement \n> l?ann?e. Pour continuer l?exemple pr?c?dent, nous pouvons conna?tre \n> pr?cis?ment la date de naissance, mais conna?tre seulement le mois et \n> l?ann?e du d?part de Lens? Comment faut-il traiter cette h?t?rog?n?it? \n> ? Faut-il affecter arbitrairement les dates impr?cises au 1er jour du \n> mois (quand le mois et l?ann?e sont connus) ou au 1er jour de l?ann?e \n> (quand seule l?ann?e est connue) ? Ou bien faut-il proc?der autrement ?\n> En vous remerciant pour vos r?ponses,\n> Amicalement\n> Nicolas Pierre et Claire\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users \n>",
+      "body_snippet": "Bonjour,\n\npour r?pondre ? vos questions, dans l'ordre :\n\n1) Les valeurs de dates de d?but et de fin peuvent ?tre des entiers de \nn'importe quelle taille\n\n2) La mani?re de proc?der que vous proposez n'",
+      "thread_id": "thread-c08c3dde6e94",
+      "thread_depth": 1,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-13ed44a15056",
+      "message_id": "<4C1115F4.5000109@ens.fr>",
+      "from_name": "Claire Zalc",
+      "from_email_hash": "08008b877ffd8c526617423d294fd0631ab479ad7f649f9beaabd1e780508f5d",
+      "date": "2010-06-10T16:42:28Z",
+      "subject": "[Traminer-users] Questions",
+      "subject_clean": "[Traminer-users] Questions",
+      "in_reply_to": "<4C1106A8.1090107@unige.ch>",
+      "references": [
+        "<4C10AE47.3090106@ens.fr>",
+        "<4C1106A8.1090107@unige.ch>"
+      ],
+      "body_plain": "Bonjour,\nUn grand merci pour vos r?ponses ? ces questions!\nEt ? bient?t pour de nouvelles...\nCordialement,\nClaire\n\n\n\nNicolas S. M?ller a ?crit :\n> Bonjour,\n>\n> pour r?pondre ? vos questions, dans l'ordre :\n>\n> 1) Les valeurs de dates de d?but et de fin peuvent ?tre des entiers de \n> n'importe quelle taille\n>\n> 2) La mani?re de proc?der que vous proposez n'est pas mauvaise, mais \n> si vous voulez ?viter de cr?er un ?pisode pour chaque \"trou\", il \n> existe l'argument \"fillblanks\"  de la fonction \"seqdef\". Si par \n> exemple vous sp?cifiez dans la commande \"seqdef\" l'argument \n> \"fillblanks=NA\", alors les trous seront automatiquement remplis dans \n> les s?quences par le symbole \"NA\".\n>\n> 3) En ce qui concerne votre derni?re pr?occupation, je vois deux \n> possibilit?s : soit, comme vous le mentionnez, choisir le 1er jour du \n> mois, soit r?duire la pr?cision ? l'unit? de temps qui est toujours \n> connu (p.ex. le mois ou l'ann?e).\n>\n> En esp?rant avoir r?pondu efficacement ? vos questions,\n> meilleurs messages.\n>\n> Nicolas\n>\n>\n> On 10.06.2010 11:20, Claire Zalc wrote:\n>> Bonjour,\n>> Quelques questions concernant la mise en forme de donn?es.\n>> Avant de nous lancer dans l?adaptation de donn?es ? un traitement \n>> avec TRAMineR, nous nous interrogeons, justement, sur la meilleure \n>> mani?re de les mettre en forme. Nous avons d?j? compris, ? partir de \n>> la documentation, et en fonction de l??tat actuel de nos donn?es, \n>> qu?il nous fallait plut?t opter pour un format de type SPELL, \n>> autrement dit autant de lignes par individus que d??tats successifs \n>> constituant sa trajectoire. Cette formule nous permet en effet de \n>> traiter de fa?on homog?ne des ?tats ayant des dur?es extr?mement \n>> diff?rentes, de plusieurs ann?es (comme la r?sidence dans une ville \n>> donn?e) ? seulement quelques jours (comme le passage par tel ou tel \n>> camp).\n>>\n>> Cette fa?on de proc?der soul?ve toutefois quelques questions li?es ? \n>> certaines particularit?s de nos donn?es, et nous voudrions savoir si \n>> vous pouviez nous ?clairer sur ces points, avant de nous lancer dans \n>> la fabrication de la base\n>> 1. Est-il possible, dans le format de type SPELL, d?avoir des nombres \n>> tr?s ?lev?s comme dates de d?but et de fin (par exemple, en nombre de \n>> jours ?coul?s depuis 1900, soit des nombre de l?ordre de 15000 ? \n>> 20000 pour la p?riode de la guerre) ?\n>>\n>> 2. Nous avons de nombreuses trajectoires ? trou?es ?, dans lesquelles \n>> des ?tats sont ind?termin?s pendant des p?riodes plus ou moins \n>> longues. Par exemple, apr?s une naissance en Pologne dont nous \n>> connaissons la date (1909 par exemple), nous ne savons plus rien, \n>> jusqu?? retrouver la personne dans une liste de recensement de \n>> personnes r?sidant ? Lens en 1939, qu?elle quitte ensuite en 1941. \n>> Nous imaginions d?crire ce type de morceau de trajectoire de la fa?on \n>> suivante :\n>>\n>> id index start end status\n>> 1 272 1 19/01/1909 20/01/1909 Varsovie\n>> 2 272 2 20/01/1909 07/06/1939 Unknown\n>> 3 272 3 07/06/1939 06/04/1941 Lens\n>>\n>> Est-ce la bonne fa?on de proc?der ? En recommandez-vous une autre, \n>> qui vous semblerait mieux correspondre ? notre cas ? Globalement, \n>> comment faut-il traiter ce qu?on pourrait appeler ici de la ? \n>> non-r?ponse ? ?\n>>\n>> 3. Nos dates de d?but et de fin d??tat sont de pr?cisions tr?s \n>> variables : parfois nous savons le jour exact de d?but ou de fin d?un \n>> ?tat, parfois seulement le mois, parfois m?me souvent seulement \n>> l?ann?e. Pour continuer l?exemple pr?c?dent, nous pouvons conna?tre \n>> pr?cis?ment la date de naissance, mais conna?tre seulement le mois et \n>> l?ann?e du d?part de Lens? Comment faut-il traiter cette \n>> h?t?rog?n?it? ? Faut-il affecter arbitrairement les dates impr?cises \n>> au 1er jour du mois (quand le mois et l?ann?e sont connus) ou au 1er \n>> jour de l?ann?e (quand seule l?ann?e est connue) ? Ou bien faut-il \n>> proc?der autrement ?\n>> En vous remerciant pour vos r?ponses,\n>> Amicalement\n>> Nicolas Pierre et Claire\n>> _______________________________________________\n>> Traminer-users mailing list\n>> Traminer-users at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users \n>>\n>\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users \n>\n>\n>",
+      "body_snippet": "Bonjour,\nUn grand merci pour vos r?ponses ? ces questions!\nEt ? bient?t pour de nouvelles...\nCordialement,\nClaire\n\n\n\nNicolas S. M?ller a ?crit :\n> Bonjour,\n>\n> pour r?pondre ? vos questions, dans l'or",
+      "thread_id": "thread-c08c3dde6e94",
+      "thread_depth": 2,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-8d2f39d6d763",
+      "message_id": "<40565069-9552-42C3-B438-083C476B651C@sciences-po.fr>",
+      "from_name": "Laurent Lesnard",
+      "from_email_hash": "946a5e21ee5c07508645771ed261e824ce2bcec857bcbdee84fbc7076d01a462",
+      "date": "2010-06-11T05:50:52Z",
+      "subject": "[Traminer-users] seqrep and distance matrix",
+      "subject_clean": "[Traminer-users] seqrep and distance matrix",
+      "in_reply_to": "<4C110154.4040102@unige.ch>",
+      "references": [
+        "<2F127579-9A9D-46E1-B545-B120C6C9A7DF@sciences-po.fr>",
+        "<4C110154.4040102@unige.ch>"
+      ],
+      "body_plain": "Hi Alexis\n\nThanks a lot for you quick reply. I'm going to look into that.\n\nBest\n\nLaurent\n\nLe 10 juin 2010 ? 17:14, Alexis Gabadinho a ?crit :\n\n> Hi Laurent,\n> \n> Here is the answer to your first question. \"seqrep\" works fine with \"half\" matrices produced with the full.matrix=FALSE option. However, the plot function, \"seqrplot\", does not work. This is fixed (thanks to your mail). The feature will be available as of tomorrow in the development version of TraMiner which you can install by following these instructions:\n> \n> http://mephisto.unige.ch/traminer/install.shtml#devel\n> \n> Nevertheless, if you don't want grouped plots you can plot the representative sequences with the current (1.6) version, by using the plot() method:\n> \n> mvad.om <- seqdist(mvad.seq, method=\"OM\", sm=\"TRATE\", full.matrix=FALSE)\n> mvad.rep <- seqrep(mvad.seq, dist.matrix=mvad.om)\n> plot(mvad.rep)\n> \n> Notice also that there is a minor bug in the seqrplot function concerning the displayed coverage statistics if you use another neighborhood diameter than the default 0.10. This is fixed in the development version as well.\n> \n> Best,\n> Alexis.\n> \n> \n> Laurent Lesnard a ?crit :\n>> Dear TraMineR makers and users\n>> \n>> Is it correct that seqrep does not accept distance matrix produced by seqdist with the option full.matrix=FALSE? If so, what to you suggest to circumvent this problem: rerun the OM analysis with full.matrix=TRUE?\n>> \n>> Another unrelated question: my experience is that TraMineR is very fast but cluster analysis is not. Any plan to introduce mixed clustering method (partitioning then ascending cluster analysis)?\n>> \n>> Thanks a lot\n>> \n>> Laurent\n>> _______________________________________________\n>> Traminer-users mailing list\n>> Traminer-users at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users \n> \n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users",
+      "body_snippet": "Hi Alexis\n\nThanks a lot for you quick reply. I'm going to look into that.\n\nBest\n\nLaurent\n\nLe 10 juin 2010 ? 17:14, Alexis Gabadinho a ?crit :\n\n> Hi Laurent,\n> \n> Here is the answer to your first quest",
+      "thread_id": "thread-9c82041f1fb9",
+      "thread_depth": 2,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-23bd39acbb9d",
+      "message_id": "<1276267094l.557304l.0l@psu.edu>",
+      "from_name": "Philippe Blanchard",
+      "from_email_hash": "f72afc056c86d3f74846d513cd14ee1b9d79f98433c185128def5cdfa0fe0375",
+      "date": "2010-06-11T14:38:14Z",
+      "subject": "[Traminer-users] Seqplots with multiple different states",
+      "subject_clean": "[Traminer-users] Seqplots with multiple different states",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi all\nA question\nthat does not directly depend on TraMineR, but that might find an answer on the\nlist. \nI need to publish multiple-sequence plots (the kind that come out nicely\n with\nfull colors, see link to my\n report on TraMineR's page) in a\nB&W review. The plots are composed of between 20 and 40\n different states, organized in families of sequences made of 5 to 12 states\neach. Families do not all work as scales, that could be clearly represented by\nprogressive grey shades. I would like the reader to be able to distinguish from\neach\nother, both families, and sequences inside\nfamilies, without\n getting a headache.\n\nI have \nsearched for answers on different R websites and R books, no way. I can't\nimagine\nthat no function could chart with stripes, symbols or\nfigures combined with grey shades.\nThanks\nPhilippe\n\n***\n\nPhilippe\nBlanchard\n\nDepartment of Sociology \n& International Center for the\nStudy of Terrorism\nPennsylvania State University\n133 Moore\nBuilding\nUniversity Park, PA\n16802\nwww.sociology.psu.edu\nwww.icst.psu.edu\n\nIEPI-CRAPUL\nUniversit? de Lausanne\nAnthropole, CH-1015 Lausanne\nwww.unil.ch/iepi\nwww.unil.ch/iepi/crapul\n\nhttp://www.afsp.msh-paris.fr/annu/annuaire.html#b\nhttps://applicationspub.unil.ch/interpub/noauth/php/Un\n/UnPers.php?PerNum=1028276&LanCode=37&menu=coord&AnDeb=2004&AnFin=2009\n\n\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20100611/4e336ff2/attachment.htm>",
+      "body_snippet": "Hi all\nA question\nthat does not directly depend on TraMineR, but that might find an answer on the\nlist. \nI need to publish multiple-sequence plots (the kind that come out nicely\n with\nfull colors, see",
+      "thread_id": "thread-23bd39acbb9d",
+      "thread_depth": 0,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-27bcda7c4548",
+      "message_id": "<4C1647EE.9080708@unige.ch>",
+      "from_name": "Matthias Studer",
+      "from_email_hash": "54d4164a8ffb9683cb367813dca90351ea4f3390e7bcdd2cc0c953bb6189fef6",
+      "date": "2010-06-14T15:17:02Z",
+      "subject": "[Traminer-users] Seqplots with multiple different states",
+      "subject_clean": "[Traminer-users] Seqplots with multiple different states",
+      "in_reply_to": "<1276267094l.557304l.0l@psu.edu>",
+      "references": [
+        "<1276267094l.557304l.0l@psu.edu>"
+      ],
+      "body_plain": "Hi Philippe,\n\nAs far as I know, there are no simple solution to do that in R and if \nyou find any solution I would be really interested. One workaround  is \nto edit your plot with Gimp (or another software) and replace each color \nby a pattern.\n\nI'm not sure that the following solution is what you are looking for but \nit might help. A least, type=\"d\" and type=\"i\" use barplot in the \nbackside and you may use the \"density\" and \"angle\" argument to get \ndifferent patterns. However, this is limited to filling the bars with \nlines with different \"densities\" and \"angles\"\n\ndata(biofam)\nbiofam.lab <- c(\"Parent\", \"Left\", \"Married\", \"Left+Marr\",\n  \"Child\", \"Left+Child\", \"Left+Marr+Child\", \"Divorced\")\nbiofam.seq <- seqdef(biofam, 10:25, labels=biofam.lab)\n\n## Biofam has 8 states, automatically generating 8 densities and 8 angles\nseqplot(biofam.seq, type=\"d\", density=1:8*2, angle=1:8*25)\n\nHope this help,\nMatthias\n\nPS: There is a website to search in almost all R websites and \nmailing-lists: http://www.rseek.org/\n\nLe 11.06.2010 16:38, Philippe Blanchard a ?crit :\n> Hi all\n> A question that does not directly depend on TraMineR, but that might \n> find an answer on the list.\n> I need to publish multiple-sequence plots (the kind that come out \n> nicely with full colors, see link to my report on TraMineR's page) in \n> a B&W review. The plots are composed of between 20 and 40 different \n> states, organized in families of sequences made of 5 to 12 states \n> each. Families do not all work as scales, that could be clearly \n> represented by progressive grey shades. I would like the reader to be \n> able to distinguish from each other, both families, and sequences \n> inside families, without getting a headache.\n> I have searched for answers on different R websites and R books, no \n> way. I can't imagine that no function could chart with stripes, \n> symbols or figures combined with grey shades.\n> Thanks\n> Philippe\n>\n> ***\n>\n> Philippe Blanchard\n>\n> Department of Sociology\n> & International Center for the Study of Terrorism\n> /Pennsylvania State University\n> 133 Moore Building\n> University Park, PA 16802\n> www.sociology.psu.edu\n> www.icst.psu.edu/\n>\n> IEPI-CRAPUL\n> /Universit? de Lausanne\n> Anthropole, CH-1015 Lausanne\n> www.unil.ch/iepi\n> www.unil.ch/iepi/crapul\n>\n> http://www.afsp.msh-paris.fr/annu/annuaire.html#b\n> https://applicationspub.unil.ch/interpub/noauth/php/Un\n> /UnPers.php?PerNum=1028276&LanCode=37&menu=coord&AnDeb=2004&AnFin=2009/\n>\n>\n>\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users\n>\n>    \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20100614/e4dd44e2/attachment.htm>",
+      "body_snippet": "Hi Philippe,\n\nAs far as I know, there are no simple solution to do that in R and if \nyou find any solution I would be really interested. One workaround  is \nto edit your plot with Gimp (or another sof",
+      "thread_id": "thread-23bd39acbb9d",
+      "thread_depth": 1,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-82a3d024dc24",
+      "message_id": "<4C19D0AA.2030903@ens.fr>",
+      "from_name": "Claire Lemercier",
+      "from_email_hash": "dc71f422849b51aa9b753a59fc62f07b551fedb6e5c22bced15a7f1bd3eb78bd",
+      "date": "2010-06-17T07:37:14Z",
+      "subject": "[Traminer-users] pseudo-ANOVA results",
+      "subject_clean": "[Traminer-users] pseudo-ANOVA results",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi all,\nI am using the pseudo-ANOVA routine (dissassoc) of TraMineR; I think \nthat I understand it correctly when it deals with \"classical\" \ncategorical variables like sex, but I want to be sure that I make no \nmistake in interpreting the results in a case where the variable has \nhundreds of levels.\nWe have 1332 individual sequences clustered in 470 households and we \nwant to test if persons in the same household tend to vote similarly at \nsimilar timepoints. We produced a distance through optimal matching \n(with parameters giving an important weight to simultaneity) and \ndissassoc gives these results for households:\n\nPseudo ANOVA table:\n            SS   df       MSE\nExp   5700.474  469 12.154529\nRes   3653.928  862  4.238896\nTotal 9354.402 1331  7.028101\n\nTest values  (p-values based on 999 permutation):\n  PseudoF  PseudoR2 PseudoF_Pval PseudoT PseudoT_Pval\n 2.867381 0.6093894            0     Inf            0\n\nIs the \"Inf\" for PseudoT a problem? Am I right in understanding that \nthis shows a very important association and that, despite of the high \nnumber of categories, it is highly significant? I also wanted to control \nfor the fact that household-homogeneity could be concentrated in only \nsome of the households. Am I correct to think that the fact that, with \nan overall pseudo-variance of 7, a vast majority of even the largest \nhouseholds has an internal pseudo-variance of less than 5 points in the \nright direction?\nAll the best,\nClaire",
+      "body_snippet": "Hi all,\nI am using the pseudo-ANOVA routine (dissassoc) of TraMineR; I think \nthat I understand it correctly when it deals with \"classical\" \ncategorical variables like sex, but I want to be sure that ",
+      "thread_id": "thread-82a3d024dc24",
+      "thread_depth": 0,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-97c5b0337691",
+      "message_id": "<4C1B54A9.60202@unige.ch>",
+      "from_name": "Matthias Studer",
+      "from_email_hash": "54d4164a8ffb9683cb367813dca90351ea4f3390e7bcdd2cc0c953bb6189fef6",
+      "date": "2010-06-18T11:12:41Z",
+      "subject": "[Traminer-users] pseudo-ANOVA results",
+      "subject_clean": "[Traminer-users] pseudo-ANOVA results",
+      "in_reply_to": "<4C19D0AA.2030903@ens.fr>",
+      "references": [
+        "<4C19D0AA.2030903@ens.fr>"
+      ],
+      "body_plain": "Dear Claire,\n\nYour questions are indeed very interesting. There are some cases when \nthe Pseudo T statistic becomes infinite. For instance, when some groups \nhave 2 or less units and I guess that this is your case. This means that \nyou should not interpret the T statistic. Therefore, you cannot conclude \nthat discrepancies (pseudo-variance) are significantly different (or \nnot) in each groups.\n\nThe p-value is significant and that is what you should look at. The \nabsolute value of the R2 may be difficult to interpret. It should be \ncompared to the R2 obtained by random permutation (to get an idea if \n0.609 is high or low). These values are stored in the object returned by \ndissassoc. You can easily get an histogram using:\nda <- dissassoc(...)\nhist(da)\n\nThe values are stored in da$perms$t[, 1] (for the PseudoF statistic) or \nda$perms$t[, 2] for Pseudo R2.\n\nThe list of pseudo variances for each household can be easily recovered. \nda$groups provide size and pseudo variance of each factor levels (i.e. \nhouseholds in your case). You should just remove the last line (which \ngives the total n and pseudo-variance). This can be done with the \nfollowing code.\nda$groups[-nrow(da$groups),]\n\nRegarding the high number of levels, I think that this is not a problem. \nPermutation gives you the probability that your R2 is higher than \nobtained by random. To be sure I suggest you to use at least 5'000 \npermutations:\nda <- dissassoc(..., R=5000)\n\nHope this help,\nMatthias Studer\n\nLe 17.06.2010 09:37, Claire Lemercier a ?crit :\n> Hi all,\n> I am using the pseudo-ANOVA routine (dissassoc) of TraMineR; I think \n> that I understand it correctly when it deals with \"classical\" \n> categorical variables like sex, but I want to be sure that I make no \n> mistake in interpreting the results in a case where the variable has \n> hundreds of levels.\n> We have 1332 individual sequences clustered in 470 households and we \n> want to test if persons in the same household tend to vote similarly \n> at similar timepoints. We produced a distance through optimal matching \n> (with parameters giving an important weight to simultaneity) and \n> dissassoc gives these results for households:\n>\n> Pseudo ANOVA table:\n>            SS   df       MSE\n> Exp   5700.474  469 12.154529\n> Res   3653.928  862  4.238896\n> Total 9354.402 1331  7.028101\n>\n> Test values  (p-values based on 999 permutation):\n>  PseudoF  PseudoR2 PseudoF_Pval PseudoT PseudoT_Pval\n> 2.867381 0.6093894            0     Inf            0\n>\n> Is the \"Inf\" for PseudoT a problem? Am I right in understanding that \n> this shows a very important association and that, despite of the high \n> number of categories, it is highly significant? I also wanted to \n> control for the fact that household-homogeneity could be concentrated \n> in only some of the households. Am I correct to think that the fact \n> that, with an overall pseudo-variance of 7, a vast majority of even \n> the largest households has an internal pseudo-variance of less than 5 \n> points in the right direction?\n> All the best,\n> Claire\n>\n>\n>\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users \n>\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20100618/d0732b59/attachment.htm>",
+      "body_snippet": "Dear Claire,\n\nYour questions are indeed very interesting. There are some cases when \nthe Pseudo T statistic becomes infinite. For instance, when some groups \nhave 2 or less units and I guess that this",
+      "thread_id": "thread-82a3d024dc24",
+      "thread_depth": 1,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-c94d444704d1",
+      "message_id": "<4C1F459F.7020602@ens.fr>",
+      "from_name": "Claire Lemercier",
+      "from_email_hash": "dc71f422849b51aa9b753a59fc62f07b551fedb6e5c22bced15a7f1bd3eb78bd",
+      "date": "2010-06-21T10:57:35Z",
+      "subject": "[Traminer-users] pseudo-ANOVA",
+      "subject_clean": "[Traminer-users] pseudo-ANOVA",
+      "in_reply_to": "<mailman.17.1276941605.20989.traminer-users@lists.r-forge.r-project.org>",
+      "references": [
+        "<mailman.17.1276941605.20989.traminer-users@lists.r-forge.r-project.org>"
+      ],
+      "body_plain": "Dear Matthias,\nMany thanks for this. Just a follow-up about the pseudo-F and pseudo-R2 \nhistograms (I'm rather being curious, as the important thing for me at \nthis stage is that the p-value is significant, and remains so if I \nconcentrate on households with at least 3 members).\nMy results now look like this (after 5000 permutations, for all households):\nPseudo ANOVA table:\n            SS   df       MSE\nExp   5700.474  469 12.154529\nRes   3653.928  862  4.238896\nTotal 9354.402 1331  7.028101\n\nTest values  (p-values based on 4999 permutations):\n  PseudoF  PseudoR2 PseudoF_Pval PseudoT PseudoT_Pval\n 2.867381 0.6093894            0     Inf            0\n\nHowever, when I look at ths histograms, the values of PseudoF cluster \naround 1 and those of PseudoR2 around 0.35. Why are they so different \nfrom the PseudoF and PseudoR2 given in the general results?\nAll the best,\nClaire.\n> Dear Claire,\n>\n> Your questions are indeed very interesting. There are some cases when \n> the Pseudo T statistic becomes infinite. For instance, when some groups \n> have 2 or less units and I guess that this is your case. This means that \n> you should not interpret the T statistic. Therefore, you cannot conclude \n> that discrepancies (pseudo-variance) are significantly different (or \n> not) in each groups.\n>\n> The p-value is significant and that is what you should look at. The \n> absolute value of the R2 may be difficult to interpret. It should be \n> compared to the R2 obtained by random permutation (to get an idea if \n> 0.609 is high or low). These values are stored in the object returned by \n> dissassoc. You can easily get an histogram using:\n> da <- dissassoc(...)\n> hist(da)\n>\n> The values are stored in da$perms$t[, 1] (for the PseudoF statistic) or \n> da$perms$t[, 2] for Pseudo R2.\n>\n> The list of pseudo variances for each household can be easily recovered. \n> da$groups provide size and pseudo variance of each factor levels (i.e. \n> households in your case). You should just remove the last line (which \n> gives the total n and pseudo-variance). This can be done with the \n> following code.\n> da$groups[-nrow(da$groups),]\n>\n> Regarding the high number of levels, I think that this is not a problem. \n> Permutation gives you the probability that your R2 is higher than \n> obtained by random. To be sure I suggest you to use at least 5'000 \n> permutations:\n> da <- dissassoc(..., R=5000)\n>\n> Hope this help,\n> Matthias Studer\n>\n> Le 17.06.2010 09:37, Claire Lemercier a ?crit :\n>   \n>> Hi all,\n>> I am using the pseudo-ANOVA routine (dissassoc) of TraMineR; I think \n>> that I understand it correctly when it deals with \"classical\" \n>> categorical variables like sex, but I want to be sure that I make no \n>> mistake in interpreting the results in a case where the variable has \n>> hundreds of levels.\n>> We have 1332 individual sequences clustered in 470 households and we \n>> want to test if persons in the same household tend to vote similarly \n>> at similar timepoints. We produced a distance through optimal matching \n>> (with parameters giving an important weight to simultaneity) and \n>> dissassoc gives these results for households:\n>>\n>> Pseudo ANOVA table:\n>>            SS   df       MSE\n>> Exp   5700.474  469 12.154529\n>> Res   3653.928  862  4.238896\n>> Total 9354.402 1331  7.028101\n>>\n>> Test values  (p-values based on 999 permutation):\n>>  PseudoF  PseudoR2 PseudoF_Pval PseudoT PseudoT_Pval\n>> 2.867381 0.6093894            0     Inf            0\n>>\n>> Is the \"Inf\" for PseudoT a problem? Am I right in understanding that \n>> this shows a very important association and that, despite of the high \n>> number of categories, it is highly significant? I also wanted to \n>> control for the fact that household-homogeneity could be concentrated \n>> in only some of the households. Am I correct to think that the fact \n>> that, with an overall pseudo-variance of 7, a vast majority of even \n>> the largest households has an internal pseudo-variance of less than 5 \n>> points in the right direction?\n>> All the best,\n>> Claire\n>>\n>>\n>>\n>> _______________________________________________\n>> Traminer-users mailing list\n>> Traminer-users at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users \n>>\n>>     \n> -------------- next part --------------\n> An HTML attachment was scrubbed...\n> URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20100618/d0732b59/attachment-0001.htm>\n>\n> ------------------------------\n>\n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users\n>\n>\n> End of Traminer-users Digest, Vol 2, Issue 8\n> ********************************************\n>\n>\n>",
+      "body_snippet": "Dear Matthias,\nMany thanks for this. Just a follow-up about the pseudo-F and pseudo-R2 \nhistograms (I'm rather being curious, as the important thing for me at \nthis stage is that the p-value is signif",
+      "thread_id": "thread-c94d444704d1",
+      "thread_depth": 0,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-b09970daa5b3",
+      "message_id": "<007701cb113a$c842afa0$58c80ee0$%ritschard@unige.ch>",
+      "from_name": "Gilbert Ritschard",
+      "from_email_hash": "b39ef9479834e10f599347c49b67598206800bd09403d69655db4ad947244ad7",
+      "date": "2010-06-21T12:10:47Z",
+      "subject": "[Traminer-users] pseudo-ANOVA",
+      "subject_clean": "[Traminer-users] pseudo-ANOVA",
+      "in_reply_to": "<4C1F459F.7020602@ens.fr>",
+      "references": [
+        "<mailman.17.1276941605.20989.traminer-users@lists.r-forge.r-project.org>",
+        "<4C1F459F.7020602@ens.fr>"
+      ],
+      "body_plain": "Dear Claire,\n\nThe histogram gives the distribution of the F_perm's, i.e. those computed\nfrom the permutations. It gives the distribution of the pseudo F under\nindependence (i.e. in the case of no covariate effect) while the pseudo F\nprovided in the table is the one computed for the observed data. It is\nprecisely because it departures from the cluster of F_perm's that it not\nprobable under independence and hence significant.\n\nCheers.\nGilbert  \n\n\n> -----Original Message-----\n> From: traminer-users-bounces at lists.r-forge.r-project.org\n> [mailto:traminer-users-bounces at lists.r-forge.r-project.org] On Behalf\n> Of Claire Lemercier\n> Sent: Monday, June 21, 2010 12:58\n> To: traminer-users at lists.r-forge.r-project.org\n> Subject: Re: [Traminer-users] pseudo-ANOVA\n> \n> Dear Matthias,\n> Many thanks for this. Just a follow-up about the pseudo-F and pseudo-R2\n> histograms (I'm rather being curious, as the important thing for me at\n> this stage is that the p-value is significant, and remains so if I\n> concentrate on households with at least 3 members).\n> My results now look like this (after 5000 permutations, for all\n> households):\n> Pseudo ANOVA table:\n>             SS   df       MSE\n> Exp   5700.474  469 12.154529\n> Res   3653.928  862  4.238896\n> Total 9354.402 1331  7.028101\n> \n> Test values  (p-values based on 4999 permutations):\n>   PseudoF  PseudoR2 PseudoF_Pval PseudoT PseudoT_Pval\n>  2.867381 0.6093894            0     Inf            0\n> \n> However, when I look at ths histograms, the values of PseudoF cluster\n> around 1 and those of PseudoR2 around 0.35. Why are they so different\n> from the PseudoF and PseudoR2 given in the general results?\n> All the best,\n> Claire.\n> > Dear Claire,\n> >\n> > Your questions are indeed very interesting. There are some cases when\n> > the Pseudo T statistic becomes infinite. For instance, when some\n> groups\n> > have 2 or less units and I guess that this is your case. This means\n> that\n> > you should not interpret the T statistic. Therefore, you cannot\n> conclude\n> > that discrepancies (pseudo-variance) are significantly different (or\n> > not) in each groups.\n> >\n> > The p-value is significant and that is what you should look at. The\n> > absolute value of the R2 may be difficult to interpret. It should be\n> > compared to the R2 obtained by random permutation (to get an idea if\n> > 0.609 is high or low). These values are stored in the object returned\n> by\n> > dissassoc. You can easily get an histogram using:\n> > da <- dissassoc(...)\n> > hist(da)\n> >\n> > The values are stored in da$perms$t[, 1] (for the PseudoF statistic)\n> or\n> > da$perms$t[, 2] for Pseudo R2.\n> >\n> > The list of pseudo variances for each household can be easily\n> recovered.\n> > da$groups provide size and pseudo variance of each factor levels\n> (i.e.\n> > households in your case). You should just remove the last line (which\n> > gives the total n and pseudo-variance). This can be done with the\n> > following code.\n> > da$groups[-nrow(da$groups),]\n> >\n> > Regarding the high number of levels, I think that this is not a\n> problem.\n> > Permutation gives you the probability that your R2 is higher than\n> > obtained by random. To be sure I suggest you to use at least 5'000\n> > permutations:\n> > da <- dissassoc(..., R=5000)\n> >\n> > Hope this help,\n> > Matthias Studer\n> >\n> > Le 17.06.2010 09:37, Claire Lemercier a ?crit :\n> >\n> >> Hi all,\n> >> I am using the pseudo-ANOVA routine (dissassoc) of TraMineR; I think\n> >> that I understand it correctly when it deals with \"classical\"\n> >> categorical variables like sex, but I want to be sure that I make no\n> >> mistake in interpreting the results in a case where the variable has\n> >> hundreds of levels.\n> >> We have 1332 individual sequences clustered in 470 households and we\n> >> want to test if persons in the same household tend to vote similarly\n> >> at similar timepoints. We produced a distance through optimal\n> matching\n> >> (with parameters giving an important weight to simultaneity) and\n> >> dissassoc gives these results for households:\n> >>\n> >> Pseudo ANOVA table:\n> >>            SS   df       MSE\n> >> Exp   5700.474  469 12.154529\n> >> Res   3653.928  862  4.238896\n> >> Total 9354.402 1331  7.028101\n> >>\n> >> Test values  (p-values based on 999 permutation):\n> >>  PseudoF  PseudoR2 PseudoF_Pval PseudoT PseudoT_Pval\n> >> 2.867381 0.6093894            0     Inf            0\n> >>\n> >> Is the \"Inf\" for PseudoT a problem? Am I right in understanding that\n> >> this shows a very important association and that, despite of the\n> high\n> >> number of categories, it is highly significant? I also wanted to\n> >> control for the fact that household-homogeneity could be\n> concentrated\n> >> in only some of the households. Am I correct to think that the fact\n> >> that, with an overall pseudo-variance of 7, a vast majority of even\n> >> the largest households has an internal pseudo-variance of less than\n> 5\n> >> points in the right direction?\n> >> All the best,\n> >> Claire\n> >>\n> >>\n> >>\n> >> _______________________________________________\n> >> Traminer-users mailing list\n> >> Traminer-users at lists.r-forge.r-project.org\n> >> https://lists.r-forge.r-project.org/cgi-\n> bin/mailman/listinfo/traminer-users\n> >>\n> >>\n> > -------------- next part --------------\n> > An HTML attachment was scrubbed...\n> > URL: <http://lists.r-forge.r-project.org/pipermail/traminer-\n> users/attachments/20100618/d0732b59/attachment-0001.htm>\n> >\n> > ------------------------------\n> >\n> > _______________________________________________\n> > Traminer-users mailing list\n> > Traminer-users at lists.r-forge.r-project.org\n> > https://lists.r-forge.r-project.org/cgi-\n> bin/mailman/listinfo/traminer-users\n> >\n> >\n> > End of Traminer-users Digest, Vol 2, Issue 8\n> > ********************************************\n> >\n> >\n> >\n> \n> \n> _______________________________________________\n> Traminer-users mailing list\n> Traminer-users at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-\n> users",
+      "body_snippet": "Dear Claire,\n\nThe histogram gives the distribution of the F_perm's, i.e. those computed\nfrom the permutations. It gives the distribution of the pseudo F under\nindependence (i.e. in the case of no cova",
+      "thread_id": "thread-c94d444704d1",
+      "thread_depth": 1,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-216ce8bba37d",
+      "message_id": "<4C208D7A.8050308@ens.fr>",
+      "from_name": "Claire Lemercier",
+      "from_email_hash": "dc71f422849b51aa9b753a59fc62f07b551fedb6e5c22bced15a7f1bd3eb78bd",
+      "date": "2010-06-22T10:16:26Z",
+      "subject": "[Traminer-users] pseudo-ANOVA",
+      "subject_clean": "[Traminer-users] pseudo-ANOVA",
+      "in_reply_to": "<mailman.13.1277200808.31205.traminer-users@lists.r-forge.r-project.org>",
+      "references": [
+        "<mailman.13.1277200808.31205.traminer-users@lists.r-forge.r-project.org>"
+      ],
+      "body_plain": "OK, of course, thanks... Now everyone will see that I am still not \naccustomed to methods based on simulation and how to read their results. \nI hope that although the question was silly, the answer will help others!\nAll the best,\nClaire.\n> ----------------------\n>\n> Message: 2\n> Date: Mon, 21 Jun 2010 14:10:47 +0200\n> From: Gilbert Ritschard <Gilbert.Ritschard at unige.ch>\n> Subject: Re: [Traminer-users] pseudo-ANOVA\n> To: 'Users questions' <traminer-users at lists.r-forge.r-project.org>\n> Message-ID: <007701cb113a$c842afa0$58c80ee0$%ritschard at unige.ch>\n> Content-Type: text/plain; CHARSET=US-ASCII\n>\n> Dear Claire,\n>\n> The histogram gives the distribution of the F_perm's, i.e. those computed\n> from the permutations. It gives the distribution of the pseudo F under\n> independence (i.e. in the case of no covariate effect) while the pseudo F\n> provided in the table is the one computed for the observed data. It is\n> precisely because it departures from the cluster of F_perm's that it not\n> probable under independence and hence significant.\n>\n> Cheers.\n> Gilbert  \n>\n>\n>",
+      "body_snippet": "OK, of course, thanks... Now everyone will see that I am still not \naccustomed to methods based on simulation and how to read their results. \nI hope that although the question was silly, the answer wi",
+      "thread_id": "thread-216ce8bba37d",
+      "thread_depth": 0,
+      "month": "2010-06"
+    },
+    {
+      "id": "msg-655f946a933a",
+      "message_id": "<4C2A5A25.9010909@coriosgroup.com>",
+      "from_name": "Robin Way",
+      "from_email_hash": "1ca33a37e73b280f1dc4df846fe1c21cbb07cae58b02934f7e86ff803eb36bcd",
+      "date": "2010-06-29T20:40:05Z",
+      "subject": "[Traminer-users] how to identify entities that exhibit selected sequences?",
+      "subject_clean": "[Traminer-users] how to identify entities that exhibit selected sequences?",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Greetings. I am a new R user and new TraMiner user.\n\nThe project on which I am about to embark is, I believe, in the domain \nof event sequences. My primary question is, when I perform the analysis \nand select a set of event sequences of primary interest, can the \nTraMiner package help me identify which of the sampled observation units \nexhibited that sequence in the historical event data used to run the \nalgorithm? Furthermore, is there a capacity to produce a ruleset \ndescribing the selected event sequences on a new set of event data for \neither the same observation units at a different point in time, or for a \ndifferent set of observation units?\n\nFor instance,  my project is concerned with the quality control and \nerror detection of a set of machines. Let's say I have 20 machines \n(sampled from a larger pool of machines) and my event sequence data is a \nset of status codes from each machine recorded multiple times per day \nover the course of a calendar month (for instance, January 2010). Once I \narrive at a set of sequences that differentiate machine-days on which \nthere was a significant machine outage, I would like to be able to apply \nthe rules associated with outages to the same machines or other machines \noutside the sample on different time periods. The prospective benefit is \nto help avoid future outages by identifying sequences that appear to be \noccurring in advance of conditions leading to future outages (albeit in \na non-parametric fashion).\n\nIs this possible with the current TraMiner release? Are there \nalternative methods of achieving this objective? Thank you very much in \nadvance.\n\n-- \nRobin Way\nCorios LLC",
+      "body_snippet": "Greetings. I am a new R user and new TraMiner user.\n\nThe project on which I am about to embark is, I believe, in the domain \nof event sequences. My primary question is, when I perform the analysis \nan",
+      "thread_id": "thread-655f946a933a",
+      "thread_depth": 0,
+      "month": "2010-06"
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-930066b9b67c",
+      "subject": "[Traminer-users] suggestion on storing large dissimilarity matrix?",
+      "message_count": 1,
+      "participants": [
+        "Matthias Studer"
+      ],
+      "started": "2010-06-01T08:39:58Z",
+      "last_reply": "2010-06-01T08:39:58Z",
+      "root_message_id": "msg-930066b9b67c"
+    },
+    {
+      "id": "thread-5e7e0b6a07ec",
+      "subject": "[Traminer-users] suggestion on storing large dissimilarity\tmatrix?",
+      "message_count": 2,
+      "participants": [
+        "Matthias Studer",
+        "Zuluaga, Juan [zuju0701@stcloudstate.edu]"
+      ],
+      "started": "2010-06-01T15:31:56Z",
+      "last_reply": "2010-06-02T08:55:37Z",
+      "root_message_id": "msg-5e7e0b6a07ec"
+    },
+    {
+      "id": "thread-c08c3dde6e94",
+      "subject": "[Traminer-users] Questions",
+      "message_count": 3,
+      "participants": [
+        "\"Nicolas S. Müller\"",
+        "Claire Zalc"
+      ],
+      "started": "2010-06-10T09:20:07Z",
+      "last_reply": "2010-06-10T16:42:28Z",
+      "root_message_id": "msg-c08c3dde6e94"
+    },
+    {
+      "id": "thread-9c82041f1fb9",
+      "subject": "[Traminer-users] seqrep and distance matrix",
+      "message_count": 3,
+      "participants": [
+        "Alexis Gabadinho",
+        "Laurent Lesnard"
+      ],
+      "started": "2010-06-10T14:05:25Z",
+      "last_reply": "2010-06-11T05:50:52Z",
+      "root_message_id": "msg-9c82041f1fb9"
+    },
+    {
+      "id": "thread-23bd39acbb9d",
+      "subject": "[Traminer-users] Seqplots with multiple different states",
+      "message_count": 2,
+      "participants": [
+        "Matthias Studer",
+        "Philippe Blanchard"
+      ],
+      "started": "2010-06-11T14:38:14Z",
+      "last_reply": "2010-06-14T15:17:02Z",
+      "root_message_id": "msg-23bd39acbb9d"
+    },
+    {
+      "id": "thread-82a3d024dc24",
+      "subject": "[Traminer-users] pseudo-ANOVA results",
+      "message_count": 2,
+      "participants": [
+        "Claire Lemercier",
+        "Matthias Studer"
+      ],
+      "started": "2010-06-17T07:37:14Z",
+      "last_reply": "2010-06-18T11:12:41Z",
+      "root_message_id": "msg-82a3d024dc24"
+    },
+    {
+      "id": "thread-c94d444704d1",
+      "subject": "[Traminer-users] pseudo-ANOVA",
+      "message_count": 2,
+      "participants": [
+        "Claire Lemercier",
+        "Gilbert Ritschard"
+      ],
+      "started": "2010-06-21T10:57:35Z",
+      "last_reply": "2010-06-21T12:10:47Z",
+      "root_message_id": "msg-c94d444704d1"
+    },
+    {
+      "id": "thread-216ce8bba37d",
+      "subject": "[Traminer-users] pseudo-ANOVA",
+      "message_count": 1,
+      "participants": [
+        "Claire Lemercier"
+      ],
+      "started": "2010-06-22T10:16:26Z",
+      "last_reply": "2010-06-22T10:16:26Z",
+      "root_message_id": "msg-216ce8bba37d"
+    },
+    {
+      "id": "thread-655f946a933a",
+      "subject": "[Traminer-users] how to identify entities that exhibit selected sequences?",
+      "message_count": 1,
+      "participants": [
+        "Robin Way"
+      ],
+      "started": "2010-06-29T20:40:05Z",
+      "last_reply": "2010-06-29T20:40:05Z",
+      "root_message_id": "msg-655f946a933a"
+    }
+  ]
+}

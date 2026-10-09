@@ -1,0 +1,4074 @@
+From mdowle at mdowle.plus.com  Mon Apr  2 01:05:58 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 02 Apr 2012 00:05:58 +0100
+Subject: [datatable-help] Comma-separated columns in by break if there
+ are spaces
+In-Reply-To: <CAGPPiq--=bJR8fdLiNQNfS_mZvb6QMHHW08CvmCj09f_ZRCndg@mail.gmail.com>
+References: <CAGPPiq--=bJR8fdLiNQNfS_mZvb6QMHHW08CvmCj09f_ZRCndg@mail.gmail.com>
+Message-ID: <1333321559.19103.11.camel@netbook>
+
+Thanks for posting this. I'm really surprised that by="A, B" worked
+before. So it wasn't intentional to change that, but what it does now
+seems correct; i.e., looking for the column called " B" (starting with a
+space).
+Have added 3 tests:
+DT = data.table("a "=1:2, "b"=3:4, " b"=5:6, v=1:6)
+DT[,sum(v),by="b, b"]    # ok
+DT[,sum(v),by="a , b"]   # ok
+DT[,sum(v),by="b, a"]    # error: ' a' not found
+
+
+
+On Sat, 2012-03-31 at 15:03 +0200, Christoph J?ckel wrote:
+> Hi together,
+> 
+> 
+> I use spaces when I separate columns in the by-argument, but with
+> version 1.8.0 that does not work anymore:
+> 
+> 
+> library(data.table)
+> DT <- data.table(A = rep(letters[1:10], each=5),
+>                  B = rep(1:10, times=5),
+>                  C = rnorm(50))
+> DT[, .N, by="A, B"] #does not work, but used to work before
+> DT[, .N, by="A,B"]  #does work
+> 
+> 
+> Is this on purpose? Or is this a minor bug, probably introduced when
+> bug #1880 was fixed (see NEWS of v1.8.0):
+> 
+> 
+> * 'by' was failing (bug #1880) when passed character column names
+> where 
+> one or more included a space. So, this now works : 
+>     DT[,sum(v),by="column 1"] 
+> and j retains spaces in column names rather than replacing spaces
+> with 
+> "."; e.g., 
+>     DT[,list("a b"=1)] 
+> Thanks to Yang Zhang for reporting. Tests added. As before, column
+> names 
+> may be back ticked in the usual R way (in i, j and by); e.g., 
+>     DT[,sum(`nicely named var`+1),by=month(`long name for date
+> column`)] 
+> 
+> 
+> If it's the latter, let me know. I'll raise a bug report.
+> 
+> 
+> Christoph
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Mon Apr  2 01:53:26 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 02 Apr 2012 00:53:26 +0100
+Subject: [datatable-help] unname does not work with data.table anymore
+In-Reply-To: <CAGPPiq9HG4ex9bb0UR+3h9RRqG4w=BPwEAquO+Ojo53UgtfPSg@mail.gmail.com>
+References: <CAGPPiq9HG4ex9bb0UR+3h9RRqG4w=BPwEAquO+Ojo53UgtfPSg@mail.gmail.com>
+Message-ID: <1333324406.19103.15.camel@netbook>
+
+No problem at all, this is what the list is for.
+
+Fixed now in v1.8.1 :
+
+o base::unname(DT) now works again, as needed by plyr::melt(). Thanks to
+  Christoph Jaeckel for reporting. Test added.
+
+
+On Sat, 2012-03-31 at 15:33 +0200, Christoph J?ckel wrote:
+> Hi together,
+> 
+> 
+> I'm really sorry for bothering again and please let me know if I
+> should just raise bug reports, but I understand far too less about R
+> and data.table to know whether or not the error messages I stumble
+> across are due to deliberate changes in v1.8.0 or just minor bugs that
+> were introduced by that version.
+> 
+> 
+> Here is another one that I discovered while running old code that
+> melted (plyr-package) a data.table. In that melt-function, unname() is
+> called, which does not work anymore with v1.8.0:
+> 
+> 
+> library(data.table)
+> DT <- data.table(A = rep(letters[1:10], each=5),
+>                  B = rep(1:10, times=5),
+>                  C = rnorm(50))
+> unname(DT)
+> 
+> 
+> Error message:
+> 
+> 
+> 
+> Error in setnames(x, value) : 
+>   Can't assign 0 names to a 3 column data.table
+> 
+> 
+> 
+> 
+> Checking out the source of unname, it's the following row that causes
+> the problems:
+> 
+> 
+> 
+> 
+> names(DT) <- NULL
+> 
+> 
+> 
+> 
+> 
+> So I guess it's the old issue with the copying of data.tables, which
+> is why data.table introduced setnames(). Just out of curiosity: How
+> can one fix that? Apparently, unname is a base-R function that uses
+> names(DT), but data.tables do not like that? So what can one do? Can
+> one overload such base-R functions?
+> 
+> 
+> 
+> 
+> Anyways, I hope that minimal example helps. Again, if I should raise a
+> bug report, just let me know.
+> 
+> 
+> Christoph 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Mon Apr  2 02:17:21 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 02 Apr 2012 01:17:21 +0100
+Subject: [datatable-help] Merging problem when column in one DT is
+ factor and in the other character
+In-Reply-To: <b5d448f1b8e088a2ede7aff27991a66e.squirrel@webmail.plus.net>
+References: <CAGPPiq9YUd4-472C_rMtTXQjuN=F=t+TiwbsmAczq=QMYVNt8w@mail.gmail.com>
+ <CAGPPiq-qn0C=4k534frdQzbcyXLM8sX=Bx=vOp=QHtYdgSzoHw@mail.gmail.com>
+ <b5d448f1b8e088a2ede7aff27991a66e.squirrel@webmail.plus.net>
+Message-ID: <1333325841.19103.24.camel@netbook>
+
+
+Thanks for example and data, very clear.
+
+Yes, problem looks to be factors with unused levels, when joined to a
+character column, as you suggested. Work arounds are to drop the unused
+levels or convert to character, as you found. 
+
+A fix is a bit more involved and won't have time for a while. Please
+could you file a bug report so it doesn't get forgotten.
+
+Thanks.
+
+On Fri, 2012-03-30 at 16:51 +0100, Matthew Dowle wrote:
+> Hi. A quick read suggests it's not intended and that's a bug. Just convert
+> the columns to character for now, and it should work. Character columns
+> are now preferred going forward, so I'd be suggesting that anyway even if
+> it worked.
+> 
+> > So in case this is expected behavior, should data.table
+> > give at least a warning that says something like "You join two
+> > data.tables whereby one keyed column is a factor, one is a character.
+> > That is probably not your intention. Convert the factor column to
+> > character or vice versa."?
+> 
+> Yes. It should be converting to character (with a warning) in this case.
+> Thought that's what I coded and tested. Will investigate...
+> 
+> > Hi together,
+> >
+> > here is the problem I needed dput for: http://www.fileuploadx.de/287440
+> > (sorry,
+> > I know that this filehoster is annoying because you have to wait until you
+> > can download the file; I hope you have a coffee machine close by ;-)
+> >
+> > In this attachment, I basically load in two data.tables DT1 and DT2 that I
+> > want to join, i.e. DT2[DT1], according to the keyed columns "Company_Code"
+> > and "intDatum" in DT1 and "DSCD" and "intDatum" in DT2. However, while
+> > "DSCD" is formatted as a character-column, "Company_Code" is formatted as
+> > a
+> > factor-column. As you can see from the long structure-object, there are
+> > plenty of levels here (the actual data.tables are very small).
+> >
+> > Now, when I try to join those with DT2[DT1], I get:
+> >
+> >
+> >         DSCD intDatum MONTH MV SICClass
+> >  [1,] 997859      151  <NA> NA       44
+> >  [2,] 997859      152  <NA> NA       44
+> >  [3,] 998064      151  <NA> NA       15
+> >  [4,] 998064      152  <NA> NA       15
+> >  [5,] 142268      151  <NA> NA       53
+> >  [6,] 142268      152  <NA> NA       53
+> >  [7,] 142859      151  <NA> NA       56
+> >  [8,] 142859      152  <NA> NA       56
+> >  [9,] 143415      151  <NA> NA       63
+> > [10,] 143415      152  <NA> NA       63
+> > [11,] 307045      151  <NA> NA       15
+> > [12,] 307045      152  <NA> NA       15
+> >
+> >
+> >
+> > Basically, data.table finds no values for MV and MONTH for any DSCD
+> > and intDatum combination. However, as DT2[DSCD=="142268"] clearly
+> > shows, there are values for that DSCD:
+> >
+> >
+> >
+> >        DSCD      MONTH      MV intDatum
+> > [1,] 142268 1997-08-28 1901.12      151
+> > [2,] 142268 1997-09-28 1829.00      152
+> >
+> >
+> >
+> > Those, however, only show up in the join after i get rid of all the
+> > unused levels (equivalently, I can also transform the Company_Code to
+> > a character column):
+> >
+> >
+> > DT1[, Company_Code := factor(Company_Code)]
+> > DT2[DT1]
+> >
+> >
+> >         DSCD intDatum      MONTH      MV SICClass
+> >  [1,] 997859      151       <NA>      NA       44
+> >  [2,] 997859      152       <NA>      NA       44
+> >  [3,] 998064      151       <NA>      NA       15
+> >  [4,] 998064      152       <NA>      NA       15
+> >  [5,] 142268      151 1997-08-28 1901.12       53
+> >  [6,] 142268      152 1997-09-28 1829.00       53
+> >  [7,] 142859      151       <NA>      NA       56
+> >  [8,] 142859      152       <NA>      NA       56
+> >  [9,] 143415      151       <NA>      NA       63
+> > [10,] 143415      152       <NA>      NA       63
+> > [11,] 307045      151       <NA>      NA       15
+> > [12,] 307045      152       <NA>      NA       15
+> >
+> >
+> >
+> > I'm pretty sure this behaviour occurred only with version 1.8.0,
+> > probably because data.table coerced every key to factor before (see
+> > the NEWS to 1.8.0). So my question is: Is what happens here intended
+> > behavior? I'm honest with you: I'm working now for a while with R and
+> > factors are one of those things that I never got. I just don't see
+> > their use and every so often they cause me huge problems (as in this
+> > case). So I'm probably making something stupid here. The nasty thing
+> > about this issue here is that mostly, however, the joins just work as
+> > expected (believe me, I tried to produce a simple example with one
+> > column factor and one character that would reproduce this behavior,
+> > but no matter what I did, the joins afterwards always worked as
+> > expected). So in case this is expected behavior, should data.table
+> > give at least a warning that says something like "You join two
+> > data.tables whereby one keyed column is a factor, one is a character.
+> > That is probably not your intention. Convert the factor column to
+> > character or vice versa."?
+> >
+> >
+> >
+> > Thanks for your help!
+> >
+> >
+> >
+> > Christoph
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From christoph.jaeckel at wi.tum.de  Mon Apr  2 13:39:34 2012
+From: christoph.jaeckel at wi.tum.de (=?ISO-8859-1?Q?Christoph_J=E4ckel?=)
+Date: Mon, 2 Apr 2012 13:39:34 +0200
+Subject: [datatable-help] Merging problem when column in one DT is
+ factor and in the other character
+In-Reply-To: <1333325841.19103.24.camel@netbook>
+References: <CAGPPiq9YUd4-472C_rMtTXQjuN=F=t+TiwbsmAczq=QMYVNt8w@mail.gmail.com>
+ <CAGPPiq-qn0C=4k534frdQzbcyXLM8sX=Bx=vOp=QHtYdgSzoHw@mail.gmail.com>
+ <b5d448f1b8e088a2ede7aff27991a66e.squirrel@webmail.plus.net>
+ <1333325841.19103.24.camel@netbook>
+Message-ID: <CAGPPiq-COLt2+fOJ0x=kdqPwDPH6K1u0QCi4MkRfN_Xx+XU79w@mail.gmail.com>
+
+I have raised a bug report under, which can be found under #1922.
+
+On Mon, Apr 2, 2012 at 2:17 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+
+>
+> Thanks for example and data, very clear.
+>
+> Yes, problem looks to be factors with unused levels, when joined to a
+> character column, as you suggested. Work arounds are to drop the unused
+> levels or convert to character, as you found.
+>
+> A fix is a bit more involved and won't have time for a while. Please
+> could you file a bug report so it doesn't get forgotten.
+>
+> Thanks.
+>
+> On Fri, 2012-03-30 at 16:51 +0100, Matthew Dowle wrote:
+> > Hi. A quick read suggests it's not intended and that's a bug. Just
+> convert
+> > the columns to character for now, and it should work. Character columns
+> > are now preferred going forward, so I'd be suggesting that anyway even if
+> > it worked.
+> >
+> > > So in case this is expected behavior, should data.table
+> > > give at least a warning that says something like "You join two
+> > > data.tables whereby one keyed column is a factor, one is a character.
+> > > That is probably not your intention. Convert the factor column to
+> > > character or vice versa."?
+> >
+> > Yes. It should be converting to character (with a warning) in this case.
+> > Thought that's what I coded and tested. Will investigate...
+> >
+> > > Hi together,
+> > >
+> > > here is the problem I needed dput for:
+> http://www.fileuploadx.de/287440
+> > > (sorry,
+> > > I know that this filehoster is annoying because you have to wait until
+> you
+> > > can download the file; I hope you have a coffee machine close by ;-)
+> > >
+> > > In this attachment, I basically load in two data.tables DT1 and DT2
+> that I
+> > > want to join, i.e. DT2[DT1], according to the keyed columns
+> "Company_Code"
+> > > and "intDatum" in DT1 and "DSCD" and "intDatum" in DT2. However, while
+> > > "DSCD" is formatted as a character-column, "Company_Code" is formatted
+> as
+> > > a
+> > > factor-column. As you can see from the long structure-object, there are
+> > > plenty of levels here (the actual data.tables are very small).
+> > >
+> > > Now, when I try to join those with DT2[DT1], I get:
+> > >
+> > >
+> > >         DSCD intDatum MONTH MV SICClass
+> > >  [1,] 997859      151  <NA> NA       44
+> > >  [2,] 997859      152  <NA> NA       44
+> > >  [3,] 998064      151  <NA> NA       15
+> > >  [4,] 998064      152  <NA> NA       15
+> > >  [5,] 142268      151  <NA> NA       53
+> > >  [6,] 142268      152  <NA> NA       53
+> > >  [7,] 142859      151  <NA> NA       56
+> > >  [8,] 142859      152  <NA> NA       56
+> > >  [9,] 143415      151  <NA> NA       63
+> > > [10,] 143415      152  <NA> NA       63
+> > > [11,] 307045      151  <NA> NA       15
+> > > [12,] 307045      152  <NA> NA       15
+> > >
+> > >
+> > >
+> > > Basically, data.table finds no values for MV and MONTH for any DSCD
+> > > and intDatum combination. However, as DT2[DSCD=="142268"] clearly
+> > > shows, there are values for that DSCD:
+> > >
+> > >
+> > >
+> > >        DSCD      MONTH      MV intDatum
+> > > [1,] 142268 1997-08-28 1901.12      151
+> > > [2,] 142268 1997-09-28 1829.00      152
+> > >
+> > >
+> > >
+> > > Those, however, only show up in the join after i get rid of all the
+> > > unused levels (equivalently, I can also transform the Company_Code to
+> > > a character column):
+> > >
+> > >
+> > > DT1[, Company_Code := factor(Company_Code)]
+> > > DT2[DT1]
+> > >
+> > >
+> > >         DSCD intDatum      MONTH      MV SICClass
+> > >  [1,] 997859      151       <NA>      NA       44
+> > >  [2,] 997859      152       <NA>      NA       44
+> > >  [3,] 998064      151       <NA>      NA       15
+> > >  [4,] 998064      152       <NA>      NA       15
+> > >  [5,] 142268      151 1997-08-28 1901.12       53
+> > >  [6,] 142268      152 1997-09-28 1829.00       53
+> > >  [7,] 142859      151       <NA>      NA       56
+> > >  [8,] 142859      152       <NA>      NA       56
+> > >  [9,] 143415      151       <NA>      NA       63
+> > > [10,] 143415      152       <NA>      NA       63
+> > > [11,] 307045      151       <NA>      NA       15
+> > > [12,] 307045      152       <NA>      NA       15
+> > >
+> > >
+> > >
+> > > I'm pretty sure this behaviour occurred only with version 1.8.0,
+> > > probably because data.table coerced every key to factor before (see
+> > > the NEWS to 1.8.0). So my question is: Is what happens here intended
+> > > behavior? I'm honest with you: I'm working now for a while with R and
+> > > factors are one of those things that I never got. I just don't see
+> > > their use and every so often they cause me huge problems (as in this
+> > > case). So I'm probably making something stupid here. The nasty thing
+> > > about this issue here is that mostly, however, the joins just work as
+> > > expected (believe me, I tried to produce a simple example with one
+> > > column factor and one character that would reproduce this behavior,
+> > > but no matter what I did, the joins afterwards always worked as
+> > > expected). So in case this is expected behavior, should data.table
+> > > give at least a warning that says something like "You join two
+> > > data.tables whereby one keyed column is a factor, one is a character.
+> > > That is probably not your intention. Convert the factor column to
+> > > character or vice versa."?
+> > >
+> > >
+> > >
+> > > Thanks for your help!
+> > >
+> > >
+> > >
+> > > Christoph
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org
+> > >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120402/3e1b8c7d/attachment.html>
+
+From skranz at uni-bonn.de  Tue Apr  3 14:28:41 2012
+From: skranz at uni-bonn.de (Sebastian Kranz)
+Date: Tue, 03 Apr 2012 14:28:41 +0200
+Subject: [datatable-help] A vote for := with by
+In-Reply-To: <web-9750348@be2.uni-bonn.de>
+References: <web-9750348@be2.uni-bonn.de>
+Message-ID: <web-9750424@be2.uni-bonn.de>
+
+Dear Matthew,
+
+data.table is a great package! Following your suggestion, 
+I just wanted to let you know that it would be really 
+great if := would work with by.
+
+  I have no clue how hard it is to implemented it 
+efficiently. If an efficient implementation is likely to 
+take some time, perhaps one could already implement a 
+simple workaround, like autmatically calling:
+
+dt[,transform(.SD, newcol = expr),by=by.col]
+
+when the user supplied
+
+dt[,newcol := expr, by=by.col]
+
+This would already allow to use the simpler syntax. (I 
+wanted to teach some students new to R how data.table 
+allows convenient and quick data aggregation and would 
+find it much easier to explain the second syntax instead 
+of explaining the first syntax)
+
+Anyway, thanks to all developers for creating and 
+maintaining the package!
+
+Best wishes,
+Sebastian
+
+From mhwaliji at google.com  Wed Apr  4 20:44:05 2012
+From: mhwaliji at google.com (Muhammad Waliji)
+Date: Wed, 4 Apr 2012 11:44:05 -0700
+Subject: [datatable-help] CJ() no longer preserves column names
+Message-ID: <CAHNAUjHgzaLPE3Mf597ckghiuMwLbU1FNnRXfs2d1MvBZMV3ow@mail.gmail.com>
+
+With data.table 1.8.0:
+> CJ(x=c(1,2), y=c("a","b"))
+*     V1 V2*
+[1,]  1  a
+[2,]  1  b
+[3,]  2  a
+[4,]  2  b
+
+With data.table 1.7.1:
+> CJ(x=c(1,2), y=c("a","b"))
+*     x y*
+[1,] 1 a
+[2,] 1 b
+[3,] 2 a
+[4,] 2 b
+
+I looked through the NEWS file and this doesn't seem to be announced. Can
+this be fixed? I have code that relies on the column names being present.
+
+Thanks!
+-Muhammad
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120404/36b598e8/attachment.html>
+
+From ripley at stats.ox.ac.uk  Sun Apr  8 08:28:53 2012
+From: ripley at stats.ox.ac.uk (Prof Brian Ripley)
+Date: Sun, 08 Apr 2012 07:28:53 +0100
+Subject: [datatable-help] Misuse of LENGTH in data.table
+Message-ID: <4F813025.1050908@stats.ox.ac.uk>
+
+Matthew,
+
+Rinternals.h has a function SETLENGTH to set lengths.  This is required 
+even if USE_RINTERNALS is defined, and shortly in R-devel (as part of 
+adding support for vector of more than 2 billion elements) your code 
+will fail to compile.
+
+Please change it to use SETLENGTH: I believe you can test in any version 
+of R by simply not defining USE_RINTERNALS.
+
+Brian Ripley
+
+-- 
+Brian D. Ripley,                  ripley at stats.ox.ac.uk
+Professor of Applied Statistics,  http://www.stats.ox.ac.uk/~ripley/
+University of Oxford,             Tel:  +44 1865 272861 (self)
+1 South Parks Road,                     +44 1865 272866 (PA)
+Oxford OX1 3TG, UK                Fax:  +44 1865 272595
+
+From mdowle at mdowle.plus.com  Tue Apr 10 19:11:27 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 10 Apr 2012 18:11:27 +0100
+Subject: [datatable-help] CJ() no longer preserves column names
+In-Reply-To: <CAHNAUjHgzaLPE3Mf597ckghiuMwLbU1FNnRXfs2d1MvBZMV3ow@mail.gmail.com>
+References: <CAHNAUjHgzaLPE3Mf597ckghiuMwLbU1FNnRXfs2d1MvBZMV3ow@mail.gmail.com>
+Message-ID: <1334077887.7257.9.camel@netbook>
+
+Thanks. Now fixed in 1.8.1.
+
+o CJ(x=...,y=...) now retains the column names x and y, useful when CJ
+  is used independently (since x[CJ(...)] takes join column names from 
+  x). Restores behaviour lost somewhere between 1.7.1 and 1.8.0, thanks
+  to Muhammad Waliji for reporting. Tests added.
+
+
+On Wed, 2012-04-04 at 11:44 -0700, Muhammad Waliji wrote:
+> With data.table 1.8.0:
+> > CJ(x=c(1,2), y=c("a","b"))
+>      V1 V2
+> [1,]  1  a
+> [2,]  1  b
+> [3,]  2  a
+> [4,]  2  b
+> 
+> 
+> With data.table 1.7.1:
+> > CJ(x=c(1,2), y=c("a","b"))
+>      x y
+> [1,] 1 a
+> [2,] 1 b
+> [3,] 2 a
+> [4,] 2 b
+> 
+> 
+> I looked through the NEWS file and this doesn't seem to be announced.
+> Can this be fixed? I have code that relies on the column names being
+> present.
+> 
+> 
+> Thanks!
+> -Muhammad
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mhwaliji at google.com  Tue Apr 10 19:12:22 2012
+From: mhwaliji at google.com (Muhammad Waliji)
+Date: Tue, 10 Apr 2012 10:12:22 -0700
+Subject: [datatable-help] CJ() no longer preserves column names
+In-Reply-To: <1334077887.7257.9.camel@netbook>
+References: <CAHNAUjHgzaLPE3Mf597ckghiuMwLbU1FNnRXfs2d1MvBZMV3ow@mail.gmail.com>
+ <1334077887.7257.9.camel@netbook>
+Message-ID: <CAHNAUjH2B1d5ucLbhQNX8BTrC9EdRkaabzXW+gK0bC6muuMRqw@mail.gmail.com>
+
+Thanks Matthew!
+
+On Tue, Apr 10, 2012 at 10:11 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+
+> Thanks. Now fixed in 1.8.1.
+>
+> o CJ(x=...,y=...) now retains the column names x and y, useful when CJ
+>  is used independently (since x[CJ(...)] takes join column names from
+>  x). Restores behaviour lost somewhere between 1.7.1 and 1.8.0, thanks
+>  to Muhammad Waliji for reporting. Tests added.
+>
+>
+> On Wed, 2012-04-04 at 11:44 -0700, Muhammad Waliji wrote:
+> > With data.table 1.8.0:
+> > > CJ(x=c(1,2), y=c("a","b"))
+> >      V1 V2
+> > [1,]  1  a
+> > [2,]  1  b
+> > [3,]  2  a
+> > [4,]  2  b
+> >
+> >
+> > With data.table 1.7.1:
+> > > CJ(x=c(1,2), y=c("a","b"))
+> >      x y
+> > [1,] 1 a
+> > [2,] 1 b
+> > [3,] 2 a
+> > [4,] 2 b
+> >
+> >
+> > I looked through the NEWS file and this doesn't seem to be announced.
+> > Can this be fixed? I have code that relies on the column names being
+> > present.
+> >
+> >
+> > Thanks!
+> > -Muhammad
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120410/e529ccda/attachment.html>
+
+From jgvcqa at rit.edu  Wed Apr 11 01:51:28 2012
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Tue, 10 Apr 2012 19:51:28 -0400
+Subject: [datatable-help] Order of DT after non-keyed by
+Message-ID: <705A8CD1C73B164D91B71C465EA15BE557F85A607B@ex02mail01.ad.rit.edu>
+
+Here is a simple example of a simple question:
+
+dt<-data.table(a=rep(1:5,1:5),b=1,c=rep(1:3,5))
+dt
+dt[,seq_along(b),by=a] # expected behavior (note: dt is already in order of a)
+setkey(dt,c) # to sort by c
+dt
+dt[,seq_along(b),by=a] # expected behavior? Appears to be in order of unique(dt$a)
+
+Thanks,
+
+Joe Voelkel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120410/5639b281/attachment.html>
+
+From mdowle at mdowle.plus.com  Wed Apr 11 02:22:07 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 11 Apr 2012 01:22:07 +0100
+Subject: [datatable-help] Order of DT after non-keyed by
+In-Reply-To: <705A8CD1C73B164D91B71C465EA15BE557F85A607B@ex02mail01.ad.rit.edu>
+References: <705A8CD1C73B164D91B71C465EA15BE557F85A607B@ex02mail01.ad.rit.edu>
+Message-ID: <1334103727.7257.27.camel@netbook>
+
+Yes, correct behaviour. That's an ad hoc by which preserves the group
+order (the order of first appearance of each group). From ?data.table,
+the second part of this sentence :
+
+"The order of the rows within each group is preserved, as is the order
+of the groups."
+
+That was new in 1.6.3 :
+
+o   Ad hoc grouping now returns results in the same order each 
+    group first appears in the table, rather than sorting the
+    groups. Thanks to Steve Lianoglou for highlighting. The order
+    of the rows within each group always has and always will be 
+    preserved. For larger datasets a 'keyed by' is still faster;
+    e.g., by=key(DT).
+
+To reorder the ad hoc by result, change 'by=' to 'keyby=' (in v1.8.0).
+Not be confused with keyed by!
+
+Matthew
+
+
+On Tue, 2012-04-10 at 19:51 -0400, Joseph Voelkel wrote:
+> Here is a simple example of a simple question:
+> 
+>  
+> 
+> dt<-data.table(a=rep(1:5,1:5),b=1,c=rep(1:3,5))
+> 
+> dt
+> 
+> dt[,seq_along(b),by=a] # expected behavior (note: dt is already in
+> order of a)
+> 
+> setkey(dt,c) # to sort by c
+> 
+> dt
+> 
+> dt[,seq_along(b),by=a] # expected behavior? Appears to be in order of
+> unique(dt$a)
+> 
+>  
+> 
+> Thanks,
+> 
+>  
+> 
+> Joe Voelkel
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From jgvcqa at rit.edu  Wed Apr 11 03:39:20 2012
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Tue, 10 Apr 2012 21:39:20 -0400
+Subject: [datatable-help] Order of DT after non-keyed by
+In-Reply-To: <1334103727.7257.27.camel@netbook>
+References: <705A8CD1C73B164D91B71C465EA15BE557F85A607B@ex02mail01.ad.rit.edu>
+ <1334103727.7257.27.camel@netbook>
+Message-ID: <705A8CD1C73B164D91B71C465EA15BE557F85A6081@ex02mail01.ad.rit.edu>
+
+Thanks, Matthew, for not only the answer but also the historical context and keyby.
+
+Joe
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+Sent: Tuesday, April 10, 2012 8:22 PM
+To: Joseph Voelkel
+Cc: datatable-help at r-forge.wu-wien.ac.at
+Subject: Re: [datatable-help] Order of DT after non-keyed by
+
+Yes, correct behaviour. That's an ad hoc by which preserves the group order (the order of first appearance of each group). From ?data.table, the second part of this sentence :
+
+"The order of the rows within each group is preserved, as is the order of the groups."
+
+That was new in 1.6.3 :
+
+o   Ad hoc grouping now returns results in the same order each 
+    group first appears in the table, rather than sorting the
+    groups. Thanks to Steve Lianoglou for highlighting. The order
+    of the rows within each group always has and always will be 
+    preserved. For larger datasets a 'keyed by' is still faster;
+    e.g., by=key(DT).
+
+To reorder the ad hoc by result, change 'by=' to 'keyby=' (in v1.8.0).
+Not be confused with keyed by!
+
+Matthew
+
+
+On Tue, 2012-04-10 at 19:51 -0400, Joseph Voelkel wrote:
+> Here is a simple example of a simple question:
+> 
+>  
+> 
+> dt<-data.table(a=rep(1:5,1:5),b=1,c=rep(1:3,5))
+> 
+> dt
+> 
+> dt[,seq_along(b),by=a] # expected behavior (note: dt is already in 
+> order of a)
+> 
+> setkey(dt,c) # to sort by c
+> 
+> dt
+> 
+> dt[,seq_along(b),by=a] # expected behavior? Appears to be in order of
+> unique(dt$a)
+> 
+>  
+> 
+> Thanks,
+> 
+>  
+> 
+> Joe Voelkel
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable
+> -help
+
+
+
+From dbetebenner at nciea.org  Thu Apr 12 21:57:03 2012
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Thu, 12 Apr 2012 14:57:03 -0500
+Subject: [datatable-help] Coercian to character
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+
+Data tablers
+
+Does data.table now coerce factors to character variables when doing by summaries?
+
+If so, is there any way to not allow this coercion?
+
+Thanks,
+
+Damian Betebenner
+Center for Assessment
+PO Box 351
+Dover, NH   03821-0351
+
+Phone (office): (603) 516-7900
+Phone (cell): (857) 234-2474
+Fax: (603) 516-7910
+
+dbetebenner at nciea.org<mailto:dbetebenner at nciea.org>
+www.nciea.org<http://www.nciea.org/>
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120412/6402b3db/attachment.html>
+
+From mdowle at mdowle.plus.com  Thu Apr 12 23:49:38 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 12 Apr 2012 22:49:38 +0100
+Subject: [datatable-help] Coercian to character
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <1334267378.7257.92.camel@netbook>
+
+It shouldn't coerce. What makes you think it does?
+
+> DT = data.table(a=factor(c("a","b","b","c")),b=1:4)
+> DT[,sum(b),by=a]
+     a V1
+[1,] a  1
+[2,] b  5
+[3,] c  4
+> str(DT[,sum(b),by=a])
+Classes ?data.table? and 'data.frame':	3 obs. of  2 variables:
+ $ a : Factor w/ 3 levels "a","b","c": 1 2 3
+ $ V1: int  1 5 4
+
+
+
+On Thu, 2012-04-12 at 14:57 -0500, Damian Betebenner wrote:
+> Data tablers
+> 
+>  
+> 
+> Does data.table now coerce factors to character variables when doing
+> by summaries?
+> 
+>  
+> 
+> If so, is there any way to not allow this coercion?
+> 
+>  
+> 
+> Thanks,
+> 
+>  
+> 
+> Damian Betebenner
+> 
+> Center for Assessment
+> 
+> PO Box 351
+> 
+> Dover, NH   03821-0351
+> 
+>  
+> 
+> Phone (office): (603) 516-7900
+> 
+> Phone (cell): (857) 234-2474
+> 
+> Fax: (603) 516-7910
+> 
+>  
+> 
+> dbetebenner at nciea.org
+> 
+> www.nciea.org
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mel at mbacou.com  Fri Apr 13 08:01:00 2012
+From: mel at mbacou.com (Bacou, Melanie)
+Date: Fri, 13 Apr 2012 02:01:00 -0400
+Subject: [datatable-help] Passing i, j and by to dt() as characters
+Message-ID: <010301cd193a$cd75cf20$68616d60$@mbacou.com>
+
+Hello,
+
+I apologize in advance if this has been covered before, but I'm trying to
+write a generic function that takes 3 URL parameters of the form:
+
+http://my.url?param1='f1=a,f2=b'&param2='c,d'&param3='e,f' 
+
+and simply pass them to dt(), so the expression to evaluate is:
+
+dt[f1=="a" & f2=="b", list( t1(c), t2(d) ), by=list( e, f )]
+
+where t1, t2 are custom aggregation functions.
+
+I can't seem to find an elegant way to convert the strings to vector names.
+Using .SDcols does work for the elements in j, but what about i and by?
+
+Any tip would be very helpful!
+Thanks, --Mel.
+
+_______________________
+?Melanie Bacou
+?IFPRI / HarvestChoice
+?Washington DC, 20006
+?W +1(202)862-5699
+?C +1(202)492-7978
+?m.bacou at cgiar.org?
+
+
+
+From mdowle at mdowle.plus.com  Fri Apr 13 10:21:42 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 13 Apr 2012 09:21:42 +0100
+Subject: [datatable-help] Passing i, j and by to dt() as characters
+In-Reply-To: <010301cd193a$cd75cf20$68616d60$@mbacou.com>
+References: <010301cd193a$cd75cf20$68616d60$@mbacou.com>
+Message-ID: <edea47c6282563aae2f4ce964a383b28.squirrel@webmail.plus.net>
+
+
+Interesting.
+
+by accepts a 'single character string containing comma separated column
+names', so by="e,f" in this case could be passed straight through.
+Passing expressions (using quote()) to i,j and by is another idiom, see
+FAQ 1.6.
+But in this case where it's a URL interface that you're providing, I'm
+thinking it's probably easier and simpler to: 
+eval(parse(text=paste("dt[",...)))? Maybe wrap that idiom into a helper
+function with a shorter name if you do it a lot. Also use paste0 rather
+than paste, new in R 2.15.0.
+
+Can't let that 'i' (f1=="a" & f2=="b") go without a comment. With 3 vector
+scans and allocations it's almost heresy to data tablers! Could dt be
+keyed by (f1,f2) then do dt[J("a","b"),...]? If you don't know in advance
+which columns, and the key would vary a lot, would secondary keys be
+something that would help you a lot?  Perhaps data.table could get fancy
+with vector scanning i expressions and automatically convert them to use
+keys.
+
+Matthew
+
+> Hello,
+>
+> I apologize in advance if this has been covered before, but I'm trying to
+> write a generic function that takes 3 URL parameters of the form:
+>
+> http://my.url?param1='f1=a,f2=b'&param2='c,d'&param3='e,f'
+>
+> and simply pass them to dt(), so the expression to evaluate is:
+>
+> dt[f1=="a" & f2=="b", list( t1(c), t2(d) ), by=list( e, f )]
+>
+> where t1, t2 are custom aggregation functions.
+>
+> I can't seem to find an elegant way to convert the strings to vector
+> names.
+> Using .SDcols does work for the elements in j, but what about i and by?
+>
+> Any tip would be very helpful!
+> Thanks, --Mel.
+>
+> _______________________
+> ?Melanie Bacou
+> ?IFPRI / HarvestChoice
+> ?Washington DC, 20006
+> ?W +1(202)862-5699
+> ?C +1(202)492-7978
+> ?m.bacou at cgiar.org?
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From jgvcqa at rit.edu  Fri Apr 13 16:50:24 2012
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Fri, 13 Apr 2012 10:50:24 -0400
+Subject: [datatable-help] Passing i, j and by to dt() as characters
+In-Reply-To: <edea47c6282563aae2f4ce964a383b28.squirrel@webmail.plus.net>
+References: <010301cd193a$cd75cf20$68616d60$@mbacou.com>
+ <edea47c6282563aae2f4ce964a383b28.squirrel@webmail.plus.net>
+Message-ID: <705A8CD1C73B164D91B71C465EA15BE557F85A632A@ex02mail01.ad.rit.edu>
+
+A side note on Matthew's last comment: "With 3 vector scans and allocations it's almost heresy to data tablers! Could dt be keyed by (f1,f2) then do dt[J("a","b"),...]?"
+
+Matthew is, of course, right. (As the god of data.table, he better be!) However, not all data tables contain lots of data, and in such a case I would probable use Mel's code for its simplicity. 
+
+Please do not burn this heretic at the stake!
+
+Joe
+
+
+-----Original Message-----
+From: datatable-help-bounces at lists.r-forge.r-project.org [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of Matthew Dowle
+Sent: Friday, April 13, 2012 4:22 AM
+To: mel at mbacou.com
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Passing i, j and by to dt() as characters
+
+
+Interesting.
+
+by accepts a 'single character string containing comma separated column names', so by="e,f" in this case could be passed straight through.
+Passing expressions (using quote()) to i,j and by is another idiom, see FAQ 1.6.
+But in this case where it's a URL interface that you're providing, I'm thinking it's probably easier and simpler to: 
+eval(parse(text=paste("dt[",...)))? Maybe wrap that idiom into a helper function with a shorter name if you do it a lot. Also use paste0 rather than paste, new in R 2.15.0.
+
+Can't let that 'i' (f1=="a" & f2=="b") go without a comment. With 3 vector scans and allocations it's almost heresy to data tablers! Could dt be keyed by (f1,f2) then do dt[J("a","b"),...]? If you don't know in advance which columns, and the key would vary a lot, would secondary keys be something that would help you a lot?  Perhaps data.table could get fancy with vector scanning i expressions and automatically convert them to use keys.
+
+Matthew
+
+> Hello,
+>
+> I apologize in advance if this has been covered before, but I'm trying 
+> to write a generic function that takes 3 URL parameters of the form:
+>
+> http://my.url?param1='f1=a,f2=b'&param2='c,d'&param3='e,f'
+>
+> and simply pass them to dt(), so the expression to evaluate is:
+>
+> dt[f1=="a" & f2=="b", list( t1(c), t2(d) ), by=list( e, f )]
+>
+> where t1, t2 are custom aggregation functions.
+>
+> I can't seem to find an elegant way to convert the strings to vector 
+> names.
+> Using .SDcols does work for the elements in j, but what about i and by?
+>
+> Any tip would be very helpful!
+> Thanks, --Mel.
+>
+> _______________________
+> ?Melanie Bacou
+> ?IFPRI / HarvestChoice
+> ?Washington DC, 20006
+> ?W +1(202)862-5699
+> ?C +1(202)492-7978
+> ?m.bacou at cgiar.org
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable
+> -help
+>
+
+
+_______________________________________________
+datatable-help mailing list
+datatable-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From mailinglist.honeypot at gmail.com  Fri Apr 13 18:16:27 2012
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Fri, 13 Apr 2012 12:16:27 -0400
+Subject: [datatable-help] Passing i, j and by to dt() as characters
+In-Reply-To: <705A8CD1C73B164D91B71C465EA15BE557F85A632A@ex02mail01.ad.rit.edu>
+References: <010301cd193a$cd75cf20$68616d60$@mbacou.com>
+ <edea47c6282563aae2f4ce964a383b28.squirrel@webmail.plus.net>
+ <705A8CD1C73B164D91B71C465EA15BE557F85A632A@ex02mail01.ad.rit.edu>
+Message-ID: <CAHA9McPYzCzFmTgpqpcf3PN--eqCMvgcaXtzjDiZhRLRumhwSg@mail.gmail.com>
+
+Hmmm...
+
+On Fri, Apr 13, 2012 at 10:50 AM, Joseph Voelkel <jgvcqa at rit.edu> wrote:
+[snip]
+> Please do not burn this heretic at the stake!
+
+... well do you sink in water?
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mel at mbacou.com  Sat Apr 14 02:58:38 2012
+From: mel at mbacou.com (Melanie Bacou)
+Date: Fri, 13 Apr 2012 17:58:38 -0700
+Subject: [datatable-help] Passing i, j and by to dt() as characters
+In-Reply-To: <CAHA9McPYzCzFmTgpqpcf3PN--eqCMvgcaXtzjDiZhRLRumhwSg@mail.gmail.com>
+References: <010301cd193a$cd75cf20$68616d60$@mbacou.com>
+ <edea47c6282563aae2f4ce964a383b28.squirrel@webmail.plus.net>
+ <705A8CD1C73B164D91B71C465EA15BE557F85A632A@ex02mail01.ad.rit.edu>
+ <CAHA9McPYzCzFmTgpqpcf3PN--eqCMvgcaXtzjDiZhRLRumhwSg@mail.gmail.com>
+Message-ID: <39d2d233b2fa16991f914a72284f5bc6@mbacou.com>
+
+Matthew, Joe,
+
+Thanks very much for the quick response, and for flagging the 
+performance pitfalls!
+
+In the general case I won't know what columns will be filtered against 
+and we're working with files in the 1 to 10 million rows. It's not so 
+much extra work to parse the 1st parameter and re-key the data, so I'm 
+testing the 2 approaches.
+
+Right now it's working with eval(parse(text=) and lots of paste() as 
+Matt suggested -- not pretty but working. I didn't know about paste0(), 
+I'm checking that as well.
+
+Kudos for your incredible work with data.table.
+
+-Mel.
+
+param1 <- unlist(str_split(param1, ","))
+param1 <- str_trim(param1)
+param1 <- str_replace(param1, "=", "==")
+
+param2 <- unlist(str_split(param2, ","))
+param2 <- str_trim(param2)
+
+dt <- data.table(dt)
+dt <- eval(parse(text=paste("dt[", paste(param1, collapse="&"), ", 
+lapply(.SD, flist), by = param3, .SDcols = param2]", sep="")))
+
+
+
+On 2012-04-13 09:16, Steve Lianoglou wrote:
+
+> Hmmm...
+>
+> On Fri, Apr 13, 2012 at 10:50 AM, Joseph Voelkel <jgvcqa at rit.edu> 
+> wrote:
+> [snip]
+>
+>> Please do not burn this heretic at the stake!
+>
+> ... well do you sink in water?
+>
+> -- Steve Lianoglou Graduate Student: Computational Systems Biology |
+> Memorial Sloan-Kettering Cancer Center | Weill Medical College of
+Cornell
+> University Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From dbetebenner at nciea.org  Sun Apr 15 11:40:24 2012
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Sun, 15 Apr 2012 04:40:24 -0500
+Subject: [datatable-help] Coercian to character
+In-Reply-To: <1334267378.7257.92.camel@netbook>
+References: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+ <1334267378.7257.92.camel@netbook>
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694E0ED00551@AUSP01VMBX05.collaborationhost.net>
+
+I started having character vectors popping up in places I never had before but upon further investigation that turned out to be an issue with my own setup, not data.table.
+
+With regard to characters (and data.tables ability to handle them as a key now), I did notice that data.table and data.frame default to using
+stringsAsFactors differently:
+
+DF <- data.frame(X=letters[1:10], Y=rnorm(10))
+sapply(DF, class)
+
+        X         Y 
+ "factor" "numeric"
+
+DT <- data.table(X=letters[1:10], Y=rnorm(10)) 
+sapply(DT, class)
+
+> DT <- data.table(X=rep(letters[1:10], each=2), Y=rnorm(20)) 
+> sapply(DT, class)
+          X           Y 
+"character"   "numeric"
+
+
+Will this inconsistency cause problems down the road?
+
+Thanks for all your help,
+
+Damian
+
+
+Damian Betebenner
+Center for Assessment
+PO Box 351
+Dover, NH?? 03821-0351
+?
+Phone (office): (603) 516-7900
+Phone (cell): (857) 234-2474
+Fax: (603) 516-7910
+
+dbetebenner at nciea.org
+www.nciea.org
+
+
+
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+Sent: Thursday, April 12, 2012 5:50 PM
+To: Damian Betebenner
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Coercian to character
+
+It shouldn't coerce. What makes you think it does?
+
+> DT = data.table(a=factor(c("a","b","b","c")),b=1:4)
+> DT[,sum(b),by=a]
+     a V1
+[1,] a  1
+[2,] b  5
+[3,] c  4
+> str(DT[,sum(b),by=a])
+Classes ?data.table? and 'data.frame':	3 obs. of  2 variables:
+ $ a : Factor w/ 3 levels "a","b","c": 1 2 3  $ V1: int  1 5 4
+
+
+
+On Thu, 2012-04-12 at 14:57 -0500, Damian Betebenner wrote:
+> Data tablers
+> 
+>  
+> 
+> Does data.table now coerce factors to character variables when doing 
+> by summaries?
+> 
+>  
+> 
+> If so, is there any way to not allow this coercion?
+> 
+>  
+> 
+> Thanks,
+> 
+>  
+> 
+> Damian Betebenner
+> 
+> Center for Assessment
+> 
+> PO Box 351
+> 
+> Dover, NH   03821-0351
+> 
+>  
+> 
+> Phone (office): (603) 516-7900
+> 
+> Phone (cell): (857) 234-2474
+> 
+> Fax: (603) 516-7910
+> 
+>  
+> 
+> dbetebenner at nciea.org
+> 
+> www.nciea.org
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable
+> -help
+
+
+
+From mdowle at mdowle.plus.com  Sun Apr 15 19:20:13 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 15 Apr 2012 18:20:13 +0100
+Subject: [datatable-help] Coercian to character
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694E0ED00551@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+ <1334267378.7257.92.camel@netbook>
+ <8AD9137B75B37049AA711A4B64CEDB694E0ED00551@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <1334510413.7257.102.camel@netbook>
+
+I thought I'd added something to FAQ 2.17 about that, but seems not.
+Will add, thanks. Maybe I only wrote it up in the comment when closing
+the related feature request. It's deliberately different since my guess
+is that most people most of the time (now) want characters left as
+characters and keep setting stringsAsFactors to FALSE. Think the default
+for data.frame was TRUE as a hang over from old versions of R before the
+global string cache was added.
+
+It's not set in stone though so could be changed. In particular there
+could be global default like we've done for other arguments so you could
+change the default if need be.
+
+It won't cause a compatibility issue (same as other differences in faq
+2.17) or any issues down the road as far I can think, but let me know if
+you think of anything.
+
+Matthew
+
+On Sun, 2012-04-15 at 04:40 -0500, Damian Betebenner wrote:
+> I started having character vectors popping up in places I never had before but upon further investigation that turned out to be an issue with my own setup, not data.table.
+> 
+> With regard to characters (and data.tables ability to handle them as a key now), I did notice that data.table and data.frame default to using
+> stringsAsFactors differently:
+> 
+> DF <- data.frame(X=letters[1:10], Y=rnorm(10))
+> sapply(DF, class)
+> 
+>         X         Y 
+>  "factor" "numeric"
+> 
+> DT <- data.table(X=letters[1:10], Y=rnorm(10)) 
+> sapply(DT, class)
+> 
+> > DT <- data.table(X=rep(letters[1:10], each=2), Y=rnorm(20)) 
+> > sapply(DT, class)
+>           X           Y 
+> "character"   "numeric"
+> 
+> 
+> Will this inconsistency cause problems down the road?
+> 
+> Thanks for all your help,
+> 
+> Damian
+> 
+> 
+> Damian Betebenner
+> Center for Assessment
+> PO Box 351
+> Dover, NH   03821-0351
+>  
+> Phone (office): (603) 516-7900
+> Phone (cell): (857) 234-2474
+> Fax: (603) 516-7910
+> 
+> dbetebenner at nciea.org
+> www.nciea.org
+> 
+> 
+> 
+> 
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> Sent: Thursday, April 12, 2012 5:50 PM
+> To: Damian Betebenner
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Coercian to character
+> 
+> It shouldn't coerce. What makes you think it does?
+> 
+> > DT = data.table(a=factor(c("a","b","b","c")),b=1:4)
+> > DT[,sum(b),by=a]
+>      a V1
+> [1,] a  1
+> [2,] b  5
+> [3,] c  4
+> > str(DT[,sum(b),by=a])
+> Classes ?data.table? and 'data.frame':	3 obs. of  2 variables:
+>  $ a : Factor w/ 3 levels "a","b","c": 1 2 3  $ V1: int  1 5 4
+> 
+> 
+> 
+> On Thu, 2012-04-12 at 14:57 -0500, Damian Betebenner wrote:
+> > Data tablers
+> > 
+> >  
+> > 
+> > Does data.table now coerce factors to character variables when doing 
+> > by summaries?
+> > 
+> >  
+> > 
+> > If so, is there any way to not allow this coercion?
+> > 
+> >  
+> > 
+> > Thanks,
+> > 
+> >  
+> > 
+> > Damian Betebenner
+> > 
+> > Center for Assessment
+> > 
+> > PO Box 351
+> > 
+> > Dover, NH   03821-0351
+> > 
+> >  
+> > 
+> > Phone (office): (603) 516-7900
+> > 
+> > Phone (cell): (857) 234-2474
+> > 
+> > Fax: (603) 516-7910
+> > 
+> >  
+> > 
+> > dbetebenner at nciea.org
+> > 
+> > www.nciea.org
+> > 
+> >  
+> > 
+> >  
+> > 
+> >  
+> > 
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable
+> > -help
+> 
+> 
+
+
+
+From mel at mbacou.com  Tue Apr 17 13:02:46 2012
+From: mel at mbacou.com (Melanie Bacou)
+Date: Tue, 17 Apr 2012 04:02:46 -0700
+Subject: [datatable-help] Column-wise value replacement
+Message-ID: <421ba4d21385e4f1b60ded854e0d2269@mbacou.com>
+
+Dear all,
+
+I have a large data.table and I am simply trying to replace all zeros 
+with NAs in a subset of columns. So I tried first:
+
+> dt[, lapply(.SD, function(x) x := ifelse(x==0, NA, x)), .SDcols=3:30]
+Error in lapply(.SD, function(x) `:=`(x, ifelse(x == 0, NA, x))) :
+   object '.SD' not found
+
+Clearly that's not the right approach...
+
+Then I tried:
+
+> for (i in names(dt)[3:30]) {
+   eval(parse(text=paste("dt[`", i, "`==0, `", i, "` := NA]", sep="")))
+}
+That worked but is rather ugly.
+
+would you recommend any better way to avoid the eval(parse()) to 
+perform such simple tasks?
+
+Thanks in advance, --Mel.
+
+
+
+From jgvcqa at rit.edu  Tue Apr 17 17:27:36 2012
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Tue, 17 Apr 2012 11:27:36 -0400
+Subject: [datatable-help] Passing i, j and by to dt() as characters
+In-Reply-To: <CAHA9McPYzCzFmTgpqpcf3PN--eqCMvgcaXtzjDiZhRLRumhwSg@mail.gmail.com>
+References: <010301cd193a$cd75cf20$68616d60$@mbacou.com>
+ <edea47c6282563aae2f4ce964a383b28.squirrel@webmail.plus.net>
+ <705A8CD1C73B164D91B71C465EA15BE557F85A632A@ex02mail01.ad.rit.edu>
+ <CAHA9McPYzCzFmTgpqpcf3PN--eqCMvgcaXtzjDiZhRLRumhwSg@mail.gmail.com>
+Message-ID: <705A8CD1C73B164D91B71C465EA15BE55CE151D814@ex02mail01.ad.rit.edu>
+
+Actually, I do. If it's fresh water. I float in the ocean. (Should I be telling you this?)
+
+-----Original Message-----
+From: Steve Lianoglou [mailto:mailinglist.honeypot at gmail.com] 
+Sent: Friday, April 13, 2012 12:16 PM
+To: Joseph Voelkel
+Cc: Matthew Dowle; mel at mbacou.com; datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Passing i, j and by to dt() as characters
+
+Hmmm...
+
+On Fri, Apr 13, 2012 at 10:50 AM, Joseph Voelkel <jgvcqa at rit.edu> wrote:
+[snip]
+> Please do not burn this heretic at the stake!
+
+... well do you sink in water?
+
+--
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From jgvcqa at rit.edu  Tue Apr 17 17:37:16 2012
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Tue, 17 Apr 2012 11:37:16 -0400
+Subject: [datatable-help] Coercian to character
+In-Reply-To: <1334510413.7257.102.camel@netbook>
+References: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+ <1334267378.7257.92.camel@netbook>
+ <8AD9137B75B37049AA711A4B64CEDB694E0ED00551@AUSP01VMBX05.collaborationhost.net>
+ <1334510413.7257.102.camel@netbook>
+Message-ID: <705A8CD1C73B164D91B71C465EA15BE55CE151D81E@ex02mail01.ad.rit.edu>
+
+Statistical work in R (what many us of do, I'd say) prefers factors over characters:
+
+# factors
+DF <- data.frame(X=letters[rep(1:5,2)], Y=rnorm(10))
+(DF.lm<-lm(Y~X,DF))
+predict(DF.lm)
+# all works fine
+
+# characters
+DF <- data.frame(X=letters[rep(1:5,2)], Y=rnorm(10), stringsAsFactors=FALSE)
+(DF.lm<-lm(Y~X,DF)) # warning
+predict(DF.lm) # warning
+
+Not sure if this one will get resolved. 
+
+Using factors instead of characters also ensures that a table of months or days of the week can be listed in the natural (not alphabetic) ordering.
+
+Joe
+
+-----Original Message-----
+From: datatable-help-bounces at lists.r-forge.r-project.org [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of Matthew Dowle
+Sent: Sunday, April 15, 2012 1:20 PM
+To: Damian Betebenner
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Coercian to character
+
+I thought I'd added something to FAQ 2.17 about that, but seems not.
+Will add, thanks. Maybe I only wrote it up in the comment when closing the related feature request. It's deliberately different since my guess is that most people most of the time (now) want characters left as characters and keep setting stringsAsFactors to FALSE. Think the default for data.frame was TRUE as a hang over from old versions of R before the global string cache was added.
+
+It's not set in stone though so could be changed. In particular there could be global default like we've done for other arguments so you could change the default if need be.
+
+It won't cause a compatibility issue (same as other differences in faq
+2.17) or any issues down the road as far I can think, but let me know if you think of anything.
+
+Matthew
+
+On Sun, 2012-04-15 at 04:40 -0500, Damian Betebenner wrote:
+> I started having character vectors popping up in places I never had before but upon further investigation that turned out to be an issue with my own setup, not data.table.
+> 
+> With regard to characters (and data.tables ability to handle them as a 
+> key now), I did notice that data.table and data.frame default to using stringsAsFactors differently:
+> 
+> DF <- data.frame(X=letters[1:10], Y=rnorm(10)) sapply(DF, class)
+> 
+>         X         Y 
+>  "factor" "numeric"
+> 
+> DT <- data.table(X=letters[1:10], Y=rnorm(10)) sapply(DT, class)
+> 
+> > DT <- data.table(X=rep(letters[1:10], each=2), Y=rnorm(20)) 
+> > sapply(DT, class)
+>           X           Y 
+> "character"   "numeric"
+> 
+> 
+> Will this inconsistency cause problems down the road?
+> 
+> Thanks for all your help,
+> 
+> Damian
+> 
+> 
+> Damian Betebenner
+> Center for Assessment
+> PO Box 351
+> Dover, NH   03821-0351
+>  
+> Phone (office): (603) 516-7900
+> Phone (cell): (857) 234-2474
+> Fax: (603) 516-7910
+> 
+> dbetebenner at nciea.org
+> www.nciea.org
+> 
+> 
+> 
+> 
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf 
+> Of Matthew Dowle
+> Sent: Thursday, April 12, 2012 5:50 PM
+> To: Damian Betebenner
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Coercian to character
+> 
+> It shouldn't coerce. What makes you think it does?
+> 
+> > DT = data.table(a=factor(c("a","b","b","c")),b=1:4)
+> > DT[,sum(b),by=a]
+>      a V1
+> [1,] a  1
+> [2,] b  5
+> [3,] c  4
+> > str(DT[,sum(b),by=a])
+> Classes ?data.table? and 'data.frame':	3 obs. of  2 variables:
+>  $ a : Factor w/ 3 levels "a","b","c": 1 2 3  $ V1: int  1 5 4
+> 
+> 
+> 
+> On Thu, 2012-04-12 at 14:57 -0500, Damian Betebenner wrote:
+> > Data tablers
+> > 
+> >  
+> > 
+> > Does data.table now coerce factors to character variables when doing 
+> > by summaries?
+> > 
+> >  
+> > 
+> > If so, is there any way to not allow this coercion?
+> > 
+> >  
+> > 
+> > Thanks,
+> > 
+> >  
+> > 
+> > Damian Betebenner
+> > 
+> > Center for Assessment
+> > 
+> > PO Box 351
+> > 
+> > Dover, NH   03821-0351
+> > 
+> >  
+> > 
+> > Phone (office): (603) 516-7900
+> > 
+> > Phone (cell): (857) 234-2474
+> > 
+> > Fax: (603) 516-7910
+> > 
+> >  
+> > 
+> > dbetebenner at nciea.org
+> > 
+> > www.nciea.org
+> > 
+> >  
+> > 
+> >  
+> > 
+> >  
+> > 
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatab
+> > le
+> > -help
+> 
+> 
+
+
+_______________________________________________
+datatable-help mailing list
+datatable-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From mdowle at mdowle.plus.com  Tue Apr 17 17:53:06 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 17 Apr 2012 16:53:06 +0100
+Subject: [datatable-help] Column-wise value replacement
+In-Reply-To: <421ba4d21385e4f1b60ded854e0d2269@mbacou.com>
+References: <421ba4d21385e4f1b60ded854e0d2269@mbacou.com>
+Message-ID: <a80338bc92f161d03a3102995bcb005e.squirrel@webmail.plus.net>
+
+
+Hi,
+
+How about this :
+
+http://stackoverflow.com/questions/7235657/fastest-way-to-replace-nas-in-a-large-data-table
+
+Skip to the end marked EDIT and reversing 0 and NA for your case:
+
+DT = data.table(a=c(1L,0L,3L),b=c(0L,5:6),c=c(7:8,0L))
+     a b c
+[1,] 1 0 7
+[2,] 0 5 8
+[3,] 3 6 0
+
+for (i in names(DT)[2:3])
+    DT[get(i)==0L,i:=NA_integer_,with=FALSE]
+
+> DT
+     a  b  c
+[1,] 1 NA  7
+[2,] 0  5  8
+[3,] 3  6 NA
+>
+
+If you have 000's of columns, then this sort of thing is just what the new
+set() is for, to avoid the overhead of repeatedly calling [.data.table,
+e.g. :
+
+for (i in 2:3)
+    set(DT,which(DT[[i]]==0L),i,NA_integer_)
+
+Without the 'which' you get an error "i is type 'logical'. Must be
+integer, or numeric is coerced with warning.". I'll add to that message
+something like "logical isn't accepted as i for speed since set() is
+intended for inside loops; checking and coercing logical to integer row
+positions takes time. Wrap logical i with which() if required".
+
+One reason for liking for() loops with data.table is that working on one
+column at a time makes sense for large tables (less working memory
+needed). I thought about constructing a list() RHS of := with a vector of
+column names on the LHS of :=, but that approach doesn't scale as the
+number of columns grows, due to needed space for the entire RHS.  The
+for() loop above is much better for that reason.  [Multiple LHS of := is
+more for when the RHS is a single value repeated for all the columns, such
+as 0L or NA, or, NULL to delete multiple columns in one step.]
+
+Finally, the .SD approach should work when bug #1732 is fixed (".SD, .N
+and .BY should be available when by="" and by=NULL"), but still not as
+efficient as the for loop above.
+
+Matthew
+
+
+> Dear all,
+>
+> I have a large data.table and I am simply trying to replace all zeros
+> with NAs in a subset of columns. So I tried first:
+>
+>> dt[, lapply(.SD, function(x) x := ifelse(x==0, NA, x)), .SDcols=3:30]
+> Error in lapply(.SD, function(x) `:=`(x, ifelse(x == 0, NA, x))) :
+>    object '.SD' not found
+>
+> Clearly that's not the right approach...
+>
+> Then I tried:
+>
+>> for (i in names(dt)[3:30]) {
+>    eval(parse(text=paste("dt[`", i, "`==0, `", i, "` := NA]", sep="")))
+> }
+> That worked but is rather ugly.
+>
+> would you recommend any better way to avoid the eval(parse()) to
+> perform such simple tasks?
+>
+> Thanks in advance, --Mel.
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From mailinglist.honeypot at gmail.com  Tue Apr 17 17:53:43 2012
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 17 Apr 2012 11:53:43 -0400
+Subject: [datatable-help] Passing i, j and by to dt() as characters
+In-Reply-To: <705A8CD1C73B164D91B71C465EA15BE55CE151D814@ex02mail01.ad.rit.edu>
+References: <010301cd193a$cd75cf20$68616d60$@mbacou.com>
+ <edea47c6282563aae2f4ce964a383b28.squirrel@webmail.plus.net>
+ <705A8CD1C73B164D91B71C465EA15BE557F85A632A@ex02mail01.ad.rit.edu>
+ <CAHA9McPYzCzFmTgpqpcf3PN--eqCMvgcaXtzjDiZhRLRumhwSg@mail.gmail.com>
+ <705A8CD1C73B164D91B71C465EA15BE55CE151D814@ex02mail01.ad.rit.edu>
+Message-ID: <CAHA9McN30RQzbwhSyz_ni=Xaq_i=TWQBc+1rSiX8SCJXumg=8w@mail.gmail.com>
+
+It was a Monty Pyhon reference from a bit in "The Search for the Holy
+Grail" that had to do w/ burning a witch ... it was a shot at humor,
+which apparently was off the mark ;-)
+
+-steve
+
+On Tue, Apr 17, 2012 at 11:27 AM, Joseph Voelkel <jgvcqa at rit.edu> wrote:
+> Actually, I do. If it's fresh water. I float in the ocean. (Should I be telling you this?)
+>
+> -----Original Message-----
+> From: Steve Lianoglou [mailto:mailinglist.honeypot at gmail.com]
+> Sent: Friday, April 13, 2012 12:16 PM
+> To: Joseph Voelkel
+> Cc: Matthew Dowle; mel at mbacou.com; datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Passing i, j and by to dt() as characters
+>
+> Hmmm...
+>
+> On Fri, Apr 13, 2012 at 10:50 AM, Joseph Voelkel <jgvcqa at rit.edu> wrote:
+> [snip]
+>> Please do not burn this heretic at the stake!
+>
+> ... well do you sink in water?
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From caneff at gmail.com  Tue Apr 17 17:57:53 2012
+From: caneff at gmail.com (Chris Neff)
+Date: Tue, 17 Apr 2012 11:57:53 -0400
+Subject: [datatable-help] Coercian to character
+In-Reply-To: <705A8CD1C73B164D91B71C465EA15BE55CE151D81E@ex02mail01.ad.rit.edu>
+References: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+ <1334267378.7257.92.camel@netbook>
+ <8AD9137B75B37049AA711A4B64CEDB694E0ED00551@AUSP01VMBX05.collaborationhost.net>
+ <1334510413.7257.102.camel@netbook>
+ <705A8CD1C73B164D91B71C465EA15BE55CE151D81E@ex02mail01.ad.rit.edu>
+Message-ID: <CAAuY0RVK3E6hd5p_ky9xFXQMem_Yi-JzJDRNgyX_pkDZ_vCQsw@mail.gmail.com>
+
+At the same time there are a lot of uses in R where the vector really
+is just an id, not something you would regress on.  I often work on
+data frames with 10 million rows  and 1 million ids, having that as a
+factor is just downright wasteful and slow.
+
+I think the global option is the best compromise here.
+
+On Tue, Apr 17, 2012 at 11:37 AM, Joseph Voelkel <jgvcqa at rit.edu> wrote:
+> Statistical work in R (what many us of do, I'd say) prefers factors over characters:
+>
+> # factors
+> DF <- data.frame(X=letters[rep(1:5,2)], Y=rnorm(10))
+> (DF.lm<-lm(Y~X,DF))
+> predict(DF.lm)
+> # all works fine
+>
+> # characters
+> DF <- data.frame(X=letters[rep(1:5,2)], Y=rnorm(10), stringsAsFactors=FALSE)
+> (DF.lm<-lm(Y~X,DF)) # warning
+> predict(DF.lm) # warning
+>
+> Not sure if this one will get resolved.
+>
+> Using factors instead of characters also ensures that a table of months or days of the week can be listed in the natural (not alphabetic) ordering.
+>
+> Joe
+>
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of Matthew Dowle
+> Sent: Sunday, April 15, 2012 1:20 PM
+> To: Damian Betebenner
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Coercian to character
+>
+> I thought I'd added something to FAQ 2.17 about that, but seems not.
+> Will add, thanks. Maybe I only wrote it up in the comment when closing the related feature request. It's deliberately different since my guess is that most people most of the time (now) want characters left as characters and keep setting stringsAsFactors to FALSE. Think the default for data.frame was TRUE as a hang over from old versions of R before the global string cache was added.
+>
+> It's not set in stone though so could be changed. In particular there could be global default like we've done for other arguments so you could change the default if need be.
+>
+> It won't cause a compatibility issue (same as other differences in faq
+> 2.17) or any issues down the road as far I can think, but let me know if you think of anything.
+>
+> Matthew
+>
+> On Sun, 2012-04-15 at 04:40 -0500, Damian Betebenner wrote:
+>> I started having character vectors popping up in places I never had before but upon further investigation that turned out to be an issue with my own setup, not data.table.
+>>
+>> With regard to characters (and data.tables ability to handle them as a
+>> key now), I did notice that data.table and data.frame default to using stringsAsFactors differently:
+>>
+>> DF <- data.frame(X=letters[1:10], Y=rnorm(10)) sapply(DF, class)
+>>
+>> ? ? ? ? X ? ? ? ? Y
+>> ?"factor" "numeric"
+>>
+>> DT <- data.table(X=letters[1:10], Y=rnorm(10)) sapply(DT, class)
+>>
+>> > DT <- data.table(X=rep(letters[1:10], each=2), Y=rnorm(20))
+>> > sapply(DT, class)
+>> ? ? ? ? ? X ? ? ? ? ? Y
+>> "character" ? "numeric"
+>>
+>>
+>> Will this inconsistency cause problems down the road?
+>>
+>> Thanks for all your help,
+>>
+>> Damian
+>>
+>>
+>> Damian Betebenner
+>> Center for Assessment
+>> PO Box 351
+>> Dover, NH ? 03821-0351
+>>
+>> Phone (office): (603) 516-7900
+>> Phone (cell): (857) 234-2474
+>> Fax: (603) 516-7910
+>>
+>> dbetebenner at nciea.org
+>> www.nciea.org
+>>
+>>
+>>
+>>
+>> -----Original Message-----
+>> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf
+>> Of Matthew Dowle
+>> Sent: Thursday, April 12, 2012 5:50 PM
+>> To: Damian Betebenner
+>> Cc: datatable-help at lists.r-forge.r-project.org
+>> Subject: Re: [datatable-help] Coercian to character
+>>
+>> It shouldn't coerce. What makes you think it does?
+>>
+>> > DT = data.table(a=factor(c("a","b","b","c")),b=1:4)
+>> > DT[,sum(b),by=a]
+>> ? ? ?a V1
+>> [1,] a ?1
+>> [2,] b ?5
+>> [3,] c ?4
+>> > str(DT[,sum(b),by=a])
+>> Classes ?data.table? and 'data.frame': ? ? ? ?3 obs. of ?2 variables:
+>> ?$ a : Factor w/ 3 levels "a","b","c": 1 2 3 ?$ V1: int ?1 5 4
+>>
+>>
+>>
+>> On Thu, 2012-04-12 at 14:57 -0500, Damian Betebenner wrote:
+>> > Data tablers
+>> >
+>> >
+>> >
+>> > Does data.table now coerce factors to character variables when doing
+>> > by summaries?
+>> >
+>> >
+>> >
+>> > If so, is there any way to not allow this coercion?
+>> >
+>> >
+>> >
+>> > Thanks,
+>> >
+>> >
+>> >
+>> > Damian Betebenner
+>> >
+>> > Center for Assessment
+>> >
+>> > PO Box 351
+>> >
+>> > Dover, NH ? 03821-0351
+>> >
+>> >
+>> >
+>> > Phone (office): (603) 516-7900
+>> >
+>> > Phone (cell): (857) 234-2474
+>> >
+>> > Fax: (603) 516-7910
+>> >
+>> >
+>> >
+>> > dbetebenner at nciea.org
+>> >
+>> > www.nciea.org
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatab
+>> > le
+>> > -help
+>>
+>>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From mdowle at mdowle.plus.com  Tue Apr 17 18:26:05 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 17 Apr 2012 17:26:05 +0100
+Subject: [datatable-help] Coercian to character
+In-Reply-To: <705A8CD1C73B164D91B71C465EA15BE55CE151D81E@ex02mail01.ad.rit.edu>
+References: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+ <1334267378.7257.92.camel@netbook>
+ <8AD9137B75B37049AA711A4B64CEDB694E0ED00551@AUSP01VMBX05.collaborationhost.net>
+ <1334510413.7257.102.camel@netbook>
+ <705A8CD1C73B164D91B71C465EA15BE55CE151D81E@ex02mail01.ad.rit.edu>
+Message-ID: <0a21c4f8d3ad445be91dde4095e7a9c8.squirrel@webmail.plus.net>
+
+
+Yes but I invisage a work flow where data is loaded up as character
+always, then set any columns you'd like as factor to factor afterwards,
+using DT[,col:=factor(col)]. Other columns might load up as character that
+are actually dates or times (for example), then have a
+DT[,col:=as.IDate(col)] applied to them instead for example. The factor()
+operation is quite compute intensive (finding unique values, then matching
+all data to those unique values) so making the default TRUE to convert to
+factor() [which may need to be converted afterwards to something other
+than factor, such as date] doesn't seem the right default from the
+efficiency perspective.
+Another column type example is comma separated lists such as in genomics.
+Those really do need to be character and then strsplit() afterwards,
+rather than a factor, unfactored and then strsplit. That's what the
+dual-delimited fast file loader will handle in data.table, when
+implemented.
+
+> Not sure if this one will get resolved.
+
+We could add the 'stringsAsFactors' argument to data.table(), then you
+could change it from FALSE to TRUE. Would that work?  The default would be
+getOption("datatable.stringsAsFactors") so you could change it globally,
+just like base::default.stringsAsFactors().
+
+> Using factors instead of characters also ensures that a table of months or
+> days of the week can be listed in the natural (not alphabetic) ordering.
+
+But factor() re-orders levels, and so does stringsAsFactors=TRUE afaik
+doesn't it? You have to work a bit harder to get unordered factor levels,
+by passing labels to factor "manually".  That's very useful, important and
+supported in data.table (mentioned in last NEWS) but not the best default
+for data.table(), iiuc.
+
+Matthew
+
+> Statistical work in R (what many us of do, I'd say) prefers factors over
+> characters:
+>
+> # factors
+> DF <- data.frame(X=letters[rep(1:5,2)], Y=rnorm(10))
+> (DF.lm<-lm(Y~X,DF))
+> predict(DF.lm)
+> # all works fine
+>
+> # characters
+> DF <- data.frame(X=letters[rep(1:5,2)], Y=rnorm(10),
+> stringsAsFactors=FALSE)
+> (DF.lm<-lm(Y~X,DF)) # warning
+> predict(DF.lm) # warning
+>
+> Not sure if this one will get resolved.
+>
+> Using factors instead of characters also ensures that a table of months or
+> days of the week can be listed in the natural (not alphabetic) ordering.
+>
+> Joe
+>
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of
+> Matthew Dowle
+> Sent: Sunday, April 15, 2012 1:20 PM
+> To: Damian Betebenner
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Coercian to character
+>
+> I thought I'd added something to FAQ 2.17 about that, but seems not.
+> Will add, thanks. Maybe I only wrote it up in the comment when closing the
+> related feature request. It's deliberately different since my guess is
+> that most people most of the time (now) want characters left as characters
+> and keep setting stringsAsFactors to FALSE. Think the default for
+> data.frame was TRUE as a hang over from old versions of R before the
+> global string cache was added.
+>
+> It's not set in stone though so could be changed. In particular there
+> could be global default like we've done for other arguments so you could
+> change the default if need be.
+>
+> It won't cause a compatibility issue (same as other differences in faq
+> 2.17) or any issues down the road as far I can think, but let me know if
+> you think of anything.
+>
+> Matthew
+>
+> On Sun, 2012-04-15 at 04:40 -0500, Damian Betebenner wrote:
+>> I started having character vectors popping up in places I never had
+>> before but upon further investigation that turned out to be an issue
+>> with my own setup, not data.table.
+>>
+>> With regard to characters (and data.tables ability to handle them as a
+>> key now), I did notice that data.table and data.frame default to using
+>> stringsAsFactors differently:
+>>
+>> DF <- data.frame(X=letters[1:10], Y=rnorm(10)) sapply(DF, class)
+>>
+>>         X         Y
+>>  "factor" "numeric"
+>>
+>> DT <- data.table(X=letters[1:10], Y=rnorm(10)) sapply(DT, class)
+>>
+>> > DT <- data.table(X=rep(letters[1:10], each=2), Y=rnorm(20))
+>> > sapply(DT, class)
+>>           X           Y
+>> "character"   "numeric"
+>>
+>>
+>> Will this inconsistency cause problems down the road?
+>>
+>> Thanks for all your help,
+>>
+>> Damian
+>>
+>>
+>> Damian Betebenner
+>> Center for Assessment
+>> PO Box 351
+>> Dover, NH   03821-0351
+>>
+>> Phone (office): (603) 516-7900
+>> Phone (cell): (857) 234-2474
+>> Fax: (603) 516-7910
+>>
+>> dbetebenner at nciea.org
+>> www.nciea.org
+>>
+>>
+>>
+>>
+>> -----Original Message-----
+>> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf
+>> Of Matthew Dowle
+>> Sent: Thursday, April 12, 2012 5:50 PM
+>> To: Damian Betebenner
+>> Cc: datatable-help at lists.r-forge.r-project.org
+>> Subject: Re: [datatable-help] Coercian to character
+>>
+>> It shouldn't coerce. What makes you think it does?
+>>
+>> > DT = data.table(a=factor(c("a","b","b","c")),b=1:4)
+>> > DT[,sum(b),by=a]
+>>      a V1
+>> [1,] a  1
+>> [2,] b  5
+>> [3,] c  4
+>> > str(DT[,sum(b),by=a])
+>> Classes ???data.table??? and 'data.frame':	3 obs. of  2 variables:
+>>  $ a : Factor w/ 3 levels "a","b","c": 1 2 3  $ V1: int  1 5 4
+>>
+>>
+>>
+>> On Thu, 2012-04-12 at 14:57 -0500, Damian Betebenner wrote:
+>> > Data tablers
+>> >
+>> >
+>> >
+>> > Does data.table now coerce factors to character variables when doing
+>> > by summaries?
+>> >
+>> >
+>> >
+>> > If so, is there any way to not allow this coercion?
+>> >
+>> >
+>> >
+>> > Thanks,
+>> >
+>> >
+>> >
+>> > Damian Betebenner
+>> >
+>> > Center for Assessment
+>> >
+>> > PO Box 351
+>> >
+>> > Dover, NH   03821-0351
+>> >
+>> >
+>> >
+>> > Phone (office): (603) 516-7900
+>> >
+>> > Phone (cell): (857) 234-2474
+>> >
+>> > Fax: (603) 516-7910
+>> >
+>> >
+>> >
+>> > dbetebenner at nciea.org
+>> >
+>> > www.nciea.org
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatab
+>> > le
+>> > -help
+>>
+>>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From jgvcqa at rit.edu  Tue Apr 17 19:11:06 2012
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Tue, 17 Apr 2012 13:11:06 -0400
+Subject: [datatable-help] Coercian to character
+In-Reply-To: <0a21c4f8d3ad445be91dde4095e7a9c8.squirrel@webmail.plus.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694DED155942@AUSP01VMBX05.collaborationhost.net>
+ <1334267378.7257.92.camel@netbook>
+ <8AD9137B75B37049AA711A4B64CEDB694E0ED00551@AUSP01VMBX05.collaborationhost.net>
+ <1334510413.7257.102.camel@netbook>
+ <705A8CD1C73B164D91B71C465EA15BE55CE151D81E@ex02mail01.ad.rit.edu>
+ <0a21c4f8d3ad445be91dde4095e7a9c8.squirrel@webmail.plus.net>
+Message-ID: <705A8CD1C73B164D91B71C465EA15BE55CE151D855@ex02mail01.ad.rit.edu>
+
+Personally, I am fine with having data.table read in character data as character. I don't find 'stringsAsFactors' particularly useful (although I use it sometimes)--I'll usually have a mix of character data, some of which I'd like as factors and some of which I'd like as character (or, to convert to dates, as your example notes). And some I'm just confused about--I don't like working with factors in general so I prefer to keep character data as character, but then all of a sudden I decide I want to run some character data in some models ...
+
+I like the DT[,col:=factor(col)] approach. It also makes the intent clearer.
+
+"But factor() re-orders levels ..." Yes. An extra step is required. But well worth it to have January as the first month of the year!
+
+Joe
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowle at mdowle.plus.com] 
+Sent: Tuesday, April 17, 2012 12:26 PM
+To: Joseph Voelkel
+Cc: Damian Betebenner; datatable-help at lists.r-forge.r-project.org
+Subject: RE: [datatable-help] Coercian to character
+
+
+Yes but I invisage a work flow where data is loaded up as character always, then set any columns you'd like as factor to factor afterwards, using DT[,col:=factor(col)]. Other columns might load up as character that are actually dates or times (for example), then have a DT[,col:=as.IDate(col)] applied to them instead for example. The factor() operation is quite compute intensive (finding unique values, then matching all data to those unique values) so making the default TRUE to convert to
+factor() [which may need to be converted afterwards to something other than factor, such as date] doesn't seem the right default from the efficiency perspective.
+Another column type example is comma separated lists such as in genomics.
+Those really do need to be character and then strsplit() afterwards, rather than a factor, unfactored and then strsplit. That's what the dual-delimited fast file loader will handle in data.table, when implemented.
+
+> Not sure if this one will get resolved.
+
+We could add the 'stringsAsFactors' argument to data.table(), then you could change it from FALSE to TRUE. Would that work?  The default would be
+getOption("datatable.stringsAsFactors") so you could change it globally, just like base::default.stringsAsFactors().
+
+> Using factors instead of characters also ensures that a table of 
+> months or days of the week can be listed in the natural (not alphabetic) ordering.
+
+But factor() re-orders levels, and so does stringsAsFactors=TRUE afaik doesn't it? You have to work a bit harder to get unordered factor levels, by passing labels to factor "manually".  That's very useful, important and supported in data.table (mentioned in last NEWS) but not the best default for data.table(), iiuc.
+
+Matthew
+
+> Statistical work in R (what many us of do, I'd say) prefers factors 
+> over
+> characters:
+>
+> # factors
+> DF <- data.frame(X=letters[rep(1:5,2)], Y=rnorm(10))
+> (DF.lm<-lm(Y~X,DF))
+> predict(DF.lm)
+> # all works fine
+>
+> # characters
+> DF <- data.frame(X=letters[rep(1:5,2)], Y=rnorm(10),
+> stringsAsFactors=FALSE)
+> (DF.lm<-lm(Y~X,DF)) # warning
+> predict(DF.lm) # warning
+>
+> Not sure if this one will get resolved.
+>
+> Using factors instead of characters also ensures that a table of 
+> months or days of the week can be listed in the natural (not alphabetic) ordering.
+>
+> Joe
+>
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf 
+> Of Matthew Dowle
+> Sent: Sunday, April 15, 2012 1:20 PM
+> To: Damian Betebenner
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Coercian to character
+>
+> I thought I'd added something to FAQ 2.17 about that, but seems not.
+> Will add, thanks. Maybe I only wrote it up in the comment when closing 
+> the related feature request. It's deliberately different since my 
+> guess is that most people most of the time (now) want characters left 
+> as characters and keep setting stringsAsFactors to FALSE. Think the 
+> default for data.frame was TRUE as a hang over from old versions of R 
+> before the global string cache was added.
+>
+> It's not set in stone though so could be changed. In particular there 
+> could be global default like we've done for other arguments so you 
+> could change the default if need be.
+>
+> It won't cause a compatibility issue (same as other differences in faq
+> 2.17) or any issues down the road as far I can think, but let me know 
+> if you think of anything.
+>
+> Matthew
+>
+> On Sun, 2012-04-15 at 04:40 -0500, Damian Betebenner wrote:
+>> I started having character vectors popping up in places I never had 
+>> before but upon further investigation that turned out to be an issue 
+>> with my own setup, not data.table.
+>>
+>> With regard to characters (and data.tables ability to handle them as 
+>> a key now), I did notice that data.table and data.frame default to 
+>> using stringsAsFactors differently:
+>>
+>> DF <- data.frame(X=letters[1:10], Y=rnorm(10)) sapply(DF, class)
+>>
+>>         X         Y
+>>  "factor" "numeric"
+>>
+>> DT <- data.table(X=letters[1:10], Y=rnorm(10)) sapply(DT, class)
+>>
+>> > DT <- data.table(X=rep(letters[1:10], each=2), Y=rnorm(20)) 
+>> > sapply(DT, class)
+>>           X           Y
+>> "character"   "numeric"
+>>
+>>
+>> Will this inconsistency cause problems down the road?
+>>
+>> Thanks for all your help,
+>>
+>> Damian
+>>
+>>
+>> Damian Betebenner
+>> Center for Assessment
+>> PO Box 351
+>> Dover, NH   03821-0351
+>>
+>> Phone (office): (603) 516-7900
+>> Phone (cell): (857) 234-2474
+>> Fax: (603) 516-7910
+>>
+>> dbetebenner at nciea.org
+>> www.nciea.org
+>>
+>>
+>>
+>>
+>> -----Original Message-----
+>> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf 
+>> Of Matthew Dowle
+>> Sent: Thursday, April 12, 2012 5:50 PM
+>> To: Damian Betebenner
+>> Cc: datatable-help at lists.r-forge.r-project.org
+>> Subject: Re: [datatable-help] Coercian to character
+>>
+>> It shouldn't coerce. What makes you think it does?
+>>
+>> > DT = data.table(a=factor(c("a","b","b","c")),b=1:4)
+>> > DT[,sum(b),by=a]
+>>      a V1
+>> [1,] a  1
+>> [2,] b  5
+>> [3,] c  4
+>> > str(DT[,sum(b),by=a])
+>> Classes ???data.table??? and 'data.frame':	3 obs. of  2 variables:
+>>  $ a : Factor w/ 3 levels "a","b","c": 1 2 3  $ V1: int  1 5 4
+>>
+>>
+>>
+>> On Thu, 2012-04-12 at 14:57 -0500, Damian Betebenner wrote:
+>> > Data tablers
+>> >
+>> >
+>> >
+>> > Does data.table now coerce factors to character variables when 
+>> > doing by summaries?
+>> >
+>> >
+>> >
+>> > If so, is there any way to not allow this coercion?
+>> >
+>> >
+>> >
+>> > Thanks,
+>> >
+>> >
+>> >
+>> > Damian Betebenner
+>> >
+>> > Center for Assessment
+>> >
+>> > PO Box 351
+>> >
+>> > Dover, NH   03821-0351
+>> >
+>> >
+>> >
+>> > Phone (office): (603) 516-7900
+>> >
+>> > Phone (cell): (857) 234-2474
+>> >
+>> > Fax: (603) 516-7910
+>> >
+>> >
+>> >
+>> > dbetebenner at nciea.org
+>> >
+>> > www.nciea.org
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> >
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datata
+>> > b
+>> > le
+>> > -help
+>>
+>>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable
+> -help
+>
+
+
+
+From mel at mbacou.com  Wed Apr 18 09:10:01 2012
+From: mel at mbacou.com (Melanie Bacou)
+Date: Wed, 18 Apr 2012 00:10:01 -0700
+Subject: [datatable-help] Column-wise value replacement
+In-Reply-To: <a80338bc92f161d03a3102995bcb005e.squirrel@webmail.plus.net>
+References: <421ba4d21385e4f1b60ded854e0d2269@mbacou.com>
+ <a80338bc92f161d03a3102995bcb005e.squirrel@webmail.plus.net>
+Message-ID: <47cdcb1bbcd8a380207b20e9fbf2eb69@mbacou.com>
+
+ 
+
+Matthew, 
+
+Thanks for the tips and comprehensive explanation! 
+
+I
+like the set() approach, it's not very R-like but more elegant than
+eval() and get() -- I believe most data.table users might feel like the
+.SD option is more intuitive though (and many R users would tend to shy
+away from using loops)? 
+
+I wonder if there's a rational for using set()
+behind the scenes, once the .SD-without-by feature is implemented...
+
+
+By the way I also vote in favor of the ":= with by" feature, that
+seems like a worthwhile addition to data.table. Again I'm finding that
+syntax very intuitive. 
+
+--Mel. 
+
+On 2012-04-17 08:53, Matthew Dowle
+wrote: 
+
+> Hi,
+> 
+> How about this :
+> 
+>
+http://stackoverflow.com/questions/7235657/fastest-way-to-replace-nas-in-a-large-data-tableSkip
+to the end marked EDIT and reversing 0 and NA for your case:
+> 
+> DT =
+data.table(a=c(1L,0L,3L),b=c(0L,5:6),c=c(7:8,0L))
+> a b c
+> [1,] 1 0 7
+>
+[2,] 0 5 8
+> [3,] 3 6 0
+> 
+> for (i in names(DT)[2:3])
+>
+DT[get(i)==0L,i:=NA_integer_,with=FALSE]
+> 
+>> DT
+> 
+> a b c
+> [1,] 1 NA
+7
+> [2,] 0 5 8
+> [3,] 3 6 NAIf you have 000's of columns, then this sort
+of thing is just what the new
+> set() is for, to avoid the overhead of
+repeatedly calling [.data.table,
+> e.g. :
+> 
+> for (i in 2:3)
+>
+set(DT,which(DT[[i]]==0L),i,NA_integer_)
+> 
+> Without the 'which' you
+get an error "i is type 'logical'. Must be
+> integer, or numeric is
+coerced with warning.". I'll add to that message
+> something like
+"logical isn't accepted as i for speed since set() is
+> intended for
+inside loops; checking and coercing logical to integer row
+> positions
+takes time. Wrap logical i with which() if required".
+> 
+> One reason
+for liking for() loops with data.table is that working on one
+> column
+at a time makes sense for large tables (less working memory
+> needed). I
+thought about constructing a list() RHS of := with a vector of
+> column
+names on the LHS of :=, but that approach doesn't scale as the
+> number
+of columns grows, due to needed space for the entire RHS. The
+> for()
+loop above is much better for that reason. [Multiple LHS of := is
+> more
+for when the RHS is a single value repeated for all the columns, such
+>
+as 0L or NA, or, NULL to delete multiple columns in one step.]
+> 
+>
+Finally, the .SD approach should work when bug #1732 is fixed (".SD,
+.N
+> and .BY should be available when by="" and by=NULL"), but still not
+as
+> efficient as the for loop above.
+> 
+> Matthew
+> 
+>> Dear all, I
+have a large data.table and I am simply trying to replace all zeros with
+NAs in a subset of columns. So I tried first: 
+>> 
+>>> dt[, lapply(.SD,
+function(x) x := ifelse(x==0, NA, x)), .SDcols=3:30]
+>> Error in
+lapply(.SD, function(x) `:=`(x, ifelse(x == 0, NA, x))) : object '.SD'
+not found Clearly that's not the right approach... Then I tried: 
+>>
+
+>>> for (i in names(dt)[3:30]) {
+>> eval(parse(text=paste("dt[`", i,
+"`==0, `", i, "` := NA]", sep=""))) } That worked but is rather ugly.
+would you recommend any better way to avoid the eval(parse()) to perform
+such simple tasks? Thanks in advance, --Mel.
+_______________________________________________ datatable-help mailing
+list datatable-help at lists.r-forge.r-project.org [1]
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+[2]
+
+ 
+
+Links:
+------
+[1]
+mailto:datatable-help at lists.r-forge.r-project.org
+[2]
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120418/6474ddd6/attachment-0001.html>
+
+From mdowle at mdowle.plus.com  Wed Apr 18 09:11:33 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 18 Apr 2012 08:11:33 +0100
+Subject: [datatable-help] Merging problem when column in one DT is
+ factor and in the other character
+In-Reply-To: <CAGPPiq-COLt2+fOJ0x=kdqPwDPH6K1u0QCi4MkRfN_Xx+XU79w@mail.gmail.com>
+References: <CAGPPiq9YUd4-472C_rMtTXQjuN=F=t+TiwbsmAczq=QMYVNt8w@mail.gmail.com>
+ <CAGPPiq-qn0C=4k534frdQzbcyXLM8sX=Bx=vOp=QHtYdgSzoHw@mail.gmail.com>
+ <b5d448f1b8e088a2ede7aff27991a66e.squirrel@webmail.plus.net>
+ <1333325841.19103.24.camel@netbook>
+ <CAGPPiq-COLt2+fOJ0x=kdqPwDPH6K1u0QCi4MkRfN_Xx+XU79w@mail.gmail.com>
+Message-ID: <1334733093.7257.122.camel@netbook>
+
+Now fixed in v1.8.1.
+
+On Mon, 2012-04-02 at 13:39 +0200, Christoph J?ckel wrote:
+> I have raised a bug report under, which can be found under #1922.
+> 
+> On Mon, Apr 2, 2012 at 2:17 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> wrote:
+>         
+>         Thanks for example and data, very clear.
+>         
+>         Yes, problem looks to be factors with unused levels, when
+>         joined to a
+>         character column, as you suggested. Work arounds are to drop
+>         the unused
+>         levels or convert to character, as you found.
+>         
+>         A fix is a bit more involved and won't have time for a while.
+>         Please
+>         could you file a bug report so it doesn't get forgotten.
+>         
+>         Thanks.
+>         
+>         On Fri, 2012-03-30 at 16:51 +0100, Matthew Dowle wrote:
+>         > Hi. A quick read suggests it's not intended and that's a
+>         bug. Just convert
+>         > the columns to character for now, and it should work.
+>         Character columns
+>         > are now preferred going forward, so I'd be suggesting that
+>         anyway even if
+>         > it worked.
+>         >
+>         > > So in case this is expected behavior, should data.table
+>         > > give at least a warning that says something like "You join
+>         two
+>         > > data.tables whereby one keyed column is a factor, one is a
+>         character.
+>         > > That is probably not your intention. Convert the factor
+>         column to
+>         > > character or vice versa."?
+>         >
+>         > Yes. It should be converting to character (with a warning)
+>         in this case.
+>         > Thought that's what I coded and tested. Will investigate...
+>         >
+>         > > Hi together,
+>         > >
+>         > > here is the problem I needed dput for:
+>         http://www.fileuploadx.de/287440
+>         > > (sorry,
+>         > > I know that this filehoster is annoying because you have
+>         to wait until you
+>         > > can download the file; I hope you have a coffee machine
+>         close by ;-)
+>         > >
+>         > > In this attachment, I basically load in two data.tables
+>         DT1 and DT2 that I
+>         > > want to join, i.e. DT2[DT1], according to the keyed
+>         columns "Company_Code"
+>         > > and "intDatum" in DT1 and "DSCD" and "intDatum" in DT2.
+>         However, while
+>         > > "DSCD" is formatted as a character-column, "Company_Code"
+>         is formatted as
+>         > > a
+>         > > factor-column. As you can see from the long
+>         structure-object, there are
+>         > > plenty of levels here (the actual data.tables are very
+>         small).
+>         > >
+>         > > Now, when I try to join those with DT2[DT1], I get:
+>         > >
+>         > >
+>         > >         DSCD intDatum MONTH MV SICClass
+>         > >  [1,] 997859      151  <NA> NA       44
+>         > >  [2,] 997859      152  <NA> NA       44
+>         > >  [3,] 998064      151  <NA> NA       15
+>         > >  [4,] 998064      152  <NA> NA       15
+>         > >  [5,] 142268      151  <NA> NA       53
+>         > >  [6,] 142268      152  <NA> NA       53
+>         > >  [7,] 142859      151  <NA> NA       56
+>         > >  [8,] 142859      152  <NA> NA       56
+>         > >  [9,] 143415      151  <NA> NA       63
+>         > > [10,] 143415      152  <NA> NA       63
+>         > > [11,] 307045      151  <NA> NA       15
+>         > > [12,] 307045      152  <NA> NA       15
+>         > >
+>         > >
+>         > >
+>         > > Basically, data.table finds no values for MV and MONTH for
+>         any DSCD
+>         > > and intDatum combination. However, as DT2[DSCD=="142268"]
+>         clearly
+>         > > shows, there are values for that DSCD:
+>         > >
+>         > >
+>         > >
+>         > >        DSCD      MONTH      MV intDatum
+>         > > [1,] 142268 1997-08-28 1901.12      151
+>         > > [2,] 142268 1997-09-28 1829.00      152
+>         > >
+>         > >
+>         > >
+>         > > Those, however, only show up in the join after i get rid
+>         of all the
+>         > > unused levels (equivalently, I can also transform the
+>         Company_Code to
+>         > > a character column):
+>         > >
+>         > >
+>         > > DT1[, Company_Code := factor(Company_Code)]
+>         > > DT2[DT1]
+>         > >
+>         > >
+>         > >         DSCD intDatum      MONTH      MV SICClass
+>         > >  [1,] 997859      151       <NA>      NA       44
+>         > >  [2,] 997859      152       <NA>      NA       44
+>         > >  [3,] 998064      151       <NA>      NA       15
+>         > >  [4,] 998064      152       <NA>      NA       15
+>         > >  [5,] 142268      151 1997-08-28 1901.12       53
+>         > >  [6,] 142268      152 1997-09-28 1829.00       53
+>         > >  [7,] 142859      151       <NA>      NA       56
+>         > >  [8,] 142859      152       <NA>      NA       56
+>         > >  [9,] 143415      151       <NA>      NA       63
+>         > > [10,] 143415      152       <NA>      NA       63
+>         > > [11,] 307045      151       <NA>      NA       15
+>         > > [12,] 307045      152       <NA>      NA       15
+>         > >
+>         > >
+>         > >
+>         > > I'm pretty sure this behaviour occurred only with version
+>         1.8.0,
+>         > > probably because data.table coerced every key to factor
+>         before (see
+>         > > the NEWS to 1.8.0). So my question is: Is what happens
+>         here intended
+>         > > behavior? I'm honest with you: I'm working now for a while
+>         with R and
+>         > > factors are one of those things that I never got. I just
+>         don't see
+>         > > their use and every so often they cause me huge problems
+>         (as in this
+>         > > case). So I'm probably making something stupid here. The
+>         nasty thing
+>         > > about this issue here is that mostly, however, the joins
+>         just work as
+>         > > expected (believe me, I tried to produce a simple example
+>         with one
+>         > > column factor and one character that would reproduce this
+>         behavior,
+>         > > but no matter what I did, the joins afterwards always
+>         worked as
+>         > > expected). So in case this is expected behavior, should
+>         data.table
+>         > > give at least a warning that says something like "You join
+>         two
+>         > > data.tables whereby one keyed column is a factor, one is a
+>         character.
+>         > > That is probably not your intention. Convert the factor
+>         column to
+>         > > character or vice versa."?
+>         > >
+>         > >
+>         > >
+>         > > Thanks for your help!
+>         > >
+>         > >
+>         > >
+>         > > Christoph
+>         > > _______________________________________________
+>         > > datatable-help mailing list
+>         > > datatable-help at lists.r-forge.r-project.org
+>         > >
+>         https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>         >
+>         >
+>         > _______________________________________________
+>         > datatable-help mailing list
+>         > datatable-help at lists.r-forge.r-project.org
+>         >
+>         https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>         
+>         
+>         
+> 
+> 
+
+
+
+From mdowle at mdowle.plus.com  Wed Apr 18 09:32:23 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 18 Apr 2012 08:32:23 +0100
+Subject: [datatable-help] Change in return type of 'by' when DT (or DT[i])
+	is empty
+Message-ID: <1334734343.7257.135.camel@netbook>
+
+Dear datatablers,
+
+This seems like a valid bug report. Any reasons why we shouldn't make
+this change?
+
+https://r-forge.r-project.org/tracker/?func=detail&atid=975&aid=1945&group_id=240
+
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Wed Apr 18 10:55:48 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 18 Apr 2012 08:55:48 +0000 (UTC)
+Subject: [datatable-help] Column-wise value replacement
+References: <421ba4d21385e4f1b60ded854e0d2269@mbacou.com>
+ <a80338bc92f161d03a3102995bcb005e.squirrel@webmail.plus.net>
+ <47cdcb1bbcd8a380207b20e9fbf2eb69@mbacou.com>
+Message-ID: <loom.20120418T102451-401@post.gmane.org>
+
+Melanie Bacou <mel <at> mbacou.com> writes:
+
+> 
+> Matthew,
+> Thanks for the tips and comprehensive explanation!
+> I like the set() approach, it's not very R-like but more elegant than eval() 
+and get() -- I believe most data.table users might feel like the .SD option is 
+more intuitive though (and many R users would tend to shy away from using 
+loops)?
+
+Maybe. But loops aren't always bad per se. Even some base functions use for() 
+loops. Vectorization can sometimes make R code difficult to follow: the tail 
+wags the dog. In this case the for() loop ticks all boxes: short code, 
+intuitive, readable _and_ fast.  This isn't to say for() loops are back in 
+vogue, just that they have a place, sometimes and in particular with data.table 
+because assignment by reference with no copies at all allows for() loops to be 
+fast.
+
+> I wonder if there's a rational for using set() behind the scenes, once 
+the .SD-without-by feature is implemented...
+
+Yes. set() changes the columns (the existing vectors) in place by reference. In 
+contrast to any method using ifelse() or similar which allocates and populates 
+a new vector for every column and replaces the whole vector. The memory usage 
+profile is quite different. Worse, if the RHS of whichever assignment operator 
+is used contains all the columns, then memory for a copy of all those columns 
+needs to be allocated first, before the assignment can start (the dreaded out 
+of memory error). A for loop using set() with data.table uses far 
+less "working" memory as it loops through each column by reference.
+
+> By the way I also vote in favor of the ":= with by" feature, that seems like 
+a worthwhile addition to data.table. Again I'm finding that syntax very 
+intuitive.
+
+Ok, great. Will get to it soon.
+
+> --Mel.
+> ?
+> On 2012-04-17 08:53, Matthew Dowle wrote:
+> 
+> Hi,
+> 
+> How about this :
+> 
+> http://stackoverflow.com/questions/7235657/fastest-way-to-replace-nas-in-a-
+large-data-tableSkip to the end marked EDIT and reversing 0 and NA for your 
+case:
+> 
+> DT = data.table(a=c(1L,0L,3L),b=c(0L,5:6),c=c(7:8,0L))
+>      a b c
+> [1,] 1 0 7
+> [2,] 0 5 8
+> [3,] 3 6 0
+> 
+> for (i in names(DT)[2:3])
+>     DT[get(i)==0L,i:=NA_integer_,with=FALSE]
+> DT
+> a  b  c
+> [1,] 1 NA  7
+> [2,] 0  5  8
+> [3,] 3  6 NAIf you have 000's of columns, then this sort of thing is just 
+what the new
+> set() is for, to avoid the overhead of repeatedly calling [.data.table,
+> e.g. :
+> 
+> for (i in 2:3)
+>     set(DT,which(DT[[i]]==0L),i,NA_integer_)
+> 
+> Without the 'which' you get an error "i is type 'logical'. Must be
+> integer, or numeric is coerced with warning.". I'll add to that message
+> something like "logical isn't accepted as i for speed since set() is
+> intended for inside loops; checking and coercing logical to integer row
+> positions takes time. Wrap logical i with which() if required".
+> 
+> One reason for liking for() loops with data.table is that working on one
+> column at a time makes sense for large tables (less working memory
+> needed). I thought about constructing a list() RHS of := with a vector of
+> column names on the LHS of :=, but that approach doesn't scale as the
+> number of columns grows, due to needed space for the entire RHS.  The
+> for() loop above is much better for that reason.  [Multiple LHS of := is
+> more for when the RHS is a single value repeated for all the columns, such
+> as 0L or NA, or, NULL to delete multiple columns in one step.]
+> 
+> Finally, the .SD approach should work when bug #1732 is fixed (".SD, .N
+> and .BY should be available when by="" and by=NULL"), but still not as
+> efficient as the for loop above.
+> 
+> Matthew
+> Dear all, I have a large data.table and I am simply trying to replace all 
+zeros with NAs in a subset of columns. So I tried first:
+> dt[, lapply(.SD, function(x) x := ifelse(x==0, NA, x)), .SDcols=3:30]
+> Error in lapply(.SD, function(x) `:=`(x, ifelse(x == 0, NA, x))) : 
+object '.SD' not found Clearly that's not the right approach... Then I tried:
+> for (i in names(dt)[3:30]) {
+> eval(parse(text=paste("dt[`", i, "`==0, `", i, "` := NA]", sep=""))) } That 
+worked but is rather ugly. would you recommend any better way to avoid the eval
+(parse()) to perform such simple tasks? Thanks in advance, --Mel. 
+_______________________________________________ datatable-help mailing list 
+datatable-help <at> lists.r-forge.r-project.org https://lists.r-forge.r-
+project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+> ?
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help <at> lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+
+
+From mdowle at mdowle.plus.com  Wed Apr 18 11:15:16 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 18 Apr 2012 10:15:16 +0100
+Subject: [datatable-help] Long vectors in R
+Message-ID: <d10ed400daac85f50721d6235ac9d663.squirrel@webmail.plus.net>
+
+
+Dear datatablers,
+
+Looks like support for long vectors is being added to R :
+
+http://stat.ethz.ch/R-manual/R-devel/doc/html/NEWS.html
+
+Since data.table hooks into R's internals, it is already failing on
+r-devel CRAN checks (as Prof Ripley warning us a while back).
+
+So, I'll see what I can do, but advance warning that we might need to soon
+depend on R 2.15.1 (or whichever version of R long vectors makes it into).
+However, I'd say there was an 80% chance it'll be compile time switches
+and we can continue to depend on R 2.12.0 in future versions of
+data.table.
+
+Matthew
+
+
+
+
+From caneff at gmail.com  Wed Apr 18 12:26:49 2012
+From: caneff at gmail.com (Chris Neff)
+Date: Wed, 18 Apr 2012 06:26:49 -0400
+Subject: [datatable-help] Change in return type of 'by' when DT (or
+ DT[i]) is empty
+In-Reply-To: <1334734343.7257.135.camel@netbook>
+References: <1334734343.7257.135.camel@netbook>
+Message-ID: <CAAuY0RUO4S2DWQt1hcmkteFNOem6Quxv51n3ztxRr5rijsYPuw@mail.gmail.com>
+
+I would agree that a empty data table is the expected result I would
+have had.  If I do
+
+DT[, sum(v), by=x]
+
+I always expect a two column data.table with columns "x" and "V1"
+(which is sum(x)). In SQL this would read
+
+SELECT
+  x,
+  SUM(v)
+FROM DT
+GROUP BY x
+
+
+So with DT[y<1,  sum(v), by=x] we have
+
+SELECT
+  x,
+  SUM(v)
+FROM DT
+WHERE y < 1
+GROUP BY x
+
+Now in any SQL dialect I work with, if WHERE y < 1 didn't return any
+rows, then the result of this would be a 0 row selection.  I believe
+that is what it should be with data.table as well: a 0-row data.table
+with columns "x" and "V1".
+
+This is a valid bug IMO, and should definitely be fixed.
+On Wed, Apr 18, 2012 at 3:32 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Dear datatablers,
+>
+> This seems like a valid bug report. Any reasons why we shouldn't make
+> this change?
+>
+> https://r-forge.r-project.org/tracker/?func=detail&atid=975&aid=1945&group_id=240
+>
+> Matthew
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From mailinglist.honeypot at gmail.com  Wed Apr 18 15:03:13 2012
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 18 Apr 2012 09:03:13 -0400
+Subject: [datatable-help] Long vectors in R
+In-Reply-To: <d10ed400daac85f50721d6235ac9d663.squirrel@webmail.plus.net>
+References: <d10ed400daac85f50721d6235ac9d663.squirrel@webmail.plus.net>
+Message-ID: <CAHA9McNVeyLG=PMzE7VGQTSieDeUZQdFMHxoaaMyJKPgRHiTZg@mail.gmail.com>
+
+Hi,
+
+Yeah, long vectors are awesome and a welcomed (future) addition to R.
+For whatever it's worth, I'm pretty sure that this (R-devel) is for
+R-2.16.x (and not 2.15.1), which is still a year away.
+
+-steve
+
+On Wed, Apr 18, 2012 at 5:15 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> Dear datatablers,
+>
+> Looks like support for long vectors is being added to R :
+>
+> http://stat.ethz.ch/R-manual/R-devel/doc/html/NEWS.html
+>
+> Since data.table hooks into R's internals, it is already failing on
+> r-devel CRAN checks (as Prof Ripley warning us a while back).
+>
+> So, I'll see what I can do, but advance warning that we might need to soon
+> depend on R 2.15.1 (or whichever version of R long vectors makes it into).
+> However, I'd say there was an 80% chance it'll be compile time switches
+> and we can continue to depend on R 2.12.0 in future versions of
+> data.table.
+>
+> Matthew
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Wed Apr 18 15:05:47 2012
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 18 Apr 2012 09:05:47 -0400
+Subject: [datatable-help] Change in return type of 'by' when DT (or
+ DT[i]) is empty
+In-Reply-To: <CAAuY0RUO4S2DWQt1hcmkteFNOem6Quxv51n3ztxRr5rijsYPuw@mail.gmail.com>
+References: <1334734343.7257.135.camel@netbook>
+ <CAAuY0RUO4S2DWQt1hcmkteFNOem6Quxv51n3ztxRr5rijsYPuw@mail.gmail.com>
+Message-ID: <CAHA9McOM6HSeSWJRCinTg-OFRBha4BT16yO1rUfLLZ4KmGFR5Q@mail.gmail.com>
+
+Hi,
+
+On Wed, Apr 18, 2012 at 6:26 AM, Chris Neff <caneff at gmail.com> wrote:
+> I would agree that a empty data table is the expected result I would
+> have had.
+[snip]
+
+Completely agree w/ Chris' synopsis (below) and +1 on making the change.
+
+-steve
+
+> ?If I do
+>
+> DT[, sum(v), by=x]
+>
+> I always expect a two column data.table with columns "x" and "V1"
+> (which is sum(x)). In SQL this would read
+>
+> SELECT
+> ?x,
+> ?SUM(v)
+> FROM DT
+> GROUP BY x
+>
+>
+> So with DT[y<1, ?sum(v), by=x] we have
+>
+> SELECT
+> ?x,
+> ?SUM(v)
+> FROM DT
+> WHERE y < 1
+> GROUP BY x
+>
+> Now in any SQL dialect I work with, if WHERE y < 1 didn't return any
+> rows, then the result of this would be a 0 row selection. ?I believe
+> that is what it should be with data.table as well: a 0-row data.table
+> with columns "x" and "V1".
+>
+> This is a valid bug IMO, and should definitely be fixed.
+> On Wed, Apr 18, 2012 at 3:32 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> Dear datatablers,
+>>
+>> This seems like a valid bug report. Any reasons why we shouldn't make
+>> this change?
+>>
+>> https://r-forge.r-project.org/tracker/?func=detail&atid=975&aid=1945&group_id=240
+>>
+>> Matthew
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Wed Apr 18 16:22:56 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 18 Apr 2012 15:22:56 +0100
+Subject: [datatable-help] Long vectors in R
+In-Reply-To: <CAHA9McNVeyLG=PMzE7VGQTSieDeUZQdFMHxoaaMyJKPgRHiTZg@mail.gmail.com>
+References: <d10ed400daac85f50721d6235ac9d663.squirrel@webmail.plus.net>
+ <CAHA9McNVeyLG=PMzE7VGQTSieDeUZQdFMHxoaaMyJKPgRHiTZg@mail.gmail.com>
+Message-ID: <06607e500b1d47707e5eba287670ee7f.squirrel@webmail.plus.net>
+
+
+Oh. How can you tell that (that it's for 2.16 and a year away)?
+
+For completeness, it'll be a bigger difference (and for more people) using
+matrix (and objects using matrix) than data.table I'd guess? Since a
+matrix is really one long vector, a single matrix can then be greater than
+16Gb (currently n*m < 2^31-1, iiuc). In data.table (and data.frame) each
+column can already up to 16Gb, and the data.table/frame as large as RAM.
+The 2 billion row limit can still bite though and the change is very
+welcome.
+
+Matthew
+
+
+> Hi,
+>
+> Yeah, long vectors are awesome and a welcomed (future) addition to R.
+> For whatever it's worth, I'm pretty sure that this (R-devel) is for
+> R-2.16.x (and not 2.15.1), which is still a year away.
+>
+> -steve
+>
+> On Wed, Apr 18, 2012 at 5:15 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> wrote:
+>>
+>> Dear datatablers,
+>>
+>> Looks like support for long vectors is being added to R :
+>>
+>> http://stat.ethz.ch/R-manual/R-devel/doc/html/NEWS.html
+>>
+>> Since data.table hooks into R's internals, it is already failing on
+>> r-devel CRAN checks (as Prof Ripley warning us a while back).
+>>
+>> So, I'll see what I can do, but advance warning that we might need to
+>> soon
+>> depend on R 2.15.1 (or whichever version of R long vectors makes it
+>> into).
+>> However, I'd say there was an 80% chance it'll be compile time switches
+>> and we can continue to depend on R 2.12.0 in future versions of
+>> data.table.
+>>
+>> Matthew
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+
+
+From mailinglist.honeypot at gmail.com  Wed Apr 18 19:55:30 2012
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 18 Apr 2012 13:55:30 -0400
+Subject: [datatable-help] Long vectors in R
+In-Reply-To: <06607e500b1d47707e5eba287670ee7f.squirrel@webmail.plus.net>
+References: <d10ed400daac85f50721d6235ac9d663.squirrel@webmail.plus.net>
+ <CAHA9McNVeyLG=PMzE7VGQTSieDeUZQdFMHxoaaMyJKPgRHiTZg@mail.gmail.com>
+ <06607e500b1d47707e5eba287670ee7f.squirrel@webmail.plus.net>
+Message-ID: <CAHA9McP+12vHizKVafLiAAT7S=Jk2joT9VpYpV986V=ZVcMT6w@mail.gmail.com>
+
+Hi,
+
+On Wed, Apr 18, 2012 at 10:22 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> Oh. How can you tell that (that it's for 2.16 and a year away)?
+
+I thought I had read it in one of the R lists I was on, but I can't
+seem to find where that might have been now, so don't take my word on
+that.
+
+The other source of evidence, though, is that you see comments in the
+svn log for R-trunk about long vector support, but not in
+R-2-15-branch ... which is just circumstantial evidence, to be sure.
+
+So, take my comment on long vector support only landing in 2.16 is
+just a guess/bet and not a statement of fact.
+
+-steve
+
+
+
+>
+> For completeness, it'll be a bigger difference (and for more people) using
+> matrix (and objects using matrix) than data.table I'd guess? Since a
+> matrix is really one long vector, a single matrix can then be greater than
+> 16Gb (currently n*m < 2^31-1, iiuc). In data.table (and data.frame) each
+> column can already up to 16Gb, and the data.table/frame as large as RAM.
+> The 2 billion row limit can still bite though and the change is very
+> welcome.
+>
+> Matthew
+>
+>
+>> Hi,
+>>
+>> Yeah, long vectors are awesome and a welcomed (future) addition to R.
+>> For whatever it's worth, I'm pretty sure that this (R-devel) is for
+>> R-2.16.x (and not 2.15.1), which is still a year away.
+>>
+>> -steve
+>>
+>> On Wed, Apr 18, 2012 at 5:15 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+>> wrote:
+>>>
+>>> Dear datatablers,
+>>>
+>>> Looks like support for long vectors is being added to R :
+>>>
+>>> http://stat.ethz.ch/R-manual/R-devel/doc/html/NEWS.html
+>>>
+>>> Since data.table hooks into R's internals, it is already failing on
+>>> r-devel CRAN checks (as Prof Ripley warning us a while back).
+>>>
+>>> So, I'll see what I can do, but advance warning that we might need to
+>>> soon
+>>> depend on R 2.15.1 (or whichever version of R long vectors makes it
+>>> into).
+>>> However, I'd say there was an 80% chance it'll be compile time switches
+>>> and we can continue to depend on R 2.12.0 in future versions of
+>>> data.table.
+>>>
+>>> Matthew
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>>
+>>
+>> --
+>> Steve Lianoglou
+>> Graduate Student: Computational Systems Biology
+>> ?| Memorial Sloan-Kettering Cancer Center
+>> ?| Weill Medical College of Cornell University
+>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Fri Apr 20 19:15:14 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 20 Apr 2012 18:15:14 +0100
+Subject: [datatable-help] Change in return type of 'by' when DT (or
+ DT[i]) is empty
+In-Reply-To: <CAHA9McOM6HSeSWJRCinTg-OFRBha4BT16yO1rUfLLZ4KmGFR5Q@mail.gmail.com>
+References: <1334734343.7257.135.camel@netbook>
+ <CAAuY0RUO4S2DWQt1hcmkteFNOem6Quxv51n3ztxRr5rijsYPuw@mail.gmail.com>
+ <CAHA9McOM6HSeSWJRCinTg-OFRBha4BT16yO1rUfLLZ4KmGFR5Q@mail.gmail.com>
+Message-ID: <1334942114.6743.8.camel@netbook>
+
+Now fixed in v1.8.1.
+
+o 'by' on an empty table now returns an empty table (#1945) and .N, .SD
+  and .BY are now available in the empty case (also #1945). The column
+  names and types of the returned empty table are consistent with the
+  non empty case. Thanks to Malcolm Cook for reporting. Tests added.
+
+o An empty data.table (0 rows, 1+ cols) now print as "Empty data.table"
+  rather than "NULL data.table". A NULL data.table, returned by
+  data.table(NULL), has 0 rows and 0 cols. DT[0] returns an empty
+  data.table.
+
+
+On Wed, 2012-04-18 at 09:05 -0400, Steve Lianoglou wrote:
+> Hi,
+> 
+> On Wed, Apr 18, 2012 at 6:26 AM, Chris Neff <caneff at gmail.com> wrote:
+> > I would agree that a empty data table is the expected result I would
+> > have had.
+> [snip]
+> 
+> Completely agree w/ Chris' synopsis (below) and +1 on making the change.
+> 
+> -steve
+> 
+> >  If I do
+> >
+> > DT[, sum(v), by=x]
+> >
+> > I always expect a two column data.table with columns "x" and "V1"
+> > (which is sum(x)). In SQL this would read
+> >
+> > SELECT
+> >  x,
+> >  SUM(v)
+> > FROM DT
+> > GROUP BY x
+> >
+> >
+> > So with DT[y<1,  sum(v), by=x] we have
+> >
+> > SELECT
+> >  x,
+> >  SUM(v)
+> > FROM DT
+> > WHERE y < 1
+> > GROUP BY x
+> >
+> > Now in any SQL dialect I work with, if WHERE y < 1 didn't return any
+> > rows, then the result of this would be a 0 row selection.  I believe
+> > that is what it should be with data.table as well: a 0-row data.table
+> > with columns "x" and "V1".
+> >
+> > This is a valid bug IMO, and should definitely be fixed.
+> > On Wed, Apr 18, 2012 at 3:32 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> >> Dear datatablers,
+> >>
+> >> This seems like a valid bug report. Any reasons why we shouldn't make
+> >> this change?
+> >>
+> >> https://r-forge.r-project.org/tracker/?func=detail&atid=975&aid=1945&group_id=240
+> >>
+> >> Matthew
+> >>
+> >>
+> >>
+> >> _______________________________________________
+> >> datatable-help mailing list
+> >> datatable-help at lists.r-forge.r-project.org
+> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+> 
+
+
+
+From mdowle at mdowle.plus.com  Thu Apr 26 11:02:33 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 26 Apr 2012 10:02:33 +0100
+Subject: [datatable-help] with=FALSE
+Message-ID: <d15dee14ebc6756a407b8d5c9eb6b2be.squirrel@webmail.plus.net>
+
+
+Dear Datatablers,
+
+It may be possible for these :
+
+    DT[,1]
+    DT[,1:3]
+    DT[,c("colA","colB")]
+
+all to return a data.table of those columns, rather than needing
+with=FALSE, for convenience. After all, there is no useful purpose of
+returning the j vector itself in these cases; the programmers intent is
+unambiguous (afaik).
+
+Where a variable holds the vector of column names or numbers, with=FALSE
+would still be needed.
+
+    colvars = c("colA","colB")
+    DT[,colvars]  # would return the column called colvars if exists, or
+the vector itself.
+    DT[,colvars,with=FALSE]   # with needed in this case
+
+Given with=FALSE would become optional in the simpler cases, I'm thinking
+it would be backwards compatible and wouldn't cause any problems to
+existing code. Unless, there is a valid reason to return the j vector
+straight back (a special case of a larger idiom perhaps)?
+
+Internally it would look at the j expression to see if it was a single
+column position, a call to ":" or a call to "c()", which resulted in a
+valid vector of column names or positions. Anything more complicated would
+need with=FALSE.  The risk would be inconsistency and confusion, or not
+maybe?
+
+This would change the very first FAQ (1.1), though. Not sure if it would
+make it easier or harder to make the transition to data.table.
+
+Thoughts?
+
+Matthew
+
+
+
+From mdowle at mdowle.plus.com  Thu Apr 26 22:48:39 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 26 Apr 2012 21:48:39 +0100
+Subject: [datatable-help] .SD without by seems to fail
+In-Reply-To: <1326316943.4023.0.camel@netbook>
+References: <705A8CD1C73B164D91B71C465EA15BE557ED2E02E3@ex02mail01.ad.rit.edu>
+ <CAGam+C5autvBeDAKcybUgJfFUGUcaV29AfuFvNN74bFn0G8ALg@mail.gmail.com>
+ <CAAuY0RXiZPY+4CM8XJQ7WJKxi15sK0_6-Rg3gGmwF_LZ=yzXFQ@mail.gmail.com>
+ <1326147324.30962.19.camel@netbook>
+ <705A8CD1C73B164D91B71C465EA15BE557ED2E04CF@ex02mail01.ad.rit.edu>
+ <1326316943.4023.0.camel@netbook>
+Message-ID: <1335473319.4079.5.camel@netbook>
+
+Now fixed in v1.8.1 :
+
+o  .N, .SD and .BY are now available to j when 'by' is missing, "", 
+   character() and NULL, fixing #1732. For consistency so that j works
+   unchanged when by is dynamic and passed one of those values all
+   meaning 'don't group'. Thanks to Joseph Voelkel reporting and Chris 
+   Neff for further use cases. Tests added.
+
+o  0 length by (such as NULL and character(0)) now return a data.table 
+   when j is vector, rather than vector, for consistency of return    
+   types when by is dynamic and 'dont group' needs to be represented. 
+   Bug fix #1599 in v1.7.0 was fixing an error in this case (0 length 
+   by).
+
+On Wed, 2012-01-11 at 21:22 +0000, Matthew Dowle wrote:
+> Thanks. .N and .BY added to FR#1732.
+> 
+> On Tue, 2012-01-10 at 17:28 -0500, Joseph Voelkel wrote:
+> > Same issue with .N and .BY, not surprisingly.
+> > 
+> > Regarding
+> >   "as.data.table(lapply(DT, sum)) works and doesn't seem much less elegant?"
+> > 
+> > In my example, I was writing several statements of .SD with by=, and then wanted a statement
+> > Without the by=. It just seemed that I shouldn't need to change .SD to DT ... Same fundamental point as Chris's but not is as elegant a context.
+> > 
+> > 
+> > -----Original Message-----
+> > From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> > Sent: Monday, January 09, 2012 5:15 PM
+> > To: Chris Neff
+> > Cc: timothee.carayol at gmail.com; Joseph Voelkel; datatable-help at lists.r-forge.r-project.org
+> > Subject: Re: [datatable-help] .SD without by seems to fail
+> > 
+> > Ok, very persuasive. I've raised a bug report :
+> > 
+> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1732&group_id=240&atid=975
+> > 
+> > 
+> > On Mon, 2012-01-09 at 14:01 -0500, Chris Neff wrote:
+> > > I think the original example should be able to work.  There are times
+> > > where I am dynamically building the by list based on the number of
+> > > subslice keys I have for my data.table. Sometimes I have to aggregate
+> > > over a certain key, so if my keys are "x" and "y" and I have value
+> > > columns V1, V2, V3 I will do something like:
+> > > 
+> > > by.cols = setdiff(key(DT), "x")
+> > > DT[, sum(V1), by=by.cols]
+> > > 
+> > > Now if I only have one key column "x", I want this to aggregate over
+> > > the whole data.table. This in the past didn't work until I submitted a
+> > > bug report and it was fixed, but I never have had to do it with the
+> > > whole .SD.  But I could easily see wanting to do
+> > > 
+> > > DT[, lapply(.SD, sum), by=by.cols]
+> > > 
+> > > especially if I include .SDcols with it too.  And I don't want to have
+> > > to check for an empty by.cols and do some different code just for that
+> > > case.  It makes sense to have it all consistent.
+> > > 
+> > > 
+> > > 2012/1/9 Timoth?e Carayol <timothee.carayol at gmail.com>:
+> > > > as.data.table(lapply(DT, sum)) works and doesn't seem much less elegant?
+> > > >
+> > > > (Well -- it would work if you were not trying to take the sum of a factor
+> > > > ;-))
+> > > >
+> > > > t
+> > > >
+> > > > On Mon, Jan 9, 2012 at 4:45 PM, Joseph Voelkel <jgvcqa at rit.edu> wrote:
+> > > >>
+> > > >> # from  help(data.table)
+> > > >>
+> > > >> DT = data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9)
+> > > >>
+> > > >> DT[,lapply(.SD,sum),by=x]  # this works fine
+> > > >>
+> > > >>
+> > > >>
+> > > >> # but this fails
+> > > >>
+> > > >> DT[,lapply(.SD,sum)]
+> > > >>
+> > > >> # with this message: Error in lapply(.SD, sum) : object '.SD' not found
+> > > >>
+> > > >>
+> > > >>
+> > > >> # Am I missing something obvious here?
+> > > >>
+> > > >>
+> > > >>
+> > > >>
+> > > >> _______________________________________________
+> > > >> datatable-help mailing list
+> > > >> datatable-help at lists.r-forge.r-project.org
+> > > >>
+> > > >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > > >
+> > > >
+> > > >
+> > > > _______________________________________________
+> > > > datatable-help mailing list
+> > > > datatable-help at lists.r-forge.r-project.org
+> > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > 
+> > 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From dbetebenner at nciea.org  Thu Apr 26 22:50:22 2012
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Thu, 26 Apr 2012 15:50:22 -0500
+Subject: [datatable-help] Characters and Factor
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694F8099E621@AUSP01VMBX05.collaborationhost.net>
+
+All,
+
+Not sure how to characterize this (a new feature or a bug) but the behavior is causing problems in code I've written that previously work as I expected. I have integers that are bigger than 2^32 that
+I have to encode as factors, after doing some data.table stuff (like below), it recorders the factors as characters and corrupts subsequent merges back to tables where these factors are ordered as
+"integers".
+
+Remedies?
+
+tmp.dt1 <- data.table(X=as.factor(1:10), Y=rnorm(10), key="X")
+tmp.dt2 <- data.table(X=as.factor(101:110), Y=rnorm(10), key="X")
+
+rbind(tmp.dt1, tmp.dt2)
+
+       V1           Y
+[1,]   1  0.47655333
+[2,]   2 -0.43962704
+[3,]   3 -0.78312270
+[4,]   4  1.88935392
+[5,]   5 -0.56413463
+[6,]   6 -0.69177767
+[7,]   7 -0.09942112
+[8,]   8  0.21452552
+[9,]   9 -0.86136222
+[10,]  10  0.55623427
+[11,] 101  0.02090036
+[12,] 102 -0.41816481
+[13,] 103  0.04798975
+[14,] 104  0.93709966
+[15,] 105 -0.95835181
+[16,] 106  0.82207890
+[17,] 107  0.85902512
+[18,] 108  1.33042023
+[19,] 109  0.22596849
+[20,] 110  0.99209054
+
+data.table(rbind(tmp.dt1, tmp.dt2), key="X")
+        X           Y
+[1,]   1 -0.16225884
+[2,]  10  0.82979617
+[3,] 101  0.22412653
+[4,] 102 -0.24841475
+[5,] 103 -0.09914182
+[6,] 104 -1.47982574
+[7,] 105 -1.79957210
+[8,] 106 -2.01715940
+[9,] 107 -0.81900855
+[10,] 108  0.26357249
+[11,] 109 -1.22742679
+[12,] 110  0.64773494
+[13,]   2 -0.98312948
+[14,]   3  0.99937771
+[15,]   4 -1.72355977
+[16,]   5 -2.02481542
+[17,]   6 -0.07222688
+[18,]   7  0.17921321
+[19,]   8 -0.92102526
+[20,]   9 -0.14129584
+
+
+
+data.table(rbind(tmp.dt1, tmp.dt2), key="X")
+
+
+
+
+Damian Betebenner
+Center for Assessment
+PO Box 351
+Dover, NH   03821-0351
+
+Phone (office): (603) 516-7900
+Phone (cell): (857) 234-2474
+Fax: (603) 516-7910
+
+dbetebenner at nciea.org<mailto:dbetebenner at nciea.org>
+www.nciea.org<http://www.nciea.org/>
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120426/7f462277/attachment.html>
+
+From mdowle at mdowle.plus.com  Fri Apr 27 10:24:33 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 27 Apr 2012 08:24:33 +0000 (UTC)
+Subject: [datatable-help] Characters and Factor
+References: <8AD9137B75B37049AA711A4B64CEDB694F8099E621@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <loom.20120427T100246-252@post.gmane.org>
+
+
+Damian Betebenner <dbetebenner <at> nciea.org> writes:
+> All, 
+> ?
+> Not sure how to characterize this (a new feature or a bug) but the behavior 
+is causing problems in code I?ve written that previously work as I expected. I 
+have integers that are bigger than 2^32 that
+> I have to encode as factors, after doing some data.table stuff (like below), 
+it recorders the factors as characters and corrupts subsequent merges back to 
+tables where these factors are ordered as
+> ?integers?.
+> ?
+> Remedies?
+> ?
+> tmp.dt1 <- data.table(X=as.factor(1:10), Y=rnorm(10), key="X")
+> tmp.dt2 <- data.table(X=as.factor(101:110), Y=rnorm(10), key="X")
+> ?
+> rbind(tmp.dt1, tmp.dt2)
+> ?
+> ?????? V1?????????? Y
+>  [1,]?? 1? 0.47655333
+>  [2,]?? 2 -0.43962704
+>  [3,]?? 3 -0.78312270
+>  [4,]?? 4? 1.88935392
+>  [5,]?? 5 -0.56413463
+>  [6,]?? 6 -0.69177767
+>  [7,]?? 7 -0.09942112
+>  [8,]?? 8? 0.21452552
+>  [9,]?? 9 -0.86136222
+> [10,]? 10? 0.55623427
+> [11,] 101? 0.02090036
+> [12,] 102 -0.41816481
+> [13,] 103? 0.04798975
+> [14,] 104? 0.93709966
+> [15,] 105 -0.95835181
+> [16,] 106? 0.82207890
+> [17,] 107? 0.85902512
+> [18,] 108? 1.33042023
+> [19,] 109? 0.22596849
+> [20,] 110? 0.99209054
+> ?
+> data.table(rbind(tmp.dt1, tmp.dt2), key="X")
+> ??????? X?????????? Y
+>  [1,]?? 1 -0.16225884
+>  [2,]? 10? 0.82979617
+>  [3,] 101? 0.22412653
+>  [4,] 102 -0.24841475
+>  [5,] 103 -0.09914182
+>  [6,] 104 -1.47982574
+>  [7,] 105 -1.79957210
+>  [8,] 106 -2.01715940
+>  [9,] 107 -0.81900855
+> [10,] 108? 0.26357249
+> [11,] 109 -1.22742679
+> [12,] 110? 0.64773494
+> [13,]?? 2 -0.98312948
+> [14,]?? 3? 0.99937771
+> [15,]?? 4 -1.72355977
+> [16,]?? 5 -2.02481542
+> [17,]?? 6 -0.07222688
+> [18,]?? 7? 0.17921321
+> [19,]?? 8 -0.92102526
+> [20,]?? 9 -0.14129584 ?
+> ?
+Hi,
+
+I've had a quick look but can't quite grasp it. rbind.data.table calls 
+data.table::c.factor() to concatenate factor columns, and that reorders the 
+levels on the new combined factor. I guess it shouldn't now that unordered 
+factor levels are allowed and supported in data.table. But if that's it, it 
+wouldn't have worked before either and it's always been a problem. Also I don't 
+see how a corruption could occur since joins between two factor columns with 
+different levels (each possibly unordered) should work fine. Could you provide 
+some more details before and after showing the change exactly?
+
+I was going to say 'just use character', but had never considered ordered 
+integers greater than 2^32 as the use case, so character type wouldn't work for 
+them. It's a new one on me, so either way some new tests are needed.
+
+Finally, there is this fix in v1.8.1 that might be involved somehow :
+
+o Joining a factor column with unsorted and unused levels to a character
+  column now matches properly, fixing #1922. Thanks to Christoph J?ckel for
+  the reproducible example. Test added.
+
+Matthew
+
+
+
+From mdowle at mdowle.plus.com  Sat Apr 28 03:43:03 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 28 Apr 2012 02:43:03 +0100
+Subject: [datatable-help] J() casts to int?
+In-Reply-To: <1317843500.3712.67.camel@netbook>
+References: <u1oipo4er4c.fsf@ld-chrate28.citadelgroup.com>
+ <1317768849.3712.34.camel@netbook>
+ <u1od3ebe93f.fsf@ld-chrate28.citadelgroup.com>
+ <1317843500.3712.67.camel@netbook>
+Message-ID: <1335577383.4079.10.camel@netbook>
+
+This one is now cleared up in 1.8.1 hopefully. J() was casting the
+non-join i columns to int, as well as the i join columns. No casting is
+now done, even for join columns, now that 'double' is allowed in keys.
+
+o Numeric columns (type 'double') are now allowed in keys and ad hoc
+  by. J() and SJ() no longer coerce 'double' to 'integer'. i join 
+  columns which mismatch on numeric type are coerced silently to match
+  the type of x's join column. Other types which use 'double' (such as
+  POSIXct and bit64) can now be fully supported. Two floating point
+  values are considered equal (by grouping and binary search joins) if 
+  their difference is within sqrt(.Machine$double.eps), by default. See 
+  example in ?unique.data.table. Completes FRs #951, #1609 and #1075.
+
+
+On Wed, 2011-10-05 at 20:38 +0100, Matthew Dowle wrote:
+> On Wed, 2011-10-05 at 10:44 -0500, Johann Hibschman wrote:
+> > This technique is something I just came up with yesterday.  I grepped
+> > through my code for uses of J(), and I use the implicit conversion to
+> > int all over the place.  
+> Then that sounds inefficient. Convenient, but inefficient. Every
+> conversion is a memory allocation and copy. If that happens a lot,
+> especially in self joins (e.g. month+12 rather than month+12L) where the
+> conversion is happening on a vector as long as the (large) table then it
+> might speed up a lot changing everywhere to 12L. The month+12 happens
+> first to create the long double vector, then that long double vector is
+> coerced to integer (a copy). Even one number (a vector length 1)
+> converted from double to int inside a loop a lot, say, will create many
+> copies of small objects and that can be bad too.
+> 
+> > However, most of those follow a pattern like
+> > this:
+> > 
+> >   tmp12 <- mkt.data[J(month + 12), list(value12=value)][, -1, with=FALSE]
+> >   tmp24 <- mkt.data[J(month + 24), list(value24=value)][, -1, with=FALSE]
+> >   mkt.data <- cbind(mkt.data, tmp12, tmp24)
+> >   mkt.data$diff1y <- mkt.data[, value - value12]
+> >   mkt.data$diff2y <- mkt.data[, value - value24]
+> > 
+> > I want to compute lagged columns and add them back into the table.  I've
+> > never found a way to do this that seems easy and straightforward to me.
+> 
+> This should be faster and shorter (easier to read and slightly less
+> error prone) :
+> 
+> mkt.data[,value12:=mkt.data[J(month + 12L), value][[2]]]
+> mkt.data[,value24:=mkt.data[J(month + 24L), value][[2]]]
+> mkt.data[,diff1y:=value-value12]
+> mkt.data[,diff2y:=value-value24]
+> 
+> and when FR#1492 (multiple := in j) is implemented it might be :
+> 
+> mkt.data[,{ value12:=mkt.data[J(month + 12L), value][[2]]
+>             value24:=mkt.data[J(month + 24L), value][[2]]
+>             diff1y:=value-value12
+>             diff2y:=value-value24 }]
+> 
+> > 
+> > I'm inclined to leave J() as coercing-to-int, but make sure that
+> > behavior is documented in its help text.  If I want to do a "fancy"
+> > merge, I can always write out data.table.  That leaves J as a simple way
+> > to specify join keys, with easily-explainable semantics.  If it gets too
+> > clever, it becomes too hard to remember what exactly it does.
+> Agreed. Something needs improving somewhere though I'm thinking, to
+> encourage (at least inform you) not to rely on J()s auto conversion, but
+> to use 12L.
+> 
+> > 
+> > Similarly, I'd rather have the current behaviour (join cols must be int),
+> > rather than have a difference between what happens with a small amount
+> > of data and with a large amount of data.
+> Good point, ok. A difference for small amount of data is out then.
+> 
+> > It's just simpler and keeps
+> > with the mental model of "key columns must be integers".
+> > 
+> > Johann
+> > 
+> > Matthew Dowle <mdowle at mdowle.plus.com> writes:
+> > 
+> > > Thanks for illustrating so clearly. J() has always cast double columns
+> > > to int (as far as I remember anyway) for convenience when looking up
+> > > data from the prompt, say, to save having to remember L on typed in
+> > > values inside J().  This case, where J() is deliberately created with
+> > > more columns than x's key, using join inherited scope, I didn't
+> > > anticipate.  Or rather, was planning to achieve that output via x. and
+> > > i. prefixes in j (previous thread I think but it seems no FR number).
+> > > The way you've done it is kind of a manual way of achieving 'i.', where
+> > > 'i.' corresponds to your 'prev.'. I'm thinking automatic i. will still
+> > > be nice for convenience, but I have to admit I thought it wasn't
+> > > possible at all (at least, as elegantly in one query). Presumably this
+> > > is most useful with roll=TRUE : age as well as delta.
+> > >
+> > > Back to J() ... inside J() it doesn't know it's being calling as the i
+> > > argument, so it doesn't know the length of x's key. Otherwise, simple
+> > > fix would be for J() to only coerce double columns involved in the join
+> > > to x's key. Should be possible to use parent.frame() inside J() to work
+> > > out where it's being called from and the length of x's key. 
+> > >
+> > > Or, perhaps all data.table joins should allow double columns in i to be
+> > > joined to int, with inefficiency warning if say the number of rows in i
+> > > is > 1000,  error/warning if fractional data is truncated, and silently
+> > > otherwise.  Then the coercion to int in J() could be removed and it's
+> > > more consistent.
+> > >
+> > > Thoughts anyone?
+> > >
+> > > In the meantime I can't think of any other way than using data.table()
+> > > instead of J(), which looks to work and give the right result.
+> > >
+> > > Matthew
+> > >
+> > >
+> > > On Tue, 2011-10-04 at 10:03 -0500, Johann Hibschman wrote:
+> > >> I just noticed that J casts all its arguments to int.  Has this always
+> > >> been the case?  I can't find it documented anywhere.
+> > >> 
+> > >> I came across this while trying to do a self join, like this:
+> > >> 
+> > >>   > tmp <- data.table(date=1:5, value=10*rnorm(5), key="date")
+> > >>   > tmp
+> > >>        date     value
+> > >>   [1,]    1  3.710278
+> > >>   [2,]    2  4.571288
+> > >>   [3,]    3  2.009627
+> > >>   [4,]    4  8.237882
+> > >>   [5,]    5 -9.004814
+> > >>   > with(tmp, J(date, value))
+> > >>        date value
+> > >>   [1,]    1     3
+> > >>   [2,]    2     4
+> > >>   [3,]    3     2
+> > >>   [4,]    4     8
+> > >>   [5,]    5    -9
+> > >>   > tmp[J(date + 2, prev.date=date, prev.value=value),
+> > >>         list(prev.date, value, prev.value, delta=value-prev.value)]
+> > >>        date prev.date     value prev.value       delta
+> > >>   [1,]    3         1  2.009627          3  -0.9903734
+> > >>   [2,]    4         2  8.237882          4   4.2378817
+> > >>   [3,]    5         3 -9.004814          2 -11.0048141
+> > >>   [4,]    6         4        NA          8          NA
+> > >>   [5,]    7         5        NA         -9          NA
+> > >>   > tmp[data.table(date + 2L, prev.date=date, prev.value=value),
+> > >>         list(prev.date, value, prev.value, delta=value-prev.value)]
+> > >>        date prev.date     value prev.value      delta
+> > >>   [1,]    3         1  2.009627   3.710278  -1.700652
+> > >>   [2,]    4         2  8.237882   4.571288   3.666594
+> > >>   [3,]    5         3 -9.004814   2.009627 -11.014441
+> > >>   [4,]    6         4        NA   8.237882         NA
+> > >>   [5,]    7         5        NA  -9.004814         NA
+> > >> 
+> > >> Is this intended?  Using J let me be sloppy and do "+2" while data.table
+> > >> made me use "+2L", but then it clobbered the non-int values.
+> > >> 
+> > >> Is there a better way?
+> > >> 
+> > >> Thanks,
+> > >> Johann
+> > >> 
+> > >> _______________________________________________
+> > >> datatable-help mailing list
+> > >> datatable-help at lists.r-forge.r-project.org
+> > >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From jgvcqa at rit.edu  Mon Apr 30 21:48:43 2012
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Mon, 30 Apr 2012 15:48:43 -0400
+Subject: [datatable-help] with=FALSE
+In-Reply-To: <d15dee14ebc6756a407b8d5c9eb6b2be.squirrel@webmail.plus.net>
+References: <d15dee14ebc6756a407b8d5c9eb6b2be.squirrel@webmail.plus.net>
+Message-ID: <705A8CD1C73B164D91B71C465EA15BE5730723090D@ex02mail01.ad.rit.edu>
+
+Well, no one has chimed in yet, so I'll give it a shot.
+
+I see your logic, and I like your continual efforts to make the package neater, but my take would be to leave things as they are for consistency. I think it would be easier for new users to find that 
+    DT[,c("colA","colB")]
+and 
+    colvars = c("colA","colB")
+    DT[,colvars]  
+both don't work, and realize they need to use with=FALSE, rather than finding that the two lead to different results.
+
+Joe Voelkel
+
+
+-----Original Message-----
+From: datatable-help-bounces at lists.r-forge.r-project.org [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of Matthew Dowle
+Sent: Thursday, April 26, 2012 5:03 AM
+To: datatable-help at lists.r-forge.r-project.org
+Subject: [datatable-help] with=FALSE
+
+
+Dear Datatablers,
+
+It may be possible for these :
+
+    DT[,1]
+    DT[,1:3]
+    DT[,c("colA","colB")]
+
+all to return a data.table of those columns, rather than needing with=FALSE, for convenience. After all, there is no useful purpose of returning the j vector itself in these cases; the programmers intent is unambiguous (afaik).
+
+Where a variable holds the vector of column names or numbers, with=FALSE would still be needed.
+
+    colvars = c("colA","colB")
+    DT[,colvars]  # would return the column called colvars if exists, or the vector itself.
+    DT[,colvars,with=FALSE]   # with needed in this case
+
+Given with=FALSE would become optional in the simpler cases, I'm thinking it would be backwards compatible and wouldn't cause any problems to existing code. Unless, there is a valid reason to return the j vector straight back (a special case of a larger idiom perhaps)?
+
+Internally it would look at the j expression to see if it was a single column position, a call to ":" or a call to "c()", which resulted in a valid vector of column names or positions. Anything more complicated would need with=FALSE.  The risk would be inconsistency and confusion, or not maybe?
+
+This would change the very first FAQ (1.1), though. Not sure if it would make it easier or harder to make the transition to data.table.
+
+Thoughts?
+
+Matthew
+
+
+_______________________________________________
+datatable-help mailing list
+datatable-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+

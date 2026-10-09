@@ -1,0 +1,153 @@
+From Zhongkui.Luo at csiro.au  Sun Sep 20 04:07:56 2009
+From: Zhongkui.Luo at csiro.au (Zhongkui.Luo at csiro.au)
+Date: Sun, 20 Sep 2009 12:07:56 +1000
+Subject: [adegenet-forum] interpolation in a map
+Message-ID: <3DC072BBBBBEAF4C9E18F52448B44985018C5D44D1@exvic-mbx05.nexus.csiro.au>
+
+Hi,
+
+Sorry for the bother. A R problem looks for your suggestion.
+
+I want to draw a figure with filled contour in an irregular map.
+
+But I found that the contours overlap the boundaries of the map, and also some regions in the map were not filled.
+
+I used the following R code:
+
+
+Map<-readShapeSpatial("data1") # data1, a shapefile, the whole Australian map with boundary.
+plot(Map)
+data2.li<-interp(data2$x,data2$y,data2$z) #data2, txt file with three columns: x, longitude; y, latitude; z, variable (e.g., rainfall)
+filled.contour(data2.li, color=topo.colors, add=TRUE)
+
+
+Are there any R functions can be used to limit the filled contours just inside the map (no overlap and no blank)?
+
+Do you have any ideas to deal with this problem? Thanks very much for that!
+
+Best,
+
+
+Zhongkui Luo
+PhD candidate
+CSIRO Land & Water, Butler Lab.
+Clunies Ross Street, Acton
+Canberra, ACT 2601, Australia
+Ph: +61 2 6246 5594  E_Mail: Zhongkui.luo at csiro.au
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20090920/82cc88df/attachment.htm 
+
+From t.jombart at imperial.ac.uk  Sun Sep 20 14:53:55 2009
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Sun, 20 Sep 2009 13:53:55 +0100
+Subject: [adegenet-forum] interpolation in a map
+In-Reply-To: <3DC072BBBBBEAF4C9E18F52448B44985018C5D44D1@exvic-mbx05.nexus.csiro.au>
+References: <3DC072BBBBBEAF4C9E18F52448B44985018C5D44D1@exvic-mbx05.nexus.csiro.au>
+Message-ID: <0B75A6276180B546A1CA8D2B46E758050307BF7832@ICEXM3.ic.ac.uk>
+
+Zhongkui.Luo at csiro.au wrote:
+> Hi,
+>  
+> Sorry for the bother. A R problem looks for your suggestion.
+>  
+> I want to draw a figure with filled contour in an irregular map.
+>  
+> But I found that the contours overlap the boundaries of the map, and also some regions in the map were not filled.
+>  
+> I used the following R code:
+>  
+>    
+> Map<-readShapeSpatial("data1") # data1, a shapefile, the whole Australian map with boundary.
+> plot(Map)
+> data2.li<-interp(data2$x,data2$y,data2$z) #data2, txt file with three columns: x, longitude; y, latitude; z, variable (e.g., rainfall)
+> filled.contour(data2.li, color=topo.colors, add=TRUE)
+>  
+>  
+> Are there any R functions can be used to limit the filled contours just inside the map (no overlap and no blank)?
+>  
+> Do you have any ideas to deal with this problem? Thanks very much for that!
+>  
+> Best,
+>  
+>  
+>
+> Zhongkui Luo
+>
+> PhD candidate
+>
+> CSIRO Land & Water, Butler Lab.
+>
+> Clunies Ross Street, Acton
+>
+> Canberra, ACT 2601, Australia
+>
+> Ph: +61 2 6246 5594  E_Mail: Zhongkui.luo at csiro.au
+>
+>  
+>
+
+Dear Luo,
+
+I am afraid your post is off-topic for this ML. Also note that it is generally considered as impolite to post the same question at the same time to different mailing lists, as you did here. Lastly, you could find your answer in one command line:
+RSiteSearch("blank map contour")
+
+which takes you to relevant results found in R mailing lists archives, where the solution has been posted by Duncan Murdoch last year.
+
+However, that kind of issue may occur to people analysing genetic data, for instance when geographically mapping the results of a multivariate analysis. Here is a ready-to-use solution:
+
+##########
+library(akima)
+library(maps)
+library(mapdata)
+
+GRID.RES <- 500
+
+## original values
+x <- seq(100,170,le=10) + runif(10,-5,5)
+y <- seq(-50,0,le=10) + runif(10,-5,5)
+z <- x*y + rnorm(length(x),2)
+
+## interpolation using akima
+x0 <- seq(100,170,le=GRID.RES)
+y0 <- seq(-50,0,le=GRID.RES)
+z.hat <- interp(x,y, z, xo=x0, yo=y0, linear = FALSE, extrap=TRUE)
+
+## find loc in australia, set others to NA
+myGrid <- expand.grid(x0, y0)
+temp <- map.where(x=myGrid[,1], y=myGrid[,2])
+toKeep <- grep("australia",temp, ignore.case=TRUE)
+toRemove <- setdiff(1:length(z.hat$z), toKeep)
+z.hat$z[toRemove] <- NA
+
+## plot
+image(z.hat)
+map(add=TRUE, lwd=3)
+contour(z.hat,add=TRUE)
+############
+
+The quality of the result depends on the grid size (GRID.RES); GRID.RES=1000 takes a few seconds on my computer but provides publication-quality figures. For genetic data analysis, 'z' could be values of a principal component to be mapped, while x and y would be spatial coordinates of samples.
+
+Best,
+
+Thibaut.
+
+-- 
+######################################
+Dr Thibaut JOMBART
+MRC Centre for Outbreak Analysis and Modelling
+Department of Infectious Disease Epidemiology
+Imperial College - Faculty of Medicine
+St Mary?s Campus
+Norfolk Place
+London W2 1PG
+United Kingdom
+Tel. : 0044 (0)20 7594 3658
+t.jombart at imperial.ac.uk
+http://www1.imperial.ac.uk/medicine/people/t.jombart/
+http://adegenet.r-forge.r-project.org/
+

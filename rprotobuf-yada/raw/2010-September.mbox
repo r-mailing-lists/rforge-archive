@@ -1,0 +1,546 @@
+From eckuipers-web at yahoo.com  Sat Sep 11 00:19:19 2010
+From: eckuipers-web at yahoo.com (eckuipers-web at yahoo.com)
+Date: Fri, 10 Sep 2010 15:19:19 -0700 (PDT)
+Subject: [Rprotobuf-yada] bytes
+Message-ID: <566863.77464.qm@web50101.mail.re2.yahoo.com>
+
+Dirk, Romain,
+Why did you decide to represent the bytes field type by an R character vector? 
+Why not raw?
+I have a message with a bytes field, and within R i cannot get to the bytes 
+since the character representation cuts it off at the first null character it 
+runs into, it seems. So charToRaw doesnt help me here either. 
+
+Any suggestions?
+Best,
+Koert
+
+From edd at debian.org  Sat Sep 11 00:54:46 2010
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Fri, 10 Sep 2010 17:54:46 -0500
+Subject: [Rprotobuf-yada] bytes
+In-Reply-To: <566863.77464.qm@web50101.mail.re2.yahoo.com>
+References: <566863.77464.qm@web50101.mail.re2.yahoo.com>
+Message-ID: <19594.46902.864417.755868@max.nulle.part>
+
+
+Hi Koert,
+
+Thanks for posting on-list! 
+
+On 10 September 2010 at 15:19, eckuipers-web at yahoo.com wrote:
+| Dirk, Romain,
+| Why did you decide to represent the bytes field type by an R character vector? 
+| Why not raw?
+| I have a message with a bytes field, and within R i cannot get to the bytes 
+| since the character representation cuts it off at the first null character it 
+| runs into, it seems. So charToRaw doesnt help me here either. 
+| 
+| Any suggestions?
+
+Fair question. 
+
+We just happened to have uploaded 0.2.0 which should be on CRAN tomorrow --
+did you check against the ancient version on CRAN or did you check against
+SVN?
+
+Dirk
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+From romain.francois at dbmail.com  Sat Sep 11 10:18:30 2010
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 11 Sep 2010 10:18:30 +0200
+Subject: [Rprotobuf-yada] bytes
+In-Reply-To: <19594.46902.864417.755868@max.nulle.part>
+References: <566863.77464.qm@web50101.mail.re2.yahoo.com>
+	<19594.46902.864417.755868@max.nulle.part>
+Message-ID: <4C8B3B56.9090902@dbmail.com>
+
+Le 11/09/10 00:54, Dirk Eddelbuettel a ?crit :
+> Hi Koert,
+>
+> Thanks for posting on-list!
+>
+> On 10 September 2010 at 15:19, eckuipers-web at yahoo.com wrote:
+> | Dirk, Romain,
+> | Why did you decide to represent the bytes field type by an R character vector?
+> | Why not raw?
+> | I have a message with a bytes field, and within R i cannot get to the bytes
+> | since the character representation cuts it off at the first null character it
+> | runs into, it seems. So charToRaw doesnt help me here either.
+> |
+> | Any suggestions?
+>
+> Fair question.
+>
+> We just happened to have uploaded 0.2.0 which should be on CRAN tomorrow --
+> did you check against the ancient version on CRAN or did you check against
+> SVN?
+
+This will not make any difference.
+
+I guess Koert is right and we really should convert bytes fields into 
+raw vectors, and bytes repeated fields into list of raw vectors.
+
+As Dirk said, we just released, so you missed a window. But next time.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://bit.ly/cCmbgg : Rcpp 0.8.6
+|- http://bit.ly/bzoWrs : Rcpp svn revision 2000
+`- http://bit.ly/b8VNE2 : Rcpp at LondonR, oct 5th
+
+
+
+From eckuipers-web at yahoo.com  Sat Sep 11 18:02:06 2010
+From: eckuipers-web at yahoo.com (eckuipers-web at yahoo.com)
+Date: Sat, 11 Sep 2010 09:02:06 -0700 (PDT)
+Subject: [Rprotobuf-yada] bytes
+In-Reply-To: <19594.46902.864417.755868@max.nulle.part>
+References: <566863.77464.qm@web50101.mail.re2.yahoo.com>
+	<19594.46902.864417.755868@max.nulle.part>
+Message-ID: <629075.53288.qm@web50106.mail.re2.yahoo.com>
+
+
+
+Hey Dirk & Romain, 
+I just read both your replies. Thanks for getting back so quick. It's okay that 
+i missed the release, I will just use the SVN if/once you decide to switch to 
+raw.
+
+Getting to the raw bytes is particular important for RPC implementations, since 
+they almost all rely on this feature. This is how i ran into it: i was trying to 
+build a R client for my protobuf over zmq RPC implementation (soon to be 
+released open source).
+
+To be specific: in RPC it is up to the channel implementation to get both the 
+request protobuf message and the function name across to the server for the 
+request. And for the response the server has to send back the response protobuf 
+message and possible errors. Naturally one wants to use protobuf for this. But 
+since the request message and response message are unknown classes from the 
+RPC's point of view, the only way to deal with them is as serialized raw bytes. 
+So most RPC implementations have their own proto file that looks something like 
+this:
+
+
+
+message Request {
+  required string method = 1;
+  required bytes request = 2;
+}
+ 
+message Response {
+  optional bytes response = 1;
+  optional string error = 2;
+}
+Best,
+Koert
+
+
+----- Original Message ----
+From: Dirk Eddelbuettel <edd at debian.org>
+To: eckuipers-web at yahoo.com
+Cc: rprotobuf-yada at lists.r-forge.r-project.org
+Sent: Fri, September 10, 2010 6:54:46 PM
+Subject: Re: [Rprotobuf-yada] bytes
+
+
+Hi Koert,
+
+Thanks for posting on-list! 
+
+On 10 September 2010 at 15:19, eckuipers-web at yahoo.com wrote:
+| Dirk, Romain,
+| Why did you decide to represent the bytes field type by an R character vector? 
+
+| Why not raw?
+| I have a message with a bytes field, and within R i cannot get to the bytes 
+| since the character representation cuts it off at the first null character it 
+| runs into, it seems. So charToRaw doesnt help me here either. 
+| 
+| Any suggestions?
+
+Fair question. 
+
+We just happened to have uploaded 0.2.0 which should be on CRAN tomorrow --
+did you check against the ancient version on CRAN or did you check against
+SVN?
+
+Dirk
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+
+From edd at debian.org  Sat Sep 11 18:19:01 2010
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 11 Sep 2010 11:19:01 -0500
+Subject: [Rprotobuf-yada] bytes
+In-Reply-To: <629075.53288.qm@web50106.mail.re2.yahoo.com>
+References: <566863.77464.qm@web50101.mail.re2.yahoo.com>
+	<19594.46902.864417.755868@max.nulle.part>
+	<629075.53288.qm@web50106.mail.re2.yahoo.com>
+Message-ID: <19595.44021.110679.686976@max.nulle.part>
+
+
+Hi Koert,
+
+On 11 September 2010 at 09:02, eckuipers-web at yahoo.com wrote:
+| 
+| Hey Dirk & Romain, 
+| I just read both your replies. Thanks for getting back so quick. It's okay that 
+| i missed the release, I will just use the SVN if/once you decide to switch to 
+| raw.
+
+Feel free to take the lead and work on a patch.  We are both pretty tied up
+with other things, but would welcome such a patch as ...
+ 
+| Getting to the raw bytes is particular important for RPC implementations, since 
+| they almost all rely on this feature. This is how i ran into it: i was trying to 
+| build a R client for my protobuf over zmq RPC implementation (soon to be 
+| released open source).
+
+... that for example sounds awesome!  I also have played with ZeroMQ and like
+it.  
+
+Getting RPC onto PProtoBuf, and in particular decent performance RPC (and
+even Message Queing) would be sweet.  ProtoBuf is becoming a nice little
+interface languages -- Drizzle (the database project that is in some ways a
+reboot of MySQL) uses it for all internal data passing.
+
+Cheers, Dirk
+
+| To be specific: in RPC it is up to the channel implementation to get both the 
+| request protobuf message and the function name across to the server for the 
+| request. And for the response the server has to send back the response protobuf 
+| message and possible errors. Naturally one wants to use protobuf for this. But 
+| since the request message and response message are unknown classes from the 
+| RPC's point of view, the only way to deal with them is as serialized raw bytes. 
+| So most RPC implementations have their own proto file that looks something like 
+| this:
+| 
+| 
+| 
+| message Request {
+|   required string method = 1;
+|   required bytes request = 2;
+| }
+|  
+| message Response {
+|   optional bytes response = 1;
+|   optional string error = 2;
+| }
+| Best,
+| Koert
+| 
+| 
+| ----- Original Message ----
+| From: Dirk Eddelbuettel <edd at debian.org>
+| To: eckuipers-web at yahoo.com
+| Cc: rprotobuf-yada at lists.r-forge.r-project.org
+| Sent: Fri, September 10, 2010 6:54:46 PM
+| Subject: Re: [Rprotobuf-yada] bytes
+| 
+| 
+| Hi Koert,
+| 
+| Thanks for posting on-list! 
+| 
+| On 10 September 2010 at 15:19, eckuipers-web at yahoo.com wrote:
+| | Dirk, Romain,
+| | Why did you decide to represent the bytes field type by an R character vector? 
+| 
+| | Why not raw?
+| | I have a message with a bytes field, and within R i cannot get to the bytes 
+| | since the character representation cuts it off at the first null character it 
+| | runs into, it seems. So charToRaw doesnt help me here either. 
+| | 
+| | Any suggestions?
+| 
+| Fair question. 
+| 
+| We just happened to have uploaded 0.2.0 which should be on CRAN tomorrow --
+| did you check against the ancient version on CRAN or did you check against
+| SVN?
+| 
+| Dirk
+| 
+| -- 
+| Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+| 
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+From eckuipers-web at yahoo.com  Sat Sep 11 18:23:41 2010
+From: eckuipers-web at yahoo.com (eckuipers-web at yahoo.com)
+Date: Sat, 11 Sep 2010 09:23:41 -0700 (PDT)
+Subject: [Rprotobuf-yada] R version
+Message-ID: <812628.13734.qm@web50102.mail.re2.yahoo.com>
+
+Is here any particular reason why RProtobuf requires R version 2.11.0 or higher?
+I have version 2.10.1 installed and rather not upgrade (since its the version we 
+use on all computers at my work)
+
+
+From edd at debian.org  Sat Sep 11 18:37:16 2010
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 11 Sep 2010 11:37:16 -0500
+Subject: [Rprotobuf-yada] R version
+In-Reply-To: <812628.13734.qm@web50102.mail.re2.yahoo.com>
+References: <812628.13734.qm@web50102.mail.re2.yahoo.com>
+Message-ID: <19595.45116.410056.576961@max.nulle.part>
+
+
+On 11 September 2010 at 09:23, eckuipers-web at yahoo.com wrote:
+| Is here any particular reason why RProtobuf requires R version 2.11.0 or higher?
+
+Nope. We just happen to run current versions and sometimes encode this
+somewhat sloppily.  I _think_ that everything in our nexus that is on CRAN
+should actually work with 2.10.* but I am not entirely sure.  For Rcpp 0.8.6
+I just dialed it back down from 2.11 to 2.10.
+
+That said, Rcpp in SVN  just switched to R 2.12 because we are matching /
+extending / cooperating with some internal changes there.  That is explicit
+and on purpose.  But for the others older releases should work. 
+
+| I have version 2.10.1 installed and rather not upgrade (since its the version we 
+| use on all computers at my work)
+
+Poor you :)  I run Ubuntu server at work using 10.4 and get current R
+versions from CRAN thanks to the backporters Vincent and Michael.
+
+In short: just edit DESCRIPTION and move on. You should be fine.  Try R CMD
+check as well.
+
+Dirk 
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+From eckuipers-web at yahoo.com  Sat Sep 11 19:00:20 2010
+From: eckuipers-web at yahoo.com (eckuipers-web at yahoo.com)
+Date: Sat, 11 Sep 2010 10:00:20 -0700 (PDT)
+Subject: [Rprotobuf-yada] bytes
+In-Reply-To: <19595.44021.110679.686976@max.nulle.part>
+References: <566863.77464.qm@web50101.mail.re2.yahoo.com>
+	<19594.46902.864417.755868@max.nulle.part>
+	<629075.53288.qm@web50106.mail.re2.yahoo.com>
+	<19595.44021.110679.686976@max.nulle.part>
+Message-ID: <269937.8793.qm@web50105.mail.re2.yahoo.com>
+
+OK I will give the patch a try. I am unfamiliar with Rcpp so not sure how of 
+much help i can be...
+
+
+
+----- Original Message ----
+From: Dirk Eddelbuettel <edd at debian.org>
+To: eckuipers-web at yahoo.com
+Cc: Dirk Eddelbuettel <edd at debian.org>; 
+rprotobuf-yada at lists.r-forge.r-project.org
+Sent: Sat, September 11, 2010 12:19:01 PM
+Subject: Re: [Rprotobuf-yada] bytes
+
+
+Hi Koert,
+
+On 11 September 2010 at 09:02, eckuipers-web at yahoo.com wrote:
+| 
+| Hey Dirk & Romain, 
+| I just read both your replies. Thanks for getting back so quick. It's okay 
+that 
+
+| i missed the release, I will just use the SVN if/once you decide to switch to 
+| raw.
+
+Feel free to take the lead and work on a patch.  We are both pretty tied up
+with other things, but would welcome such a patch as ...
+
+| Getting to the raw bytes is particular important for RPC implementations, 
+since 
+
+| they almost all rely on this feature. This is how i ran into it: i was trying 
+to 
+
+| build a R client for my protobuf over zmq RPC implementation (soon to be 
+| released open source).
+
+... that for example sounds awesome!  I also have played with ZeroMQ and like
+it.  
+
+Getting RPC onto PProtoBuf, and in particular decent performance RPC (and
+even Message Queing) would be sweet.  ProtoBuf is becoming a nice little
+interface languages -- Drizzle (the database project that is in some ways a
+reboot of MySQL) uses it for all internal data passing.
+
+Cheers, Dirk
+
+| To be specific: in RPC it is up to the channel implementation to get both the 
+| request protobuf message and the function name across to the server for the 
+| request. And for the response the server has to send back the response 
+protobuf 
+
+| message and possible errors. Naturally one wants to use protobuf for this. But 
+
+| since the request message and response message are unknown classes from the 
+| RPC's point of view, the only way to deal with them is as serialized raw 
+bytes. 
+
+| So most RPC implementations have their own proto file that looks something 
+like 
+
+| this:
+| 
+| 
+| 
+| message Request {
+|   required string method = 1;
+|   required bytes request = 2;
+| }
+|  
+| message Response {
+|   optional bytes response = 1;
+|   optional string error = 2;
+| }
+| Best,
+| Koert
+| 
+| 
+| ----- Original Message ----
+| From: Dirk Eddelbuettel <edd at debian.org>
+| To: eckuipers-web at yahoo.com
+| Cc: rprotobuf-yada at lists.r-forge.r-project.org
+| Sent: Fri, September 10, 2010 6:54:46 PM
+| Subject: Re: [Rprotobuf-yada] bytes
+| 
+| 
+| Hi Koert,
+| 
+| Thanks for posting on-list! 
+| 
+| On 10 September 2010 at 15:19, eckuipers-web at yahoo.com wrote:
+| | Dirk, Romain,
+| | Why did you decide to represent the bytes field type by an R character 
+vector? 
+
+| 
+| | Why not raw?
+| | I have a message with a bytes field, and within R i cannot get to the bytes 
+| | since the character representation cuts it off at the first null character 
+it 
+
+| | runs into, it seems. So charToRaw doesnt help me here either. 
+| | 
+| | Any suggestions?
+| 
+| Fair question. 
+| 
+| We just happened to have uploaded 0.2.0 which should be on CRAN tomorrow --
+| did you check against the ancient version on CRAN or did you check against
+| SVN?
+| 
+| Dirk
+| 
+| -- 
+| Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+| 
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+
+From edd at debian.org  Sat Sep 11 19:17:02 2010
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 11 Sep 2010 12:17:02 -0500
+Subject: [Rprotobuf-yada] bytes
+In-Reply-To: <269937.8793.qm@web50105.mail.re2.yahoo.com>
+References: <566863.77464.qm@web50101.mail.re2.yahoo.com>
+	<19594.46902.864417.755868@max.nulle.part>
+	<629075.53288.qm@web50106.mail.re2.yahoo.com>
+	<19595.44021.110679.686976@max.nulle.part>
+	<269937.8793.qm@web50105.mail.re2.yahoo.com>
+Message-ID: <19595.47502.553181.232067@max.nulle.part>
+
+
+On 11 September 2010 at 10:00, eckuipers-web at yahoo.com wrote:
+| OK I will give the patch a try. 
+
+Great!
+
+| I am unfamiliar with Rcpp so not sure how of much help i can be...
+
+We do help on the rcpp-dev list which has more readers.  And Rcpp is more
+versatile so you had to learn that anyway ;-)
+
+Dirk
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+From romain.francois at dbmail.com  Mon Sep 13 08:28:18 2010
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Mon, 13 Sep 2010 08:28:18 +0200
+Subject: [Rprotobuf-yada] R version
+In-Reply-To: <19595.45116.410056.576961@max.nulle.part>
+References: <812628.13734.qm@web50102.mail.re2.yahoo.com>
+	<19595.45116.410056.576961@max.nulle.part>
+Message-ID: <4C8DC482.8080107@dbmail.com>
+
+Le 11/09/10 18:37, Dirk Eddelbuettel a ?crit :
+>
+>
+> On 11 September 2010 at 09:23, eckuipers-web at yahoo.com wrote:
+> | Is here any particular reason why RProtobuf requires R version 2.11.0 or higher?
+>
+> Nope. We just happen to run current versions and sometimes encode this
+> somewhat sloppily.
+
+Yes and No, but mostly no.
+
+No because RProtoBuf uses the controllable internal web server for the 
+RPC system, and the web server was introduced in R 2.11.0
+
+Yes because, well nobody knows or uses the RPC system so far. Blame it 
+on our marketing.
+
+Romain
+
+> I _think_ that everything in our nexus that is on CRAN
+> should actually work with 2.10.* but I am not entirely sure.  For Rcpp 0.8.6
+> I just dialed it back down from 2.11 to 2.10.
+>
+> That said, Rcpp in SVN  just switched to R 2.12 because we are matching /
+> extending / cooperating with some internal changes there.  That is explicit
+> and on purpose.  But for the others older releases should work.
+>
+> | I have version 2.10.1 installed and rather not upgrade (since its the version we
+> | use on all computers at my work)
+>
+> Poor you :)  I run Ubuntu server at work using 10.4 and get current R
+> versions from CRAN thanks to the backporters Vincent and Michael.
+>
+> In short: just edit DESCRIPTION and move on. You should be fine.  Try R CMD
+> check as well.
+>
+> Dirk
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://bit.ly/cCmbgg : Rcpp 0.8.6
+|- http://bit.ly/bzoWrs : Rcpp svn revision 2000
+`- http://bit.ly/b8VNE2 : Rcpp at LondonR, oct 5th
+
+
+

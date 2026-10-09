@@ -1,0 +1,135 @@
+From pasi.haapakorva at thl.fi  Fri May 26 10:57:51 2017
+From: pasi.haapakorva at thl.fi (Haapakorva Pasi)
+Date: Fri, 26 May 2017 08:57:51 +0000
+Subject: [Traminer-users] Limit on cases due to 32bit vector
+Message-ID: <BCB8ADC546D6234C950F5441D00F7F1D4FCCADF2@HELW040.stakes.fi>
+
+Hi again,
+
+I've finally filed a bug report on this issue here https://r-forge.r-project.org/tracker/index.php?func=detail&aid=6512&group_id=743&atid=2975
+
+One thing developers could try is use LongVectors: https://stat.ethz.ch/R-manual/R-devel/library/base/html/LongVectors.html
+
+Pasi Haapakorva
+
+From: Haapakorva Pasi
+Sent: 29. tammikuuta 2016 12:00
+To: 'traminer-users at lists.r-forge.r-project.org'
+Subject: Limit on cases due to 32bit vector
+
+Hi all,
+
+I've discovered a 32bit limit on cases (even on a 64bit system). This is due to the vector size limit in R (3.2.3, 64bit, Windows x64), which is 2^31-1.
+
+> .Machine$integer.max
+[1] 2147483647
+> 2^31-1
+[1] 2147483647
+
+> sqrt(2^31-1)
+[1] 46340.95
+
+Regardless of full.matrix=true/false (because vector size doesn't change), seqdist() stops abruptly whenever there are more than 46341 cases. 46341 works fine, but 46342 does not. You can try this yourself (but if you change the size to anything less, you need a lot of RAM. 46341 eats about 30 gbs of RAM):
+----------
+library(TraMineR)
+
+id <- seq(from=1, to=46342, by=1)
+set.seed(234324)
+time1 <- sample(seq(from=1, to=3, by=1), size=46342, replace=TRUE)
+time2 <- sample(seq(from=1, to=3, by=1), size=46342, replace=TRUE)
+time3 <- sample(seq(from=1, to=3, by=1), size=46342, replace=TRUE)
+
+testdata <- data.frame(id, time1, time2, time3)
+
+testseq <- seqdef(testdata, 2:4)
+testdist <- seqdist(testseq, method="OM", indel=1, sm="TRATE", full.matrix=FALSE)
+---------
+
+This is important, because adding more RAM won't help, and neither won't renting a super computer.
+
+One might ask if a smaller sample would work, but I want to use all the cases I have (a birth cohort of 60,000) to get more reliable results later on (narrower confidence intervals). I can at least create clusters from two smaller samples and combine visually similar clusters from the two datas.
+
+Do you think we could get around the 2^31-1 limit? There has been a int64 package, which doesn't seem to be maintained anymore. Any other ideas? Input from the developers? I'm not a developer myself, so I can't do much.
+
+I haven't found many similar issues, but some have been solved with wcAggregateCases, which has happened to lower the case amount to less than 2^31-1: http://stackoverflow.com/questions/15929936/problem-with-big-data-during-computation-of-sequence-distances-using-tramine
+
+Pasi Haapakorva
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20170526/60b5afae/attachment.html>
+
+From reyno113 at purdue.edu  Sun May 28 18:25:25 2017
+From: reyno113 at purdue.edu (Reynolds, Jeremy E)
+Date: Sun, 28 May 2017 16:25:25 +0000
+Subject: [Traminer-users] subsetting a sequence object
+Message-ID: <1683846e620c4fd5813b11e54a433e2e@wppexc08.purdue.lcl>
+
+Dear Traminer Users,
+
+I am trying to create a sequence index plot for a subset of the cases in a sequence object.  I followed the example at the link below, but I get an error message about missing values.  I can try to make an example with the mvad data if needed, but I am hoping the output below might be enough for someone to give me a tip.
+
+Thanks,
+
+Jeremy
+
+https://stackoverflow.com/questions/13922750/how-to-create-sequence-index-plots-of-a-subset-of-groups-in-a-sequence-object
+
+txt> subset <- bhps.m$lcs6c_m %in% c("2611")
+txt> table(subset)
+subset
+FALSE  TRUE
+61031 23119
+
+txt>library(summarytools)
+
+txt> freq(men.match$lcs6c_m)
+
+
+
+Frequencies
+
+
+
+Dataframe name: men.match
+
+ Variable name: lcs6c_m
+
+
+
+                N   %Valid   %Cum.Valid   %Total   %Cum.Total
+
+----------- ----- -------- ------------ -------- ------------
+
+       1024     0        0            0        0            0
+
+       2296     0        0            0        0            0
+
+       2611 23119      100          100      100          100
+
+       2849     0        0          100        0          100
+
+       3876     0        0          100        0          100
+
+       5479     0        0          100        0          100
+
+       <NA>     0       NA           NA        0          100
+
+      Total 23119      100          100      100          100
+
+txt> seqIplot(seq.m[subset, ], group=bhps.m$lcs6c_m[subset])
+Error in if (any(x == nr)) { : missing value where TRUE/FALSE needed
+
+____________________________________
+Dr. Jeremy Reynolds
+Professor
+309 Stone Hall
+Department of Sociology
+700 W. State Street
+Purdue University
+West Lafayette, IN 47907
+Phone: (765) 496-3348<tel:%28765%29%20496-3348> https://www.cla.purdue.edu/sociology/directory/index.aspx?p=Jeremy_Reynolds
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20170528/c7a63849/attachment.html>
+

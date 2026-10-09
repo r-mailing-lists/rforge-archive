@@ -1,0 +1,128 @@
+From jeremyr at uga.edu  Fri Aug 14 19:57:03 2015
+From: jeremyr at uga.edu (Jeremy Reynolds)
+Date: Fri, 14 Aug 2015 13:57:03 -0400
+Subject: [Traminer-users] violation of triangle inequality with future based
+	substitution costs
+Message-ID: <CABicVB9x+ufDfSUiS+cpb-WF22cXzYQ1AtJ3R5PxWvoH-8=kMA@mail.gmail.com>
+
+Dear Traminer Experts,
+
+I have been using future based substitution costs as described in Studer
+and Ritschard 2014 and implemented in Traminer to make dissimilarity
+matrices.  Unfortunately, the results often violate the triangle
+inequality.  It seems to depend on what subset of my data I use, but I
+don't really know why the triangle inequality is violated in some cases and
+not in others.
+
+Is there some appropriate way to fix this (e.g. alter one of the
+substitution costs manually)?  Does the violation suggest that there is a
+problem somewhere else in my analysis or suggest something about my data?
+I have pasted the output from my latest analysis below in case it is
+useful.
+
+Thanks,
+
+Jeremy
+
+
+> ###########> # Calculate Substitution Costs using future similarity > ###########> > ######> #default lag of 1> ######> future <- seqcost(seq.hc, method="FUTURE", lag=1)   [>] creating substitution-cost matrix using common future... [>] computing transition rates for states 1/2/3/4/5 ...> dimnames(future) = list( c("M", "S", "F", "O", "U"), c("M", "S", "F", "O", "U"))> round(future, 4)       M      S      F      O      U
+M 0.0000 0.1701 0.4147 0.6304 0.3960
+S 0.1701 0.0000 0.2375 0.6125 0.3910
+F 0.4147 0.2375 0.0000 0.7700 0.5552
+O 0.6304 0.6125 0.7700 0.0000 0.4573
+U 0.3960 0.3910 0.5552 0.4573 0.0000
+
+> #largest substitution cost (F vs O)> maxsub <- max (max (future))> maxsub    [1] 0.7699533> #smallest substitution cost (M vs S)> minsub <- min(future[lower.tri(future)])> minsub     [1] 0.1701276
+
+
+
+> ###### > #lag of 2 > ###### > future2 <- seqcost(seq.hc, method="FUTURE",
+lag=2) [>] creating substitution-cost matrix using common future... [>]
+computing transition rates for states 1/2/3/4/5 ... > dimnames(future2) =
+list( c("M", "S", "F", "O", "U"), c("M", "S", "F", "O", "U")) > round(future2,
+4) M S F O U M 0.0000 0.1015 0.2740 0.4063 0.2184 S 0.1015 0.0000 0.1692
+0.4116 0.2428 F 0.2740 0.1692 0.0000 0.5508 0.3660 O 0.4063 0.4116 0.5508
+0.0000 0.2577 U 0.2184 0.2428 0.3660 0.2577 0.0000
+
+> #largest substitution cost (F vs O)> maxsub2 <- max (max (future2))> maxsub2     [1] 0.5508451> #smallest substitution cost (M vs S)> minsub2 <- min(future2[lower.tri(future2)])> minsub2    [1] 0.1014867
+
+
+
+> ##########################################> # make distance matrices> #########################################
+> disomf1i5 <- seqdistOO(seq.hc, method = "OM", indel = .5*maxsub, sm = future) [>] 10923 sequences with 5 distinct events/states [>] 10923 distinct sequences [>] min/max sequence length: 18/18 [>] computing distances using OM metric [>] total time: 59.34 secsWarning message: [!] at least, one substitution cost doesn't respect the triangle inequality.
+ [!] replacing 1 with 2 (cost=0.1701276) and then 2 with 3 (cost=0.2375203)
+ [!] costs less than replacing directly 1 with 3 (cost=0.4147297)
+ [!] total difference ([1=>2] + [2=>3] - [1=>3]): -0.007081773
+> disomf2i5 <- seqdistOO(seq.hc, method = "OM", indel = .5*maxsub2, sm = future2) [>] 10923 sequences with 5 distinct events/states [>] 10923 distinct sequences [>] min/max sequence length: 18/18 [>] computing distances using OM metric [>] total time: 59.04 secsWarning message: [!] at least, one substitution cost doesn't respect the triangle inequality.
+ [!] replacing 1 with 2 (cost=0.1014867) and then 2 with 3 (cost=0.1691506)
+ [!] costs less than replacing directly 1 with 3 (cost=0.27397)
+ [!] total difference ([1=>2] + [2=>3] - [1=>3]): -0.003332678
+
+
+
+-- 
+********************
+Dr. Jeremy Reynolds
+Professor
+Department of Sociology
+116 Baldwin Hall
+University of Georgia
+Athens, GA 30602-1611
+Phone: (706) 583-8072
+Web: http://uga.edu/soc/people/faculty/reynolds_jeremy.php
+Fax: (706) 542-4320
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20150814/f88148e5/attachment.html>
+
+From Matthias.Studer at unige.ch  Mon Aug 17 14:34:41 2015
+From: Matthias.Studer at unige.ch (Matthias Studer)
+Date: Mon, 17 Aug 2015 12:34:41 +0000
+Subject: [Traminer-users] violation of triangle inequality with future
+ based	substitution costs
+In-Reply-To: <CABicVB9x+ufDfSUiS+cpb-WF22cXzYQ1AtJ3R5PxWvoH-8=kMA@mail.gmail.com>
+References: <CABicVB9x+ufDfSUiS+cpb-WF22cXzYQ1AtJ3R5PxWvoH-8=kMA@mail.gmail.com>
+Message-ID: <367AEF503B1B6A4EA602FB66D71A3EC720056F87@kilo.isis.unige.ch>
+
+Dear Jeremy,
+
+Thank you for pointing this out.
+
+In our first version of the paper, we forgot to take the square root of the result, leading to a squared Euclidean distance that do not garantee the triangle inequality. We corrected this issue in the lastest version of the paper published in the Journal of the Royal Statistical Society: Serie A. However, the change was unfortunately not put in the latest development version of seqdist2. Please excuse us for that. We plan to fix in the next upcoming days.
+
+Future based costs are based on your data, this is why the results depend on your subset.
+
+Best regards,
+Matthias
+
+
+De : traminer-users-bounces at lists.r-forge.r-project.org [mailto:traminer-users-bounces at lists.r-forge.r-project.org] De la part de Jeremy Reynolds
+Envoy? : vendredi 14 ao?t 2015 19:57
+? : traminer-users at lists.r-forge.r-project.org
+Objet : [Traminer-users] violation of triangle inequality with future based substitution costs
+
+Dear Traminer Experts,
+I have been using future based substitution costs as described in Studer and Ritschard 2014 and implemented in Traminer to make dissimilarity matrices.  Unfortunately, the results often violate the triangle inequality.  It seems to depend on what subset of my data I use, but I don't really know why the triangle inequality is violated in some cases and not in others.
+
+Is there some appropriate way to fix this (e.g. alter one of the substitution costs manually)?  Does the violation suggest that there is a problem somewhere else in my analysis or suggest something about my data?
+I have pasted the output from my latest analysis below in case it is useful.
+
+Thanks,
+Jeremy
+
+
+--
+********************
+Dr. Jeremy Reynolds
+Professor
+Department of Sociology
+116 Baldwin Hall
+University of Georgia
+Athens, GA 30602-1611
+Phone: (706) 583-8072
+Web: http://uga.edu/soc/people/faculty/reynolds_jeremy.php
+Fax: (706) 542-4320
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/traminer-users/attachments/20150817/1e80c4df/attachment.html>
+

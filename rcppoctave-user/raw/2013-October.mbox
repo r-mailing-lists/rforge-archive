@@ -1,0 +1,3088 @@
+From renaud at mancala.cbio.uct.ac.za  Fri Oct  4 21:08:08 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Fri, 4 Oct 2013 21:08:08 +0200
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+Message-ID: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+
+Hi all,
+
+I finally got RcppOctave to work on Windows!
+See these threads for details on what it took:
+http://lists.r-forge.r-project.org/pipermail/rcpp-devel/2013-October/006524.html
+http://lists.r-forge.r-project.org/pipermail/rcpp-devel/2013-October/006555.html
+
+I would love to have feedbacks -- and log output :) -- on
+install/build/check run on other Windows machines. So feel free to try and
+complain if things go wrong.
+
+The source is available from github on branch develop:
+https://github.com/renozao/RcppOctave/archive/develop.zip
+
+Corresponding built source and binary packages are also available from my
+CRAN-like repo:
+http://web.cbio.uct.ac.za/~renaud/CRAN
+e.g.:
+install.packages('RcppOctave', repos = c(getOption('repos'), '
+http://web.cbio.uct.ac.za/~renaud/CRAN'))
+
+Requirements:
+  * building: Octave bin/ sub-directory must be in Windows PATH + the usual
+Rtools stuff. Probably better not to have spaces in R and Rtools paths;
+  * installing: never actually tried... but Octave bin/ sub-directory must
+be in the path, I imagine that Octave library directory (where liboctave,
+liboctinterp and libcruft live) must also be somehow registered or in
+Windows PATH.
+
+Note that I developed/tested the windows version using the mingw port (
+http://wiki.octave.org/Octave_for_Windows#Octave-3.6.4-mingw_.2B_octaveforge_pkgs),
+not sure if this is important, probably it is, maybe someone knows ;)
+
+I will also test on my side, but the more the merrier!
+
+Thank you.
+
+Bests,
+Renaud
+
+PS: people interested in keeping up with RcppOctave might consider
+subscribing the -- currently pristine -- mailing list
+http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131004/a1bb6abc/attachment.html>
+
+From djsamperi at gmail.com  Sat Oct  5 23:44:00 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Sat, 5 Oct 2013 17:44:00 -0400
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+Message-ID: <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+
+Hello Renaud,
+
+Here is a summary of my testing results.
+
+1. Your binary and source distribution is currently setup to use DLL's
+instead
+    of static libs. This is tricky to do under Windows, and this is why Rcpp
+    provides a static lib to link against. You may want to consider using
+    the same convention to avoid the complications explained below.
+
+2. Your binary installs fine under Windows 7, but when RcppOctave is
+    loaded and then R is terminated, I get the unhelpful Windows error
+    message: "This application has requested the Runtime to terminate
+    it in an unusual way." I get the same failure when I try to build from
+    source at the point where R CMD INSTALL tries to test the ability
+    to load the package. The solution (not obvious from the message!)
+    is to simply add the directory containing Rcpp.dll to PATH.
+    The next item explains why.
+
+3. Under normal circumstances when package Foo loads
+    its own Foo.dll, what happens is that R reads the dll directly and
+    does not depend on Windows to resolve dependencies on other
+    R package dll's. But in the case of RcppOctave.dll, there is a
+dependency
+    on Rcpp.dll, and Windows will not resolve this dependency unless
+    the directory containing Rcpp.dll is on PATH (another strategy is to
+    place Rcpp.dll in a Windows System directory, but this is not
+    consistent with the R install process and is not recommended).
+
+4. The parameter _WIN32_WINNT is set to a value used to identify
+    the underlying Windows OS version (2000, XP, 7, 8, etc.), and it
+    is set differently in the gcc configuration used to build Octave and
+    the one found in Rtools. I don't know if this makes a difference
+    that matters. In general, there is the potential for ABI problems
+    since Octave and Rtools use different versions of gcc. To be safe I
+    guess you could build Octave using the gcc from Rtools.
+
+5. On the recommended order of including RcppCommon.h vs Rcpp.h,
+    I have implemented custom wraps a few times with only Rcpp.h
+    included (at the top). This seems to work with rcpp_octave.h as well.
+    I would like to see a simple example where
+    the recommended order is necessary. Is this recommendation
+    insurance against some future change? Does it apply specifically
+    to user customized modules (as suggested by wrap_end.h)?
+
+Thanks,
+Dominick
+
+
+
+On Fri, Oct 4, 2013 at 3:08 PM, Renaud Gaujoux <
+renaud at mancala.cbio.uct.ac.za> wrote:
+
+> Hi all,
+>
+> I finally got RcppOctave to work on Windows!
+> See these threads for details on what it took:
+>
+> http://lists.r-forge.r-project.org/pipermail/rcpp-devel/2013-October/006524.html
+>
+> http://lists.r-forge.r-project.org/pipermail/rcpp-devel/2013-October/006555.html
+>
+> I would love to have feedbacks -- and log output :) -- on
+> install/build/check run on other Windows machines. So feel free to try and
+> complain if things go wrong.
+>
+> The source is available from github on branch develop:
+> https://github.com/renozao/RcppOctave/archive/develop.zip
+>
+> Corresponding built source and binary packages are also available from my
+> CRAN-like repo:
+> http://web.cbio.uct.ac.za/~renaud/CRAN
+> e.g.:
+> install.packages('RcppOctave', repos = c(getOption('repos'), '
+> http://web.cbio.uct.ac.za/~renaud/CRAN'))
+>
+> Requirements:
+>   * building: Octave bin/ sub-directory must be in Windows PATH + the
+> usual Rtools stuff. Probably better not to have spaces in R and Rtools
+> paths;
+>   * installing: never actually tried... but Octave bin/ sub-directory must
+> be in the path, I imagine that Octave library directory (where liboctave,
+> liboctinterp and libcruft live) must also be somehow registered or in
+> Windows PATH.
+>
+> Note that I developed/tested the windows version using the mingw port (
+> http://wiki.octave.org/Octave_for_Windows#Octave-3.6.4-mingw_.2B_octaveforge_pkgs),
+> not sure if this is important, probably it is, maybe someone knows ;)
+>
+> I will also test on my side, but the more the merrier!
+>
+> Thank you.
+>
+> Bests,
+> Renaud
+>
+> PS: people interested in keeping up with RcppOctave might consider
+> subscribing the -- currently pristine -- mailing list
+> http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/
+>
+>
+> _______________________________________________
+> Rcpp-devel mailing list
+> Rcpp-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rcpp-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131005/c7587767/attachment.html>
+
+From edd at debian.org  Sun Oct  6 01:15:08 2013
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 5 Oct 2013 18:15:08 -0500
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+Message-ID: <21072.40316.45566.743241@max.nulle.part>
+
+
+Dominick,
+
+Thanks for the detailed email, the follow-up is appreciated.  A few quick
+additions below as some questions were raised:
+
+On 5 October 2013 at 17:44, Dominick Samperi wrote:
+| Hello Renaud,
+| 
+| Here is a summary of my testing results.
+| 
+| 1. Your binary and source distribution is currently setup to use DLL's instead
+| ??? of static libs. This is tricky to do under Windows, and this is why Rcpp
+| ??? provides a static lib to link against. You may want to consider using
+| ??? the same convention to avoid the complications explained below.
+
+Indeed, the use of this 'deploy a static library for simplicity' shortcut is
+acknowledged. We do it because it works reliably (and people struggle enough
+already with Rtools and what have you when working on Windows), but the
+resulting binaries/libraries are sadly rather HUGE.
+
+And of course if we had a foolproof way to build with DLLs we would.  But as
+you say: "tricky". Possibly too tricky too ever get there.
+ 
+| 2. Your binary installs fine under Windows 7, but when RcppOctave is
+| ??? loaded and then R is terminated, I get the unhelpful Windows error
+| ??? message: "This application has requested the Runtime to terminate
+| ??? it in an unusual way." I get the same failure when I try to build from
+| ??? source at the point where R CMD INSTALL tries to test the ability
+| ??? to load the package. The solution (not obvious from the message!)
+| ? ? is to simply add the directory containing Rcpp.dll to PATH.
+| ??? The next item explains why.
+|
+| 3. Under normal circumstances when package Foo loads
+| ??? its own Foo.dll, what happens is that R reads the dll directly and
+| ??? does not depend on Windows to resolve dependencies on other
+| ? ? R package dll's. But in the case of RcppOctave.dll, there is a dependency
+| ??? on Rcpp.dll, and Windows will not resolve this dependency unless
+| ??? the directory containing Rcpp.dll is on PATH (another strategy is to
+| ??? place Rcpp.dll in a Windows System directory, but this is not
+| ??? consistent with the R install process and is not recommended).
+
+Correct. 
+
+When I test on Windows, particularly with RInside, I sometimes cheat and copy
+various required DLLs into the current directory. We normally do not need to
+do this for R packages as R takes care of loading its shared libraries, but
+when embedding R into Octave, this aspect may need to be covered. Maybe the
+Rcpp DLL directory needs to be appended to the DLL search path for Octave?
+
+[ We also 'cheat' a little on Linux by embedding the shared library location
+via rpath. That is not ideal as it breaks things once you move libraries
+(which is why rpath is more or less forbidden by use of distributions) but as
+R uses private shared library locations we just do it regardless. ]
+ 
+| 4. The parameter _WIN32_WINNT is set to a value used to identify
+| ??? the underlying Windows OS version (2000, XP, 7, 8, etc.), and it
+| ??? is set differently in the gcc configuration used to build Octave and
+| ??? the one found in Rtools. I don't know if this makes a difference
+| ??? that matters. In general, there is the potential for ABI problems
+| ??? since Octave and Rtools use different versions of gcc. To be safe I
+| ??? guess you could build Octave using the gcc from Rtools.
+
+Seconded. A bit of a pain as you would need to rebuild Octave, and even more
+of a pain when you want to redistribute.  Years ago I created some (simple)
+(in-house, at work) real-time plotting / charting apps via Qt that also used
+R, and I "simply" resolved to rebuilding Qt from source using the Rtools
+build chain. Not elegant, but that is the price one pays on Windows when
+using gcc -- which is a compiler common to 'all of us' but really not common
+for the Windows world at large.  So mixing and matching with other object
+code is just so much harder on Windows.
+ 
+| 5. On the recommended order of including RcppCommon.h vs Rcpp.h,
+| ??? I have implemented custom wraps a few times with only Rcpp.h
+| ??? included (at the top). This seems to work with rcpp_octave.h as well.
+| ??? I would like to see a simple example where
+| ??? the recommended order is necessary. Is this recommendation
+| ??? insurance against some future change? Does it apply specifically
+| ??? to user customized modules (as suggested by wrap_end.h)?
+
+Oh, I can see the possible confusion.  But I do not recall that we ever said
+one could include only RcppCommon.h.  I think the only time we talk about
+RcppCommon is in the context of as<>() and wrap() implementations where it is
+an effective forward declaration of 'all things Rcpp'.  The best official
+word on what to do is still the Rcpp-extending vignette.  But include is
+finicky which is why we now test in RcppArmadillo.h whether Rcpp.h has
+already been loaded -- it should not. One should include just RcppArmadillo.
+And in almost all cases one wants just one include in client projects:
+Rcpp.h.  But as<>() and wrap() happen to be an exception. 
+
+Contributions to better/clearer documentation would of course be appreciated.
+
+Hope this helps,  Dirk
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+From renaud at mancala.cbio.uct.ac.za  Mon Oct  7 10:32:28 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Mon, 7 Oct 2013 10:32:28 +0200
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <21072.40316.45566.743241@max.nulle.part>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+Message-ID: <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+
+Hi,
+
+thanks for all these explanations!
+
+I believe some clarifications from my side as well may be useful. I also
+have possibly silly questions :)
+Building RcppOctave involves 2 separate compilation/linking:
+
+  * Octave modules that call R RNG functions, but -- currently -- do not
+use Rcpp at all: these are built using mkoctfile, adding R flags  to the
+compilation command (-L"path/to/R" and -lR). Modules are compiled using
+Octave as a shared library. I think that, as long as the Octave dll issue
+is solved, Octave knows how to load these modules, without having to change
+the PATH. They load correctly on my Windows installation, but it is the
+machine on which the package was built, so this might also hide path issues.
+  * the RcppOctave's package library, which defines Rcpp wrap and as
+templates to convert and pass data between R an Octave: it is built by R
+compiler, adding Rcpp flags (as recommended and defined by
+Rcpp.package.skeleton) and Octave flags (-L"patth/to/octave/libraries" and
+-loctinterp -loctave -lcruft)
+
+The path to all Octave stuff are determined at configure time just before
+compiling.
+So, I believe this is all fine when installing on Linux, since compilation
+occurs at that time.
+On Windows, however, both the modules and the package's library are
+compiled when building the binary package.
+
+If I understand static linking correctly, packages that link against Rcpp
+using Rcpp:::LdFlags() will include in their library the definition of the
+Rcpp functions they use, making them standalone, right? or will the
+complete Rcpp dll be included?
+In this case I don't see why Rcpp.dll is needed in the PATH at all.
+
+
+I don't think I linking RcppOctave against Octave statically is ideal:
+1. I only call a few Octave functions, meaning that all other functions
+that a user may need will not be included in the library, and we get back
+to the starting point of dll loading issue.
+2. there is no point in including all Octave in RcppOctave
+3. Most Windows users will only have Octave dll, and no static libraries
+unless they compile them themselves. Am I right on this one: dll and static
+libraries are different objects that can't be used on of another?
+
+Possible solution:
+I could manually load the RcppOctave library in .onLoad (instead of the
+useDyn directive in NAEMASPACE), after adding the required directories to
+the PATH. These can be discovered using octave-config, which ships with all
+Octave installation.
+I will try this, re-build and update the package in both github and myCRAN
+repo, so that they can be tested.
+
+
+Renaud
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131007/0a94da7f/attachment-0001.html>
+
+From renaud at mancala.cbio.uct.ac.za  Mon Oct  7 10:59:41 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Mon, 7 Oct 2013 10:59:41 +0200
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+Message-ID: <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+
+Dominick, just to be sure: did you have Octave bin directory in your PATH
+when you tested the package?
+Because Octave dlls are also in that directory.
+
+I am getting confused on which path/dll is to be used where. Currently I
+build RcppOctave.dll linking against the dll.a files found in
+"C:\Octave\Octave3.6.4_gcc4.6.2\lib\octave\3.6.4". But there are .dll files
+(although named liboctave-1.dll and not liboctave.dll as I would expect) in
+""C:\Octave\Octave3.6.4_gcc4.6.2\bin" where octave.exe. and
+octave-config.exe also live.
+I had tried loading the .dll.a files with dyn.load in R but got errors. The
+-1.dll files load fine, and might be the ones I could load manually in
+.onLoad.
+
+Now, should I also link using the bin/ path and the -1.dll files?
+
+Renaud
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131007/2cc10f48/attachment.html>
+
+From renaud at mancala.cbio.uct.ac.za  Mon Oct  7 16:52:00 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Mon, 7 Oct 2013 16:52:00 +0200
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+Message-ID: <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+
+Thanks for the details Dominick.
+I think I got it working now, by ad Octave bin directory to the path prior
+loading RcppOctave library.
+I tested it by renaming the Octave root directory into something different
+than at building time.
+
+I added the option to specify Octave path via option octave.path (e.g., see
+?OctaveInit), so that the package loads fine even if Octave is not
+installed/found. The user can also define this option in the .Rprofile if
+Octave is not installed in the path by default.
+
+Please let me know if it works for you:
+
+install.packages('RcppOctave', repos = c(getOption('repos'), '
+http://web.cbio.uct.ac.za/~renaud/CRAN'))
+library(RcppOctave)
+.O$rand()
+
+Note that this version (0.10.1) was linked against the .dll.a files, but
+will load the .dll files... I will try later to link against the .dll files
+as you suggested.
+
+Bests,
+Renaud
+
+
+
+On 7 October 2013 16:24, Dominick Samperi <djsamperi at gmail.com> wrote:
+
+> Yes, I placed Octave bin on my path. This is required to find its dll's
+> for the same reason
+> that Rcpp libs (directory containing Rcpp.dll) needs to be on PATH. If you
+> enable clients
+> of RcppOctave.dll to link against functions provided by RcppOctave, then
+> these clients
+> will have to add the RcppOctave libs directory to their PATH.
+>
+> The Octave dll's must be in its bin directory due to another Windows dll
+> search rule:
+> when you run an executable (like octave.exe) that depends on dll's,
+> Windows will
+> resolve the dependencies when the dll's are in the same directory as the
+> executable.
+>
+> You should be able to link to liboctave-1.dll using '-loctave-1', provided
+> the bin
+> directory is on your PATH. The gcc '.dll.a' suffix means the file is an
+> import library,
+> not a static lib or a shared lib. Import libs tell Windows how to resolve
+> references
+> in the corresponding dll. Windows uses the '.lib' suffix for import libs.
+> For your
+> purposes you should link against the dll's, not the dll.a's.
+>
+>
+>
+> On Mon, Oct 7, 2013 at 4:59 AM, Renaud Gaujoux <
+> renaud at mancala.cbio.uct.ac.za> wrote:
+>
+>> Dominick, just to be sure: did you have Octave bin directory in your PATH
+>> when you tested the package?
+>> Because Octave dlls are also in that directory.
+>>
+>> I am getting confused on which path/dll is to be used where. Currently I
+>> build RcppOctave.dll linking against the dll.a files found in
+>> "C:\Octave\Octave3.6.4_gcc4.6.2\lib\octave\3.6.4". But there are .dll files
+>> (although named liboctave-1.dll and not liboctave.dll as I would expect) in
+>> ""C:\Octave\Octave3.6.4_gcc4.6.2\bin" where octave.exe. and
+>> octave-config.exe also live.
+>> I had tried loading the .dll.a files with dyn.load in R but got errors.
+>> The -1.dll files load fine, and might be the ones I could load manually in
+>> .onLoad.
+>>
+>> Now, should I also link using the bin/ path and the -1.dll files?
+>>
+>> Renaud
+>>
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131007/c9374c39/attachment.html>
+
+From djsamperi at gmail.com  Mon Oct  7 22:22:09 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Mon, 7 Oct 2013 16:22:09 -0400
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+Message-ID: <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+
+I don't think you need to worry about linking against the .dll files, as the
+import libraries (.dll.a files) contain all of the information that the
+linker needs,
+and you PATH will tell Windows where to find the corresponding dll's.
+It is possible to link against the dll's without using import libs,
+but then various tricks have to be used to specify what is
+exported from each dll.
+
+I downloaded the source for 0.10.1 and it seems to build and install
+ok provided I place Rcpp.dll on PATH. It would save the user some
+trouble if PATH could be updated automatically, but it is probably not
+a good idea to have R package installation or startup update the users
+environment...
+
+
+
+On Mon, Oct 7, 2013 at 10:52 AM, Renaud Gaujoux <
+renaud at mancala.cbio.uct.ac.za> wrote:
+
+> Thanks for the details Dominick.
+> I think I got it working now, by ad Octave bin directory to the path prior
+> loading RcppOctave library.
+> I tested it by renaming the Octave root directory into something different
+> than at building time.
+>
+> I added the option to specify Octave path via option octave.path (e.g.,
+> see ?OctaveInit), so that the package loads fine even if Octave is not
+> installed/found. The user can also define this option in the .Rprofile if
+> Octave is not installed in the path by default.
+>
+> Please let me know if it works for you:
+>
+> install.packages('RcppOctave', repos = c(getOption('repos'), '
+> http://web.cbio.uct.ac.za/~renaud/CRAN'))
+> library(RcppOctave)
+> .O$rand()
+>
+> Note that this version (0.10.1) was linked against the .dll.a files, but
+> will load the .dll files... I will try later to link against the .dll files
+> as you suggested.
+>
+> Bests,
+> Renaud
+>
+>
+>
+> On 7 October 2013 16:24, Dominick Samperi <djsamperi at gmail.com> wrote:
+>
+>> Yes, I placed Octave bin on my path. This is required to find its dll's
+>> for the same reason
+>> that Rcpp libs (directory containing Rcpp.dll) needs to be on PATH. If
+>> you enable clients
+>> of RcppOctave.dll to link against functions provided by RcppOctave, then
+>> these clients
+>> will have to add the RcppOctave libs directory to their PATH.
+>>
+>> The Octave dll's must be in its bin directory due to another Windows dll
+>> search rule:
+>> when you run an executable (like octave.exe) that depends on dll's,
+>> Windows will
+>> resolve the dependencies when the dll's are in the same directory as the
+>> executable.
+>>
+>> You should be able to link to liboctave-1.dll using '-loctave-1',
+>> provided the bin
+>> directory is on your PATH. The gcc '.dll.a' suffix means the file is an
+>> import library,
+>> not a static lib or a shared lib. Import libs tell Windows how to resolve
+>> references
+>> in the corresponding dll. Windows uses the '.lib' suffix for import libs.
+>> For your
+>> purposes you should link against the dll's, not the dll.a's.
+>>
+>>
+>>
+>> On Mon, Oct 7, 2013 at 4:59 AM, Renaud Gaujoux <
+>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>
+>>> Dominick, just to be sure: did you have Octave bin directory in your
+>>> PATH when you tested the package?
+>>> Because Octave dlls are also in that directory.
+>>>
+>>> I am getting confused on which path/dll is to be used where. Currently I
+>>> build RcppOctave.dll linking against the dll.a files found in
+>>> "C:\Octave\Octave3.6.4_gcc4.6.2\lib\octave\3.6.4". But there are .dll files
+>>> (although named liboctave-1.dll and not liboctave.dll as I would expect) in
+>>> ""C:\Octave\Octave3.6.4_gcc4.6.2\bin" where octave.exe. and
+>>> octave-config.exe also live.
+>>> I had tried loading the .dll.a files with dyn.load in R but got errors.
+>>> The -1.dll files load fine, and might be the ones I could load manually in
+>>> .onLoad.
+>>>
+>>> Now, should I also link using the bin/ path and the -1.dll files?
+>>>
+>>> Renaud
+>>>
+>>>
+>>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131007/41445864/attachment.html>
+
+From getoxxx at gmail.com  Tue Oct  8 08:11:38 2013
+From: getoxxx at gmail.com (Renaud)
+Date: Tue, 8 Oct 2013 08:11:38 +0200
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+Message-ID: <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+
+Good. Still wondering why path to Rcpp.dll is needed when installing the
+binary package since RcppOctave.dll is linked static to Rcpp.a with full
+path specified. Most users will use the binary and not build it from source
+(which requires Rtools and possibly more config.
+
+Did you try installing the binary directly from the repo (with only octave
+bin/ in the path, not Rtools nor R)?
+
+Renaud
+
+On Monday, October 7, 2013, Dominick Samperi wrote:
+
+> I don't think you need to worry about linking against the .dll files, as
+> the
+> import libraries (.dll.a files) contain all of the information that the
+> linker needs,
+> and you PATH will tell Windows where to find the corresponding dll's.
+> It is possible to link against the dll's without using import libs,
+> but then various tricks have to be used to specify what is
+> exported from each dll.
+>
+> I downloaded the source for 0.10.1 and it seems to build and install
+> ok provided I place Rcpp.dll on PATH. It would save the user some
+> trouble if PATH could be updated automatically, but it is probably not
+> a good idea to have R package installation or startup update the users
+> environment...
+>
+>
+>
+> On Mon, Oct 7, 2013 at 10:52 AM, Renaud Gaujoux <
+> renaud at mancala.cbio.uct.ac.za <javascript:_e({}, 'cvml',
+> 'renaud at mancala.cbio.uct.ac.za');>> wrote:
+>
+>> Thanks for the details Dominick.
+>> I think I got it working now, by ad Octave bin directory to the path
+>> prior loading RcppOctave library.
+>> I tested it by renaming the Octave root directory into something
+>> different than at building time.
+>>
+>> I added the option to specify Octave path via option octave.path (e.g.,
+>> see ?OctaveInit), so that the package loads fine even if Octave is not
+>> installed/found. The user can also define this option in the .Rprofile if
+>> Octave is not installed in the path by default.
+>>
+>> Please let me know if it works for you:
+>>
+>> install.packages('RcppOctave', repos = c(getOption('repos'), '
+>> http://web.cbio.uct.ac.za/~renaud/CRAN'))
+>> library(RcppOctave)
+>> .O$rand()
+>>
+>> Note that this version (0.10.1) was linked against the .dll.a files, but
+>> will load the .dll files... I will try later to link against the .dll files
+>> as you suggested.
+>>
+>> Bests,
+>> Renaud
+>>
+>>
+>>
+>> On 7 October 2013 16:24, Dominick Samperi <djsamperi at gmail.com<javascript:_e({}, 'cvml', 'djsamperi at gmail.com');>
+>> > wrote:
+>>
+>>> Yes, I placed Octave bin on my path. This is required to find its dll's
+>>> for the same reason
+>>> that Rcpp libs (directory containing Rcpp.dll) needs to be on PATH. If
+>>> you enable clients
+>>> of RcppOctave.dll to link against functions provided by RcppOctave, then
+>>> these clients
+>>> will have to add the RcppOctave libs directory to their PATH.
+>>>
+>>> The Octave dll's must be in its bin directory due to another Windows dll
+>>> search rule:
+>>> when you run an executable (like octave.exe) that depends on dll's,
+>>> Windows will
+>>> resolve the dependencies when the dll's are in the same directory as the
+>>> executable.
+>>>
+>>> You should be able to link to liboctave-1.dll using '-loctave-1',
+>>> provided the bin
+>>> directory is on your PATH. The gcc '.dll.a' suffix means the file is an
+>>> import library,
+>>> not a static lib or a shared lib. Import libs tell Windows how to
+>>> resolve references
+>>> in the corresponding dll. Windows uses the '.lib' suffix for import
+>>> libs. For your
+>>> purposes you should link against the dll's, not the dll.a's.
+>>>
+>>>
+>>>
+>>> On Mon, Oct 7, 2013 at 4:59 AM, Renaud Gaujoux <
+>>> renaud at mancala.cbio.uct.ac.za <javascript:_e({}, 'cvml',
+>>> 'renaud at mancala.cbio.uct.ac.za');>> wrote:
+>>>
+>>>> Dominick, just to be sure: did you have Octave bin directory in your
+>>>> PATH when you tested the package?
+>>>> Because Octave dlls are also in that directory.
+>>>>
+>>>> I am getting confused on which path/dll is to be used where. Currently
+>>>> I build RcppOctave.dll linking against the dll.a files found in
+>>>> "C:\Octave\Octave3.6.4_gcc4.6.2\lib\octave\3.6.4". But there are .dll files
+>>>> (although named liboctave-1.dll and not liboctave.dll as I would expect) in
+>>>> ""C:\Octave\Octave3.6.4_gcc4.6.2\bin" where octave.exe. and
+>>>> octave-config.exe also live.
+>>>> I had tried loading the .dll.a files with dyn.load in R but got errors.
+>>>> The -1.dll files load fine, and might be the ones I could load manually in
+>>>> .onLoad.
+>>>>
+>>>> Now, should I also link using the bin/ path and the -1.dll files?
+>>>>
+>>>> Renaud
+>>>>
+>>>>
+>>>>
+>>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131008/f34785d2/attachment-0001.html>
+
+From djsamperi at gmail.com  Tue Oct  8 15:47:53 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Tue, 8 Oct 2013 09:47:53 -0400
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+Message-ID: <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+
+I just installed the binary with Rtools not on my path (but with R in PATH)
+and the first time I tried to load/unload RcppOctave I got the obscure
+Windows load error (app terminated "in an unusual way"), but now I
+cannot reproduce it! If you are linking to the static Rcpp lib there
+should be no problems.
+
+I guess the source distribution is not in sync with the binary?
+
+
+On Tue, Oct 8, 2013 at 2:11 AM, Renaud <getoxxx at gmail.com> wrote:
+
+> Good. Still wondering why path to Rcpp.dll is needed when installing the
+> binary package since RcppOctave.dll is linked static to Rcpp.a with full
+> path specified. Most users will use the binary and not build it from source
+> (which requires Rtools and possibly more config.
+>
+> Did you try installing the binary directly from the repo (with only octave
+> bin/ in the path, not Rtools nor R)?
+>
+> Renaud
+>
+>
+> On Monday, October 7, 2013, Dominick Samperi wrote:
+>
+>> I don't think you need to worry about linking against the .dll files, as
+>> the
+>> import libraries (.dll.a files) contain all of the information that the
+>> linker needs,
+>> and you PATH will tell Windows where to find the corresponding dll's.
+>> It is possible to link against the dll's without using import libs,
+>> but then various tricks have to be used to specify what is
+>> exported from each dll.
+>>
+>> I downloaded the source for 0.10.1 and it seems to build and install
+>> ok provided I place Rcpp.dll on PATH. It would save the user some
+>> trouble if PATH could be updated automatically, but it is probably not
+>> a good idea to have R package installation or startup update the users
+>> environment...
+>>
+>>
+>>
+>> On Mon, Oct 7, 2013 at 10:52 AM, Renaud Gaujoux <
+>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>
+>>> Thanks for the details Dominick.
+>>> I think I got it working now, by ad Octave bin directory to the path
+>>> prior loading RcppOctave library.
+>>> I tested it by renaming the Octave root directory into something
+>>> different than at building time.
+>>>
+>>> I added the option to specify Octave path via option octave.path (e.g.,
+>>> see ?OctaveInit), so that the package loads fine even if Octave is not
+>>> installed/found. The user can also define this option in the .Rprofile if
+>>> Octave is not installed in the path by default.
+>>>
+>>> Please let me know if it works for you:
+>>>
+>>> install.packages('RcppOctave', repos = c(getOption('repos'), '
+>>> http://web.cbio.uct.ac.za/~renaud/CRAN'))
+>>> library(RcppOctave)
+>>> .O$rand()
+>>>
+>>> Note that this version (0.10.1) was linked against the .dll.a files, but
+>>> will load the .dll files... I will try later to link against the .dll files
+>>> as you suggested.
+>>>
+>>> Bests,
+>>> Renaud
+>>>
+>>>
+>>>
+>>> On 7 October 2013 16:24, Dominick Samperi <djsamperi at gmail.com> wrote:
+>>>
+>>>> Yes, I placed Octave bin on my path. This is required to find its dll's
+>>>> for the same reason
+>>>> that Rcpp libs (directory containing Rcpp.dll) needs to be on PATH. If
+>>>> you enable clients
+>>>> of RcppOctave.dll to link against functions provided by RcppOctave,
+>>>> then these clients
+>>>> will have to add the RcppOctave libs directory to their PATH.
+>>>>
+>>>> The Octave dll's must be in its bin directory due to another Windows
+>>>> dll search rule:
+>>>> when you run an executable (like octave.exe) that depends on dll's,
+>>>> Windows will
+>>>> resolve the dependencies when the dll's are in the same directory as
+>>>> the executable.
+>>>>
+>>>> You should be able to link to liboctave-1.dll using '-loctave-1',
+>>>> provided the bin
+>>>> directory is on your PATH. The gcc '.dll.a' suffix means the file is an
+>>>> import library,
+>>>> not a static lib or a shared lib. Import libs tell Windows how to
+>>>> resolve references
+>>>> in the corresponding dll. Windows uses the '.lib' suffix for import
+>>>> libs. For your
+>>>> purposes you should link against the dll's, not the dll.a's.
+>>>>
+>>>>
+>>>>
+>>>> On Mon, Oct 7, 2013 at 4:59 AM, Renaud Gaujoux <
+>>>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>>>
+>>>>> Dominick, just to be sure: did you have Octave bin directory in your
+>>>>> PATH when you tested the package?
+>>>>> Because Octave dlls are also in that directory.
+>>>>>
+>>>>> I am getting confused on which path/dll is to be used where. Currently
+>>>>> I build RcppOctave.dll linking against the dll.a files found in
+>>>>> "C:\Octave\Octave3.6.4_gcc4.6.2\lib\octave\3.6.4". But there are .dll files
+>>>>> (although named liboctave-1.dll and not liboctave.dll as I would expect) in
+>>>>> ""C:\Octave\Octave3.6.4_gcc4.6.2\bin" where octave.exe. and
+>>>>> octave-config.exe also live.
+>>>>> I had tried loading the .dll.a files with dyn.load in R but got
+>>>>> errors. The -1.dll files load fine, and might be the ones I could load
+>>>>> manually in .onLoad.
+>>>>>
+>>>>> Now, should I also link using the bin/ path and the -1.dll files?
+>>>>>
+>>>>> Renaud
+>>>>>
+>>>>>
+>>>>>
+>>>>
+>>>
+>>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131008/4b5558da/attachment.html>
+
+From renaud at mancala.cbio.uct.ac.za  Tue Oct  8 16:27:13 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Tue, 8 Oct 2013 16:27:13 +0200
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+Message-ID: <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+
+Yes, I also sporadically got this error. Don't know the origin, although it
+may happen because Rtools is not in the path anymore: there may be some
+conflict/mess up with dlls, which are present in Rtools and Octave, while
+the package was compiled against Rtools ones. Possible or fantasy?
+
+I updated both github and my CRAN repo, with a new version that has a
+cleaner loading procedure.
+I have just asked CRAN if they could install Octave on Win-builder so that
+I can check the package on their Windows machine. On my box I am getting
+strange errors when checking about not being able to read the DESCRIPTION
+file... very weird.
+
+Bests,
+Renaud
+
+
+
+
+On 8 October 2013 15:47, Dominick Samperi <djsamperi at gmail.com> wrote:
+
+> I just installed the binary with Rtools not on my path (but with R in PATH)
+> and the first time I tried to load/unload RcppOctave I got the obscure
+> Windows load error (app terminated "in an unusual way"), but now I
+> cannot reproduce it! If you are linking to the static Rcpp lib there
+> should be no problems.
+>
+> I guess the source distribution is not in sync with the binary?
+>
+>
+> On Tue, Oct 8, 2013 at 2:11 AM, Renaud <getoxxx at gmail.com> wrote:
+>
+>> Good. Still wondering why path to Rcpp.dll is needed when installing the
+>> binary package since RcppOctave.dll is linked static to Rcpp.a with full
+>> path specified. Most users will use the binary and not build it from source
+>> (which requires Rtools and possibly more config.
+>>
+>> Did you try installing the binary directly from the repo (with only
+>> octave bin/ in the path, not Rtools nor R)?
+>>
+>> Renaud
+>>
+>>
+>> On Monday, October 7, 2013, Dominick Samperi wrote:
+>>
+>>> I don't think you need to worry about linking against the .dll files, as
+>>> the
+>>> import libraries (.dll.a files) contain all of the information that the
+>>> linker needs,
+>>> and you PATH will tell Windows where to find the corresponding dll's.
+>>> It is possible to link against the dll's without using import libs,
+>>> but then various tricks have to be used to specify what is
+>>> exported from each dll.
+>>>
+>>> I downloaded the source for 0.10.1 and it seems to build and install
+>>> ok provided I place Rcpp.dll on PATH. It would save the user some
+>>> trouble if PATH could be updated automatically, but it is probably not
+>>> a good idea to have R package installation or startup update the users
+>>> environment...
+>>>
+>>>
+>>>
+>>> On Mon, Oct 7, 2013 at 10:52 AM, Renaud Gaujoux <
+>>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>>
+>>>> Thanks for the details Dominick.
+>>>> I think I got it working now, by ad Octave bin directory to the path
+>>>> prior loading RcppOctave library.
+>>>> I tested it by renaming the Octave root directory into something
+>>>> different than at building time.
+>>>>
+>>>> I added the option to specify Octave path via option octave.path (e.g.,
+>>>> see ?OctaveInit), so that the package loads fine even if Octave is not
+>>>> installed/found. The user can also define this option in the .Rprofile if
+>>>> Octave is not installed in the path by default.
+>>>>
+>>>> Please let me know if it works for you:
+>>>>
+>>>> install.packages('RcppOctave', repos = c(getOption('repos'), '
+>>>> http://web.cbio.uct.ac.za/~renaud/CRAN'))
+>>>> library(RcppOctave)
+>>>> .O$rand()
+>>>>
+>>>> Note that this version (0.10.1) was linked against the .dll.a files,
+>>>> but will load the .dll files... I will try later to link against the .dll
+>>>> files as you suggested.
+>>>>
+>>>> Bests,
+>>>> Renaud
+>>>>
+>>>>
+>>>>
+>>>> On 7 October 2013 16:24, Dominick Samperi <djsamperi at gmail.com> wrote:
+>>>>
+>>>>> Yes, I placed Octave bin on my path. This is required to find its
+>>>>> dll's for the same reason
+>>>>> that Rcpp libs (directory containing Rcpp.dll) needs to be on PATH. If
+>>>>> you enable clients
+>>>>> of RcppOctave.dll to link against functions provided by RcppOctave,
+>>>>> then these clients
+>>>>> will have to add the RcppOctave libs directory to their PATH.
+>>>>>
+>>>>> The Octave dll's must be in its bin directory due to another Windows
+>>>>> dll search rule:
+>>>>> when you run an executable (like octave.exe) that depends on dll's,
+>>>>> Windows will
+>>>>> resolve the dependencies when the dll's are in the same directory as
+>>>>> the executable.
+>>>>>
+>>>>> You should be able to link to liboctave-1.dll using '-loctave-1',
+>>>>> provided the bin
+>>>>> directory is on your PATH. The gcc '.dll.a' suffix means the file is
+>>>>> an import library,
+>>>>> not a static lib or a shared lib. Import libs tell Windows how to
+>>>>> resolve references
+>>>>> in the corresponding dll. Windows uses the '.lib' suffix for import
+>>>>> libs. For your
+>>>>> purposes you should link against the dll's, not the dll.a's.
+>>>>>
+>>>>>
+>>>>>
+>>>>> On Mon, Oct 7, 2013 at 4:59 AM, Renaud Gaujoux <
+>>>>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>>>>
+>>>>>> Dominick, just to be sure: did you have Octave bin directory in your
+>>>>>> PATH when you tested the package?
+>>>>>> Because Octave dlls are also in that directory.
+>>>>>>
+>>>>>> I am getting confused on which path/dll is to be used where.
+>>>>>> Currently I build RcppOctave.dll linking against the dll.a files found in
+>>>>>> "C:\Octave\Octave3.6.4_gcc4.6.2\lib\octave\3.6.4". But there are .dll files
+>>>>>> (although named liboctave-1.dll and not liboctave.dll as I would expect) in
+>>>>>> ""C:\Octave\Octave3.6.4_gcc4.6.2\bin" where octave.exe. and
+>>>>>> octave-config.exe also live.
+>>>>>> I had tried loading the .dll.a files with dyn.load in R but got
+>>>>>> errors. The -1.dll files load fine, and might be the ones I could load
+>>>>>> manually in .onLoad.
+>>>>>>
+>>>>>> Now, should I also link using the bin/ path and the -1.dll files?
+>>>>>>
+>>>>>> Renaud
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>
+>>>>
+>>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131008/222dd0bb/attachment-0001.html>
+
+From djsamperi at gmail.com  Wed Oct  9 07:34:45 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Wed, 9 Oct 2013 01:34:45 -0400
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+Message-ID: <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+
+I tried to build RcppOctave under Mac OS X (10.8.5) but ran into
+a few problems.
+
+1. In src/modules/Makefile.in, the '-F' flag (for framework) is not
+    recognized by mkoctfile, so I added this temporary work-around:
+
+#R_LDFLAGS = @R_LDFLAGS@
+R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+
+2. Parsing the man files o_whatever.Rd fails (attempt to
+    free an unallocated pointer), so I removed all of these
+    man pages for now (the failure occurs in
+   <R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+   where .fetch_Rd_object is applied to each Rd file).
+
+3. With these changes the build gets to the point where
+    the install process checks if the package can be
+    loaded, and fails with:
+
+** testing if installed package can be loaded
+sh: line 1: 55395 Abort trap: 6
+'/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+'/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7/filed5d471d0dd21'
+R(55395) malloc: *** error for object 0x7fff7684d570: pointer being freed
+was not allocated
+*** set a breakpoint in malloc_error_break to debug
+ERROR: loading failed
+* removing ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+* restoring previous ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+
+4. If I ignore this and try to run library(RcppOctave) in R I get:
+
+> library(RcppOctave)
+Loading required package: Rcpp
+Loading required package: pkgmaker
+Loading required package: registry
+R(55403) malloc: *** error for object 0x7fff7684d570: pointer being freed
+was not allocated
+*** set a breakpoint in malloc_error_break to debug
+Abort trap: 6
+
+5. Setting the breakpoint as instructed was not very helpful
+as the malloc code does not have symbols and cannot be
+traced.
+
+
+On Tue, Oct 8, 2013 at 10:27 AM, Renaud Gaujoux <
+renaud at mancala.cbio.uct.ac.za> wrote:
+
+> Yes, I also sporadically got this error. Don't know the origin, although
+> it may happen because Rtools is not in the path anymore: there may be some
+> conflict/mess up with dlls, which are present in Rtools and Octave, while
+> the package was compiled against Rtools ones. Possible or fantasy?
+>
+> I updated both github and my CRAN repo, with a new version that has a
+> cleaner loading procedure.
+> I have just asked CRAN if they could install Octave on Win-builder so that
+> I can check the package on their Windows machine. On my box I am getting
+> strange errors when checking about not being able to read the DESCRIPTION
+> file... very weird.
+>
+> Bests,
+> Renaud
+>
+>
+>
+>
+> On 8 October 2013 15:47, Dominick Samperi <djsamperi at gmail.com> wrote:
+>
+>> I just installed the binary with Rtools not on my path (but with R in
+>> PATH)
+>> and the first time I tried to load/unload RcppOctave I got the obscure
+>> Windows load error (app terminated "in an unusual way"), but now I
+>> cannot reproduce it! If you are linking to the static Rcpp lib there
+>> should be no problems.
+>>
+>> I guess the source distribution is not in sync with the binary?
+>>
+>>
+>> On Tue, Oct 8, 2013 at 2:11 AM, Renaud <getoxxx at gmail.com> wrote:
+>>
+>>> Good. Still wondering why path to Rcpp.dll is needed when installing the
+>>> binary package since RcppOctave.dll is linked static to Rcpp.a with full
+>>> path specified. Most users will use the binary and not build it from source
+>>> (which requires Rtools and possibly more config.
+>>>
+>>> Did you try installing the binary directly from the repo (with only
+>>> octave bin/ in the path, not Rtools nor R)?
+>>>
+>>> Renaud
+>>>
+>>>
+>>> On Monday, October 7, 2013, Dominick Samperi wrote:
+>>>
+>>>> I don't think you need to worry about linking against the .dll files,
+>>>> as the
+>>>> import libraries (.dll.a files) contain all of the information that the
+>>>> linker needs,
+>>>> and you PATH will tell Windows where to find the corresponding dll's.
+>>>> It is possible to link against the dll's without using import libs,
+>>>> but then various tricks have to be used to specify what is
+>>>> exported from each dll.
+>>>>
+>>>> I downloaded the source for 0.10.1 and it seems to build and install
+>>>> ok provided I place Rcpp.dll on PATH. It would save the user some
+>>>> trouble if PATH could be updated automatically, but it is probably not
+>>>> a good idea to have R package installation or startup update the users
+>>>> environment...
+>>>>
+>>>>
+>>>>
+>>>> On Mon, Oct 7, 2013 at 10:52 AM, Renaud Gaujoux <
+>>>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>>>
+>>>>> Thanks for the details Dominick.
+>>>>> I think I got it working now, by ad Octave bin directory to the path
+>>>>> prior loading RcppOctave library.
+>>>>> I tested it by renaming the Octave root directory into something
+>>>>> different than at building time.
+>>>>>
+>>>>> I added the option to specify Octave path via option octave.path
+>>>>> (e.g., see ?OctaveInit), so that the package loads fine even if Octave is
+>>>>> not installed/found. The user can also define this option in the .Rprofile
+>>>>> if Octave is not installed in the path by default.
+>>>>>
+>>>>> Please let me know if it works for you:
+>>>>>
+>>>>> install.packages('RcppOctave', repos = c(getOption('repos'), '
+>>>>> http://web.cbio.uct.ac.za/~renaud/CRAN'))
+>>>>> library(RcppOctave)
+>>>>> .O$rand()
+>>>>>
+>>>>> Note that this version (0.10.1) was linked against the .dll.a files,
+>>>>> but will load the .dll files... I will try later to link against the .dll
+>>>>> files as you suggested.
+>>>>>
+>>>>> Bests,
+>>>>> Renaud
+>>>>>
+>>>>>
+>>>>>
+>>>>> On 7 October 2013 16:24, Dominick Samperi <djsamperi at gmail.com> wrote:
+>>>>>
+>>>>>> Yes, I placed Octave bin on my path. This is required to find its
+>>>>>> dll's for the same reason
+>>>>>> that Rcpp libs (directory containing Rcpp.dll) needs to be on PATH.
+>>>>>> If you enable clients
+>>>>>> of RcppOctave.dll to link against functions provided by RcppOctave,
+>>>>>> then these clients
+>>>>>> will have to add the RcppOctave libs directory to their PATH.
+>>>>>>
+>>>>>> The Octave dll's must be in its bin directory due to another Windows
+>>>>>> dll search rule:
+>>>>>> when you run an executable (like octave.exe) that depends on dll's,
+>>>>>> Windows will
+>>>>>> resolve the dependencies when the dll's are in the same directory as
+>>>>>> the executable.
+>>>>>>
+>>>>>> You should be able to link to liboctave-1.dll using '-loctave-1',
+>>>>>> provided the bin
+>>>>>> directory is on your PATH. The gcc '.dll.a' suffix means the file is
+>>>>>> an import library,
+>>>>>> not a static lib or a shared lib. Import libs tell Windows how to
+>>>>>> resolve references
+>>>>>> in the corresponding dll. Windows uses the '.lib' suffix for import
+>>>>>> libs. For your
+>>>>>> purposes you should link against the dll's, not the dll.a's.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> On Mon, Oct 7, 2013 at 4:59 AM, Renaud Gaujoux <
+>>>>>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>>>>>
+>>>>>>> Dominick, just to be sure: did you have Octave bin directory in your
+>>>>>>> PATH when you tested the package?
+>>>>>>> Because Octave dlls are also in that directory.
+>>>>>>>
+>>>>>>> I am getting confused on which path/dll is to be used where.
+>>>>>>> Currently I build RcppOctave.dll linking against the dll.a files found in
+>>>>>>> "C:\Octave\Octave3.6.4_gcc4.6.2\lib\octave\3.6.4". But there are .dll files
+>>>>>>> (although named liboctave-1.dll and not liboctave.dll as I would expect) in
+>>>>>>> ""C:\Octave\Octave3.6.4_gcc4.6.2\bin" where octave.exe. and
+>>>>>>> octave-config.exe also live.
+>>>>>>> I had tried loading the .dll.a files with dyn.load in R but got
+>>>>>>> errors. The -1.dll files load fine, and might be the ones I could load
+>>>>>>> manually in .onLoad.
+>>>>>>>
+>>>>>>> Now, should I also link using the bin/ path and the -1.dll files?
+>>>>>>>
+>>>>>>> Renaud
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>
+>>>>>
+>>>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131009/d00a6773/attachment.html>
+
+From renaud at mancala.cbio.uct.ac.za  Wed Oct  9 10:21:06 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 9 Oct 2013 10:21:06 +0200
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+Message-ID: <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+
+You are a resourceful person Dominick! :D
+I was not thinking in going Mac for now, because I can't test anything, but
+it will be great if we manage our way through it as well.
+
+1. In src/modules/Makefile.in, the '-F' flag (for framework) is not
+>     recognized by mkoctfile, so I added this temporary work-around:
+>
+> #R_LDFLAGS = @R_LDFLAGS@
+> R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+>
+
+One can probably test for Mac in configure.in and tweak the R_LDFLAGS for
+this platform only.
+
+>
+> 2. Parsing the man files o_whatever.Rd fails (attempt to
+>     free an unallocated pointer), so I removed all of these
+>     man pages for now (the failure occurs in
+>    <R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+>    where .fetch_Rd_object is applied to each Rd file).
+>
+
+The o_*.Rd files document more R-friendly wrappers to octave functions.
+They contain \Sexp statements that retrieve Octave help files of the
+associated function via RcppOctave o_help function:
+
+\Sexpr[results=rd,stage=render]{RcppOctave::o_help(<octave_function_name>,
+format='rd')}
+
+For packages that contain such expressions in man pages, R CMD build also
+generate the manual pdf, by installing the package in a temp directory and
+evaluating the code in all \Sexpr statements. On Windows, R CMD INSTALL
+--build also renders the man pages.
+So the issue will probably solves away when the package loads properly.
+
+For quick testing compilation and load on Windows, I run R CMD INSTALL
+directly on the package source directory with flag --no-help. To ensure a
+fresh compilation at each run I use --preclean which runs the cleanup
+script, and removes everything, including the .o, .so, .dll, .oct files:
+
+# mkdir libtest
+R --vanilla CMD INSTALL -l libtest --no-help --preclean pkg_src_directory
+
+
+> 3. With these changes the build gets to the point where
+>     the install process checks if the package can be
+>     loaded, and fails with:
+>
+> ** testing if installed package can be loaded
+> sh: line 1: 55395 Abort trap: 6
+> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7/filed5d471d0dd21'
+> R(55395) malloc: *** error for object 0x7fff7684d570: pointer being freed
+> was not allocated
+> *** set a breakpoint in malloc_error_break to debug
+> ERROR: loading failed
+> * removing ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+> * restoring previous ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>
+> 4. If I ignore this and try to run library(RcppOctave) in R I get:
+>
+> > library(RcppOctave)
+> Loading required package: Rcpp
+> Loading required package: pkgmaker
+> Loading required package: registry
+> R(55403) malloc: *** error for object 0x7fff7684d570: pointer being freed
+> was not allocated
+> *** set a breakpoint in malloc_error_break to debug
+> Abort trap: 6
+>
+> 5. Setting the breakpoint as instructed was not very helpful
+> as the malloc code does not have symbols and cannot be
+> traced.
+>
+>
+I will double check for bad allocations in the code, but will unfortunately
+be limited in my ability to debug this.
+
+Renaud
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131009/5411687d/attachment-0001.html>
+
+From djsamperi at gmail.com  Thu Oct 10 07:01:02 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Thu, 10 Oct 2013 01:01:02 -0400
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+Message-ID: <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+
+It appears that there is some conflict between Rcpp and Octave under
+Mac OS X that doesn't depend on the design of RcppOctave. Just
+drop the files strtest.cpp and Makevars (attached) into Rcpp/src and
+run R CMD INSTALL Rcpp. This leads to a memory error. The file
+strtest.cpp was stripped out of rcpp_octave.cpp, but it does not
+use RcppOctave or Rcpp (it is just a trivial Octave client).
+
+Since the problem is OS-dependent, it might have something do to
+with static initializers in the Octave string_vector class, or perhaps there
+is a MacOS-specific conflict with std::string.
+
+
+
+On Wed, Oct 9, 2013 at 4:21 AM, Renaud Gaujoux <
+renaud at mancala.cbio.uct.ac.za> wrote:
+
+> You are a resourceful person Dominick! :D
+> I was not thinking in going Mac for now, because I can't test anything,
+> but it will be great if we manage our way through it as well.
+>
+> 1. In src/modules/Makefile.in, the '-F' flag (for framework) is not
+>>      recognized by mkoctfile, so I added this temporary work-around:
+>>
+>> #R_LDFLAGS = @R_LDFLAGS@
+>> R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+>>
+>
+> One can probably test for Mac in configure.in and tweak the R_LDFLAGS for
+> this platform only.
+>
+>>
+>> 2. Parsing the man files o_whatever.Rd fails (attempt to
+>>     free an unallocated pointer), so I removed all of these
+>>     man pages for now (the failure occurs in
+>>    <R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+>>    where .fetch_Rd_object is applied to each Rd file).
+>>
+>
+> The o_*.Rd files document more R-friendly wrappers to octave functions.
+> They contain \Sexp statements that retrieve Octave help files of the
+> associated function via RcppOctave o_help function:
+>
+> \Sexpr[results=rd,stage=render]{RcppOctave::o_help(<octave_function_name>,
+> format='rd')}
+>
+> For packages that contain such expressions in man pages, R CMD build also
+> generate the manual pdf, by installing the package in a temp directory and
+> evaluating the code in all \Sexpr statements. On Windows, R CMD INSTALL
+> --build also renders the man pages.
+> So the issue will probably solves away when the package loads properly.
+>
+> For quick testing compilation and load on Windows, I run R CMD INSTALL
+> directly on the package source directory with flag --no-help. To ensure a
+> fresh compilation at each run I use --preclean which runs the cleanup
+> script, and removes everything, including the .o, .so, .dll, .oct files:
+>
+> # mkdir libtest
+> R --vanilla CMD INSTALL -l libtest --no-help --preclean pkg_src_directory
+>
+>
+>> 3. With these changes the build gets to the point where
+>>     the install process checks if the package can be
+>>     loaded, and fails with:
+>>
+>> ** testing if installed package can be loaded
+>> sh: line 1: 55395 Abort trap: 6
+>> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+>> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7/filed5d471d0dd21'
+>> R(55395) malloc: *** error for object 0x7fff7684d570: pointer being freed
+>> was not allocated
+>> *** set a breakpoint in malloc_error_break to debug
+>> ERROR: loading failed
+>> * removing ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>> * restoring previous ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>
+>> 4. If I ignore this and try to run library(RcppOctave) in R I get:
+>>
+>> > library(RcppOctave)
+>> Loading required package: Rcpp
+>> Loading required package: pkgmaker
+>> Loading required package: registry
+>> R(55403) malloc: *** error for object 0x7fff7684d570: pointer being freed
+>> was not allocated
+>> *** set a breakpoint in malloc_error_break to debug
+>> Abort trap: 6
+>>
+>> 5. Setting the breakpoint as instructed was not very helpful
+>> as the malloc code does not have symbols and cannot be
+>> traced.
+>>
+>>
+> I will double check for bad allocations in the code, but will
+> unfortunately be limited in my ability to debug this.
+>
+> Renaud
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/6dea1391/attachment.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Makevars
+Type: application/octet-stream
+Size: 1878 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/6dea1391/attachment.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: strtest.cpp
+Type: text/x-c++src
+Size: 595 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/6dea1391/attachment.cpp>
+
+From renaud at mancala.cbio.uct.ac.za  Thu Oct 10 10:18:27 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Thu, 10 Oct 2013 10:18:27 +0200
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+Message-ID: <CAHavPHGrnKmZ+S7N6Yx9RhJYRrm+maR3qMZk17WseutxxYdgUw@mail.gmail.com>
+
+Can you try with this modified version of the file?
+I wrapped the const char* strings into std::string, maybe this will make
+Mac happier.
+
+Let's communicate on this Mac issue off Rcpp-devel list for now on, since
+it is not directly related to Rcpp, but keep rcppoctave-user (where we are
+currently alone with Dirk :)). I will send a summary of the findings at the
+end. People that are keen to participate can subscribe to the
+rcppoctave-user list:
+
+http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rcppoctave-user
+
+
+
+
+On 10 October 2013 07:01, Dominick Samperi <djsamperi at gmail.com> wrote:
+
+> It appears that there is some conflict between Rcpp and Octave under
+> Mac OS X that doesn't depend on the design of RcppOctave. Just
+> drop the files strtest.cpp and Makevars (attached) into Rcpp/src and
+> run R CMD INSTALL Rcpp. This leads to a memory error. The file
+> strtest.cpp was stripped out of rcpp_octave.cpp, but it does not
+> use RcppOctave or Rcpp (it is just a trivial Octave client).
+>
+> Since the problem is OS-dependent, it might have something do to
+> with static initializers in the Octave string_vector class, or perhaps
+> there
+> is a MacOS-specific conflict with std::string.
+>
+>
+>
+> On Wed, Oct 9, 2013 at 4:21 AM, Renaud Gaujoux <
+> renaud at mancala.cbio.uct.ac.za> wrote:
+>
+>> You are a resourceful person Dominick! :D
+>> I was not thinking in going Mac for now, because I can't test anything,
+>> but it will be great if we manage our way through it as well.
+>>
+>> 1. In src/modules/Makefile.in, the '-F' flag (for framework) is not
+>>>      recognized by mkoctfile, so I added this temporary work-around:
+>>>
+>>> #R_LDFLAGS = @R_LDFLAGS@
+>>> R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+>>>
+>>
+>> One can probably test for Mac in configure.in and tweak the R_LDFLAGS
+>> for this platform only.
+>>
+>>>
+>>> 2. Parsing the man files o_whatever.Rd fails (attempt to
+>>>     free an unallocated pointer), so I removed all of these
+>>>     man pages for now (the failure occurs in
+>>>    <R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+>>>    where .fetch_Rd_object is applied to each Rd file).
+>>>
+>>
+>> The o_*.Rd files document more R-friendly wrappers to octave functions.
+>> They contain \Sexp statements that retrieve Octave help files of the
+>> associated function via RcppOctave o_help function:
+>>
+>> \Sexpr[results=rd,stage=render]{RcppOctave::o_help(<octave_function_name>,
+>> format='rd')}
+>>
+>> For packages that contain such expressions in man pages, R CMD build also
+>> generate the manual pdf, by installing the package in a temp directory and
+>> evaluating the code in all \Sexpr statements. On Windows, R CMD INSTALL
+>> --build also renders the man pages.
+>> So the issue will probably solves away when the package loads properly.
+>>
+>> For quick testing compilation and load on Windows, I run R CMD INSTALL
+>> directly on the package source directory with flag --no-help. To ensure a
+>> fresh compilation at each run I use --preclean which runs the cleanup
+>> script, and removes everything, including the .o, .so, .dll, .oct files:
+>>
+>> # mkdir libtest
+>> R --vanilla CMD INSTALL -l libtest --no-help --preclean pkg_src_directory
+>>
+>>
+>>> 3. With these changes the build gets to the point where
+>>>     the install process checks if the package can be
+>>>     loaded, and fails with:
+>>>
+>>> ** testing if installed package can be loaded
+>>> sh: line 1: 55395 Abort trap: 6
+>>> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+>>> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7/filed5d471d0dd21'
+>>> R(55395) malloc: *** error for object 0x7fff7684d570: pointer being
+>>> freed was not allocated
+>>> *** set a breakpoint in malloc_error_break to debug
+>>> ERROR: loading failed
+>>> * removing ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>> * restoring previous ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>>
+>>> 4. If I ignore this and try to run library(RcppOctave) in R I get:
+>>>
+>>> > library(RcppOctave)
+>>> Loading required package: Rcpp
+>>> Loading required package: pkgmaker
+>>> Loading required package: registry
+>>> R(55403) malloc: *** error for object 0x7fff7684d570: pointer being
+>>> freed was not allocated
+>>> *** set a breakpoint in malloc_error_break to debug
+>>> Abort trap: 6
+>>>
+>>> 5. Setting the breakpoint as instructed was not very helpful
+>>> as the malloc code does not have symbols and cannot be
+>>> traced.
+>>>
+>>>
+>> I will double check for bad allocations in the code, but will
+>> unfortunately be limited in my ability to debug this.
+>>
+>> Renaud
+>>
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/8435787c/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: strtest.cpp
+Type: text/x-c++src
+Size: 647 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/8435787c/attachment-0001.cpp>
+
+From djsamperi at gmail.com  Thu Oct 10 15:45:00 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Thu, 10 Oct 2013 09:45:00 -0400
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CAHavPHGrnKmZ+S7N6Yx9RhJYRrm+maR3qMZk17WseutxxYdgUw@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CAHavPHGrnKmZ+S7N6Yx9RhJYRrm+maR3qMZk17WseutxxYdgUw@mail.gmail.com>
+Message-ID: <CADUbQ5h1mPueBM-haUgNE_JMLmwKh3drK7y2C0b-=pcD=SeErA@mail.gmail.com>
+
+Your modified strtest.cpp doesn't help:
+
+** R
+** inst
+** preparing package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded
+sh: line 1: 28714 Abort trap: 6
+'/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+'/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpSQ4FV7/file6fc0345d6d7c'
+R(28714) malloc: *** error for object 0x7fff7a01b570: pointer being freed
+was not allocated
+*** set a breakpoint in malloc_error_break to debug
+ERROR: loading failed
+* removing ?/Users/dsamperi/Library/R/3.0/library/Rcpp?
+* restoring previous ?/Users/dsamperi/Library/R/3.0/library/Rcpp?
+
+
+On Thu, Oct 10, 2013 at 4:18 AM, Renaud Gaujoux <
+renaud at mancala.cbio.uct.ac.za> wrote:
+
+> Can you try with this modified version of the file?
+> I wrapped the const char* strings into std::string, maybe this will make
+> Mac happier.
+>
+> Let's communicate on this Mac issue off Rcpp-devel list for now on, since
+> it is not directly related to Rcpp, but keep rcppoctave-user (where we are
+> currently alone with Dirk :)). I will send a summary of the findings at the
+> end. People that are keen to participate can subscribe to the
+> rcppoctave-user list:
+>
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rcppoctave-user
+>
+>
+>
+>
+> On 10 October 2013 07:01, Dominick Samperi <djsamperi at gmail.com> wrote:
+>
+>> It appears that there is some conflict between Rcpp and Octave under
+>> Mac OS X that doesn't depend on the design of RcppOctave. Just
+>> drop the files strtest.cpp and Makevars (attached) into Rcpp/src and
+>> run R CMD INSTALL Rcpp. This leads to a memory error. The file
+>> strtest.cpp was stripped out of rcpp_octave.cpp, but it does not
+>> use RcppOctave or Rcpp (it is just a trivial Octave client).
+>>
+>> Since the problem is OS-dependent, it might have something do to
+>> with static initializers in the Octave string_vector class, or perhaps
+>> there
+>> is a MacOS-specific conflict with std::string.
+>>
+>>
+>>
+>> On Wed, Oct 9, 2013 at 4:21 AM, Renaud Gaujoux <
+>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>
+>>> You are a resourceful person Dominick! :D
+>>> I was not thinking in going Mac for now, because I can't test anything,
+>>> but it will be great if we manage our way through it as well.
+>>>
+>>> 1. In src/modules/Makefile.in, the '-F' flag (for framework) is not
+>>>>      recognized by mkoctfile, so I added this temporary work-around:
+>>>>
+>>>> #R_LDFLAGS = @R_LDFLAGS@
+>>>> R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+>>>>
+>>>
+>>> One can probably test for Mac in configure.in and tweak the R_LDFLAGS
+>>> for this platform only.
+>>>
+>>>>
+>>>> 2. Parsing the man files o_whatever.Rd fails (attempt to
+>>>>     free an unallocated pointer), so I removed all of these
+>>>>     man pages for now (the failure occurs in
+>>>>    <R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+>>>>    where .fetch_Rd_object is applied to each Rd file).
+>>>>
+>>>
+>>> The o_*.Rd files document more R-friendly wrappers to octave functions.
+>>> They contain \Sexp statements that retrieve Octave help files of the
+>>> associated function via RcppOctave o_help function:
+>>>
+>>> \Sexpr[results=rd,stage=render]{RcppOctave::o_help(<octave_function_name>,
+>>> format='rd')}
+>>>
+>>> For packages that contain such expressions in man pages, R CMD build
+>>> also generate the manual pdf, by installing the package in a temp directory
+>>> and evaluating the code in all \Sexpr statements. On Windows, R CMD INSTALL
+>>> --build also renders the man pages.
+>>> So the issue will probably solves away when the package loads properly.
+>>>
+>>> For quick testing compilation and load on Windows, I run R CMD INSTALL
+>>> directly on the package source directory with flag --no-help. To ensure a
+>>> fresh compilation at each run I use --preclean which runs the cleanup
+>>> script, and removes everything, including the .o, .so, .dll, .oct files:
+>>>
+>>> # mkdir libtest
+>>> R --vanilla CMD INSTALL -l libtest --no-help --preclean pkg_src_directory
+>>>
+>>>
+>>>> 3. With these changes the build gets to the point where
+>>>>     the install process checks if the package can be
+>>>>     loaded, and fails with:
+>>>>
+>>>> ** testing if installed package can be loaded
+>>>> sh: line 1: 55395 Abort trap: 6
+>>>> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+>>>> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7/filed5d471d0dd21'
+>>>> R(55395) malloc: *** error for object 0x7fff7684d570: pointer being
+>>>> freed was not allocated
+>>>> *** set a breakpoint in malloc_error_break to debug
+>>>> ERROR: loading failed
+>>>> * removing ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>>> * restoring previous ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>>>
+>>>> 4. If I ignore this and try to run library(RcppOctave) in R I get:
+>>>>
+>>>> > library(RcppOctave)
+>>>> Loading required package: Rcpp
+>>>> Loading required package: pkgmaker
+>>>> Loading required package: registry
+>>>> R(55403) malloc: *** error for object 0x7fff7684d570: pointer being
+>>>> freed was not allocated
+>>>> *** set a breakpoint in malloc_error_break to debug
+>>>> Abort trap: 6
+>>>>
+>>>> 5. Setting the breakpoint as instructed was not very helpful
+>>>> as the malloc code does not have symbols and cannot be
+>>>> traced.
+>>>>
+>>>>
+>>> I will double check for bad allocations in the code, but will
+>>> unfortunately be limited in my ability to debug this.
+>>>
+>>> Renaud
+>>>
+>>>
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/2a4774b7/attachment.html>
+
+From edd at debian.org  Thu Oct 10 15:58:35 2013
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 10 Oct 2013 08:58:35 -0500
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5h1mPueBM-haUgNE_JMLmwKh3drK7y2C0b-=pcD=SeErA@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CAHavPHGrnKmZ+S7N6Yx9RhJYRrm+maR3qMZk17WseutxxYdgUw@mail.gmail.com>
+ <CADUbQ5h1mPueBM-haUgNE_JMLmwKh3drK7y2C0b-=pcD=SeErA@mail.gmail.com>
+Message-ID: <21078.45707.315981.696316@max.nulle.part>
+
+
+On 10 October 2013 at 09:45, Dominick Samperi wrote:
+| Your modified strtest.cpp doesn't help:
+
+:-/
+
+I fear Dominick is correct on the instantiation issues etc pp.  Of course,
+something reproducible on another OS may help.
+
+We could at some point involve John Eaton (who I was pretty close to when
+Octave was my main scripting language and kept up with for a while when I
+morphed to R -- but when I stopped maintaining Octave for Debian it got
+quieter). I introduced John to the R folks which made him go to one of the
+earlier conference.  He even hooked up an R - Octave bridge (forget though
+which way it operated).  Bryan Lewis is a sharp cookie who may be able to
+help too, he also has a nascent R - Octave bridge (and has the best name:
+Ratlab).
+
+Dirk
+
+| 
+| ** R
+| ** inst
+| ** preparing package for lazy loading
+| ** help
+| *** installing help indices
+| ** building package indices
+| ** installing vignettes
+| ** testing if installed package can be loaded
+| sh: line 1: 28714 Abort trap: 6 ? ? ? ? ? '/Library/Frameworks/R.framework
+| /Resources/bin/R' --no-save --slave 2>&1 < '/var/folders/fq/
+| 2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpSQ4FV7/file6fc0345d6d7c'
+| R(28714) malloc: *** error for object 0x7fff7a01b570: pointer being freed was
+| not allocated
+| *** set a breakpoint in malloc_error_break to debug
+| ERROR: loading failed
+| * removing ?/Users/dsamperi/Library/R/3.0/library/Rcpp?
+| * restoring previous ?/Users/dsamperi/Library/R/3.0/library/Rcpp?
+| 
+| 
+| On Thu, Oct 10, 2013 at 4:18 AM, Renaud Gaujoux <renaud at mancala.cbio.uct.ac.za>
+| wrote:
+| 
+|     Can you try with this modified version of the file?
+|     I wrapped the const char* strings into std::string, maybe this will make
+|     Mac happier.
+| 
+|     Let's communicate on this Mac issue off Rcpp-devel list for now on, since
+|     it is not directly related to Rcpp, but keep rcppoctave-user (where we are
+|     currently alone with Dirk :)). I will send a summary of the findings at the
+|     end. People that are keen to participate can subscribe to the
+|     rcppoctave-user list:
+| 
+|     http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rcppoctave-user
+| 
+| 
+| 
+| 
+|     On 10 October 2013 07:01, Dominick Samperi <djsamperi at gmail.com> wrote:
+| 
+|         It appears that there is some conflict between Rcpp and Octave under
+|         Mac OS X that doesn't depend on the design of RcppOctave. Just
+|         drop the files strtest.cpp and Makevars (attached) into Rcpp/src and
+|         run R CMD INSTALL Rcpp. This leads to a memory error. The file
+|         strtest.cpp was stripped out of rcpp_octave.cpp, but it does not
+|         use RcppOctave or Rcpp (it is just a trivial Octave client).
+| 
+|         Since the problem is OS-dependent, it might have something do to
+|         with static initializers in the Octave string_vector class, or perhaps
+|         there
+|         is a MacOS-specific conflict with std::string.
+| 
+| 
+| 
+|         On Wed, Oct 9, 2013 at 4:21 AM, Renaud Gaujoux <
+|         renaud at mancala.cbio.uct.ac.za> wrote:
+| 
+|             You are a resourceful person Dominick! :D
+|             I was not thinking in going Mac for now, because I can't test
+|             anything, but it will be great if we manage our way through it as
+|             well.
+| 
+| 
+|                 1. In src/modules/Makefile.in, the '-F' flag (for framework) is
+|                 not
+|                 ? ? recognized by mkoctfile, so I added this temporary
+|                 work-around:
+| 
+|                 #R_LDFLAGS = @R_LDFLAGS@
+|                 R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+| 
+| 
+|             One can probably test for Mac in configure.in and tweak the
+|             R_LDFLAGS for this platform only.
+| 
+| 
+|                 2. Parsing the man files o_whatever.Rd fails (attempt to
+|                 ? ? free an unallocated pointer), so I removed all of these
+|                 ? ? man pages for now (the failure occurs in
+|                 ? ?<R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+|                 ? ?where .fetch_Rd_object is applied to each Rd file).
+| 
+| 
+|             The o_*.Rd files document more R-friendly wrappers to octave
+|             functions. They contain \Sexp statements that retrieve Octave help
+|             files of the associated function via RcppOctave o_help function:
+| 
+|             \Sexpr[results=rd,stage=render]{RcppOctave::o_help
+|             (<octave_function_name>, format='rd')}
+| 
+|             For packages that contain such expressions in man pages, R CMD
+|             build also generate the manual pdf, by installing the package in a
+|             temp directory and evaluating the code in all \Sexpr statements. On
+|             Windows, R CMD INSTALL --build also renders the man pages.
+|             So the issue will probably solves away when the package loads
+|             properly.
+| 
+|             For quick testing compilation and load on Windows, I run R CMD
+|             INSTALL directly on the package source directory with flag
+|             --no-help. To ensure a fresh compilation at each run I use
+|             --preclean which runs the cleanup script, and removes everything,
+|             including the .o, .so, .dll, .oct files:
+| 
+|             # mkdir libtest
+|             R --vanilla CMD INSTALL -l libtest --no-help --preclean
+|             pkg_src_directory
+| 
+| 
+| 
+|                 3. With these changes the build gets to the point where
+|                 ? ? the install process checks if the package can be
+|                 ? ? loaded, and fails with:
+| 
+|                 ** testing if installed package can be loaded
+|                 sh: line 1: 55395 Abort trap: 6 ? ? ? ? ? '/Library/
+|                 Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1
+|                 < '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7
+|                 /filed5d471d0dd21'
+|                 R(55395) malloc: *** error for object 0x7fff7684d570: pointer
+|                 being freed was not allocated
+|                 *** set a breakpoint in malloc_error_break to debug
+|                 ERROR: loading failed
+|                 * removing ?/Users/dsamperi/Library/R/3.0/library/
+|                 RcppOctave?
+|                 * restoring previous ?/Users/dsamperi/Library/R/3.0/library/
+|                 RcppOctave?
+| 
+|                 4. If I ignore this and try to run library(RcppOctave) in R I
+|                 get:
+| 
+|                 > library(RcppOctave)
+|                 Loading required package: Rcpp
+|                 Loading required package: pkgmaker
+|                 Loading required package: registry
+|                 R(55403) malloc: *** error for object 0x7fff7684d570: pointer
+|                 being freed was not allocated
+|                 *** set a breakpoint in malloc_error_break to debug
+|                 Abort trap: 6
+| 
+|                 5. Setting the breakpoint as instructed was not very helpful
+|                 as the malloc code does not have symbols and cannot be
+|                 traced.
+| 
+| 
+| 
+|             I will double check for bad allocations in the code, but will
+|             unfortunately be limited in my ability to debug this.
+| 
+|             Renaud
+|             ?
+|        
+| 
+| 
+| 
+| 
+| 
+| 
+| ----------------------------------------------------------------------
+| _______________________________________________
+| Rcppoctave-user mailing list
+| Rcppoctave-user at lists.r-forge.r-project.org
+| http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rcppoctave-user
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+From djsamperi at gmail.com  Thu Oct 10 16:11:38 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Thu, 10 Oct 2013 10:11:38 -0400
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5h1mPueBM-haUgNE_JMLmwKh3drK7y2C0b-=pcD=SeErA@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CAHavPHGrnKmZ+S7N6Yx9RhJYRrm+maR3qMZk17WseutxxYdgUw@mail.gmail.com>
+ <CADUbQ5h1mPueBM-haUgNE_JMLmwKh3drK7y2C0b-=pcD=SeErA@mail.gmail.com>
+Message-ID: <CADUbQ5hQBmS+x3acx=h5CLgPjqNh0gTj0G=+AsPFdq8fVu6u=Q@mail.gmail.com>
+
+BTW, in case this is not obvious, the function in strtest.cpp is
+not called at runtime! Thus the only way it could lead to problems
+is if the classes (like string_vector) need startup (static) initialization.
+
+
+On Thu, Oct 10, 2013 at 9:45 AM, Dominick Samperi <djsamperi at gmail.com>wrote:
+
+> Your modified strtest.cpp doesn't help:
+>
+> ** R
+> ** inst
+> ** preparing package for lazy loading
+> ** help
+> *** installing help indices
+> ** building package indices
+> ** installing vignettes
+> ** testing if installed package can be loaded
+> sh: line 1: 28714 Abort trap: 6
+> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpSQ4FV7/file6fc0345d6d7c'
+> R(28714) malloc: *** error for object 0x7fff7a01b570: pointer being freed
+> was not allocated
+> *** set a breakpoint in malloc_error_break to debug
+> ERROR: loading failed
+> * removing ?/Users/dsamperi/Library/R/3.0/library/Rcpp?
+> * restoring previous ?/Users/dsamperi/Library/R/3.0/library/Rcpp?
+>
+>
+> On Thu, Oct 10, 2013 at 4:18 AM, Renaud Gaujoux <
+> renaud at mancala.cbio.uct.ac.za> wrote:
+>
+>> Can you try with this modified version of the file?
+>> I wrapped the const char* strings into std::string, maybe this will make
+>> Mac happier.
+>>
+>> Let's communicate on this Mac issue off Rcpp-devel list for now on, since
+>> it is not directly related to Rcpp, but keep rcppoctave-user (where we are
+>> currently alone with Dirk :)). I will send a summary of the findings at the
+>> end. People that are keen to participate can subscribe to the
+>> rcppoctave-user list:
+>>
+>>
+>> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rcppoctave-user
+>>
+>>
+>>
+>>
+>> On 10 October 2013 07:01, Dominick Samperi <djsamperi at gmail.com> wrote:
+>>
+>>> It appears that there is some conflict between Rcpp and Octave under
+>>> Mac OS X that doesn't depend on the design of RcppOctave. Just
+>>> drop the files strtest.cpp and Makevars (attached) into Rcpp/src and
+>>> run R CMD INSTALL Rcpp. This leads to a memory error. The file
+>>> strtest.cpp was stripped out of rcpp_octave.cpp, but it does not
+>>> use RcppOctave or Rcpp (it is just a trivial Octave client).
+>>>
+>>> Since the problem is OS-dependent, it might have something do to
+>>> with static initializers in the Octave string_vector class, or perhaps
+>>> there
+>>> is a MacOS-specific conflict with std::string.
+>>>
+>>>
+>>>
+>>> On Wed, Oct 9, 2013 at 4:21 AM, Renaud Gaujoux <
+>>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>>
+>>>> You are a resourceful person Dominick! :D
+>>>> I was not thinking in going Mac for now, because I can't test anything,
+>>>> but it will be great if we manage our way through it as well.
+>>>>
+>>>> 1. In src/modules/Makefile.in, the '-F' flag (for framework) is not
+>>>>>      recognized by mkoctfile, so I added this temporary work-around:
+>>>>>
+>>>>> #R_LDFLAGS = @R_LDFLAGS@
+>>>>> R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+>>>>>
+>>>>
+>>>> One can probably test for Mac in configure.in and tweak the R_LDFLAGS
+>>>> for this platform only.
+>>>>
+>>>>>
+>>>>> 2. Parsing the man files o_whatever.Rd fails (attempt to
+>>>>>     free an unallocated pointer), so I removed all of these
+>>>>>     man pages for now (the failure occurs in
+>>>>>    <R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+>>>>>    where .fetch_Rd_object is applied to each Rd file).
+>>>>>
+>>>>
+>>>> The o_*.Rd files document more R-friendly wrappers to octave functions.
+>>>> They contain \Sexp statements that retrieve Octave help files of the
+>>>> associated function via RcppOctave o_help function:
+>>>>
+>>>> \Sexpr[results=rd,stage=render]{RcppOctave::o_help(<octave_function_name>,
+>>>> format='rd')}
+>>>>
+>>>> For packages that contain such expressions in man pages, R CMD build
+>>>> also generate the manual pdf, by installing the package in a temp directory
+>>>> and evaluating the code in all \Sexpr statements. On Windows, R CMD INSTALL
+>>>> --build also renders the man pages.
+>>>> So the issue will probably solves away when the package loads properly.
+>>>>
+>>>> For quick testing compilation and load on Windows, I run R CMD INSTALL
+>>>> directly on the package source directory with flag --no-help. To ensure a
+>>>> fresh compilation at each run I use --preclean which runs the cleanup
+>>>> script, and removes everything, including the .o, .so, .dll, .oct files:
+>>>>
+>>>> # mkdir libtest
+>>>> R --vanilla CMD INSTALL -l libtest --no-help --preclean
+>>>> pkg_src_directory
+>>>>
+>>>>
+>>>>> 3. With these changes the build gets to the point where
+>>>>>     the install process checks if the package can be
+>>>>>     loaded, and fails with:
+>>>>>
+>>>>> ** testing if installed package can be loaded
+>>>>> sh: line 1: 55395 Abort trap: 6
+>>>>> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+>>>>> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7/filed5d471d0dd21'
+>>>>> R(55395) malloc: *** error for object 0x7fff7684d570: pointer being
+>>>>> freed was not allocated
+>>>>> *** set a breakpoint in malloc_error_break to debug
+>>>>> ERROR: loading failed
+>>>>> * removing ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>>>> * restoring previous ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>>>>
+>>>>> 4. If I ignore this and try to run library(RcppOctave) in R I get:
+>>>>>
+>>>>> > library(RcppOctave)
+>>>>> Loading required package: Rcpp
+>>>>> Loading required package: pkgmaker
+>>>>> Loading required package: registry
+>>>>> R(55403) malloc: *** error for object 0x7fff7684d570: pointer being
+>>>>> freed was not allocated
+>>>>> *** set a breakpoint in malloc_error_break to debug
+>>>>> Abort trap: 6
+>>>>>
+>>>>> 5. Setting the breakpoint as instructed was not very helpful
+>>>>> as the malloc code does not have symbols and cannot be
+>>>>> traced.
+>>>>>
+>>>>>
+>>>> I will double check for bad allocations in the code, but will
+>>>> unfortunately be limited in my ability to debug this.
+>>>>
+>>>> Renaud
+>>>>
+>>>>
+>>>
+>>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/3023608d/attachment-0001.html>
+
+From renaud at mancala.cbio.uct.ac.za  Thu Oct 10 16:52:42 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Thu, 10 Oct 2013 16:52:42 +0200
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5hQBmS+x3acx=h5CLgPjqNh0gTj0G=+AsPFdq8fVu6u=Q@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CAHavPHGrnKmZ+S7N6Yx9RhJYRrm+maR3qMZk17WseutxxYdgUw@mail.gmail.com>
+ <CADUbQ5h1mPueBM-haUgNE_JMLmwKh3drK7y2C0b-=pcD=SeErA@mail.gmail.com>
+ <CADUbQ5hQBmS+x3acx=h5CLgPjqNh0gTj0G=+AsPFdq8fVu6u=Q@mail.gmail.com>
+Message-ID: <CAHavPHEpKqV9FjoZhaJ2JdMxeue8dn=tsaQKKPcLxbS3MYxiaw@mail.gmail.com>
+
+Oh, true... this is scary...
+
+
+On 10 October 2013 16:11, Dominick Samperi <djsamperi at gmail.com> wrote:
+
+> BTW, in case this is not obvious, the function in strtest.cpp is
+> not called at runtime! Thus the only way it could lead to problems
+> is if the classes (like string_vector) need startup (static)
+> initialization.
+>
+>
+> On Thu, Oct 10, 2013 at 9:45 AM, Dominick Samperi <djsamperi at gmail.com>wrote:
+>
+>> Your modified strtest.cpp doesn't help:
+>>
+>> ** R
+>> ** inst
+>> ** preparing package for lazy loading
+>> ** help
+>> *** installing help indices
+>> ** building package indices
+>> ** installing vignettes
+>> ** testing if installed package can be loaded
+>> sh: line 1: 28714 Abort trap: 6
+>> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+>> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpSQ4FV7/file6fc0345d6d7c'
+>> R(28714) malloc: *** error for object 0x7fff7a01b570: pointer being freed
+>> was not allocated
+>> *** set a breakpoint in malloc_error_break to debug
+>> ERROR: loading failed
+>> * removing ?/Users/dsamperi/Library/R/3.0/library/Rcpp?
+>> * restoring previous ?/Users/dsamperi/Library/R/3.0/library/Rcpp?
+>>
+>>
+>> On Thu, Oct 10, 2013 at 4:18 AM, Renaud Gaujoux <
+>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>
+>>> Can you try with this modified version of the file?
+>>> I wrapped the const char* strings into std::string, maybe this will make
+>>> Mac happier.
+>>>
+>>> Let's communicate on this Mac issue off Rcpp-devel list for now on,
+>>> since it is not directly related to Rcpp, but keep rcppoctave-user (where
+>>> we are currently alone with Dirk :)). I will send a summary of the findings
+>>> at the end. People that are keen to participate can subscribe to the
+>>> rcppoctave-user list:
+>>>
+>>>
+>>> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rcppoctave-user
+>>>
+>>>
+>>>
+>>>
+>>> On 10 October 2013 07:01, Dominick Samperi <djsamperi at gmail.com> wrote:
+>>>
+>>>> It appears that there is some conflict between Rcpp and Octave under
+>>>> Mac OS X that doesn't depend on the design of RcppOctave. Just
+>>>> drop the files strtest.cpp and Makevars (attached) into Rcpp/src and
+>>>> run R CMD INSTALL Rcpp. This leads to a memory error. The file
+>>>> strtest.cpp was stripped out of rcpp_octave.cpp, but it does not
+>>>> use RcppOctave or Rcpp (it is just a trivial Octave client).
+>>>>
+>>>> Since the problem is OS-dependent, it might have something do to
+>>>> with static initializers in the Octave string_vector class, or perhaps
+>>>> there
+>>>> is a MacOS-specific conflict with std::string.
+>>>>
+>>>>
+>>>>
+>>>> On Wed, Oct 9, 2013 at 4:21 AM, Renaud Gaujoux <
+>>>> renaud at mancala.cbio.uct.ac.za> wrote:
+>>>>
+>>>>> You are a resourceful person Dominick! :D
+>>>>> I was not thinking in going Mac for now, because I can't test
+>>>>> anything, but it will be great if we manage our way through it as well.
+>>>>>
+>>>>> 1. In src/modules/Makefile.in, the '-F' flag (for framework) is not
+>>>>>>      recognized by mkoctfile, so I added this temporary work-around:
+>>>>>>
+>>>>>> #R_LDFLAGS = @R_LDFLAGS@
+>>>>>> R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+>>>>>>
+>>>>>
+>>>>> One can probably test for Mac in configure.in and tweak the R_LDFLAGS
+>>>>> for this platform only.
+>>>>>
+>>>>>>
+>>>>>> 2. Parsing the man files o_whatever.Rd fails (attempt to
+>>>>>>     free an unallocated pointer), so I removed all of these
+>>>>>>     man pages for now (the failure occurs in
+>>>>>>    <R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+>>>>>>    where .fetch_Rd_object is applied to each Rd file).
+>>>>>>
+>>>>>
+>>>>> The o_*.Rd files document more R-friendly wrappers to octave
+>>>>> functions. They contain \Sexp statements that retrieve Octave help files of
+>>>>> the associated function via RcppOctave o_help function:
+>>>>>
+>>>>> \Sexpr[results=rd,stage=render]{RcppOctave::o_help(<octave_function_name>,
+>>>>> format='rd')}
+>>>>>
+>>>>> For packages that contain such expressions in man pages, R CMD build
+>>>>> also generate the manual pdf, by installing the package in a temp directory
+>>>>> and evaluating the code in all \Sexpr statements. On Windows, R CMD INSTALL
+>>>>> --build also renders the man pages.
+>>>>> So the issue will probably solves away when the package loads properly.
+>>>>>
+>>>>> For quick testing compilation and load on Windows, I run R CMD INSTALL
+>>>>> directly on the package source directory with flag --no-help. To ensure a
+>>>>> fresh compilation at each run I use --preclean which runs the cleanup
+>>>>> script, and removes everything, including the .o, .so, .dll, .oct files:
+>>>>>
+>>>>> # mkdir libtest
+>>>>> R --vanilla CMD INSTALL -l libtest --no-help --preclean
+>>>>> pkg_src_directory
+>>>>>
+>>>>>
+>>>>>> 3. With these changes the build gets to the point where
+>>>>>>     the install process checks if the package can be
+>>>>>>     loaded, and fails with:
+>>>>>>
+>>>>>> ** testing if installed package can be loaded
+>>>>>> sh: line 1: 55395 Abort trap: 6
+>>>>>> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+>>>>>> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7/filed5d471d0dd21'
+>>>>>> R(55395) malloc: *** error for object 0x7fff7684d570: pointer being
+>>>>>> freed was not allocated
+>>>>>> *** set a breakpoint in malloc_error_break to debug
+>>>>>> ERROR: loading failed
+>>>>>> * removing ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>>>>> * restoring previous
+>>>>>> ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>>>>>
+>>>>>> 4. If I ignore this and try to run library(RcppOctave) in R I get:
+>>>>>>
+>>>>>> > library(RcppOctave)
+>>>>>> Loading required package: Rcpp
+>>>>>> Loading required package: pkgmaker
+>>>>>> Loading required package: registry
+>>>>>> R(55403) malloc: *** error for object 0x7fff7684d570: pointer being
+>>>>>> freed was not allocated
+>>>>>> *** set a breakpoint in malloc_error_break to debug
+>>>>>> Abort trap: 6
+>>>>>>
+>>>>>> 5. Setting the breakpoint as instructed was not very helpful
+>>>>>> as the malloc code does not have symbols and cannot be
+>>>>>> traced.
+>>>>>>
+>>>>>>
+>>>>> I will double check for bad allocations in the code, but will
+>>>>> unfortunately be limited in my ability to debug this.
+>>>>>
+>>>>> Renaud
+>>>>>
+>>>>>
+>>>>
+>>>>
+>>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/4dcaf7de/attachment.html>
+
+From djsamperi at gmail.com  Thu Oct 10 21:26:39 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Thu, 10 Oct 2013 15:26:39 -0400
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+Message-ID: <CADUbQ5j0tXO6_2UriVAVz9jWr66RZkbJdTtyToOJmyLws5vRbw@mail.gmail.com>
+
+The problem here is that Mac Ports installs a very old version of Octave.
+Installing the latest version (3.6.4) from source seems to resolve the
+issue. At least .O$version() works!
+
+Installing Octave from source under MacOS takes some work due
+to many dependencies, and the need for work-arounds for Apple
+changes and deprecated features. See, for example:
+http://wiki.octave.org/Octave_for_Mac
+
+
+
+On Thu, Oct 10, 2013 at 1:01 AM, Dominick Samperi <djsamperi at gmail.com>wrote:
+
+> It appears that there is some conflict between Rcpp and Octave under
+> Mac OS X that doesn't depend on the design of RcppOctave. Just
+> drop the files strtest.cpp and Makevars (attached) into Rcpp/src and
+> run R CMD INSTALL Rcpp. This leads to a memory error. The file
+> strtest.cpp was stripped out of rcpp_octave.cpp, but it does not
+> use RcppOctave or Rcpp (it is just a trivial Octave client).
+>
+> Since the problem is OS-dependent, it might have something do to
+> with static initializers in the Octave string_vector class, or perhaps
+> there
+> is a MacOS-specific conflict with std::string.
+>
+>
+>
+> On Wed, Oct 9, 2013 at 4:21 AM, Renaud Gaujoux <
+> renaud at mancala.cbio.uct.ac.za> wrote:
+>
+>> You are a resourceful person Dominick! :D
+>> I was not thinking in going Mac for now, because I can't test anything,
+>> but it will be great if we manage our way through it as well.
+>>
+>> 1. In src/modules/Makefile.in, the '-F' flag (for framework) is not
+>>>      recognized by mkoctfile, so I added this temporary work-around:
+>>>
+>>> #R_LDFLAGS = @R_LDFLAGS@
+>>> R_LDFLAGS = -L/Library/Frameworks/R.framework/Libraries -lR
+>>>
+>>
+>> One can probably test for Mac in configure.in and tweak the R_LDFLAGS
+>> for this platform only.
+>>
+>>>
+>>> 2. Parsing the man files o_whatever.Rd fails (attempt to
+>>>     free an unallocated pointer), so I removed all of these
+>>>     man pages for now (the failure occurs in
+>>>    <R>/src/library/tools/R/Rd.R, function .build_Rd_db(),
+>>>    where .fetch_Rd_object is applied to each Rd file).
+>>>
+>>
+>> The o_*.Rd files document more R-friendly wrappers to octave functions.
+>> They contain \Sexp statements that retrieve Octave help files of the
+>> associated function via RcppOctave o_help function:
+>>
+>> \Sexpr[results=rd,stage=render]{RcppOctave::o_help(<octave_function_name>,
+>> format='rd')}
+>>
+>> For packages that contain such expressions in man pages, R CMD build also
+>> generate the manual pdf, by installing the package in a temp directory and
+>> evaluating the code in all \Sexpr statements. On Windows, R CMD INSTALL
+>> --build also renders the man pages.
+>> So the issue will probably solves away when the package loads properly.
+>>
+>> For quick testing compilation and load on Windows, I run R CMD INSTALL
+>> directly on the package source directory with flag --no-help. To ensure a
+>> fresh compilation at each run I use --preclean which runs the cleanup
+>> script, and removes everything, including the .o, .so, .dll, .oct files:
+>>
+>> # mkdir libtest
+>> R --vanilla CMD INSTALL -l libtest --no-help --preclean pkg_src_directory
+>>
+>>
+>>> 3. With these changes the build gets to the point where
+>>>     the install process checks if the package can be
+>>>     loaded, and fails with:
+>>>
+>>> ** testing if installed package can be loaded
+>>> sh: line 1: 55395 Abort trap: 6
+>>> '/Library/Frameworks/R.framework/Resources/bin/R' --no-save --slave 2>&1 <
+>>> '/var/folders/fq/2th4vc9n1mq9cxv5nl9bmzkc0000gn/T//RtmpbjkEA7/filed5d471d0dd21'
+>>> R(55395) malloc: *** error for object 0x7fff7684d570: pointer being
+>>> freed was not allocated
+>>> *** set a breakpoint in malloc_error_break to debug
+>>> ERROR: loading failed
+>>> * removing ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>> * restoring previous ?/Users/dsamperi/Library/R/3.0/library/RcppOctave?
+>>>
+>>> 4. If I ignore this and try to run library(RcppOctave) in R I get:
+>>>
+>>> > library(RcppOctave)
+>>> Loading required package: Rcpp
+>>> Loading required package: pkgmaker
+>>> Loading required package: registry
+>>> R(55403) malloc: *** error for object 0x7fff7684d570: pointer being
+>>> freed was not allocated
+>>> *** set a breakpoint in malloc_error_break to debug
+>>> Abort trap: 6
+>>>
+>>> 5. Setting the breakpoint as instructed was not very helpful
+>>> as the malloc code does not have symbols and cannot be
+>>> traced.
+>>>
+>>>
+>> I will double check for bad allocations in the code, but will
+>> unfortunately be limited in my ability to debug this.
+>>
+>> Renaud
+>>
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131010/88d96d43/attachment-0001.html>
+
+From edd at debian.org  Thu Oct 10 21:35:48 2013
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 10 Oct 2013 14:35:48 -0500
+Subject: [Rcppoctave-user] RcppOctave on Windows: testing needed
+In-Reply-To: <CADUbQ5j0tXO6_2UriVAVz9jWr66RZkbJdTtyToOJmyLws5vRbw@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CADUbQ5j0tXO6_2UriVAVz9jWr66RZkbJdTtyToOJmyLws5vRbw@mail.gmail.com>
+Message-ID: <21079.404.8867.293163@max.nulle.part>
+
+
+On 10 October 2013 at 15:26, Dominick Samperi wrote:
+| The problem here is that Mac Ports installs a very old version of Octave.
+| Installing the latest version (3.6.4) from source seems to resolve the
+| issue. At least .O$version() works!
+
+Nice one!  Thanks a bunch for doing all the work to confirm this.
+ 
+Dirk
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+From djsamperi at gmail.com  Fri Oct 11 06:51:01 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Fri, 11 Oct 2013 00:51:01 -0400
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CAHA9McMOLiM09cymuBezJWL-=kW0HS+XaKdfzDEdK1uB_dk1uA@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CADUbQ5j0tXO6_2UriVAVz9jWr66RZkbJdTtyToOJmyLws5vRbw@mail.gmail.com>
+ <CAHA9McMETwzYfhsBU9qGY=SUREfeEbzE6Gja8K8o2nSJakCiYg@mail.gmail.com>
+ <CAHA9McMOLiM09cymuBezJWL-=kW0HS+XaKdfzDEdK1uB_dk1uA@mail.gmail.com>
+Message-ID: <CADUbQ5h8UJRx7o9DEhiDjSVLFmP93ZXObMTKrUJupNm6nguaTg@mail.gmail.com>
+
+A few additional close out notes:
+1. It turns out that Apple (and Homebrew) no longer support Fortran, so
+    I had to specify an external Fortran compiler and options:
+$ export F77="/usr/local/bin/gfortran -arch x86_64"
+$ brew install octave --default-fortran-flags "-O2"
+2. The fortran compiler can be obtained from AT&T (Simon Urbenek).
+3. I think the build uses clang/clang++ and not gcc/g++
+   (because Apple no longer supports the latter), so there
+   is the potential for ABI problems when this version of
+   Octave is used with RcppOctave.
+4. I think brew can be instructed to use gcc/g++ by
+   setting CC and CXX.
+
+
+On Thu, Oct 10, 2013 at 11:26 PM, Steve Lianoglou
+<lianoglou.steve at gene.com>wrote:
+
+> Just to close this out (for posterity again).
+>
+> Dominick had pointed out to me off list that the octave formula isn't
+> in the default homebrew install, and to get it you've got to "tap"
+> their science repository by following the instructions here:
+>
+> https://github.com/Homebrew/homebrew-science
+>
+> I had forgotten that I added those a while ago, so thanks again Dominick!
+>
+> -steve
+>
+> On Thu, Oct 10, 2013 at 12:44 PM, Steve Lianoglou
+> <lianoglou.steve at gene.com> wrote:
+> > Hi,
+> >
+> > On Thu, Oct 10, 2013 at 12:26 PM, Dominick Samperi <djsamperi at gmail.com>
+> wrote:
+> >> The problem here is that Mac Ports installs a very old version of
+> Octave.
+> >> Installing the latest version (3.6.4) from source seems to resolve the
+> >> issue. At least .O$version() works!
+> >>
+> >> Installing Octave from source under MacOS takes some work due
+> >> to many dependencies, and the need for work-arounds for Apple
+> >> changes and deprecated features. See, for example:
+> >> http://wiki.octave.org/Octave_for_Mac
+> >
+> > Nice work!
+> >
+> > For the sake of future wanderers landing on this thread via google,
+> > these days the "preferred" package manager on OSX seems to be
+> > homebrew:
+> >
+> > http://brew.sh
+> >
+> > It's so good, Simon Urbanek doesn't hate it, yet ... which is not to
+> > say that he endorses it ;-)
+> >
+> > https://stat.ethz.ch/pipermail/r-sig-mac/2013-September/010303.html
+> >
+> > They've also got the latest octave on tap:
+> >
+> >   $ brew info octave | head -n2
+> >   octave: stable 3.6.4
+> >   http://www.gnu.org/software/octave/index.html
+> >
+> > HTH,
+> > -steve
+> >
+> > --
+> > Steve Lianoglou
+> > Computational Biologist
+> > Bioinformatics and Computational Biology
+> > Genentech
+>
+>
+>
+> --
+> Steve Lianoglou
+> Computational Biologist
+> Bioinformatics and Computational Biology
+> Genentech
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131011/5daef24b/attachment.html>
+
+From lianoglou.steve at gene.com  Thu Oct 10 21:44:52 2013
+From: lianoglou.steve at gene.com (Steve Lianoglou)
+Date: Thu, 10 Oct 2013 12:44:52 -0700
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CADUbQ5j0tXO6_2UriVAVz9jWr66RZkbJdTtyToOJmyLws5vRbw@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CADUbQ5j0tXO6_2UriVAVz9jWr66RZkbJdTtyToOJmyLws5vRbw@mail.gmail.com>
+Message-ID: <CAHA9McMETwzYfhsBU9qGY=SUREfeEbzE6Gja8K8o2nSJakCiYg@mail.gmail.com>
+
+Hi,
+
+On Thu, Oct 10, 2013 at 12:26 PM, Dominick Samperi <djsamperi at gmail.com> wrote:
+> The problem here is that Mac Ports installs a very old version of Octave.
+> Installing the latest version (3.6.4) from source seems to resolve the
+> issue. At least .O$version() works!
+>
+> Installing Octave from source under MacOS takes some work due
+> to many dependencies, and the need for work-arounds for Apple
+> changes and deprecated features. See, for example:
+> http://wiki.octave.org/Octave_for_Mac
+
+Nice work!
+
+For the sake of future wanderers landing on this thread via google,
+these days the "preferred" package manager on OSX seems to be
+homebrew:
+
+http://brew.sh
+
+It's so good, Simon Urbanek doesn't hate it, yet ... which is not to
+say that he endorses it ;-)
+
+https://stat.ethz.ch/pipermail/r-sig-mac/2013-September/010303.html
+
+They've also got the latest octave on tap:
+
+  $ brew info octave | head -n2
+  octave: stable 3.6.4
+  http://www.gnu.org/software/octave/index.html
+
+HTH,
+-steve
+
+-- 
+Steve Lianoglou
+Computational Biologist
+Bioinformatics and Computational Biology
+Genentech
+
+From lianoglou.steve at gene.com  Fri Oct 11 05:26:16 2013
+From: lianoglou.steve at gene.com (Steve Lianoglou)
+Date: Thu, 10 Oct 2013 20:26:16 -0700
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CAHA9McMETwzYfhsBU9qGY=SUREfeEbzE6Gja8K8o2nSJakCiYg@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CADUbQ5j0tXO6_2UriVAVz9jWr66RZkbJdTtyToOJmyLws5vRbw@mail.gmail.com>
+ <CAHA9McMETwzYfhsBU9qGY=SUREfeEbzE6Gja8K8o2nSJakCiYg@mail.gmail.com>
+Message-ID: <CAHA9McMOLiM09cymuBezJWL-=kW0HS+XaKdfzDEdK1uB_dk1uA@mail.gmail.com>
+
+Just to close this out (for posterity again).
+
+Dominick had pointed out to me off list that the octave formula isn't
+in the default homebrew install, and to get it you've got to "tap"
+their science repository by following the instructions here:
+
+https://github.com/Homebrew/homebrew-science
+
+I had forgotten that I added those a while ago, so thanks again Dominick!
+
+-steve
+
+On Thu, Oct 10, 2013 at 12:44 PM, Steve Lianoglou
+<lianoglou.steve at gene.com> wrote:
+> Hi,
+>
+> On Thu, Oct 10, 2013 at 12:26 PM, Dominick Samperi <djsamperi at gmail.com> wrote:
+>> The problem here is that Mac Ports installs a very old version of Octave.
+>> Installing the latest version (3.6.4) from source seems to resolve the
+>> issue. At least .O$version() works!
+>>
+>> Installing Octave from source under MacOS takes some work due
+>> to many dependencies, and the need for work-arounds for Apple
+>> changes and deprecated features. See, for example:
+>> http://wiki.octave.org/Octave_for_Mac
+>
+> Nice work!
+>
+> For the sake of future wanderers landing on this thread via google,
+> these days the "preferred" package manager on OSX seems to be
+> homebrew:
+>
+> http://brew.sh
+>
+> It's so good, Simon Urbanek doesn't hate it, yet ... which is not to
+> say that he endorses it ;-)
+>
+> https://stat.ethz.ch/pipermail/r-sig-mac/2013-September/010303.html
+>
+> They've also got the latest octave on tap:
+>
+>   $ brew info octave | head -n2
+>   octave: stable 3.6.4
+>   http://www.gnu.org/software/octave/index.html
+>
+> HTH,
+> -steve
+>
+> --
+> Steve Lianoglou
+> Computational Biologist
+> Bioinformatics and Computational Biology
+> Genentech
+
+
+
+-- 
+Steve Lianoglou
+Computational Biologist
+Bioinformatics and Computational Biology
+Genentech
+
+From renaud at mancala.cbio.uct.ac.za  Fri Oct 11 09:53:24 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Fri, 11 Oct 2013 09:53:24 +0200
+Subject: [Rcppoctave-user] [Rcpp-devel] RcppOctave on Windows: testing
+	needed
+In-Reply-To: <CADUbQ5h8UJRx7o9DEhiDjSVLFmP93ZXObMTKrUJupNm6nguaTg@mail.gmail.com>
+References: <CAHavPHEYaZTnx7Zm=KCjAw=9=yYw4s=exNv5nGbdWoOw-HJvdQ@mail.gmail.com>
+ <CADUbQ5jjAmDuA4q=O5wA0uDp4TSaN7MDM6cmN7a+f1iyDyshug@mail.gmail.com>
+ <21072.40316.45566.743241@max.nulle.part>
+ <CAHavPHEMreeC-hiP6Dmd8cSjuvuYkJdA4NQscW_ODMDbBfE+Xw@mail.gmail.com>
+ <CAHavPHHRFm0heNWdkpUsRnW=W7UdvwhjuKagPk4=XdMNmZ=zJA@mail.gmail.com>
+ <CADUbQ5gExOGN1ZxtJep=Y++s8dx5v2bh1D2cgWoFY_EHK=+=GA@mail.gmail.com>
+ <CAHavPHGPE5ZT1EB=wcmHZq0dXjsTiNG_b2gnw8gqLoFkx_HwcQ@mail.gmail.com>
+ <CADUbQ5hgdHM-ZBTxFLs0Kg8D7ub8NvC5gAV8_q8=OHybh0ZKuA@mail.gmail.com>
+ <CAHavPHH1jb+AhAc2E53GiKo_WzcXXHsR++S635HxhVftnY2Sdw@mail.gmail.com>
+ <CADUbQ5j8xWDzy51k5vMUt2baCXaU6_8K02ZG2JQMHnfpDK=6OQ@mail.gmail.com>
+ <CAHavPHEyXEySsJ1p-YkX1+CdYvbMgdtv+c5U6-W1O1SCF9D_kw@mail.gmail.com>
+ <CADUbQ5j7FgSXh0604_ZOX1Dur3OeK_yxiBZHesAvTSwjS-7LNQ@mail.gmail.com>
+ <CAHavPHGmwV2W=usz5PsquDrhzALcKEfscv6GAOYzfhikivDiaQ@mail.gmail.com>
+ <CADUbQ5hiOcGBCaGWB+a7tibEXLSBdVJEzPxs6sMUP4u6rmaFFw@mail.gmail.com>
+ <CADUbQ5j0tXO6_2UriVAVz9jWr66RZkbJdTtyToOJmyLws5vRbw@mail.gmail.com>
+ <CAHA9McMETwzYfhsBU9qGY=SUREfeEbzE6Gja8K8o2nSJakCiYg@mail.gmail.com>
+ <CAHA9McMOLiM09cymuBezJWL-=kW0HS+XaKdfzDEdK1uB_dk1uA@mail.gmail.com>
+ <CADUbQ5h8UJRx7o9DEhiDjSVLFmP93ZXObMTKrUJupNm6nguaTg@mail.gmail.com>
+Message-ID: <CAHavPHEiSJ2WT0AK+NzGV9Zowb+Hs3iE+_JmmOkv61wV_xUNMw@mail.gmail.com>
+
+Many thanks for this nice joint investigation work!
+
+There certainly still are things to check and tweak to get the package run
+smoothly and robustly on Mac (and Windows), but this is a great advance!
+
+Coming next:
+
+  * a README file with instructions on how to build/install on these
+platforms. I will post it here as well for comments.
+  * start another thread on rcppoctave-user to discuss Mac-specific
+development and make information more easily accessible
+  * I want to update the version on CRAN with some other fixes, and will do
+so keeping the Unix-only flag in the DESCRIPTION file, so that I don't need
+to wait for the Windows/Mac building machines to get Octave-geared.
+  * the cross-platform capabilities development will carry on and be
+available from the develop/ branch on github (+ r-forge and myCRAN). Any
+further contribution to achieving this aim are obviously welcomed ;)
+
+
+Bests,
+Renaud
+
+PS: ABI also means Acquired Brain Injury, which somehow makes sense in the
+case of malfunctioning C++ libraries as well...
+
+
+
+On 11 October 2013 06:51, Dominick Samperi <djsamperi at gmail.com> wrote:
+
+> A few additional close out notes:
+> 1. It turns out that Apple (and Homebrew) no longer support Fortran, so
+>     I had to specify an external Fortran compiler and options:
+> $ export F77="/usr/local/bin/gfortran -arch x86_64"
+> $ brew install octave --default-fortran-flags "-O2"
+> 2. The fortran compiler can be obtained from AT&T (Simon Urbenek).
+> 3. I think the build uses clang/clang++ and not gcc/g++
+>    (because Apple no longer supports the latter), so there
+>    is the potential for ABI problems when this version of
+>    Octave is used with RcppOctave.
+> 4. I think brew can be instructed to use gcc/g++ by
+>    setting CC and CXX.
+>
+>
+> On Thu, Oct 10, 2013 at 11:26 PM, Steve Lianoglou <
+> lianoglou.steve at gene.com> wrote:
+>
+>> Just to close this out (for posterity again).
+>>
+>> Dominick had pointed out to me off list that the octave formula isn't
+>> in the default homebrew install, and to get it you've got to "tap"
+>> their science repository by following the instructions here:
+>>
+>> https://github.com/Homebrew/homebrew-science
+>>
+>> I had forgotten that I added those a while ago, so thanks again Dominick!
+>>
+>> -steve
+>>
+>> On Thu, Oct 10, 2013 at 12:44 PM, Steve Lianoglou
+>> <lianoglou.steve at gene.com> wrote:
+>> > Hi,
+>> >
+>> > On Thu, Oct 10, 2013 at 12:26 PM, Dominick Samperi <djsamperi at gmail.com>
+>> wrote:
+>> >> The problem here is that Mac Ports installs a very old version of
+>> Octave.
+>> >> Installing the latest version (3.6.4) from source seems to resolve the
+>> >> issue. At least .O$version() works!
+>> >>
+>> >> Installing Octave from source under MacOS takes some work due
+>> >> to many dependencies, and the need for work-arounds for Apple
+>> >> changes and deprecated features. See, for example:
+>> >> http://wiki.octave.org/Octave_for_Mac
+>> >
+>> > Nice work!
+>> >
+>> > For the sake of future wanderers landing on this thread via google,
+>> > these days the "preferred" package manager on OSX seems to be
+>> > homebrew:
+>> >
+>> > http://brew.sh
+>> >
+>> > It's so good, Simon Urbanek doesn't hate it, yet ... which is not to
+>> > say that he endorses it ;-)
+>> >
+>> > https://stat.ethz.ch/pipermail/r-sig-mac/2013-September/010303.html
+>> >
+>> > They've also got the latest octave on tap:
+>> >
+>> >   $ brew info octave | head -n2
+>> >   octave: stable 3.6.4
+>> >   http://www.gnu.org/software/octave/index.html
+>> >
+>> > HTH,
+>> > -steve
+>> >
+>> > --
+>> > Steve Lianoglou
+>> > Computational Biologist
+>> > Bioinformatics and Computational Biology
+>> > Genentech
+>>
+>>
+>>
+>> --
+>> Steve Lianoglou
+>> Computational Biologist
+>> Bioinformatics and Computational Biology
+>> Genentech
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131011/c1e1d0b9/attachment-0001.html>
+
+From renaud at mancala.cbio.uct.ac.za  Fri Oct 11 10:35:59 2013
+From: renaud at mancala.cbio.uct.ac.za (Renaud Gaujoux)
+Date: Fri, 11 Oct 2013 10:35:59 +0200
+Subject: [Rcppoctave-user] RcppOctave on Mac OS
+Message-ID: <CAHavPHHx4yVL0LVZ764CB9fE8t-_Bpt7xLY+hJ_a-9kGm4eGBg@mail.gmail.com>
+
+Hi,
+
+primary discussions on how to get RcppOctave working on Mac OS can be found
+on this thread:
+
+http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/2013-October/000010.html
+
+Tests were carried on on a Mac
+Here is a summary of what we've got so far, thanks to Dominick and Steve:
+
+  * Preliminary tests show that RcppOctave builds against Octave, when the
+later is built from source using the instructions from http://wiki.octave
+.org/Octave_for_Mac
+
+  * Mac Ports octave packages are out-dated (3.2.4) and RcppOctave will not
+build against them
+
+  * Homebrew has up-to-date Octave versions, which seem to work fine with
+RcppOctave. The reference instructions to install it can be found at
+http://wiki.octave.org/Octave_for_MacOS_X#Homebrew.
+Basically this amounts to:
+    1. install XCode and its Command Line Tools
+    2. install homebrew
+    3. add the homebrew/science repository (tap in brewing language):
+
+       $ brew tap homebrew/science
+       $ brew update && brew upgrade
+       $ brew tap --repair #may not be necessary
+       $ brew install gfortran
+       $ brew install octave
+
+There was an issue due to gfortran not being found (not sure if this would
+be the case after brew install gfortran), and Dominick provided a solution
+here:
+http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/2013-October/000020.html
+
+More details when we know more...
+
+Bests,
+Renaud
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131011/4c2d5d73/attachment.html>
+
+From djsamperi at gmail.com  Fri Oct 11 16:11:35 2013
+From: djsamperi at gmail.com (Dominick Samperi)
+Date: Fri, 11 Oct 2013 10:11:35 -0400
+Subject: [Rcppoctave-user] RcppOctave on Mac OS
+In-Reply-To: <CAHavPHHx4yVL0LVZ764CB9fE8t-_Bpt7xLY+hJ_a-9kGm4eGBg@mail.gmail.com>
+References: <CAHavPHHx4yVL0LVZ764CB9fE8t-_Bpt7xLY+hJ_a-9kGm4eGBg@mail.gmail.com>
+Message-ID: <CADUbQ5g6=MLd898sLDdPLc=N+UJGgnuxuL6bmBswN6g913HrPw@mail.gmail.com>
+
+I may have confused things by mentioning AT&T (and Simon) as a
+source for gfortran. What I had in mind is that the version of gfortran
+that is recommended when building R is available from that source
+(see the R Mac OS FAQ). But this is not strictly necessary when
+building Octave (or RcppOctave).
+
+
+
+On Fri, Oct 11, 2013 at 4:35 AM, Renaud Gaujoux <
+renaud at mancala.cbio.uct.ac.za> wrote:
+
+> Hi,
+>
+> primary discussions on how to get RcppOctave working on Mac OS can be
+> found on this thread:
+>
+>
+> http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/2013-October/000010.html
+>
+> Tests were carried on on a Mac
+> Here is a summary of what we've got so far, thanks to Dominick and Steve:
+>
+>   * Preliminary tests show that RcppOctave builds against Octave, when the
+> later is built from source using the instructions from http://wiki.octave
+> .org/Octave_for_Mac
+>
+>   * Mac Ports octave packages are out-dated (3.2.4) and RcppOctave will
+> not build against them
+>
+>   * Homebrew has up-to-date Octave versions, which seem to work fine with
+> RcppOctave. The reference instructions to install it can be found at
+> http://wiki.octave.org/Octave_for_MacOS_X#Homebrew.
+> Basically this amounts to:
+>     1. install XCode and its Command Line Tools
+>     2. install homebrew
+>     3. add the homebrew/science repository (tap in brewing language):
+>
+>        $ brew tap homebrew/science
+>        $ brew update && brew upgrade
+>        $ brew tap --repair #may not be necessary
+>        $ brew install gfortran
+>        $ brew install octave
+>
+> There was an issue due to gfortran not being found (not sure if this would
+> be the case after brew install gfortran), and Dominick provided a solution
+> here:
+> http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/2013-October/000020.html
+>
+> More details when we know more...
+>
+> Bests,
+> Renaud
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rcppoctave-user/attachments/20131011/200a2546/attachment.html>
+

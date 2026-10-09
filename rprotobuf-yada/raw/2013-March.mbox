@@ -1,0 +1,61 @@
+From johansen at adobe.com  Fri Mar  1 02:08:48 2013
+From: johansen at adobe.com (Josh Hansen)
+Date: Thu, 28 Feb 2013 17:08:48 -0800
+Subject: [Rprotobuf-yada] Extending RProtoBuf to read elephant-bird-style
+ block-serialized protobufs
+Message-ID: <CD554DB0.AD20%johansen@adobe.com>
+
+So I recently asked about using writeDelimitedTo(...) in RProtoBuf. Since then, I've decided against that approach and am instead looking into the block serialization format used by the Java elephant-bird library, which aims to make Hadoop work with protocol buffer data. I'm pleased with what that gives me (Hadoop Map/Reduce, Hive, Pig, etc. support; splittability; small serialization size; compression). However, my use case still requires data to be usable in R. To that end, I'm interested in extending the RProtoBuf library to read elephant-bird block-serialized protocol buffers.  Is RProtoBuf the right place to implement this capability? If so, what design guidance can you give me?
+
+A bit more information about the block serialization format can be found in the BinaryBlockReader<https://github.com/kevinweil/elephant-bird/blob/master/core/src/main/java/com/twitter/elephantbird/mapreduce/io/BinaryBlockReader.java> and BinaryBlockWriter<https://github.com/kevinweil/elephant-bird/blob/master/core/src/main/java/com/twitter/elephantbird/mapreduce/io/BinaryBlockWriter.java> classes, and in block_storage.proto<https://github.com/kevinweil/elephant-bird/blob/master/core/src/main/protobuf/block_storage.proto>.  block_storage.proto defines the SerializedBlock message. BinaryBlockWriter basically stuffs serialized messages of the target type into the `repeated bytes proto_blobs = 3;` field in SerializedBlock, split over multiple SerializedBlocks. The example given in the .proto file:
+SerializedBlock block = SerializedBlock.newBuilder().setVersion(1)
+                                                     .setProtoClassName(Status.class.getName())
+                                                     .addProtoBlobs(status1.toByteString())
+                                                     .addProtoBlobs(status2.toByteString())
+                                                     .build();
+
+The SerializedBlock objects are then serialized in standard protobuf fashion, then written to the output stream with a certain byte sequence as delimiter, plus size information.
+
+At any rate, a port to C++ of the reader and writer classes would probably not be too bad. The hard part from my perspective is how to connect that to the world of R in general, and to RProtoBuf in particular. Thoughts?
+- Josh
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rprotobuf-yada/attachments/20130228/9e9f9ff0/attachment.html>
+
+From johansen at adobe.com  Tue Mar  5 23:45:56 2013
+From: johansen at adobe.com (Josh Hansen)
+Date: Tue, 5 Mar 2013 14:45:56 -0800
+Subject: [Rprotobuf-yada] Extending RProtoBuf to read
+ elephant-bird-style block-serialized protobufs
+In-Reply-To: <CD554DB0.AD20%johansen@adobe.com>
+Message-ID: <CD5BB951.ADA6%johansen@adobe.com>
+
+I have now implemented a method in wrapper_Descriptor.cpp called "readMessagesFromFile" that reads messages serialized using the elephant-bird block serialization format. I'm working on returning these messages as a well-formed DataFrame but have a question.
+
+It seems that there are "get_payload" and "as_list" methods in wrapper_Message.cpp. These methods seem like they would be perfect for constructing the data frame; however, neither the GPB::Message class nor the S4_Message class seem to have either of these methods on their instances. Where, then, are those methods being defined?
+
+Thanks for any information.
+- Josh
+
+From: Josh Hansen <johansen at adobe.com<mailto:johansen at adobe.com>>
+Date: Thursday, February 28, 2013 6:08 PM
+To: "rprotobuf-yada at lists.r-forge.r-project.org<mailto:rprotobuf-yada at lists.r-forge.r-project.org>" <rprotobuf-yada at lists.r-forge.r-project.org<mailto:rprotobuf-yada at lists.r-forge.r-project.org>>
+Subject: Extending RProtoBuf to read elephant-bird-style block-serialized protobufs
+
+So I recently asked about using writeDelimitedTo(...) in RProtoBuf. Since then, I've decided against that approach and am instead looking into the block serialization format used by the Java elephant-bird library, which aims to make Hadoop work with protocol buffer data. I'm pleased with what that gives me (Hadoop Map/Reduce, Hive, Pig, etc. support; splittability; small serialization size; compression). However, my use case still requires data to be usable in R. To that end, I'm interested in extending the RProtoBuf library to read elephant-bird block-serialized protocol buffers.  Is RProtoBuf the right place to implement this capability? If so, what design guidance can you give me?
+
+A bit more information about the block serialization format can be found in the BinaryBlockReader<https://github.com/kevinweil/elephant-bird/blob/master/core/src/main/java/com/twitter/elephantbird/mapreduce/io/BinaryBlockReader.java> and BinaryBlockWriter<https://github.com/kevinweil/elephant-bird/blob/master/core/src/main/java/com/twitter/elephantbird/mapreduce/io/BinaryBlockWriter.java> classes, and in block_storage.proto<https://github.com/kevinweil/elephant-bird/blob/master/core/src/main/protobuf/block_storage.proto>.  block_storage.proto defines the SerializedBlock message. BinaryBlockWriter basically stuffs serialized messages of the target type into the `repeated bytes proto_blobs = 3;` field in SerializedBlock, split over multiple SerializedBlocks. The example given in the .proto file:
+SerializedBlock block = SerializedBlock.newBuilder().setVersion(1)
+                                                     .setProtoClassName(Status.class.getName())
+                                                     .addProtoBlobs(status1.toByteString())
+                                                     .addProtoBlobs(status2.toByteString())
+                                                     .build();
+
+The SerializedBlock objects are then serialized in standard protobuf fashion, then written to the output stream with a certain byte sequence as delimiter, plus size information.
+
+At any rate, a port to C++ of the reader and writer classes would probably not be too bad. The hard part from my perspective is how to connect that to the world of R in general, and to RProtoBuf in particular. Thoughts?
+- Josh
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rprotobuf-yada/attachments/20130305/5b4bb07a/attachment.html>
+

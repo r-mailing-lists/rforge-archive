@@ -1,0 +1,1769 @@
+From meik.michalke at uni-duesseldorf.de  Thu Sep  1 19:39:37 2011
+From: meik.michalke at uni-duesseldorf.de (meik michalke)
+Date: Thu, 1 Sep 2011 19:39:37 +0200
+Subject: [Roxygen-devel] fix for aliases
+Message-ID: <201109011939.42055.meik.michalke@uni-duesseldorf.de>
+
+hi,
+
+as R CMD check revealed to me, the values of \alias{} must not be quoted. 
+otherwise you run into warnings regarding undocumented stuff.
+
+here's another fix, in two patches:
+
+<patch1>
+--- roclet-namespace.R.orig     2011-08-29 23:52:59.648650390 +0200
++++ roclet-namespace.R  2011-09-01 19:25:54.228446954 +0200
+@@ -182,9 +182,15 @@
+   unlist(lapply(matches, f, tag = tag, all = partitum), use.names = FALSE)
+ }
+   
+-words <- function(x) {
+-  quote_if_needed(str_split(str_trim(x), "\\s+")[[1]])
++words <- function(x, quote=TRUE) {
++  x.trimmed <- str_split(str_trim(x), "\\s+")[[1]]
++  if(isTRUE(quote)){
++    return(quote_if_needed(x.trimmed))
++  } else {
++    return(x.trimmed)
++  }
+ }
++
+ is.syntactic <- function(x) make.names(x) == x
+ has.quotes <- function(x) str_detect(x, "'|\"")
+ quote_if_needed <- function(x) {
+</patch1>
+
+<patch2>
+--- roclet-rd.R.orig    2011-07-28 20:59:24.000000000 +0200
++++ roclet-rd.R 2011-09-01 19:27:26.976672899 +0200
+@@ -333,7 +333,7 @@
+   add_tag(rd, process_description(partitum, base_path))
+ 
+   add_tag(rd, process_had_tag(partitum, 'aliases', function(tag, param) {
+-      new_tag('alias', words(param))
++      new_tag('alias', words(param, quote=FALSE))
+     }))
+   add_tag(rd, process.usage(partitum))
+   add_tag(rd, process.arguments(partitum))
+</patch2>
+
+
+viele gr??e :: m.eik
+
+-- 
+dipl. psych. meik michalke
+institut f"ur experimentelle psychologie
+abt. f"ur diagnostik und differentielle psychologie
+heinrich-heine-universit"at d-40204 d"usseldorf
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20110901/89b3dca8/attachment.pgp>
+
+From hadley at rice.edu  Fri Sep  2 02:43:31 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Thu, 1 Sep 2011 19:43:31 -0500
+Subject: [Roxygen-devel] fix for aliases
+In-Reply-To: <201109011939.42055.meik.michalke@uni-duesseldorf.de>
+References: <201109011939.42055.meik.michalke@uni-duesseldorf.de>
+Message-ID: <CABdHhvF_YC2dwgCDg=WcjTGW4tguKXwxEB68j1TWAtDRG4b4Eg@mail.gmail.com>
+
+Would you mind adding this to
+https://github.com/klutometis/roxygen/issues/24?  That way it won't
+get lost in my inbox.
+Hadley
+
+On Thu, Sep 1, 2011 at 12:39 PM, meik michalke
+<meik.michalke at uni-duesseldorf.de> wrote:
+> hi,
+>
+> as R CMD check revealed to me, the values of \alias{} must not be quoted.
+> otherwise you run into warnings regarding undocumented stuff.
+>
+> here's another fix, in two patches:
+>
+> <patch1>
+> --- roclet-namespace.R.orig ? ? 2011-08-29 23:52:59.648650390 +0200
+> +++ roclet-namespace.R ?2011-09-01 19:25:54.228446954 +0200
+> @@ -182,9 +182,15 @@
+> ? unlist(lapply(matches, f, tag = tag, all = partitum), use.names = FALSE)
+> ?}
+>
+> -words <- function(x) {
+> - ?quote_if_needed(str_split(str_trim(x), "\\s+")[[1]])
+> +words <- function(x, quote=TRUE) {
+> + ?x.trimmed <- str_split(str_trim(x), "\\s+")[[1]]
+> + ?if(isTRUE(quote)){
+> + ? ?return(quote_if_needed(x.trimmed))
+> + ?} else {
+> + ? ?return(x.trimmed)
+> + ?}
+> ?}
+> +
+> ?is.syntactic <- function(x) make.names(x) == x
+> ?has.quotes <- function(x) str_detect(x, "'|\"")
+> ?quote_if_needed <- function(x) {
+> </patch1>
+>
+> <patch2>
+> --- roclet-rd.R.orig ? ?2011-07-28 20:59:24.000000000 +0200
+> +++ roclet-rd.R 2011-09-01 19:27:26.976672899 +0200
+> @@ -333,7 +333,7 @@
+> ? add_tag(rd, process_description(partitum, base_path))
+>
+> ? add_tag(rd, process_had_tag(partitum, 'aliases', function(tag, param) {
+> - ? ? ?new_tag('alias', words(param))
+> + ? ? ?new_tag('alias', words(param, quote=FALSE))
+> ? ? }))
+> ? add_tag(rd, process.usage(partitum))
+> ? add_tag(rd, process.arguments(partitum))
+> </patch2>
+>
+>
+> viele gr??e :: m.eik
+>
+> --
+> dipl. psych. meik michalke
+> institut f"ur experimentelle psychologie
+> abt. f"ur diagnostik und differentielle psychologie
+> heinrich-heine-universit"at d-40204 d"usseldorf
+>
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From daniel.sabanesbove at ifspm.uzh.ch  Thu Sep  8 15:36:14 2011
+From: daniel.sabanesbove at ifspm.uzh.ch (=?ISO-8859-1?Q?Daniel_Saban=E9s_Bov=E9?=)
+Date: Thu, 08 Sep 2011 15:36:14 +0200
+Subject: [Roxygen-devel] suggested fix for useDynLib in roxygen2
+Message-ID: <4E68C4CE.9040903@ifspm.uzh.ch>
+
+Hi,
+
+I have switched to roxygen2, which is a lot faster than roxygen it
+seems. Thanks to everybody responsible for this new implementation!
+
+The useDynLib tag made some problems, however. In order to make it work
+as in the good old roxygen, I changed line 103 of R/roclet-namespace.R
+and replaced ns_default with ns_collapse, which is in diff language:
+
+diff roclet-namespace.R roclet-namespace.R~
+
+103c103
+<       process_tag(partitum, 'useDynLib', ns_collapse)
+---
+>       process_tag(partitum, 'useDynLib', ns_default)
+
+
+Before that, I got
+
+useDynLib(packageName)
+useDynLib(routine1)
+useDynLib(routine2)
+etc.
+
+in NAMESPACE instead of
+
+useDynLib(packageName, routine1, routine2, ...)
+
+Best regards,
+Daniel
+
+From brian at braverock.com  Sun Sep 18 13:24:05 2011
+From: brian at braverock.com (Brian G. Peterson)
+Date: Sun, 18 Sep 2011 06:24:05 -0500
+Subject: [Roxygen-devel] support for \section tag in Rd2roxygen ?
+Message-ID: <1316345045.6600.11.camel@brian-rcg>
+
+I'm in the process of trying to convert the over 140 pages of
+documentation for the PerformanceAnalytics package from hand-coded .Rd
+files to roxygen2
+
+I've previously gotten some assistance here with regard to aliases and
+multiple functions in the same file, and with some small changes to the
+source documents have made significant progress.  (i.e. Rd2roxygen can
+now run to completion)
+
+I'm now noticing that the documentation produced by Rd2roxygen is
+significantly shorter than the original.
+
+So far, Ive been able to identify that it appears that Rd2roxygen fails
+to parse \section tags completely.  There are no errors or warnings, but
+all of the text contained in \section tags in the original Rd files is
+completely missing from the converted roxygen comments.
+
+Am I missing something, or am I correct that it is Rd2roxygen?
+
+Regards, 
+
+   - Brian
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+
+
+From renaud at cbio.uct.ac.za  Wed Sep 21 14:16:52 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 21 Sep 2011 14:16:52 +0200
+Subject: [Roxygen-devel] [roxygen2] roxygenise parses R files that are not
+	in Collate
+Message-ID: <4E79D5B4.8030309@cbio.uct.ac.za>
+
+Hi,
+
+Suppose a package directory that contains R files that are not in the 
+Collate field in the DESCRIPTION.
+Running:
+roxygenise('.', roclets='rd')
+
+will parse all the R files, even those that are not in Collate.
+I explicitly used the argument roclets='rd', since the default would be 
+to update the Collate field with new R scripts (right?).
+
+Is this normal?
+Attached a dummy package to reproduce the issue.
+
+Thank you
+
+-- 
+Renaud Gaujoux
+Computational Biology - University of Cape Town
+South Africa
+
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: test_1.0.tar.gz
+Type: application/x-gzip
+Size: 479 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20110921/a911ca4f/attachment.bin>
+
+From renaud at cbio.uct.ac.za  Wed Sep 21 15:41:51 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 21 Sep 2011 15:41:51 +0200
+Subject: [Roxygen-devel] [roxygen2] error sourcing the R files (probably
+	environment issue)
+Message-ID: <4E79E99F.7040102@cbio.uct.ac.za>
+
+Hi,
+
+in one of the R files I have something like this, that defines a 
+temporary function in order to define a static variable:
+
+f <- function(){
+     .a <- 0
+     function(x=1){
+         .a <<- .a + x
+         .a
+     }
+}
+f2 <- f()
+rm(f)
+
+When running roxygenise on this I get the error:
+Error in eval(expr, envir, enclos) : object 'f' not found
+
+No error with R CMD check.
+If I use the -- very nice -- function devtools::load_all, it works 
+perfectly fine as well.
+
+In this simple case I know I could do f <- f() instead and remove the 
+problematic call to rm (and it works fine).
+But my actual use case is to define a S4 method like this:
+
+setMethod('A', 'ANY', f())
+rm(f)
+
+Here I really need to remove not to have it remaining in my namespace.
+
+Does roxygen2 source the R files differently?
+Maybe there is an alternative way to define static variables for my use 
+case, that would not break roxygenise?
+
+Thank you
+
+Renaud
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+
+From renaud at cbio.uct.ac.za  Wed Sep 21 16:25:18 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 21 Sep 2011 16:25:18 +0200
+Subject: [Roxygen-devel] [roxygen2] More explicit error messages?
+Message-ID: <4E79F3CE.8010307@cbio.uct.ac.za>
+
+Hi,
+
+I know it is my third post today... I would really like to migrate my 
+package (at least partially) to roxygen2 documentations, but I keep 
+getting into troubles (...).
+I now get the following error message:
+
+Error in roclet_rd_one(partitum, base_path) : Missing name
+
+It seems that any roxygen block could throw this error, and it is very 
+hard to track down the issue in big projects.
+It would be nice to provide the user with at least some more details on 
+which block was being parsed when the error occurred. Give the filename 
+and line number would obviously be even better.
+
+Hadley, I saw your Feature-Issue on the subject 
+(https://github.com/klutometis/roxygen/issues/13).
+Does the development version implement this feature already?
+
+Thank you
+
+Renaud
+
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+
+From hadley at rice.edu  Wed Sep 21 17:20:16 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 10:20:16 -0500
+Subject: [Roxygen-devel] [roxygen2] More explicit error messages?
+In-Reply-To: <4E79F3CE.8010307@cbio.uct.ac.za>
+References: <4E79F3CE.8010307@cbio.uct.ac.za>
+Message-ID: <CABdHhvEU2-ihpJgbOxvPLNZMozB1tbFMjvJVL9Z2KQLAoHJvCA@mail.gmail.com>
+
+> I know it is my third post today... I would really like to migrate my
+> package (at least partially) to roxygen2 documentations, but I keep getting
+> into troubles (...).
+> I now get the following error message:
+>
+> Error in roclet_rd_one(partitum, base_path) : Missing name
+>
+> It seems that any roxygen block could throw this error, and it is very hard
+> to track down the issue in big projects.
+> It would be nice to provide the user with at least some more details on
+> which block was being parsed when the error occurred. Give the filename and
+> line number would obviously be even better.
+
+Yes, agreed.
+
+> Hadley, I saw your Feature-Issue on the subject
+> (https://github.com/klutometis/roxygen/issues/13).
+> Does the development version implement this feature already?
+
+No, not yet.
+
+Hadley
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From renaud at cbio.uct.ac.za  Wed Sep 21 17:45:10 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 21 Sep 2011 17:45:10 +0200
+Subject: [Roxygen-devel] [roxygen2] More explicit error messages?
+In-Reply-To: <CABdHhvEU2-ihpJgbOxvPLNZMozB1tbFMjvJVL9Z2KQLAoHJvCA@mail.gmail.com>
+References: <4E79F3CE.8010307@cbio.uct.ac.za>
+	<CABdHhvEU2-ihpJgbOxvPLNZMozB1tbFMjvJVL9Z2KQLAoHJvCA@mail.gmail.com>
+Message-ID: <4E7A0686.1040108@cbio.uct.ac.za>
+
+On your comment to the issue you say it should be straightforward to 
+implement this feature.
+Could you point the files, functions or mechanisms to look at?
+Maybe I could get this working locally without knowing too much of 
+roxygen2's arcanes?
+
+Thank you.
+
+On 21/09/2011 17:20, Hadley Wickham wrote:
+>> I know it is my third post today... I would really like to migrate my
+>> package (at least partially) to roxygen2 documentations, but I keep getting
+>> into troubles (...).
+>> I now get the following error message:
+>>
+>> Error in roclet_rd_one(partitum, base_path) : Missing name
+>>
+>> It seems that any roxygen block could throw this error, and it is very hard
+>> to track down the issue in big projects.
+>> It would be nice to provide the user with at least some more details on
+>> which block was being parsed when the error occurred. Give the filename and
+>> line number would obviously be even better.
+> Yes, agreed.
+>
+>> Hadley, I saw your Feature-Issue on the subject
+>> (https://github.com/klutometis/roxygen/issues/13).
+>> Does the development version implement this feature already?
+> No, not yet.
+>
+> Hadley
+>
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+
+From renaud at cbio.uct.ac.za  Wed Sep 21 18:10:16 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 21 Sep 2011 18:10:16 +0200
+Subject: [Roxygen-devel] [roxygen2] More explicit error messages?
+In-Reply-To: <CABdHhvEU2-ihpJgbOxvPLNZMozB1tbFMjvJVL9Z2KQLAoHJvCA@mail.gmail.com>
+References: <4E79F3CE.8010307@cbio.uct.ac.za>
+	<CABdHhvEU2-ihpJgbOxvPLNZMozB1tbFMjvJVL9Z2KQLAoHJvCA@mail.gmail.com>
+Message-ID: <4E7A0C68.2070105@cbio.uct.ac.za>
+
+It was very straightforward indeed.
+Patching line 324 of roclet-rd.R with the following seems to do the trick:
+
+if (is.null(name)){
+     # get the location and filename from srcref
+     ll <- partitum$srcref$lloc
+     stop("Missing name in block ", basename(partitum$srcref$filename), 
+":lines ", ll[1], "-", ll[3])
+}
+
+More verbose error messages for other types of errors (e.g. related to 
+wrong usage of roxygen flags) would still be nice to have as well, but 
+this at least allows to pinpoint very problematic blocks.
+
+This brought me to another question (which might need a separate post 
+though): it seems that union class names are not extracted (throws the 
+error: Missing name).
+
+Thank you
+
+Renaud
+
+On 21/09/2011 17:20, Hadley Wickham wrote:
+>> I know it is my third post today... I would really like to migrate my
+>> package (at least partially) to roxygen2 documentations, but I keep getting
+>> into troubles (...).
+>> I now get the following error message:
+>>
+>> Error in roclet_rd_one(partitum, base_path) : Missing name
+>>
+>> It seems that any roxygen block could throw this error, and it is very hard
+>> to track down the issue in big projects.
+>> It would be nice to provide the user with at least some more details on
+>> which block was being parsed when the error occurred. Give the filename and
+>> line number would obviously be even better.
+> Yes, agreed.
+>
+>> Hadley, I saw your Feature-Issue on the subject
+>> (https://github.com/klutometis/roxygen/issues/13).
+>> Does the development version implement this feature already?
+> No, not yet.
+>
+> Hadley
+>
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+
+From hadley at rice.edu  Wed Sep 21 18:18:58 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 11:18:58 -0500
+Subject: [Roxygen-devel] [roxygen2] More explicit error messages?
+In-Reply-To: <4E7A0C68.2070105@cbio.uct.ac.za>
+References: <4E79F3CE.8010307@cbio.uct.ac.za>
+	<CABdHhvEU2-ihpJgbOxvPLNZMozB1tbFMjvJVL9Z2KQLAoHJvCA@mail.gmail.com>
+	<4E7A0C68.2070105@cbio.uct.ac.za>
+Message-ID: <CABdHhvGv25nipp9zdO7jbmnBS3SsFwONp53r67ejZLBLBpJkZA@mail.gmail.com>
+
+On Wed, Sep 21, 2011 at 11:10 AM, Renaud Gaujoux <renaud at cbio.uct.ac.za> wrote:
+> It was very straightforward indeed.
+> Patching line 324 of roclet-rd.R with the following seems to do the trick:
+>
+> if (is.null(name)){
+> ? ?# get the location and filename from srcref
+> ? ?ll <- partitum$srcref$lloc
+> ? ?stop("Missing name in block ", basename(partitum$srcref$filename),
+> ":lines ", ll[1], "-", ll[3])
+> }
+>
+> More verbose error messages for other types of errors (e.g. related to wrong
+> usage of roxygen flags) would still be nice to have as well, but this at
+> least allows to pinpoint very problematic blocks.
+
+It would be even better to pull that out into a separate function:
+
+roxygen_stop <- function(msg, srcref) {
+  ll <-srcref$lloc
+  stop(msg, "\n", "In: ",  basename(srcref$filename),  ":lines ",
+ll[1], "-", ll[3])
+}
+
+then replace all uses of stop (and similarly for warning).
+
+A patch along those lines would be greatly appreciated!
+
+> This brought me to another question (which might need a separate post
+> though): it seems that union class names are not extracted (throws the
+> error: Missing name).
+
+You'll need to provide more details on that one.
+
+Hadley
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From renaud at cbio.uct.ac.za  Wed Sep 21 18:45:21 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 21 Sep 2011 18:45:21 +0200
+Subject: [Roxygen-devel] [roxygen2] More explicit error messages?
+In-Reply-To: <CABdHhvGv25nipp9zdO7jbmnBS3SsFwONp53r67ejZLBLBpJkZA@mail.gmail.com>
+References: <4E79F3CE.8010307@cbio.uct.ac.za>
+	<CABdHhvEU2-ihpJgbOxvPLNZMozB1tbFMjvJVL9Z2KQLAoHJvCA@mail.gmail.com>
+	<4E7A0C68.2070105@cbio.uct.ac.za>
+	<CABdHhvGv25nipp9zdO7jbmnBS3SsFwONp53r67ejZLBLBpJkZA@mail.gmail.com>
+Message-ID: <4E7A14A1.7060403@cbio.uct.ac.za>
+
+
+
+On 21/09/2011 18:18, Hadley Wickham wrote:
+> On Wed, Sep 21, 2011 at 11:10 AM, Renaud Gaujoux<renaud at cbio.uct.ac.za>  wrote:
+>> It was very straightforward indeed.
+>> Patching line 324 of roclet-rd.R with the following seems to do the trick:
+>>
+>> if (is.null(name)){
+>>     # get the location and filename from srcref
+>>     ll<- partitum$srcref$lloc
+>>     stop("Missing name in block ", basename(partitum$srcref$filename),
+>> ":lines ", ll[1], "-", ll[3])
+>> }
+>>
+>> More verbose error messages for other types of errors (e.g. related to wrong
+>> usage of roxygen flags) would still be nice to have as well, but this at
+>> least allows to pinpoint very problematic blocks.
+> It would be even better to pull that out into a separate function:
+>
+> roxygen_stop<- function(msg, srcref) {
+>    ll<-srcref$lloc
+>    stop(msg, "\n", "In: ",  basename(srcref$filename),  ":lines ",
+> ll[1], "-", ll[3])
+> }
+>
+> then replace all uses of stop (and similarly for warning).
+>
+> A patch along those lines would be greatly appreciated!
+>
+I am happy to try to provide such a patch.
+
+>> This brought me to another question (which might need a separate post
+>> though): it seems that union class names are not extracted (throws the
+>> error: Missing name).
+> You'll need to provide more details on that one.
+If one puts roxygen documentation before a statement setClassUnion one 
+gets the error of Missing name at the line of setClassUnion.
+I think it is because this statement is not known to roxygen2 parser.
+Adding the following to roclet-rd.R makes it aware it, but I am not sure 
+if the name 'S4class' is correct in this case:
+
+register.srcref.parser('setClassUnion', function(call, env) {
+   list(S4class = as.character(call$name))
+})
+
+Renaud
+
+> Hadley
+>
+>
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+
+From maechler at stat.math.ethz.ch  Wed Sep 21 14:38:27 2011
+From: maechler at stat.math.ethz.ch (Martin Maechler)
+Date: Wed, 21 Sep 2011 12:38:27 -0000
+Subject: [Roxygen-devel] release to CRAN // Version number on R-forge
+Message-ID: <1303826413.17874.4.camel@lynne>
+
+Dear Roxygen developers,
+as you know probably much better than I,
+the R-forge version of  roxygen  is much different than the somewhat
+dated CRAN one.
+But both use  Version: 0.1-2  
+which is a bit confusing.
+
+There's at least one bug in the CRAN version -- fixed in the R-forge
+version that has vexed me the few times I've stumbled upon it,
+and I'd be happy if you planned for another CRAN release of roxygen
+rather sooner than later..
+
+Best regards,
+Martin
+
+-- 
+Martin Maechler <maechler at stat.math.ethz.ch>
+Seminar fur Statistik, ETH Zurich
+
+
+From hadley at rice.edu  Wed Sep 21 21:35:15 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 14:35:15 -0500
+Subject: [Roxygen-devel] release to CRAN // Version number on R-forge
+In-Reply-To: <1303826413.17874.4.camel@lynne>
+References: <1303826413.17874.4.camel@lynne>
+Message-ID: <CABdHhvFG+5pGKhMv0aYXc99-tTdO3-uAEWi4r7ixSNejscbWbA@mail.gmail.com>
+
+Hi Martin,
+
+Roxygen development has transition to github
+(https://github.com/klutometis/roxygen) and to a new name (roxygen2),
+because we made some api/format breaking changes.  If you let me know
+what the bug was I can make sure it's also fixed in the new version.
+
+Hadley
+
+2011/4/26 Martin Maechler <maechler at stat.math.ethz.ch>:
+> Dear Roxygen developers,
+> as you know probably much better than I,
+> the R-forge version of ?roxygen ?is much different than the somewhat
+> dated CRAN one.
+> But both use ?Version: 0.1-2
+> which is a bit confusing.
+>
+> There's at least one bug in the CRAN version -- fixed in the R-forge
+> version that has vexed me the few times I've stumbled upon it,
+> and I'd be happy if you planned for another CRAN release of roxygen
+> rather sooner than later..
+>
+> Best regards,
+> Martin
+>
+> --
+> Martin Maechler <maechler at stat.math.ethz.ch>
+> Seminar fur Statistik, ETH Zurich
+>
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From hadley at rice.edu  Wed Sep 21 21:36:49 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 14:36:49 -0500
+Subject: [Roxygen-devel] [roxygen2] roxygenise parses R files that are
+ not in Collate
+In-Reply-To: <4E79D5B4.8030309@cbio.uct.ac.za>
+References: <4E79D5B4.8030309@cbio.uct.ac.za>
+Message-ID: <CABdHhvHUOmHvzDP+OAhYR5bFPbzS6EBp4N8W677RtNYa5Wf8dA@mail.gmail.com>
+
+On Wed, Sep 21, 2011 at 7:16 AM, Renaud Gaujoux
+<renaud at mancala.cbio.uct.ac.za> wrote:
+> Hi,
+>
+> Suppose a package directory that contains R files that are not in the
+> Collate field in the DESCRIPTION.
+> Running:
+> roxygenise('.', roclets='rd')
+>
+> will parse all the R files, even those that are not in Collate.
+> I explicitly used the argument roclets='rd', since the default would be to
+> update the Collate field with new R scripts (right?).
+
+Yes, correct.  Roxygen2 updates collate for you, so it must parse all
+files.  What behaviour are you looking for?
+
+Hadley
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From hadley at rice.edu  Wed Sep 21 21:38:04 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 14:38:04 -0500
+Subject: [Roxygen-devel] [roxygen2] error sourcing the R files (probably
+ environment issue)
+In-Reply-To: <4E79E99F.7040102@cbio.uct.ac.za>
+References: <4E79E99F.7040102@cbio.uct.ac.za>
+Message-ID: <CABdHhvGtsmCKvMX6Pxh_Gkm4TsT4rMEZSiusErCAh8Ri=+4ASg@mail.gmail.com>
+
+> in one of the R files I have something like this, that defines a temporary
+> function in order to define a static variable:
+>
+> f <- function(){
+> ? ?.a <- 0
+> ? ?function(x=1){
+> ? ? ? ?.a <<- .a + x
+> ? ? ? ?.a
+> ? ?}
+> }
+> f2 <- f()
+> rm(f)
+>
+> When running roxygenise on this I get the error:
+> Error in eval(expr, envir, enclos) : object 'f' not found
+
+What does traceback give you?  Could you provide a small reproducible example?
+
+Hadley
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From hadley at rice.edu  Wed Sep 21 21:39:03 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 14:39:03 -0500
+Subject: [Roxygen-devel] support for \section tag in Rd2roxygen ?
+In-Reply-To: <1316345045.6600.11.camel@brian-rcg>
+References: <1316345045.6600.11.camel@brian-rcg>
+Message-ID: <CABdHhvHHVyv3R2iwrONr0o5Cpe-BXYjQovdh6iieKTPDHaZF6Q@mail.gmail.com>
+
+What format are you using for the section tag?  In plyr, I have:
+
+#' @section Output:
+#'   The most unambiguous behaviour is achieved when \code{.fun} returns a
+#'   data frame - in that case pieces will be combined with
+#'   \code{\link{rbind.fill}}.  If \code{.fun} returns an atomic vector of
+#'   fixed length, it will be \code{rbind}ed together and converted to a data
+#'   frame. Any other values will result in an error.
+
+and that works fine.  Did you miss the colon?
+
+Hadley
+
+On Sun, Sep 18, 2011 at 6:24 AM, Brian G. Peterson <brian at braverock.com> wrote:
+> I'm in the process of trying to convert the over 140 pages of
+> documentation for the PerformanceAnalytics package from hand-coded .Rd
+> files to roxygen2
+>
+> I've previously gotten some assistance here with regard to aliases and
+> multiple functions in the same file, and with some small changes to the
+> source documents have made significant progress. ?(i.e. Rd2roxygen can
+> now run to completion)
+>
+> I'm now noticing that the documentation produced by Rd2roxygen is
+> significantly shorter than the original.
+>
+> So far, Ive been able to identify that it appears that Rd2roxygen fails
+> to parse \section tags completely. ?There are no errors or warnings, but
+> all of the text contained in \section tags in the original Rd files is
+> completely missing from the converted roxygen comments.
+>
+> Am I missing something, or am I correct that it is Rd2roxygen?
+>
+> Regards,
+>
+> ? - Brian
+>
+> --
+> Brian G. Peterson
+> http://braverock.com/brian/
+> Ph: 773-459-4973
+> IM: bgpbraverock
+>
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From hadley at rice.edu  Wed Sep 21 21:39:44 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 14:39:44 -0500
+Subject: [Roxygen-devel] suggested fix for useDynLib in roxygen2
+In-Reply-To: <4E68C4CE.9040903@ifspm.uzh.ch>
+References: <4E68C4CE.9040903@ifspm.uzh.ch>
+Message-ID: <CABdHhvF5HVSGGXK_-Vbt1QY59dXkU4UOnK3eEuAR3FpHeFuWig@mail.gmail.com>
+
+Hi Daniel,
+
+Would you mind filing a bug at https://github.com/klutometis/roxygen?
+That way it will get fixed when we start preparing for the next
+version of roxygen.
+
+Hadley
+
+2011/9/8 Daniel Saban?s Bov? <daniel.sabanesbove at ifspm.uzh.ch>:
+> Hi,
+>
+> I have switched to roxygen2, which is a lot faster than roxygen it
+> seems. Thanks to everybody responsible for this new implementation!
+>
+> The useDynLib tag made some problems, however. In order to make it work
+> as in the good old roxygen, I changed line 103 of R/roclet-namespace.R
+> and replaced ns_default with ns_collapse, which is in diff language:
+>
+> diff roclet-namespace.R roclet-namespace.R~
+>
+> 103c103
+> < ? ? ? process_tag(partitum, 'useDynLib', ns_collapse)
+> ---
+>> ? ? ? process_tag(partitum, 'useDynLib', ns_default)
+>
+>
+> Before that, I got
+>
+> useDynLib(packageName)
+> useDynLib(routine1)
+> useDynLib(routine2)
+> etc.
+>
+> in NAMESPACE instead of
+>
+> useDynLib(packageName, routine1, routine2, ...)
+>
+> Best regards,
+> Daniel
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From brian at braverock.com  Wed Sep 21 21:55:38 2011
+From: brian at braverock.com (Brian G. Peterson)
+Date: Wed, 21 Sep 2011 14:55:38 -0500
+Subject: [Roxygen-devel] support for \section tag in Rd2roxygen ?
+In-Reply-To: <CABdHhvHHVyv3R2iwrONr0o5Cpe-BXYjQovdh6iieKTPDHaZF6Q@mail.gmail.com>
+References: <1316345045.6600.11.camel@brian-rcg>
+	<CABdHhvHHVyv3R2iwrONr0o5Cpe-BXYjQovdh6iieKTPDHaZF6Q@mail.gmail.com>
+Message-ID: <1316634938.6600.24.camel@brian-rcg>
+
+Thanks for the reply,  but I think you misunderstood the question.
+
+Rd2roxygen seems to completely fail to parse \section tags in the
+existing Rd files.  There's no error, but no section data is converted
+either.
+
+Regards,
+
+  - Brian
+
+
+
+On Wed, 2011-09-21 at 14:39 -0500, Hadley Wickham wrote:
+> What format are you using for the section tag?  In plyr, I have:
+> 
+> #' @section Output:
+> #'   The most unambiguous behaviour is achieved when \code{.fun} returns a
+> #'   data frame - in that case pieces will be combined with
+> #'   \code{\link{rbind.fill}}.  If \code{.fun} returns an atomic vector of
+> #'   fixed length, it will be \code{rbind}ed together and converted to a data
+> #'   frame. Any other values will result in an error.
+> 
+> and that works fine.  Did you miss the colon?
+> 
+> Hadley
+> 
+> On Sun, Sep 18, 2011 at 6:24 AM, Brian G. Peterson <brian at braverock.com> wrote:
+> > I'm in the process of trying to convert the over 140 pages of
+> > documentation for the PerformanceAnalytics package from hand-coded .Rd
+> > files to roxygen2
+> >
+> > I've previously gotten some assistance here with regard to aliases and
+> > multiple functions in the same file, and with some small changes to the
+> > source documents have made significant progress.  (i.e. Rd2roxygen can
+> > now run to completion)
+> >
+> > I'm now noticing that the documentation produced by Rd2roxygen is
+> > significantly shorter than the original.
+> >
+> > So far, Ive been able to identify that it appears that Rd2roxygen fails
+> > to parse \section tags completely.  There are no errors or warnings, but
+> > all of the text contained in \section tags in the original Rd files is
+> > completely missing from the converted roxygen comments.
+> >
+> > Am I missing something, or am I correct that it is Rd2roxygen?
+> >
+> > Regards,
+> >
+> >   - Brian
+> >
+
+
+From hadley at rice.edu  Wed Sep 21 22:09:02 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 15:09:02 -0500
+Subject: [Roxygen-devel] support for \section tag in Rd2roxygen ?
+In-Reply-To: <1316634938.6600.24.camel@brian-rcg>
+References: <1316345045.6600.11.camel@brian-rcg>
+	<CABdHhvHHVyv3R2iwrONr0o5Cpe-BXYjQovdh6iieKTPDHaZF6Q@mail.gmail.com>
+	<1316634938.6600.24.camel@brian-rcg>
+Message-ID: <CABdHhvFhxHDyeYkCTj=f1e_R565PCDuVg=Mn3usOGwZQ8rKQeg@mail.gmail.com>
+
+Oh, sorry, I missed that.  I've cc'd Yihui (the Rd2Roxygen maintainer)
+who can speak to whether this is a bug or a feature that hasn't been
+implemented yet.
+
+Hadley
+
+On Wed, Sep 21, 2011 at 2:55 PM, Brian G. Peterson <brian at braverock.com> wrote:
+> Thanks for the reply, ?but I think you misunderstood the question.
+>
+> Rd2roxygen seems to completely fail to parse \section tags in the
+> existing Rd files. ?There's no error, but no section data is converted
+> either.
+>
+> Regards,
+>
+> ?- Brian
+>
+>
+>
+> On Wed, 2011-09-21 at 14:39 -0500, Hadley Wickham wrote:
+>> What format are you using for the section tag? ?In plyr, I have:
+>>
+>> #' @section Output:
+>> #' ? The most unambiguous behaviour is achieved when \code{.fun} returns a
+>> #' ? data frame - in that case pieces will be combined with
+>> #' ? \code{\link{rbind.fill}}. ?If \code{.fun} returns an atomic vector of
+>> #' ? fixed length, it will be \code{rbind}ed together and converted to a data
+>> #' ? frame. Any other values will result in an error.
+>>
+>> and that works fine. ?Did you miss the colon?
+>>
+>> Hadley
+>>
+>> On Sun, Sep 18, 2011 at 6:24 AM, Brian G. Peterson <brian at braverock.com> wrote:
+>> > I'm in the process of trying to convert the over 140 pages of
+>> > documentation for the PerformanceAnalytics package from hand-coded .Rd
+>> > files to roxygen2
+>> >
+>> > I've previously gotten some assistance here with regard to aliases and
+>> > multiple functions in the same file, and with some small changes to the
+>> > source documents have made significant progress. ?(i.e. Rd2roxygen can
+>> > now run to completion)
+>> >
+>> > I'm now noticing that the documentation produced by Rd2roxygen is
+>> > significantly shorter than the original.
+>> >
+>> > So far, Ive been able to identify that it appears that Rd2roxygen fails
+>> > to parse \section tags completely. ?There are no errors or warnings, but
+>> > all of the text contained in \section tags in the original Rd files is
+>> > completely missing from the converted roxygen comments.
+>> >
+>> > Am I missing something, or am I correct that it is Rd2roxygen?
+>> >
+>> > Regards,
+>> >
+>> > ? - Brian
+>> >
+>
+>
+>
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From renaud at cbio.uct.ac.za  Wed Sep 21 22:44:01 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 21 Sep 2011 22:44:01 +0200
+Subject: [Roxygen-devel] [roxygen2] error sourcing the R files (probably
+ environment issue)
+In-Reply-To: <CABdHhvGtsmCKvMX6Pxh_Gkm4TsT4rMEZSiusErCAh8Ri=+4ASg@mail.gmail.com>
+References: <4E79E99F.7040102@cbio.uct.ac.za>
+	<CABdHhvGtsmCKvMX6Pxh_Gkm4TsT4rMEZSiusErCAh8Ri=+4ASg@mail.gmail.com>
+Message-ID: <4E7A4C91.7090500@cbio.uct.ac.za>
+
+The sample code in my post should be enough to reproduce the issue.
+I have wrapped it into a package (attached to this post).
+
+Renaud
+
+On 21/09/2011 21:38, Hadley Wickham wrote:
+>> in one of the R files I have something like this, that defines a temporary
+>> function in order to define a static variable:
+>>
+>> f<- function(){
+>>     .a<- 0
+>>     function(x=1){
+>>         .a<<- .a + x
+>>         .a
+>>     }
+>> }
+>> f2<- f()
+>> rm(f)
+>>
+>> When running roxygenise on this I get the error:
+>> Error in eval(expr, envir, enclos) : object 'f' not found
+> What does traceback give you?  Could you provide a small reproducible example?
+>
+> Hadley
+>
+>
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: test_1.0.tar.gz
+Type: application/x-gzip
+Size: 479 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20110921/161c9a7e/attachment.bin>
+
+From renaud at cbio.uct.ac.za  Wed Sep 21 22:46:15 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Wed, 21 Sep 2011 22:46:15 +0200
+Subject: [Roxygen-devel] [roxygen2] error sourcing the R files (probably
+ environment issue)
+In-Reply-To: <CABdHhvGtsmCKvMX6Pxh_Gkm4TsT4rMEZSiusErCAh8Ri=+4ASg@mail.gmail.com>
+References: <4E79E99F.7040102@cbio.uct.ac.za>
+	<CABdHhvGtsmCKvMX6Pxh_Gkm4TsT4rMEZSiusErCAh8Ri=+4ASg@mail.gmail.com>
+Message-ID: <4E7A4D17.8080708@cbio.uct.ac.za>
+
+Forgot the traceback:
+
+ > traceback()
+12: eval(expr, envir, enclos)
+11: eval(assignee, env)
+10: parser(call, env)
+9: FUN(X[[1L]], ...)
+8: lapply(src_refs, parse.srcref, env = env)
+7: force(code)
+6: parse_cache$compute(c(env_hash, readLines(file, warn = FALSE)),
+        {
+            src_refs <- attributes(parse(srcfile$filename, srcfile = 
+srcfile))$srcref
+            pre_refs <- prerefs(srcfile, src_refs)
+            if (length(src_refs) == 0)
+                return(list())
+            src_parsed <- lapply(src_refs, parse.srcref, env = env)
+            pre_parsed <- lapply(pre_refs, parse.preref)
+            stopifnot(length(src_parsed) == length(pre_parsed))
+            mapply(c, src_parsed, pre_parsed, SIMPLIFY = FALSE)
+        })
+5: FUN("/home/renaud/Documents/tmp/test/R/fun.R"[[1L]],
+        ...)
+4: lapply(paths, parse.file, env = env, env_hash = env_hash)
+3: unlist(lapply(paths, parse.file, env = env, env_hash = env_hash),
+        recursive = FALSE)
+2: parse.files(r_files)
+1: roxygenise(".")
+
+-- 
+Renaud Gaujoux
+Computational Biology - University of Cape Town
+South Africa
+
+
+On 21/09/2011 21:38, Hadley Wickham wrote:
+>> in one of the R files I have something like this, that defines a temporary
+>> function in order to define a static variable:
+>>
+>> f<- function(){
+>>     .a<- 0
+>>     function(x=1){
+>>         .a<<- .a + x
+>>         .a
+>>     }
+>> }
+>> f2<- f()
+>> rm(f)
+>>
+>> When running roxygenise on this I get the error:
+>> Error in eval(expr, envir, enclos) : object 'f' not found
+> What does traceback give you?  Could you provide a small reproducible example?
+>
+> Hadley
+>
+>
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+
+From hadley at rice.edu  Wed Sep 21 23:48:47 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 21 Sep 2011 16:48:47 -0500
+Subject: [Roxygen-devel] [roxygen2] error sourcing the R files (probably
+ environment issue)
+In-Reply-To: <4E7A4C91.7090500@cbio.uct.ac.za>
+References: <4E79E99F.7040102@cbio.uct.ac.za>
+	<CABdHhvGtsmCKvMX6Pxh_Gkm4TsT4rMEZSiusErCAh8Ri=+4ASg@mail.gmail.com>
+	<4E7A4C91.7090500@cbio.uct.ac.za>
+Message-ID: <CABdHhvFkNqS6q9DaEN6kSwOE+DfYZS_Lip=t7qsMyu1PO1T5Jw@mail.gmail.com>
+
+Could you please file an issue at https://github.com/klutometis/roxygen/issues?
+Thanks!
+Hadley
+
+On Wed, Sep 21, 2011 at 3:44 PM, Renaud Gaujoux <renaud at cbio.uct.ac.za> wrote:
+> The sample code in my post should be enough to reproduce the issue.
+> I have wrapped it into a package (attached to this post).
+>
+> Renaud
+>
+> On 21/09/2011 21:38, Hadley Wickham wrote:
+>>>
+>>> in one of the R files I have something like this, that defines a
+>>> temporary
+>>> function in order to define a static variable:
+>>>
+>>> f<- function(){
+>>> ? ?.a<- 0
+>>> ? ?function(x=1){
+>>> ? ? ? ?.a<<- .a + x
+>>> ? ? ? ?.a
+>>> ? ?}
+>>> }
+>>> f2<- f()
+>>> rm(f)
+>>>
+>>> When running roxygenise on this I get the error:
+>>> Error in eval(expr, envir, enclos) : object 'f' not found
+>>
+>> What does traceback give you? ?Could you provide a small reproducible
+>> example?
+>>
+>> Hadley
+>>
+>>
+>
+>
+>
+> ###
+>
+> UNIVERSITY OF CAPE TOWN
+> This e-mail is subject to the UCT ICT policies and e-mail disclaimer
+> published on our website at
+> http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27
+> 21 650 9111. This e-mail is intended only for the person(s) to whom it is
+> addressed. If the e-mail has reached you in error, please notify the author.
+> If you are not the intended recipient of the e-mail you may not use,
+> disclose, copy, redirect or print the content. If this e-mail is not related
+> to the business of UCT it is sent by the sender in the sender's individual
+> capacity.
+>
+> ###
+>
+>
+>
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From xie at yihui.name  Thu Sep 22 00:27:57 2011
+From: xie at yihui.name (Yihui Xie)
+Date: Wed, 21 Sep 2011 18:27:57 -0400
+Subject: [Roxygen-devel] support for \section tag in Rd2roxygen ?
+In-Reply-To: <CABdHhvFhxHDyeYkCTj=f1e_R565PCDuVg=Mn3usOGwZQ8rKQeg@mail.gmail.com>
+References: <1316345045.6600.11.camel@brian-rcg>
+	<CABdHhvHHVyv3R2iwrONr0o5Cpe-BXYjQovdh6iieKTPDHaZF6Q@mail.gmail.com>
+	<1316634938.6600.24.camel@brian-rcg>
+	<CABdHhvFhxHDyeYkCTj=f1e_R565PCDuVg=Mn3usOGwZQ8rKQeg@mail.gmail.com>
+Message-ID: <CANROs4f369NbZP8LAQtmpjrR+eQhGLXny=ZCTCWdr+Bsx4YdUQ@mail.gmail.com>
+
+The section tag is not implemented. I can do this in this weekend.
+Thanks for letting me know.
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Sep 21, 2011 at 4:09 PM, Hadley Wickham <hadley at rice.edu> wrote:
+> Oh, sorry, I missed that. ?I've cc'd Yihui (the Rd2Roxygen maintainer)
+> who can speak to whether this is a bug or a feature that hasn't been
+> implemented yet.
+>
+> Hadley
+>
+> On Wed, Sep 21, 2011 at 2:55 PM, Brian G. Peterson <brian at braverock.com> wrote:
+>> Thanks for the reply, ?but I think you misunderstood the question.
+>>
+>> Rd2roxygen seems to completely fail to parse \section tags in the
+>> existing Rd files. ?There's no error, but no section data is converted
+>> either.
+>>
+>> Regards,
+>>
+>> ?- Brian
+>>
+>>
+>>
+>> On Wed, 2011-09-21 at 14:39 -0500, Hadley Wickham wrote:
+>>> What format are you using for the section tag? ?In plyr, I have:
+>>>
+>>> #' @section Output:
+>>> #' ? The most unambiguous behaviour is achieved when \code{.fun} returns a
+>>> #' ? data frame - in that case pieces will be combined with
+>>> #' ? \code{\link{rbind.fill}}. ?If \code{.fun} returns an atomic vector of
+>>> #' ? fixed length, it will be \code{rbind}ed together and converted to a data
+>>> #' ? frame. Any other values will result in an error.
+>>>
+>>> and that works fine. ?Did you miss the colon?
+>>>
+>>> Hadley
+>>>
+>>> On Sun, Sep 18, 2011 at 6:24 AM, Brian G. Peterson <brian at braverock.com> wrote:
+>>> > I'm in the process of trying to convert the over 140 pages of
+>>> > documentation for the PerformanceAnalytics package from hand-coded .Rd
+>>> > files to roxygen2
+>>> >
+>>> > I've previously gotten some assistance here with regard to aliases and
+>>> > multiple functions in the same file, and with some small changes to the
+>>> > source documents have made significant progress. ?(i.e. Rd2roxygen can
+>>> > now run to completion)
+>>> >
+>>> > I'm now noticing that the documentation produced by Rd2roxygen is
+>>> > significantly shorter than the original.
+>>> >
+>>> > So far, Ive been able to identify that it appears that Rd2roxygen fails
+>>> > to parse \section tags completely. ?There are no errors or warnings, but
+>>> > all of the text contained in \section tags in the original Rd files is
+>>> > completely missing from the converted roxygen comments.
+>>> >
+>>> > Am I missing something, or am I correct that it is Rd2roxygen?
+>>> >
+>>> > Regards,
+>>> >
+>>> > ? - Brian
+>>> >
+>>
+>>
+>>
+>
+>
+>
+> --
+> Assistant Professor / Dobelman Family Junior Chair
+> Department of Statistics / Rice University
+> http://had.co.nz/
+>
+
+From renaud at cbio.uct.ac.za  Thu Sep 22 12:21:25 2011
+From: renaud at cbio.uct.ac.za (Renaud Gaujoux)
+Date: Thu, 22 Sep 2011 12:21:25 +0200
+Subject: [Roxygen-devel] [roxygen2] error sourcing the R files (probably
+ environment issue)
+In-Reply-To: <CABdHhvFkNqS6q9DaEN6kSwOE+DfYZS_Lip=t7qsMyu1PO1T5Jw@mail.gmail.com>
+References: <4E79E99F.7040102@cbio.uct.ac.za>
+	<CABdHhvGtsmCKvMX6Pxh_Gkm4TsT4rMEZSiusErCAh8Ri=+4ASg@mail.gmail.com>
+	<4E7A4C91.7090500@cbio.uct.ac.za>
+	<CABdHhvFkNqS6q9DaEN6kSwOE+DfYZS_Lip=t7qsMyu1PO1T5Jw@mail.gmail.com>
+Message-ID: <4E7B0C25.4030806@cbio.uct.ac.za>
+
+Done:
+https://github.com/klutometis/roxygen/issues/42
+
+Thank you
+
+On 21/09/2011 23:48, Hadley Wickham wrote:
+> Could you please file an issue at https://github.com/klutometis/roxygen/issues?
+> Thanks!
+> Hadley
+>
+> On Wed, Sep 21, 2011 at 3:44 PM, Renaud Gaujoux<renaud at cbio.uct.ac.za>  wrote:
+>> The sample code in my post should be enough to reproduce the issue.
+>> I have wrapped it into a package (attached to this post).
+>>
+>> Renaud
+>>
+>> On 21/09/2011 21:38, Hadley Wickham wrote:
+>>>> in one of the R files I have something like this, that defines a
+>>>> temporary
+>>>> function in order to define a static variable:
+>>>>
+>>>> f<- function(){
+>>>>     .a<- 0
+>>>>     function(x=1){
+>>>>         .a<<- .a + x
+>>>>         .a
+>>>>     }
+>>>> }
+>>>> f2<- f()
+>>>> rm(f)
+>>>>
+>>>> When running roxygenise on this I get the error:
+>>>> Error in eval(expr, envir, enclos) : object 'f' not found
+>>> What does traceback give you?  Could you provide a small reproducible
+>>> example?
+>>>
+>>> Hadley
+>>>
+>>>
+>>
+>>
+>> ###
+>>
+>> UNIVERSITY OF CAPE TOWN
+>> This e-mail is subject to the UCT ICT policies and e-mail disclaimer
+>> published on our website at
+>> http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27
+>> 21 650 9111. This e-mail is intended only for the person(s) to whom it is
+>> addressed. If the e-mail has reached you in error, please notify the author.
+>> If you are not the intended recipient of the e-mail you may not use,
+>> disclose, copy, redirect or print the content. If this e-mail is not related
+>> to the business of UCT it is sent by the sender in the sender's individual
+>> capacity.
+>>
+>> ###
+>>
+>>
+>>
+>
+>
+
+
+
+###
+
+UNIVERSITY OF CAPE TOWN 
+
+This e-mail is subject to the UCT ICT policies and e-mail disclaimer published on our website at http://www.uct.ac.za/about/policies/emaildisclaimer/ or obtainable from +27 21 650 9111. This e-mail is intended only for the person(s) to whom it is addressed. If the e-mail has reached you in error, please notify the author. If you are not the intended recipient of the e-mail you may not use, disclose, copy, redirect or print the content. If this e-mail is not related to the business of UCT it is sent by the sender in the sender's individual capacity.
+
+###
+ 
+
+
+From hadley at rice.edu  Mon Sep 26 15:55:19 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Mon, 26 Sep 2011 08:55:19 -0500
+Subject: [Roxygen-devel] [roxygen2] More explicit error messages?
+In-Reply-To: <4E7A14A1.7060403@cbio.uct.ac.za>
+References: <4E79F3CE.8010307@cbio.uct.ac.za>
+	<CABdHhvEU2-ihpJgbOxvPLNZMozB1tbFMjvJVL9Z2KQLAoHJvCA@mail.gmail.com>
+	<4E7A0C68.2070105@cbio.uct.ac.za>
+	<CABdHhvGv25nipp9zdO7jbmnBS3SsFwONp53r67ejZLBLBpJkZA@mail.gmail.com>
+	<4E7A14A1.7060403@cbio.uct.ac.za>
+Message-ID: <CABdHhvFaiw1LKg86NapPEEFNXv741yTf90erLA9nMezX_V+BWw@mail.gmail.com>
+
+> If one puts roxygen documentation before a statement setClassUnion one gets
+> the error of Missing name at the line of setClassUnion.
+> I think it is because this statement is not known to roxygen2 parser.
+> Adding the following to roclet-rd.R makes it aware it, but I am not sure if
+> the name 'S4class' is correct in this case:
+>
+> register.srcref.parser('setClassUnion', function(call, env) {
+> ?list(S4class = as.character(call$name))
+> })
+
+Ok, please file a bug report at https://github.com/klutometis/roxygen/issues
+
+Thanks!
+
+Hadley
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From r.m.krug at gmail.com  Wed Sep 28 13:15:46 2011
+From: r.m.krug at gmail.com (Rainer M Krug)
+Date: Wed, 28 Sep 2011 13:15:46 +0200
+Subject: [Roxygen-devel] useDynLib when using roxygen2
+Message-ID: <4E8301E2.7080908@gmail.com>
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+Hi
+
+I have a package which needs a useDynLib() in the NAMESPACE file.
+I am using roxygenize as follow:
+
+Rscript -e "library(roxygen2);roxygenize('pkg', roxygen.dir='pkg',
+copy.package=FALSE, unlink.target=FALSE)"
+
+and the NAMESPACES is correctly created (including the export() as
+requested by the @export tag), but how can I add the useDynLib? I
+remember reading somewhere that I can use a tag - but which one?
+
+Thanks,
+
+Rainer
+
+
+- -- 
+Rainer M. Krug, PhD (Conservation Ecology, SUN), MSc (Conservation
+Biology, UCT), Dipl. Phys. (Germany)
+
+Centre of Excellence for Invasion Biology
+Stellenbosch University
+South Africa
+
+Tel :       +33 - (0)9 53 10 27 44
+Cell:       +33 - (0)6 85 62 59 98
+Fax :       +33 - (0)9 58 10 27 44
+
+Fax (D):    +49 - (0)3 21 21 25 22 44
+
+email:      Rainer at krugs.de
+
+Skype:      RMkrug
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iEYEARECAAYFAk6DAeEACgkQoYgNqgF2egqPzQCfafmnr896skhJSMUMRaqmvtiC
+ZOAAniSyWoh/4Ili/5lKhW8CxMdy/DtZ
+=4XJc
+-----END PGP SIGNATURE-----
+
+From hadley at rice.edu  Wed Sep 28 13:50:11 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 28 Sep 2011 06:50:11 -0500
+Subject: [Roxygen-devel] useDynLib when using roxygen2
+In-Reply-To: <4E8301E2.7080908@gmail.com>
+References: <4E8301E2.7080908@gmail.com>
+Message-ID: <CABdHhvEa+EbwjUOk9Xv1DzKZN+4_XFntUyYjb9O7z_S_EdO0sg@mail.gmail.com>
+
+Hi Rainer,
+
+It's @useDynLib ;)
+
+Hadley
+
+On Wed, Sep 28, 2011 at 6:15 AM, Rainer M Krug <r.m.krug at gmail.com> wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+>
+> Hi
+>
+> I have a package which needs a useDynLib() in the NAMESPACE file.
+> I am using roxygenize as follow:
+>
+> Rscript -e "library(roxygen2);roxygenize('pkg', roxygen.dir='pkg',
+> copy.package=FALSE, unlink.target=FALSE)"
+>
+> and the NAMESPACES is correctly created (including the export() as
+> requested by the @export tag), but how can I add the useDynLib? I
+> remember reading somewhere that I can use a tag - but which one?
+>
+> Thanks,
+>
+> Rainer
+>
+>
+> - --
+> Rainer M. Krug, PhD (Conservation Ecology, SUN), MSc (Conservation
+> Biology, UCT), Dipl. Phys. (Germany)
+>
+> Centre of Excellence for Invasion Biology
+> Stellenbosch University
+> South Africa
+>
+> Tel : ? ? ? +33 - (0)9 53 10 27 44
+> Cell: ? ? ? +33 - (0)6 85 62 59 98
+> Fax : ? ? ? +33 - (0)9 58 10 27 44
+>
+> Fax (D): ? ?+49 - (0)3 21 21 25 22 44
+>
+> email: ? ? ?Rainer at krugs.de
+>
+> Skype: ? ? ?RMkrug
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.11 (GNU/Linux)
+> Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+>
+> iEYEARECAAYFAk6DAeEACgkQoYgNqgF2egqPzQCfafmnr896skhJSMUMRaqmvtiC
+> ZOAAniSyWoh/4Ili/5lKhW8CxMdy/DtZ
+> =4XJc
+> -----END PGP SIGNATURE-----
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From r.m.krug at gmail.com  Wed Sep 28 14:05:53 2011
+From: r.m.krug at gmail.com (Rainer M Krug)
+Date: Wed, 28 Sep 2011 14:05:53 +0200
+Subject: [Roxygen-devel] useDynLib when using roxygen2
+In-Reply-To: <CABdHhvEa+EbwjUOk9Xv1DzKZN+4_XFntUyYjb9O7z_S_EdO0sg@mail.gmail.com>
+References: <4E8301E2.7080908@gmail.com>
+	<CABdHhvEa+EbwjUOk9Xv1DzKZN+4_XFntUyYjb9O7z_S_EdO0sg@mail.gmail.com>
+Message-ID: <4E830DA1.5080902@gmail.com>
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+On 28/09/11 13:50, Hadley Wickham wrote:
+> Hi Rainer,
+> 
+> It's @useDynLib ;)
+
+Thanks - works perfectly.
+
+Is there a list of all tags available?
+
+Rainer
+
+
+> 
+> Hadley
+> 
+> On Wed, Sep 28, 2011 at 6:15 AM, Rainer M Krug <r.m.krug at gmail.com>
+> wrote: Hi
+> 
+> I have a package which needs a useDynLib() in the NAMESPACE file. I
+> am using roxygenize as follow:
+> 
+> Rscript -e "library(roxygen2);roxygenize('pkg', roxygen.dir='pkg', 
+> copy.package=FALSE, unlink.target=FALSE)"
+> 
+> and the NAMESPACES is correctly created (including the export() as 
+> requested by the @export tag), but how can I add the useDynLib? I 
+> remember reading somewhere that I can use a tag - but which one?
+> 
+> Thanks,
+> 
+> Rainer
+> 
+> 
+>> _______________________________________________ Roxygen-devel
+>> mailing list Roxygen-devel at lists.r-forge.r-project.org 
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>>
+>
+>> 
+> 
+> 
+
+- -- 
+Rainer M. Krug, PhD (Conservation Ecology, SUN), MSc (Conservation
+Biology, UCT), Dipl. Phys. (Germany)
+
+Centre of Excellence for Invasion Biology
+Stellenbosch University
+South Africa
+
+Tel :       +33 - (0)9 53 10 27 44
+Cell:       +33 - (0)6 85 62 59 98
+Fax :       +33 - (0)9 58 10 27 44
+
+Fax (D):    +49 - (0)3 21 21 25 22 44
+
+email:      Rainer at krugs.de
+
+Skype:      RMkrug
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iEYEARECAAYFAk6DDaEACgkQoYgNqgF2egp8QACeKJfENWbDrO7iXpVzbjD97Bry
+88cAmgOsF++K+rm1eCkrs1atkMjsSvdZ
+=3Giv
+-----END PGP SIGNATURE-----
+
+From hadley at rice.edu  Wed Sep 28 14:27:35 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 28 Sep 2011 07:27:35 -0500
+Subject: [Roxygen-devel] useDynLib when using roxygen2
+In-Reply-To: <4E830DA1.5080902@gmail.com>
+References: <4E8301E2.7080908@gmail.com>
+	<CABdHhvEa+EbwjUOk9Xv1DzKZN+4_XFntUyYjb9O7z_S_EdO0sg@mail.gmail.com>
+	<4E830DA1.5080902@gmail.com>
+Message-ID: <CABdHhvFN3cJUFHoHuC6AFa5UDZDL65NEsuuiMqscgkzSxpcUhQ@mail.gmail.com>
+
+> Thanks - works perfectly.
+>
+> Is there a list of all tags available?
+
+They should be listed in the documentation for the applicable roclet,
+but useDynLib seems to be missing.  Would you mind filing a bug report
+at https://github.com/klutometis/roxygen/issues ?
+
+Thanks,
+
+Hadley
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From r.m.krug at gmail.com  Wed Sep 28 14:53:34 2011
+From: r.m.krug at gmail.com (Rainer M Krug)
+Date: Wed, 28 Sep 2011 14:53:34 +0200
+Subject: [Roxygen-devel] useDynLib when using roxygen2
+In-Reply-To: <CABdHhvFN3cJUFHoHuC6AFa5UDZDL65NEsuuiMqscgkzSxpcUhQ@mail.gmail.com>
+References: <4E8301E2.7080908@gmail.com>
+	<CABdHhvEa+EbwjUOk9Xv1DzKZN+4_XFntUyYjb9O7z_S_EdO0sg@mail.gmail.com>
+	<4E830DA1.5080902@gmail.com>
+	<CABdHhvFN3cJUFHoHuC6AFa5UDZDL65NEsuuiMqscgkzSxpcUhQ@mail.gmail.com>
+Message-ID: <CAGhLh6G5G9Ucf3wWabFzHz7NNz9_V1uJPwi4yuyZ9edFKCVBVg@mail.gmail.com>
+
+On Wed, Sep 28, 2011 at 2:27 PM, Hadley Wickham <hadley at rice.edu> wrote:
+
+> > Thanks - works perfectly.
+> >
+> > Is there a list of all tags available?
+>
+> They should be listed in the documentation for the applicable roclet,
+> but useDynLib seems to be missing.  Would you mind filing a bug report
+> at https://github.com/klutometis/roxygen/issues ?
+>
+
+Done -  #45
+
+While we are at it - are there any plans to include the
+tag  callGraphPrimitives in roxygen2 again?
+
+Thanks,
+
+Rainer
+
+
+> Thanks,
+>
+> Hadley
+>
+>
+> --
+> Assistant Professor / Dobelman Family Junior Chair
+> Department of Statistics / Rice University
+> http://had.co.nz/
+>
+
+
+
+-- 
+Rainer M. Krug, PhD (Conservation Ecology, SUN), MSc (Conservation Biology,
+UCT), Dipl. Phys. (Germany)
+
+Centre of Excellence for Invasion Biology
+Stellenbosch University
+South Africa
+
+Tel :       +33 - (0)9 53 10 27 44
+Cell:       +33 - (0)6 85 62 59 98
+Fax (F):       +33 - (0)9 58 10 27 44
+
+Fax (D):    +49 - (0)3 21 21 25 22 44
+
+email:      Rainer at krugs.de
+
+Skype:      RMkrug
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20110928/6f80aaff/attachment.htm>
+

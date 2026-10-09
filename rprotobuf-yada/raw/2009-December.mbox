@@ -1,0 +1,2851 @@
+From romain.francois at dbmail.com  Tue Dec  1 18:51:14 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Tue, 01 Dec 2009 18:51:14 +0100
+Subject: [Rprotobuf-yada] playing with sockets.
+In-Reply-To: <4B1388B7.7080907@free.fr>
+References: <4B1388B7.7080907@free.fr>
+Message-ID: <4B155792.7020308@dbmail.com>
+
+This is getting clearer how to approach this. With the new dynamic help 
+system, R has all the power of a web server.
+
+The code of R web server is in the Rhttpd.c file in the R distribution, 
+it handles GET, HEAD and POST methods by calling the hidden 
+tools:::httpd function.
+
+With the patch I have proposed on R-devel, plus some hackery of httpd, 
+we can get protobuf server over http for free.
+
+We could do something like this :
+
+- send a POST request to the url : 
+http://127.0.0.1:12345/RProtoBuf/full.service.name/Method
+- the body of the request would be the serialized input of the given 
+method, and the length of the message would be contained in the headers 
+of the POST request (as Content-Length)
+- hack around httpd so that it recognize "RProtoBuf" and send the response
+
+
+On 11/30/2009 09:56 AM, Romain Fran?ois wrote:
+> Hello,
+>
+> I've added some code in trunk to start playing with sockets. It is
+> absolutely not functional currently, and was more an excuse to learn
+> about sockets programming in C.
+>
+> I have based it on the protocol used by this rpc implementation:
+> http://code.google.com/p/protobuf-rpc/ but I am not sure this is the
+> best one to use.
+>
+> The client side, as in "R invokes a remote rpc method" is not so hard I
+> think: open a socket, write the input message and read the result
+> message back.
+>
+> The server side is going to be more tricky because I need to understand
+> threads on top of sockets.
+>
+> Romain
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/FtUu : new package : highlight
+|- http://tr.im/EAD5 : LondonR slides
+`- http://tr.im/BcPw : celebrating R commit #50000
+
+
+From francoisromain at free.fr  Wed Dec  2 17:30:32 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Wed, 02 Dec 2009 17:30:32 +0100
+Subject: [Rprotobuf-yada] throw not exported anymore
+Message-ID: <4B169628.7090901@free.fr>
+
+because I found out about R_FindNamespace so I can do this :
+
+SEXP call = PROTECT( Rf_lang3( Rf_install("throw"), m, s) ) ;
+UNPROTECT( 2) ; /* m, s */
+Rf_eval( call, R_FindNamespace(Rf_mkString("RProtoBuf")) ) ;
+	
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/Gq7i : ohloh
+|- http://tr.im/FtUu : new package : highlight
+`- http://tr.im/EAD5 : LondonR slides
+
+
+From francoisromain at free.fr  Wed Dec  2 19:19:07 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Wed, 02 Dec 2009 19:19:07 +0100
+Subject: [Rprotobuf-yada] asMessage
+Message-ID: <4B16AF9B.1040904@free.fr>
+
+Hi,
+
+For convenience, I have added the asMessage function as a shorthand for 
+as( ., "protobufMessage" )
+
+There are a few methods implemented, for example to coerce a message 
+descriptor to a message (of type google.protobuf.DescriptorProto) :
+
+ > asMessage( tutorial.Person )
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/Gq7i : ohloh
+|- http://tr.im/FtUu : new package : highlight
+`- http://tr.im/EAD5 : LondonR slides
+
+
+From edd at debian.org  Sat Dec  5 05:17:24 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Fri, 4 Dec 2009 22:17:24 -0600
+Subject: [Rprotobuf-yada] Vignette
+Message-ID: <19225.57044.336574.728727@ron.nulle.part>
+
+
+I added a bit more, describing the two 'static and as C++' methods briefly
+which makes for a nice intro to the 'more dynamic' approach that the package
+is really about. Still more to do, as always...
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Dec  5 08:24:03 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 05 Dec 2009 08:24:03 +0100
+Subject: [Rprotobuf-yada] Vignette
+In-Reply-To: <19225.57044.336574.728727@ron.nulle.part>
+References: <19225.57044.336574.728727@ron.nulle.part>
+Message-ID: <4B1A0A93.4080306@dbmail.com>
+
+On 12/05/2009 05:17 AM, Dirk Eddelbuettel wrote:
+>
+>
+> I added a bit more, describing the two 'static and as C++' methods briefly
+> which makes for a nice intro to the 'more dynamic' approach that the package
+> is really about. Still more to do, as always...
+>
+> Dirk
+
+Thanks.
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/Gq7i : ohloh
+|- http://tr.im/FtUu : new package : highlight
+`- http://tr.im/EAD5 : LondonR slides
+
+
+From francoisromain at free.fr  Sat Dec  5 08:31:09 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Sat, 05 Dec 2009 08:31:09 +0100
+Subject: [Rprotobuf-yada] c++ class names
+Message-ID: <4B1A0C3D.8030700@free.fr>
+
+Hello,
+
+I am getting annoyed by the "protobuf" prefix we have for the S4 classes 
+that shadow some C++ classes:
+
+protobufDescriptor
+protobufFieldDescriptor
+protobufEnumDescriptor
+protobufServiceDescriptor
+protobufMethodDescriptor
+protobufFileDescriptor
+protobufMessage
+
+and was thinking maybe we can remove the prefix before we release the 
+first version.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/Gq7i : ohloh
+|- http://tr.im/FtUu : new package : highlight
+`- http://tr.im/EAD5 : LondonR slides
+
+
+From edd at debian.org  Sat Dec  5 16:43:32 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 5 Dec 2009 09:43:32 -0600
+Subject: [Rprotobuf-yada] c++ class names
+In-Reply-To: <4B1A0C3D.8030700@free.fr>
+References: <4B1A0C3D.8030700@free.fr>
+Message-ID: <19226.32676.286797.550633@ron.nulle.part>
+
+
+On 5 December 2009 at 08:31, Romain Fran?ois wrote:
+| Hello,
+| 
+| I am getting annoyed by the "protobuf" prefix we have for the S4 classes 
+| that shadow some C++ classes:
+| 
+| protobufDescriptor
+| protobufFieldDescriptor
+| protobufEnumDescriptor
+| protobufServiceDescriptor
+| protobufMethodDescriptor
+| protobufFileDescriptor
+| protobufMessage
+| 
+| and was thinking maybe we can remove the prefix before we release the 
+| first version.
+
+I'd rather go the other way -- something I meant to bring up was that 
+
+    using namespace google::protobuf::compiler ;
+    using namespace google::protobuf ;
+
+is considered uncool as it is 'too global' and against the spirit of
+namespaces.  OTOH it is really, really long -- but one can do tricks such as
+namespace aliases:
+
+    namespace gpc = google::protobuf::compiler;
+    namespace gp  = google::protobuf;
+
+which, instead of requiring (without the using namespace ...)
+
+    google::protobuf::compiler::Foo f;
+
+allows a much simpler
+
+    gpc::Foo f;
+
+Of course, we could also use GPC or GooPrCo or ...  
+
+What do you think?  
+
+
+As for your question above, I hear you. But I am too much of a noob with S4
+to be really comfortable.  To me, this is safe and explicit. Dunno.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Sat Dec  5 19:04:36 2009
+From: francoisromain at free.fr (francoisromain at free.fr)
+Date: Sat, 5 Dec 2009 18:04:36 +0000
+Subject: [Rprotobuf-yada] c++ class names
+Message-ID: <1631381025-1260036271-cardhu_decombobulator_blackberry.rim.net-1960802573-@bda110.bisx.produk.on.blackberry>
+
+
+Hi, 
+
+I agree with you on the c++ code. What about keeping just one : google::prototuf. The code is really all about these classes. And append the compiler prrfix when necessary, like I do with the io namespace ? Or would you rather go "using" free ? 
+
+For the S4 classes, it does not really matter. The thing is our s4 class is really just there to shadow a c++ class, and it would be nicer if both had the same name. 
+
+I am cooking up a quick java http server so that I can do an R client for rpc over http, and then in a few weeks when simon commits the generic web server code (I really look forward to this) we can make the r rpc server over http. With this and abit of unit test, we'll have quite a decent package.
+
+Romain
+
+------Message d'origine------
+De: Dirk Eddelbuettel
+?: Romain Fran?ois
+Cc: rprotobuf-yada at lists.r-forge.r-project.org
+Envoy?: 5 d?c 2009 16:43
+Objet: Re: [Rprotobuf-yada] c++ class names
+
+
+On 5 December 2009 at 08:31, Romain Fran?ois wrote:
+| Hello,
+| 
+| I am getting annoyed by the "protobuf" prefix we have for the S4 classes 
+| that shadow some C++ classes:
+| 
+| protobufDescriptor
+| protobufFieldDescriptor
+| protobufEnumDescriptor
+| protobufServiceDescriptor
+| protobufMethodDescriptor
+| protobufFileDescriptor
+| protobufMessage
+| 
+| and was thinking maybe we can remove the prefix before we release the 
+| first version.
+
+I'd rather go the other way -- something I meant to bring up was that 
+
+    using namespace google::protobuf::compiler ;
+    using namespace google::protobuf ;
+
+is considered uncool as it is 'too global' and against the spirit of
+namespaces.  OTOH it is really, really long -- but one can do tricks such as
+namespace aliases:
+
+    namespace gpc = google::protobuf::compiler;
+    namespace gp  = google::protobuf;
+
+which, instead of requiring (without the using namespace ...)
+
+    google::protobuf::compiler::Foo f;
+
+allows a much simpler
+
+    gpc::Foo f;
+
+Of course, we could also use GPC or GooPrCo or ...  
+
+What do you think?  
+
+
+As for your question above, I hear you. But I am too much of a noob with S4
+to be really comfortable.  To me, this is safe and explicit. Dunno.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+
+From edd at debian.org  Tue Dec  8 17:59:44 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Tue, 8 Dec 2009 10:59:44 -0600
+Subject: [Rprotobuf-yada] c++ class names
+In-Reply-To: <4B1DFA9F.7070606@free.fr>
+References: <1631381025-1260036271-cardhu_decombobulator_blackberry.rim.net-1960802573-@bda110.bisx.produk.on.blackberry>
+	<19226.43069.500290.23479@ron.nulle.part>
+	<4B1AD153.6010508@free.fr>
+	<19226.54308.286347.595079@ron.nulle.part>
+	<4B1BA2B6.1070305@free.fr>
+	<19227.52920.455276.99191@ron.nulle.part>
+	<4B1BEB6B.9040709@free.fr>
+	<19227.61353.59296.567865@ron.nulle.part>
+	<4B1BFA83.6090503@free.fr>
+	<19227.64991.709457.636251@ron.nulle.part>
+	<4B1C00B3.9070602@free.fr>
+	<19228.3422.170191.906090@ron.nulle.part>
+	<4B1C8EBB.8080702@free.fr>
+	<19228.63287.987311.296386@ron.nulle.part>
+	<4B1DFA9F.7070606@free.fr>
+Message-ID: <19230.34304.198063.243953@ron.nulle.part>
+
+
+On 8 December 2009 at 08:05, Romain Fran?ois wrote:
+| That sounds interesting. I think I used this technique before at mango.
+
+I just checked, I also have a working example in rquantlib. I can apply that,
+esp we switch to RUnit :) 
+
+| BTW. we should ge back at using the mailing list.
+
+Yup. Doing so now.
+
+Dirk
+ 
+| On 12/07/2009 01:38 PM, Dirk Eddelbuettel wrote:
+| >
+| > On 7 December 2009 at 06:12, Romain Fran?ois wrote:
+| > | On 12/06/2009 09:00 PM, Dirk Eddelbuettel wrote:
+| > |>  On 6 December 2009 at 20:06, Romain Fran?ois wrote:
+| > |>  |>   No hurries.  Could we place the tests into the tests/ directory but call them
+| > |>  |>   from the vignette via source("../../tests/foo.R")  ?
+| > |>  |
+| > |>  | I'd use system.file("tests", "somefile.R", package = "RProtoBuf" ) from
+| > |>  | the vignette.
+| > |>
+| > |>  That only uses the _installed version_ which is inferior, in my book, to
+| > |>  using the tests/ directory.
+| > |
+| > | when you "R CMD build", which is how I make the vignettes, system.file
+| > | uses the one you are building.
+| > |
+| > | The problem with ../../tests is that it does not work with the installed
+| > | version, because "inst" disappears.
+| >
+| > There is the RUnit solution introduced by Gregor G / Martin M. I'll try to
+| > look it up again and present it -- we should be able to do the same for
+| > svUnit if these are really that close.
+| >
+| > The trick, as I recall, was to keep real tests in
+| >
+| >      inst/tests/
+| >
+| > and have
+| >
+| >      tests/
+| >
+| > contain a script that loops over inst/tests/ when using sources where as the
+| > installed tests/ (formerly inst/tests/) is used otherwise.
+| >
+| > See any of the Rmetrics packages:
+| >
+| > edd at ron:~/src/debian/CRAN$ cat timeSeries-2100.84/tests/doRUnit.R
+| > #### doRUnit.R --- Run RUnit tests
+| > ####------------------------------------------------------------------------
+| >
+| > ### Origianlly follows Gregor Gojanc's example in CRAN package  'gdata'
+| > ### and the corresponding section in the R Wiki:
+| > ###  http://wiki.r-project.org/rwiki/doku.php?id=developers:runit
+| >
+| > ### MM: Vastly changed:  This should also be "runnable" for *installed*
+| > ##              package which has no ./tests/
+| > ## ---->  put the bulk of the code e.g. in  ../inst/unitTests/runTests.R :
+| >
+| > if(require("RUnit", quietly = TRUE)) {
+| >
+| >    ## --- Setup ---
+| >
+| >    wd<- getwd()
+| >    pkg<- sub("\\.Rcheck$", '', basename(dirname(wd)))
+| >
+| >    library(package = pkg, character.only=TRUE)
+| >
+| >    path<- system.file("unitTests", package = pkg)
+| >
+| >    stopifnot(file.exists(path), file.info(path.expand(path))$isdir)
+| >
+| >    source(file.path(path, "runTests.R"), echo = TRUE)
+| > }
+| >
+| >
+| > ################################################################################
+| >
+| > edd at ron:~/src/debian/CRAN$
+| >
+| >
+| > and then also
+| >
+| >
+| > edd at ron:~/src/debian/CRAN$ ls -1 timeSeries-2100.84/inst/unitTests/
+| > Makefile
+| > runit.aggregate.R
+| > runit.align.R
+| > runit.apply.R
+| > runit.as.R
+| > runit.attach.R
+| > runit.bind.R
+| > runit.colCum.R
+| > runit.colStats.R
+| > runit.cor.R
+| > runit.cumulated.R
+| > runit.daily.R
+| > runit.dim.R
+| > runit.drawdowns.R
+| > runit.durations.R
+| > runit.lag.R
+| > runit.mathOps.R
+| > runit.merge.R
+| > runit.methods-plot.R
+| > runit.methods-print.R
+| > runit.methods-summary.R
+| > runit.model.frame.R
+| > runit.monthly.R
+| > runit.na.contiguous.R
+| > runit.NA.R
+| > runit.Omit.R
+| > runit.order.R
+| > runit.periodical.R
+| > runit.rank.R
+| > runit.returns.R
+| > runit.rowCum.R
+| > runit.signalCounts.R
+| > runit.spreads.R
+| > runit.subset.R
+| > runit.time.R
+| > runit.TimeSeriesClass.R
+| > runit.TimeSeriesCoercion.R
+| > runit.TimeSeriesData.R
+| > runit.TimeSeriesPositions.R
+| > runit.timeSeries.R
+| > runTests.R
+| > edd at ron:~/src/debian/CRAN$
+| >
+| > Dirk
+| >
+| > |>  | I don't really remember. I'll have to look into the code next week. In
+| > |>  | the thread we had in the rcpp mailing list, i wanted vector<string>   ->
+| > |>  | SEXP but I don't remember why right now.
+| > |>
+| > |>  Ack.
+| > |>
+| > |>  Dirk
+| > |>
+| > |
+| > |
+| > | --
+| > | Romain Francois
+| > | Professional R Enthusiast
+| > | +33(0) 6 28 91 30 30
+| > | http://romainfrancois.blog.free.fr
+| > | |- http://tr.im/Gq7i : ohloh
+| > | |- http://tr.im/FtUu : new package : highlight
+| > | `- http://tr.im/EAD5 : LondonR slides
+| > |
+| >
+| 
+| 
+| -- 
+| Romain Francois
+| Professional R Enthusiast
+| +33(0) 6 28 91 30 30
+| http://romainfrancois.blog.free.fr
+| |- http://tr.im/Gq7i : ohloh
+| |- http://tr.im/FtUu : new package : highlight
+| `- http://tr.im/EAD5 : LondonR slides
+| 
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Tue Dec  8 18:28:30 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Tue, 8 Dec 2009 11:28:30 -0600
+Subject: [Rprotobuf-yada] c++ class names
+In-Reply-To: <19230.34304.198063.243953@ron.nulle.part>
+References: <1631381025-1260036271-cardhu_decombobulator_blackberry.rim.net-1960802573-@bda110.bisx.produk.on.blackberry>
+	<19226.43069.500290.23479@ron.nulle.part>
+	<4B1AD153.6010508@free.fr>
+	<19226.54308.286347.595079@ron.nulle.part>
+	<4B1BA2B6.1070305@free.fr>
+	<19227.52920.455276.99191@ron.nulle.part>
+	<4B1BEB6B.9040709@free.fr>
+	<19227.61353.59296.567865@ron.nulle.part>
+	<4B1BFA83.6090503@free.fr>
+	<19227.64991.709457.636251@ron.nulle.part>
+	<4B1C00B3.9070602@free.fr>
+	<19228.3422.170191.906090@ron.nulle.part>
+	<4B1C8EBB.8080702@free.fr>
+	<19228.63287.987311.296386@ron.nulle.part>
+	<4B1DFA9F.7070606@free.fr>
+	<19230.34304.198063.243953@ron.nulle.part>
+Message-ID: <19230.36030.533025.195455@ron.nulle.part>
+
+
+On 8 December 2009 at 10:59, Dirk Eddelbuettel wrote:
+| On 8 December 2009 at 08:05, Romain Fran?ois wrote:
+| | That sounds interesting. I think I used this technique before at mango.
+| 
+| I just checked, I also have a working example in rquantlib. I can apply that,
+| esp we switch to RUnit :) 
+
+Hm, upon closer inspection is also does system.file(package=...) so it relies
+on the installed package.  I had thought there was way around it.
+
+Glancing at http://wiki.r-project.org/rwiki/doku.php?id=developers:runit
+shows some discussion of it and use of another environment var (eeek!) to
+make that work. 
+
+Will file this for now. Needs more thought.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Wed Dec  9 11:57:01 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Wed, 09 Dec 2009 11:57:01 +0100
+Subject: [Rprotobuf-yada] rpc over http
+Message-ID: <4B1F827D.3030401@free.fr>
+
+Hello,
+
+I'm moving on with protobuf over http.
+
+===== java server =====
+
+I have commited a __very__ basic java server (I think it needs java 6) 
+to the java directory of the project which receives protobuf http 
+requests, invokes the method, and return the result as an http response. 
+(At the moment, only the tutorial.EchoService.Echo rpc method is 
+implemented, which basically receives a tutorial.Person message and send 
+it back as is).
+
+To compile the server, just go to the java directpry and type "ant", you 
+should see something like this:
+
+[romain at santorini java]$ ant
+Buildfile: build.xml
+
+clean:
+    [delete] Deleting directory /home/romain/svn/rprotobuf/java/build
+    [delete] Deleting directory /home/romain/svn/rprotobuf/java/javadoc
+    [delete] Deleting directory /home/romain/svn/rprotobuf/java/jar
+
+init:
+     [mkdir] Created dir: /home/romain/svn/rprotobuf/java/build
+     [mkdir] Created dir: /home/romain/svn/rprotobuf/java/javadoc
+     [mkdir] Created dir: /home/romain/svn/rprotobuf/java/jar
+
+build:
+     [javac] Compiling 4 source files to 
+/home/romain/svn/rprotobuf/java/build
+       [jar] Building jar: 
+/home/romain/svn/rprotobuf/java/jar/RProtoBuf-java-http.jar
+
+all:
+
+BUILD SUCCESSFUL
+Total time: 1 second
+
+To run the server :
+
+$ java -cp jar/RProtoBuf-java-http.jar 
+org.rproject.rprotobuf.ProtobufHttpServer
+
+
+===== R client =====
+
+now it gets interesting with the R client. I have also commited some 
+code to invoke a rpc method over http.
+
+To call a rpc method over http, you need 3 things:
+- a method descriptor.
+- an input message which must be of the message type that the method expects
+- a "RpcHTTP" object which represents the protocol used (contains host 
+name and port number)
+
+It goes like this :
+
+require( RProtoBuf )
+p <- new( tutorial.Person, name = "foo", id = 2, email = "bla at bla.com" )
+http <- new( "RpcHTTP", host = "127.0.0.1", port = 4444L)
+result <- invoke( tutorial.EchoService.Echo, p, http )
+writeLines( result$toString() )
+
+On the client side (the R console), you should see this (the debugging 
+information will eventually go) :
+
+ > source("send.R" )
+sending http request
+headers : sent 83 bytes
+input message : sent 20 bytes
+reading 59 bytes
+complete line: {HTTP/1.1 200 OK}
+complete line: {Content-length: 20}
+header 'content-length' => '20'
+end of request - moving to body
+name: "foo"
+id: 2
+email: "bla at bla.com"
+
+and this on the server side :
+
+ProtobufHandler >> handle
+http method : POST
+Content-length=[20]
+Connection=[close]
+rpc method : {tutorial.EchoService.Echo}
+  read 20 bytes
+finished reading body
+sending result : 20 bytes
+
+
+
+===== the protocol =====
+
+This is just (ab)using the http protocol.
+
+The client sends a request that looks like this :
+
+-----------------------------------------------------
+POST /{service full name}/{method name} HTTP/1.0
+Connection: close
+Content-Length: {length of the serialized message}
+
+{raw bytes of the serialized message}
+-----------------------------------------------------
+
+The server replies with something that looks like this :
+
+-----------------------------------------------------
+HTTP/1.1 200 OK
+Content-length: {length of the serialized response}
+
+{raw bytes of the serialized response}
+-----------------------------------------------------
+
+or like this if the method is unknown :
+
+-----------------------------------------------------
+HTTP/1.1 501
+-----------------------------------------------------
+
+
+
+
+===== what's next =====
+
+I need to make the java server a bit nicer and maybe release it 
+separately. I chose http as a first attempt because it will be "easy" to 
+implement with other languages, and because that is what kenton 
+recommended.
+
+When R is ready to serve, I'll make a server so that two instances of R 
+can exchange protobuf messages
+
+I really need to think about another protocol. http "works" but I think 
+it is too verbose. In the example, it needs to send 103 bytes (83+20) to 
+send a message that takes only 20 bytes. The response also takes too 
+much space. No big deal but we can do better than that.
+
+I need some nicer examples of methods. Echo is a bit too dummy.
+
+The code for the R client is all in rpc_over_http.cpp. This is very 
+inspired from the Rhttp.c from the R sources, it probably should get c++'ed.
+
+I need to document it.
+
+
+Romain
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/Gq7i : ohloh
+|- http://tr.im/FtUu : new package : highlight
+`- http://tr.im/EAD5 : LondonR slides
+
+
+From edd at debian.org  Wed Dec  9 13:47:33 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 9 Dec 2009 06:47:33 -0600
+Subject: [Rprotobuf-yada] rpc over http
+In-Reply-To: <4B1F827D.3030401@free.fr>
+References: <4B1F827D.3030401@free.fr>
+Message-ID: <19231.40037.683848.226281@ron.nulle.part>
+
+
+Impressive stuff. 
+
+I think RPC is hard, that is an entire new project in and by itself. So I am
+fine with waiting on R having a basic server and/or deferring to other RPC
+implementation.  
+
+But having it is very cool. Well done.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Wed Dec  9 13:51:30 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Wed, 09 Dec 2009 13:51:30 +0100
+Subject: [Rprotobuf-yada] rpc over http
+In-Reply-To: <19231.40037.683848.226281@ron.nulle.part>
+References: <4B1F827D.3030401@free.fr>
+	<19231.40037.683848.226281@ron.nulle.part>
+Message-ID: <4B1F9D52.30709@free.fr>
+
+On 12/09/2009 01:47 PM, Dirk Eddelbuettel wrote:
+>
+> Impressive stuff.
+>
+> I think RPC is hard, that is an entire new project in and by itself. So I am
+> fine with waiting on R having a basic server and/or deferring to other RPC
+> implementation.
+
+Oh yes. Simon said it was a matter of weeks. I don't want to mess with 
+it until I see what he does.
+
+This would involve messing around with sockets, threads, the R event 
+loop. Too much for my shoulders.
+
+Do you have some ideas of methods that we could use to demonstrate how 
+this works. Echo is very boring.
+
+> But having it is very cool. Well done.
+>
+> Dirk
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/Gq7i : ohloh
+|- http://tr.im/FtUu : new package : highlight
+`- http://tr.im/EAD5 : LondonR slides
+
+
+From francoisromain at free.fr  Wed Dec  9 16:42:33 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Wed, 09 Dec 2009 16:42:33 +0100
+Subject: [Rprotobuf-yada] rpc over http
+In-Reply-To: <4B1F827D.3030401@free.fr>
+References: <4B1F827D.3030401@free.fr>
+Message-ID: <4B1FC569.4000101@free.fr>
+
+I've now reworked the java code a bit so that it can support any 
+service/method. To support a service, one must subclass the 
+ProtobufMethodInvoker abstract class and define these two methods:
+
+	public abstract Message invoke( Message input ) ;
+	
+	public abstract Builder getInputMessageBuilder() ;
+
+and register it by calling the register method of the ProtobufMethodPool 
+class.
+
+I'll have a look at other rpc implementations to see the kind of 
+examples they use.
+
+Romain
+
+
+On 12/09/2009 11:57 AM, Romain Fran?ois wrote:
+>
+> Hello,
+>
+> I'm moving on with protobuf over http.
+>
+> ===== java server =====
+>
+> I have commited a __very__ basic java server (I think it needs java 6)
+> to the java directory of the project which receives protobuf http
+> requests, invokes the method, and return the result as an http response.
+> (At the moment, only the tutorial.EchoService.Echo rpc method is
+> implemented, which basically receives a tutorial.Person message and send
+> it back as is).
+>
+> To compile the server, just go to the java directpry and type "ant", you
+> should see something like this:
+>
+> [romain at santorini java]$ ant
+> Buildfile: build.xml
+>
+> clean:
+>      [delete] Deleting directory /home/romain/svn/rprotobuf/java/build
+>      [delete] Deleting directory /home/romain/svn/rprotobuf/java/javadoc
+>      [delete] Deleting directory /home/romain/svn/rprotobuf/java/jar
+>
+> init:
+>       [mkdir] Created dir: /home/romain/svn/rprotobuf/java/build
+>       [mkdir] Created dir: /home/romain/svn/rprotobuf/java/javadoc
+>       [mkdir] Created dir: /home/romain/svn/rprotobuf/java/jar
+>
+> build:
+>       [javac] Compiling 4 source files to
+> /home/romain/svn/rprotobuf/java/build
+>         [jar] Building jar:
+> /home/romain/svn/rprotobuf/java/jar/RProtoBuf-java-http.jar
+>
+> all:
+>
+> BUILD SUCCESSFUL
+> Total time: 1 second
+>
+> To run the server :
+>
+> $ java -cp jar/RProtoBuf-java-http.jar
+> org.rproject.rprotobuf.ProtobufHttpServer
+>
+>
+> ===== R client =====
+>
+> now it gets interesting with the R client. I have also commited some
+> code to invoke a rpc method over http.
+>
+> To call a rpc method over http, you need 3 things:
+> - a method descriptor.
+> - an input message which must be of the message type that the method expects
+> - a "RpcHTTP" object which represents the protocol used (contains host
+> name and port number)
+>
+> It goes like this :
+>
+> require( RProtoBuf )
+> p<- new( tutorial.Person, name = "foo", id = 2, email = "bla at bla.com" )
+> http<- new( "RpcHTTP", host = "127.0.0.1", port = 4444L)
+> result<- invoke( tutorial.EchoService.Echo, p, http )
+> writeLines( result$toString() )
+>
+> On the client side (the R console), you should see this (the debugging
+> information will eventually go) :
+>
+>   >  source("send.R" )
+> sending http request
+> headers : sent 83 bytes
+> input message : sent 20 bytes
+> reading 59 bytes
+> complete line: {HTTP/1.1 200 OK}
+> complete line: {Content-length: 20}
+> header 'content-length' =>  '20'
+> end of request - moving to body
+> name: "foo"
+> id: 2
+> email: "bla at bla.com"
+>
+> and this on the server side :
+>
+> ProtobufHandler>>  handle
+> http method : POST
+> Content-length=[20]
+> Connection=[close]
+> rpc method : {tutorial.EchoService.Echo}
+>    read 20 bytes
+> finished reading body
+> sending result : 20 bytes
+>
+>
+>
+> ===== the protocol =====
+>
+> This is just (ab)using the http protocol.
+>
+> The client sends a request that looks like this :
+>
+> -----------------------------------------------------
+> POST /{service full name}/{method name} HTTP/1.0
+> Connection: close
+> Content-Length: {length of the serialized message}
+>
+> {raw bytes of the serialized message}
+> -----------------------------------------------------
+>
+> The server replies with something that looks like this :
+>
+> -----------------------------------------------------
+> HTTP/1.1 200 OK
+> Content-length: {length of the serialized response}
+>
+> {raw bytes of the serialized response}
+> -----------------------------------------------------
+>
+> or like this if the method is unknown :
+>
+> -----------------------------------------------------
+> HTTP/1.1 501
+> -----------------------------------------------------
+>
+>
+>
+>
+> ===== what's next =====
+>
+> I need to make the java server a bit nicer and maybe release it
+> separately. I chose http as a first attempt because it will be "easy" to
+> implement with other languages, and because that is what kenton
+> recommended.
+>
+> When R is ready to serve, I'll make a server so that two instances of R
+> can exchange protobuf messages
+>
+> I really need to think about another protocol. http "works" but I think
+> it is too verbose. In the example, it needs to send 103 bytes (83+20) to
+> send a message that takes only 20 bytes. The response also takes too
+> much space. No big deal but we can do better than that.
+>
+> I need some nicer examples of methods. Echo is a bit too dummy.
+>
+> The code for the R client is all in rpc_over_http.cpp. This is very
+> inspired from the Rhttp.c from the R sources, it probably should get c++'ed.
+>
+> I need to document it.
+>
+>
+> Romain
+>
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/Gq7i : ohloh
+|- http://tr.im/FtUu : new package : highlight
+`- http://tr.im/EAD5 : LondonR slides
+
+
+From edd at debian.org  Wed Dec  9 17:00:49 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 9 Dec 2009 10:00:49 -0600
+Subject: [Rprotobuf-yada] rpc over http
+In-Reply-To: <4B1F9D52.30709@free.fr>
+References: <4B1F827D.3030401@free.fr>
+	<19231.40037.683848.226281@ron.nulle.part> <4B1F9D52.30709@free.fr>
+Message-ID: <19231.51633.398413.224407@ron.nulle.part>
+
+
+On 9 December 2009 at 13:51, Romain Fran?ois wrote:
+| Do you have some ideas of methods that we could use to demonstrate how 
+| this works. Echo is very boring.
+
+Darn good question. I was mulling over that commuting in but have no great
+answer. So for something for R: "Something to do with data" -- or maybe ship
+a dataset and a formula and get a result back?    But maybe my thinking is
+tainted by playing too much with HPC...
+
+I still think of RProtoBuf as a super-duper config mechanism so I am just
+happy to send self-describing structures around.  
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Wed Dec  9 17:25:14 2009
+From: francoisromain at free.fr (francoisromain at free.fr)
+Date: Wed, 9 Dec 2009 16:25:14 +0000
+Subject: [Rprotobuf-yada] rpc over http
+Message-ID: <939092063-1260375907-cardhu_decombobulator_blackberry.rim.net-2116075342-@bda110.bisx.produk.on.blackberry>
+
+
+I'm not much further. It is a shame we've built all this and we don't know how to demo it ... 
+
+I was thinking somthing like remote random generations but that's not much more exciting. 
+
+I think this can be a good citizen in the HPC world, but I would not use it to send self describing structures because I think it is all about client and server agreeing about the format. 
+
+I might get impatient and wrap up the little java server I wrote with rjava and factor it out when r can serve by itself. 
+
+One other thing I'll play with (this is much later) is a graphics device that would send drawing requests around as protobuf messages. Similar to xgd but based on protobuf. 
+
+Romain
+
+
+
+------Message d'origine------
+De: Dirk Eddelbuettel
+?: Romain Fran?ois
+Cc: rprotobuf-yada at lists.r-forge.r-project.org
+Envoy?: 9 d?c 2009 17:00
+Objet: Re: [Rprotobuf-yada] rpc over http
+
+
+On 9 December 2009 at 13:51, Romain Fran?ois wrote:
+| Do you have some ideas of methods that we could use to demonstrate how 
+| this works. Echo is very boring.
+
+Darn good question. I was mulling over that commuting in but have no great
+answer. So for something for R: "Something to do with data" -- or maybe ship
+a dataset and a formula and get a result back?    But maybe my thinking is
+tainted by playing too much with HPC...
+
+I still think of RProtoBuf as a super-duper config mechanism so I am just
+happy to send self-describing structures around.  
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+
+From francoisromain at free.fr  Thu Dec 10 17:17:21 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Thu, 10 Dec 2009 17:17:21 +0100
+Subject: [Rprotobuf-yada] it never actually worked
+Message-ID: <4B211F11.1070905@free.fr>
+
+Hi,
+
+So I was testing out the rpc over http client when I realized that the 
+package only ever worked with compiled message types, so only the ones 
+that we explicitly compile (addressbook).
+
+This is fixed now (I hope) and we can use both compiled in messages (the 
+ones from addressbook.proto, but also the ones used internally by the 
+protobuf lib).
+
+
+
+So I have pushed a hello world rpc example :
+
+package rprotobuf ;
+option java_package = "org.rproject.rprotobuf" ;
+option java_outer_classname = "HelloWorld" ;
+
+message HelloWorldRequest{}
+message HelloWorldResponse{
+	required string message = 1;
+}
+service HelloWorldService{
+	rpc HelloWorld(HelloWorldRequest) returns(HelloWorldResponse);
+}
+
+which should work now (if the server runs:)
+
+ > p <- new( rprotobuf.HelloWorldRequest )
+ > http <- new( "RpcHTTP", host = "127.0.0.1", port = 4444L)
+ > result <- invoke( rprotobuf.HelloWorldService.HelloWorld, p, http)
+sending http request
+headers : sent 95 bytes
+reading 52 bytes
+complete line: {HTTP/1.1 200 OK}
+complete line: {Content-length: 13}
+header 'content-length' => '13'
+end of request - moving to body
+ > writeLines( result$toString() )
+message: "hello world"
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/Gq7i : ohloh
+|- http://tr.im/FtUu : new package : highlight
+`- http://tr.im/EAD5 : LondonR slides
+
+
+From francoisromain at free.fr  Wed Dec 16 12:49:41 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Wed, 16 Dec 2009 12:49:41 +0100
+Subject: [Rprotobuf-yada] finalizer for messages
+Message-ID: <4B28C955.5040308@free.fr>
+
+Now that I know how to work with external pointer finalizers (much 
+easier than I anticipated; all covered in R-exts), I have added a 
+finalizer for Message. We don't need to define them for **Descriptor 
+because they don't belong to us, but we need to define them for messages 
+to avoid memory leaks.
+
+So I have added them, now the package does not pass R CMD check. I think 
+I need to be more careful when I access message fields of other 
+messages, at the moment, I wrap up the pointer, where I think I should 
+make a copy of the message.
+
+much more dbugging "fun" to come :( but should be manageaable:
+
+$ grep "Get.*Message" *.cpp
+extractors.cpp: 
+new_RS4_Message_( &ref->GetRepeatedMessage( *message, fieldDesc, i ) ) ) ;
+extractors.cpp:                         res = PROTECT( new_RS4_Message_( 
+&ref->GetMessage( *message, fieldDesc ) ) ) ;
+extractors.cpp: * Get the message descriptor of a Message
+identical.cpp: 
+const GPB::Message* mm1 = &ref->GetRepeatedMessage( *m1, field_desc, j ) ;
+identical.cpp: 
+const GPB::Message* mm2 = &ref->GetRepeatedMessage( *m2, field_desc, j ) ;
+identical.cpp:                                          const 
+GPB::Message* mm1 = &ref->GetMessage( *m1, field_desc ) ;
+identical.cpp:                                                  const 
+GPB::Message* mm2 = &ref->GetMessage( *m2, field_desc ) ;
+read.cpp:               throwException( "could not call 
+factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+read.cpp:               throwException( "could not call 
+factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+read.cpp:               throwException( "could not call 
+factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+rprotobuf.cpp:          throwException( "could not call 
+factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+set.cpp: 
+new_RS4_Message_( &ref->GetRepeatedMessage( *message, field_desc, i ) ) ) ;
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/HlX9 : new package : bibtex
+|- http://tr.im/Gq7i : ohloh
+`- http://tr.im/FtUu : new package : highlight
+
+
+From romain.francois at dbmail.com  Wed Dec 16 17:26:38 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Wed, 16 Dec 2009 17:26:38 +0100
+Subject: [Rprotobuf-yada] finalizer for messages
+In-Reply-To: <4B28C955.5040308@free.fr>
+References: <4B28C955.5040308@free.fr>
+Message-ID: <4B290A3E.8040805@dbmail.com>
+
+
+I think the problem is now solved, and we have a cleaner package that 
+plays well (at least I think) with R's garbage collector.
+
+ > require( RProtoBuf )
+Loading required package: RProtoBuf
+Loading required package: Rcpp
+ > message <- new( tutorial.Person, id = 1 )
+ > message <- new( tutorial.Person, id = 1 )
+ > message <- new( tutorial.Person, id = 1 )
+ > message <- new( tutorial.Person, id = 1 )
+ > gc()
+RProtoBuf finalizing Message (0x9258f68)
+RProtoBuf finalizing Message (0x91ce378)
+RProtoBuf finalizing Message (0x97f27b0)
+          used (Mb) gc trigger (Mb) max used (Mb)
+Ncells 260797  7.0     407500 10.9   350000  9.4
+Vcells 210014  1.7     786432  6.0   500691  3.9
+
+previously the 3 first messages did not free their memory after the 
+external pointer was GC'd.
+
+I'll leave debugging messages as above for some time.
+
+On 12/16/2009 12:49 PM, Romain Fran?ois wrote:
+>
+> Now that I know how to work with external pointer finalizers (much
+> easier than I anticipated; all covered in R-exts), I have added a
+> finalizer for Message. We don't need to define them for **Descriptor
+> because they don't belong to us, but we need to define them for messages
+> to avoid memory leaks.
+>
+> So I have added them, now the package does not pass R CMD check. I think
+> I need to be more careful when I access message fields of other
+> messages, at the moment, I wrap up the pointer, where I think I should
+> make a copy of the message.
+>
+> much more dbugging "fun" to come :( but should be manageaable:
+>
+> $ grep "Get.*Message" *.cpp
+> extractors.cpp:
+> new_RS4_Message_(&ref->GetRepeatedMessage( *message, fieldDesc, i ) ) ) ;
+> extractors.cpp:                         res = PROTECT( new_RS4_Message_(
+> &ref->GetMessage( *message, fieldDesc ) ) ) ;
+> extractors.cpp: * Get the message descriptor of a Message
+> identical.cpp:
+> const GPB::Message* mm1 =&ref->GetRepeatedMessage( *m1, field_desc, j ) ;
+> identical.cpp:
+> const GPB::Message* mm2 =&ref->GetRepeatedMessage( *m2, field_desc, j ) ;
+> identical.cpp:                                          const
+> GPB::Message* mm1 =&ref->GetMessage( *m1, field_desc ) ;
+> identical.cpp:                                                  const
+> GPB::Message* mm2 =&ref->GetMessage( *m2, field_desc ) ;
+> read.cpp:               throwException( "could not call
+> factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+> read.cpp:               throwException( "could not call
+> factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+> read.cpp:               throwException( "could not call
+> factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+> rprotobuf.cpp:          throwException( "could not call
+> factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+> set.cpp:
+> new_RS4_Message_(&ref->GetRepeatedMessage( *message, field_desc, i ) ) ) ;
+>
+> Romain
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/HlX9 : new package : bibtex
+|- http://tr.im/Gq7i : ohloh
+`- http://tr.im/FtUu : new package : highlight
+
+
+From edd at debian.org  Wed Dec 16 18:05:42 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 16 Dec 2009 11:05:42 -0600
+Subject: [Rprotobuf-yada] finalizer for messages
+In-Reply-To: <4B290A3E.8040805@dbmail.com>
+References: <4B28C955.5040308@free.fr>
+	<4B290A3E.8040805@dbmail.com>
+Message-ID: <19241.4966.977550.216031@ron.nulle.part>
+
+
+On 16 December 2009 at 17:26, Romain Francois wrote:
+| I think the problem is now solved, and we have a cleaner package that 
+| plays well (at least I think) with R's garbage collector.
+| 
+|  > require( RProtoBuf )
+| Loading required package: RProtoBuf
+| Loading required package: Rcpp
+|  > message <- new( tutorial.Person, id = 1 )
+|  > message <- new( tutorial.Person, id = 1 )
+|  > message <- new( tutorial.Person, id = 1 )
+|  > message <- new( tutorial.Person, id = 1 )
+|  > gc()
+| RProtoBuf finalizing Message (0x9258f68)
+| RProtoBuf finalizing Message (0x91ce378)
+| RProtoBuf finalizing Message (0x97f27b0)
+|           used (Mb) gc trigger (Mb) max used (Mb)
+| Ncells 260797  7.0     407500 10.9   350000  9.4
+| Vcells 210014  1.7     786432  6.0   500691  3.9
+| 
+| previously the 3 first messages did not free their memory after the 
+| external pointer was GC'd.
+| 
+| I'll leave debugging messages as above for some time.
+
+I had to look at that for second .... so we get three finalizers / cleanups
+because out of four allocations, only one is reachable?
+
+Nifty, my friend, very nifty!
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Wed Dec 16 18:15:11 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Wed, 16 Dec 2009 18:15:11 +0100
+Subject: [Rprotobuf-yada] finalizer for messages
+In-Reply-To: <19241.4966.977550.216031@ron.nulle.part>
+References: <4B28C955.5040308@free.fr>	<4B290A3E.8040805@dbmail.com>
+	<19241.4966.977550.216031@ron.nulle.part>
+Message-ID: <4B29159F.6040909@dbmail.com>
+
+On 12/16/2009 06:05 PM, Dirk Eddelbuettel wrote:
+> On 16 December 2009 at 17:26, Romain Francois wrote:
+> | I think the problem is now solved, and we have a cleaner package that
+> | plays well (at least I think) with R's garbage collector.
+> |
+> |>  require( RProtoBuf )
+> | Loading required package: RProtoBuf
+> | Loading required package: Rcpp
+> |>  message<- new( tutorial.Person, id = 1 )
+> |>  message<- new( tutorial.Person, id = 1 )
+> |>  message<- new( tutorial.Person, id = 1 )
+> |>  message<- new( tutorial.Person, id = 1 )
+> |>  gc()
+> | RProtoBuf finalizing Message (0x9258f68)
+> | RProtoBuf finalizing Message (0x91ce378)
+> | RProtoBuf finalizing Message (0x97f27b0)
+> |           used (Mb) gc trigger (Mb) max used (Mb)
+> | Ncells 260797  7.0     407500 10.9   350000  9.4
+> | Vcells 210014  1.7     786432  6.0   500691  3.9
+> |
+> | previously the 3 first messages did not free their memory after the
+> | external pointer was GC'd.
+> |
+> | I'll leave debugging messages as above for some time.
+>
+> I had to look at that for second .... so we get three finalizers / cleanups
+> because out of four allocations, only one is reachable?
+
+yep. same if you do things like :
+
+f <- function( ){
+	message <- new( tutorial.Person )
+	rnorm( 10 )
+}
+f()
+
+the message is now subject for garbage collection, ...
+
+ > gc()
+RProtoBuf finalizing Message (0x96b5518)
+
+> Nifty, my friend, very nifty!
+>
+> Dirk
+
+I had lots of "TODO: finalizers" in the code since the project started, 
+and could not really sleep knowing of all this lost memory.
+
+It is all actually very easy to do with external pointers, even if the 
+manual is a bit harsh at first.
+
+SEXP ptr = PROTECT( R_MakeExternalPtr( (void*)p ,
+	R_NilValue, R_NilValue));
+
+The first argument is the pointer the external pointer wraps. The two 
+other arguments are things we also want to protect from garbage collection.
+
+Then, we do :
+
+R_RegisterCFinalizerEx( ptr, Message_finalizer , _FALSE_ ) ;
+
+to register a finalizer with the external pointer, meaning when R 
+garbage collects the external pointer, it calls the function 
+Message_finalizer with the external pointer as its argument :
+
+void Message_finalizer( SEXP xp){
+	if (TYPEOF(xp)==EXTPTRSXP) {
+		GPB::Message* message = (GPB::Message*)XPP(xp) ;
+		FIN_DBG( message, "Message" ) ;
+		delete message;
+	}
+}
+
+The FIN_DBG macro just prints the message using Rprintf, which will 
+disappear at some point.
+
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/HlX9 : new package : bibtex
+|- http://tr.im/Gq7i : ohloh
+`- http://tr.im/FtUu : new package : highlight
+
+
+From edd at debian.org  Sat Dec 19 14:56:20 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 19 Dec 2009 07:56:20 -0600
+Subject: [Rprotobuf-yada] unit tests
+Message-ID: <19244.56196.525260.429081@ron.nulle.part>
+
+
+So what is the story on unit tests?  I saw you removed the vignette; the
+Suggests on svUnit is still there. Can we / shall we add some tests?  
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Dec 19 15:17:40 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 19 Dec 2009 15:17:40 +0100
+Subject: [Rprotobuf-yada] unit tests
+In-Reply-To: <19244.56196.525260.429081@ron.nulle.part>
+References: <19244.56196.525260.429081@ron.nulle.part>
+Message-ID: <4B2CE084.2090205@dbmail.com>
+
+The vignette refused to build for some reason, so I wiped it out (not 
+very constructive way of doing things, ...).
+
+We definitely need testing. I am still not 100% clear about garbage 
+collection, finalizers and external pointers. unit testing would help me 
+sleep at nights.
+
+RUnit/svUnit, I don't really care. One plus for RUnit is that it has 
+report generation which svUnit currently lacks. Did you get round to 
+have a look at how google tests the C++ code ?
+
+
+In terms of development, what I do now on the package is bring to R the 
+C++ classes as external pointers, starting with the streams  :
+
+$ grep setClass.*Stream pkg/R/*.R
+pkg/R/00classes.R:setClass( "ZeroCopyInputStream", representation(
+pkg/R/00classes.R:setClass( "ArrayInputStream", contains = 
+"ZeroCopyInputStream" )
+pkg/R/00classes.R:setClass( "FileInputStream", contains = 
+"ZeroCopyInputStream" )
+pkg/R/00classes.R:setClass( "ConnectionInputStream", contains = 
+"ZeroCopyInputStream" )
+pkg/R/00classes.R:setClass( "ZeroCopyOutputStream", representation(
+pkg/R/00classes.R:setClass( "ArrayOutputStream", contains = 
+"ZeroCopyInputStream" )
+pkg/R/00classes.R:setClass( "FileOutputStream", contains = 
+"ZeroCopyInputStream" )
+pkg/R/00classes.R:setClass( "ConnectionOutputStream", contains = 
+"ZeroCopyOutputStream" )
+
+mapping their c++ counterparts.
+http://code.google.com/apis/protocolbuffers/docs/reference/cpp/google.protobuf.io.zero_copy_stream.html
+
+This is more an experiment and a way of learning about how to do it. You 
+don't need to use or know about these classes to use the package.
+
+And it is quite a repetitive task, so I am starting to think about make 
+some sort of code generator .... could be good for Rcpp as well
+
+On 12/19/2009 02:56 PM, Dirk Eddelbuettel wrote:
+> So what is the story on unit tests?  I saw you removed the vignette; the
+> Suggests on svUnit is still there. Can we / shall we add some tests?
+>
+> Dirk
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/HlX9 : new package : bibtex
+|- http://tr.im/Gq7i : ohloh
+`- http://tr.im/FtUu : new package : highlight
+
+
+
+
+From saptarshi.guha at gmail.com  Thu Dec 24 17:53:00 2009
+From: saptarshi.guha at gmail.com (Saptarshi Guha)
+Date: Thu, 24 Dec 2009 11:53:00 -0500
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+Message-ID: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>
+
+Hello,
+
+I tried installing rprotobuf on Linux(64 bit) but ran into the following error
+
+svn checkout svn://svn.r-forge.r-project.org/svnroot/rprotobuf
+cd rprotobuf
+R CMD INSTALL pkg
+
+g++ -I/ln/meraki/custom/lib64/R/include
+-I/ln/meraki/custom/lib64/R/library/Rcpp/lib -pthread
+-I/ln/meraki/custom/include   -I/usr/local/include    -fpic  -g -O2 -c
+as.cpp -o as.o
+/ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h: In member function
+?void RcppDatetime::parseTime()?:
+/ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:98: warning:
+converting to ?time_t? from ?double?
+/ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:99: warning:
+converting to ?int? from ?double?
+as.cpp: At global scope:
+as.cpp:4: error: ?external_pointer? is not a template
+as.cpp:4: error: explicit instantiation of non-template type
+?rcpp::external_pointer?
+make: *** [as.o] Error 1
+chmod: cannot access
+`/ln/meraki/custom/lib64/R/library/RProtoBuf/libs/*': No such file or
+directory
+ERROR: compilation failed for package 'RProtoBuf'
+** Removing '/ln/meraki/custom/lib64/R/library/RProtoBuf'
+
+
+Have I missed something?
+
+On another note, since Google's protobuf actually uses pthreads, I think it is a
+good idea to set R_CStackLimit (I don't see it in rprotobuf source, but since it
+links with RCpp, is this already set?). I have set this to -1 in my library,
+which fixed some very hard to decipher bugs. Also, I can load my libraries /and/
+debug using GDB.
+
+
+Thanks
+Saptarshi
+
+Info.
+R version 2.8.1 (2008-12-22)
+Linux spica 2.6.18-164.6.1.el5 #1 SMP Tue Oct 27 11:28:30 EDT 2009
+x86_64 x86_64 x86_64 GNU/Linux
+
+From edd at debian.org  Thu Dec 24 18:18:51 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 24 Dec 2009 11:18:51 -0600
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>
+Message-ID: <19251.41595.446089.125533@ron.nulle.part>
+
+
+Hi Saptarshi,
+
+On 24 December 2009 at 11:53, Saptarshi Guha wrote:
+| Hello,
+| 
+| I tried installing rprotobuf on Linux(64 bit) but ran into the following   error
+|
+| svn checkout svn://svn.r-forge.r-project.org/svnroot/rprotobuf
+| cd rprotobuf
+| R CMD INSTALL pkg
+| 
+| g++ -I/ln/meraki/custom/lib64/R/include
+| -I/ln/meraki/custom/lib64/R/library/Rcpp/lib -pthread
+| -I/ln/meraki/custom/include   -I/usr/local/include    -fpic  -g -O2 -c
+| as.cpp -o as.o
+| /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h: In member function
+| ?void RcppDatetime::parseTime()?:
+| /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:98: warning:
+| converting to ?time_t? from ?double?
+| /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:99: warning:
+| converting to ?int? from ?double?
+| as.cpp: At global scope:
+| as.cpp:4: error: ?external_pointer? is not a template
+| as.cpp:4: error: explicit instantiation of non-template type
+| ?rcpp::external_pointer?
+| make: *** [as.o] Error 1
+| chmod: cannot access
+| `/ln/meraki/custom/lib64/R/library/RProtoBuf/libs/*': No such file or
+| directory
+| ERROR: compilation failed for package 'RProtoBuf'
+| ** Removing '/ln/meraki/custom/lib64/R/library/RProtoBuf'
+| 
+| 
+| Have I missed something?
+
+I just verified that it also breaks for me :-/   
+
+g++ -I/usr/share/R/include -I/usr/local/lib/R/site-library/Rcpp/lib -pthread -fpic  -g -O3 -Wall -pipe -c as.cpp -o as.o
+as.cpp:4: error: ?external_pointer? is not a template
+as.cpp:4: error: explicit instantiation of non-template type ?rcpp::external_pointer?
+make: *** [as.o] Error 1
+ERROR: compilation failed for package ?RProtoBuf?
+* removing ?/usr/local/lib/R/site-library/RProtoBuf?
+* restoring previous ?/usr/local/lib/R/site-library/RProtoBuf?
+
+So looks like Romain broke that...  
+
+At my end: 'g++ --version' gives 'g++ (Ubuntu 4.3.4-5ubuntu1) 4.3.4' (at work
+and using amd64; R is 2.10.1).
+
+Now the fun bit:  It builds on a very similar Debian box (g++ 4.3.6, R
+2.10.1) so I will take a peek at the R headers and see if I can discern what
+goes wrong with the external pointer template.
+
+| On another note, since Google's protobuf actually uses pthreads, I think it is a
+| good idea to set R_CStackLimit (I don't see it in rprotobuf source, but since it
+| links with RCpp, is this already set?). I have set this to -1 in my library,
+| which fixed some very hard to decipher bugs.
+
+Hm. Interesting. I only ever touch that in littler and RInside, ie when I
+actually embed R but not in normal client code.  But you make a good point
+with R and these potentially multithreaded libraries.
+
+| Also, I can load my libraries /and/ debug using GDB.
+
+Noted.
+
+Will you send an abstract for R / Hadoop / ... to our upcoming R / Finance
+conference?  [ Romain: That is of course also open for you if can spin a
+finance topic ;-)  Don't think we can fly you over, unfortunately ... ]
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Thu Dec 24 18:33:31 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 24 Dec 2009 11:33:31 -0600
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <19251.41595.446089.125533@ron.nulle.part>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>
+	<19251.41595.446089.125533@ron.nulle.part>
+Message-ID: <19251.42475.506310.965599@ron.nulle.part>
+
+
+On 24 December 2009 at 11:18, Dirk Eddelbuettel wrote:
+| I just verified that it also breaks for me :-/   
+| 
+| g++ -I/usr/share/R/include -I/usr/local/lib/R/site-library/Rcpp/lib -pthread -fpic  -g -O3 -Wall -pipe -c as.cpp -o as.o
+| as.cpp:4: error: ?external_pointer? is not a template
+| as.cpp:4: error: explicit instantiation of non-template type ?rcpp::external_pointer?
+| make: *** [as.o] Error 1
+| ERROR: compilation failed for package ?RProtoBuf?
+| * removing ?/usr/local/lib/R/site-library/RProtoBuf?
+| * restoring previous ?/usr/local/lib/R/site-library/RProtoBuf?
+| 
+| So looks like Romain broke that...  
+
+It looks like a simple oversight that somehow doesn't bite on i386.    
+
+Just commenting it out at the top of as.cpp -- that does the trick.  The rcpp
+namespace is never used anywhere. [ Romain and I have one/off discussion
+about sticking stuff to rcpp or keeping in his brandew RForge package cpp
+which has fancy STL object inspection / creation from R. For a die-hard Java
+programmer he has quite the C++ tricks up his sleeve. ]
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From saptarshi.guha at gmail.com  Thu Dec 24 18:44:10 2009
+From: saptarshi.guha at gmail.com (Saptarshi Guha)
+Date: Thu, 24 Dec 2009 12:44:10 -0500
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <19251.42475.506310.965599@ron.nulle.part>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com> 
+	<19251.41595.446089.125533@ron.nulle.part>
+	<19251.42475.506310.965599@ron.nulle.part>
+Message-ID: <1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>
+
+Hello,
+Yes, that fixed that. However, one slight thing
+
+g++ -I/ln/meraki/custom/lib64/R/include
+-I/ln/meraki/custom/lib64/R/library/Rcpp/lib -pthread
+-I/ln/meraki/custom/include   -I/usr/local/include    -fpic  -g -O2 -c
+DescriptorPoolLookup.cpp -o DescriptorPoolLookup.o
+/ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h: In member function
+?void RcppDatetime::parseTime()?:
+/ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:98: warning:
+converting to ?time_t? from ?double?
+/ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:99: warning:
+converting to ?int? from ?double?
+DescriptorPoolLookup.cpp: In static member function ?static SEXPREC*
+rprotobuf::DescriptorPoolLookup::getElements()?:
+DescriptorPoolLookup.cpp:24: error: ?RcppSexp? was not declared in this scope
+
+
+Do I have an old version of Rcpp? I checked Rcpp.h and did not find
+RcppSexp, my Rcpp version is 0.6.6
+
+Regards
+Saptarshi
+
+
+On Thu, Dec 24, 2009 at 12:33 PM, Dirk Eddelbuettel <edd at debian.org> wrote:
+>
+> On 24 December 2009 at 11:18, Dirk Eddelbuettel wrote:
+> | I just verified that it also breaks for me :-/
+> |
+> | g++ -I/usr/share/R/include -I/usr/local/lib/R/site-library/Rcpp/lib -pthread -fpic ?-g -O3 -Wall -pipe -c as.cpp -o as.o
+> | as.cpp:4: error: ?external_pointer? is not a template
+> | as.cpp:4: error: explicit instantiation of non-template type ?rcpp::external_pointer?
+> | make: *** [as.o] Error 1
+> | ERROR: compilation failed for package ?RProtoBuf?
+> | * removing ?/usr/local/lib/R/site-library/RProtoBuf?
+> | * restoring previous ?/usr/local/lib/R/site-library/RProtoBuf?
+> |
+> | So looks like Romain broke that...
+>
+> It looks like a simple oversight that somehow doesn't bite on i386.
+>
+> Just commenting it out at the top of as.cpp -- that does the trick. ?The rcpp
+> namespace is never used anywhere. [ Romain and I have one/off discussion
+> about sticking stuff to rcpp or keeping in his brandew RForge package cpp
+> which has fancy STL object inspection / creation from R. For a die-hard Java
+> programmer he has quite the C++ tricks up his sleeve. ]
+>
+> Dirk
+>
+> --
+> Three out of two people have difficulties with fractions.
+>
+
+From edd at debian.org  Thu Dec 24 18:51:17 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 24 Dec 2009 11:51:17 -0600
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>
+	<19251.41595.446089.125533@ron.nulle.part>
+	<19251.42475.506310.965599@ron.nulle.part>
+	<1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>
+Message-ID: <19251.43541.352911.712091@ron.nulle.part>
+
+
+On 24 December 2009 at 12:44, Saptarshi Guha wrote:
+| Hello,
+| Yes, that fixed that. However, one slight thing
+| 
+| g++ -I/ln/meraki/custom/lib64/R/include
+| -I/ln/meraki/custom/lib64/R/library/Rcpp/lib -pthread
+| -I/ln/meraki/custom/include   -I/usr/local/include    -fpic  -g -O2 -c
+| DescriptorPoolLookup.cpp -o DescriptorPoolLookup.o
+| /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h: In member function
+| ?void RcppDatetime::parseTime()?:
+| /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:98: warning:
+| converting to ?time_t? from ?double?
+| /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:99: warning:
+| converting to ?int? from ?double?
+| DescriptorPoolLookup.cpp: In static member function ?static SEXPREC*
+| rprotobuf::DescriptorPoolLookup::getElements()?:
+| DescriptorPoolLookup.cpp:24: error: ?RcppSexp? was not declared in this scope
+| 
+| 
+| Do I have an old version of Rcpp? I checked Rcpp.h and did not find
+| RcppSexp, my Rcpp version is 0.6.6
+
+Yup! That one is from last week.  The DESCRIPTION for RProtoBuf may need
+updating.
+
+The Rcpp from CRAN should be fine -- 0.7.0 -- but you can of course also play
+with SVN which is currently pretty close.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From saptarshi.guha at gmail.com  Thu Dec 24 18:51:33 2009
+From: saptarshi.guha at gmail.com (Saptarshi Guha)
+Date: Thu, 24 Dec 2009 12:51:33 -0500
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com> 
+	<19251.41595.446089.125533@ron.nulle.part>
+	<19251.42475.506310.965599@ron.nulle.part> 
+	<1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>
+Message-ID: <1e7471d50912240951p5e06c05axa6567470778a6182@mail.gmail.com>
+
+Also, I think you're right about the StackLimit being required for embedded R.
+I read the documentation and the R_CStackLimit is set while initializing.
+
+On Thu, Dec 24, 2009 at 12:44 PM, Saptarshi Guha
+<saptarshi.guha at gmail.com> wrote:
+> Hello,
+> Yes, that fixed that. However, one slight thing
+>
+> g++ -I/ln/meraki/custom/lib64/R/include
+> -I/ln/meraki/custom/lib64/R/library/Rcpp/lib -pthread
+> -I/ln/meraki/custom/include ? -I/usr/local/include ? ?-fpic ?-g -O2 -c
+> DescriptorPoolLookup.cpp -o DescriptorPoolLookup.o
+> /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h: In member function
+> ?void RcppDatetime::parseTime()?:
+> /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:98: warning:
+> converting to ?time_t? from ?double?
+> /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:99: warning:
+> converting to ?int? from ?double?
+> DescriptorPoolLookup.cpp: In static member function ?static SEXPREC*
+> rprotobuf::DescriptorPoolLookup::getElements()?:
+> DescriptorPoolLookup.cpp:24: error: ?RcppSexp? was not declared in this scope
+>
+>
+> Do I have an old version of Rcpp? I checked Rcpp.h and did not find
+> RcppSexp, my Rcpp version is 0.6.6
+>
+> Regards
+> Saptarshi
+>
+>
+> On Thu, Dec 24, 2009 at 12:33 PM, Dirk Eddelbuettel <edd at debian.org> wrote:
+>>
+>> On 24 December 2009 at 11:18, Dirk Eddelbuettel wrote:
+>> | I just verified that it also breaks for me :-/
+>> |
+>> | g++ -I/usr/share/R/include -I/usr/local/lib/R/site-library/Rcpp/lib -pthread -fpic ?-g -O3 -Wall -pipe -c as.cpp -o as.o
+>> | as.cpp:4: error: ?external_pointer? is not a template
+>> | as.cpp:4: error: explicit instantiation of non-template type ?rcpp::external_pointer?
+>> | make: *** [as.o] Error 1
+>> | ERROR: compilation failed for package ?RProtoBuf?
+>> | * removing ?/usr/local/lib/R/site-library/RProtoBuf?
+>> | * restoring previous ?/usr/local/lib/R/site-library/RProtoBuf?
+>> |
+>> | So looks like Romain broke that...
+>>
+>> It looks like a simple oversight that somehow doesn't bite on i386.
+>>
+>> Just commenting it out at the top of as.cpp -- that does the trick. ?The rcpp
+>> namespace is never used anywhere. [ Romain and I have one/off discussion
+>> about sticking stuff to rcpp or keeping in his brandew RForge package cpp
+>> which has fancy STL object inspection / creation from R. For a die-hard Java
+>> programmer he has quite the C++ tricks up his sleeve. ]
+>>
+>> Dirk
+>>
+>> --
+>> Three out of two people have difficulties with fractions.
+>>
+>
+
+From saptarshi.guha at gmail.com  Thu Dec 24 18:54:05 2009
+From: saptarshi.guha at gmail.com (Saptarshi Guha)
+Date: Thu, 24 Dec 2009 12:54:05 -0500
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <19251.43541.352911.712091@ron.nulle.part>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com> 
+	<19251.41595.446089.125533@ron.nulle.part>
+	<19251.42475.506310.965599@ron.nulle.part> 
+	<1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com> 
+	<19251.43541.352911.712091@ron.nulle.part>
+Message-ID: <1e7471d50912240954v3498a392pca9aa8c14ebe5a97@mail.gmail.com>
+
+Yes, it all compiled now(thanks), but ...
+
+** preparing package for lazy loading
+Loading required package: Rcpp
+Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+  methods can add arguments to the generic only if '...' is an
+argument to the generic
+Error: unable to load R code in package 'RProtoBuf'
+
+
+
+On Thu, Dec 24, 2009 at 12:51 PM, Dirk Eddelbuettel <edd at debian.org> wrote:
+>
+> On 24 December 2009 at 12:44, Saptarshi Guha wrote:
+> | Hello,
+> | Yes, that fixed that. However, one slight thing
+> |
+> | g++ -I/ln/meraki/custom/lib64/R/include
+> | -I/ln/meraki/custom/lib64/R/library/Rcpp/lib -pthread
+> | -I/ln/meraki/custom/include ? -I/usr/local/include ? ?-fpic ?-g -O2 -c
+> | DescriptorPoolLookup.cpp -o DescriptorPoolLookup.o
+> | /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h: In member function
+> | ?void RcppDatetime::parseTime()?:
+> | /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:98: warning:
+> | converting to ?time_t? from ?double?
+> | /ln/meraki/custom/lib64/R/library/Rcpp/lib/Rcpp.h:99: warning:
+> | converting to ?int? from ?double?
+> | DescriptorPoolLookup.cpp: In static member function ?static SEXPREC*
+> | rprotobuf::DescriptorPoolLookup::getElements()?:
+> | DescriptorPoolLookup.cpp:24: error: ?RcppSexp? was not declared in this scope
+> |
+> |
+> | Do I have an old version of Rcpp? I checked Rcpp.h and did not find
+> | RcppSexp, my Rcpp version is 0.6.6
+>
+> Yup! That one is from last week. ?The DESCRIPTION for RProtoBuf may need
+> updating.
+>
+> The Rcpp from CRAN should be fine -- 0.7.0 -- but you can of course also play
+> with SVN which is currently pretty close.
+>
+> Dirk
+>
+> --
+> Three out of two people have difficulties with fractions.
+>
+
+From edd at debian.org  Thu Dec 24 19:13:42 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 24 Dec 2009 12:13:42 -0600
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <1e7471d50912240954v3498a392pca9aa8c14ebe5a97@mail.gmail.com>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>
+	<19251.41595.446089.125533@ron.nulle.part>
+	<19251.42475.506310.965599@ron.nulle.part>
+	<1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>
+	<19251.43541.352911.712091@ron.nulle.part>
+	<1e7471d50912240954v3498a392pca9aa8c14ebe5a97@mail.gmail.com>
+Message-ID: <19251.44886.852276.917306@ron.nulle.part>
+
+
+On 24 December 2009 at 12:54, Saptarshi Guha wrote:
+| Yes, it all compiled now(thanks), but ...
+| 
+| ** preparing package for lazy loading
+| Loading required package: Rcpp
+| Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+|   methods can add arguments to the generic only if '...' is an
+| argument to the generic
+| Error: unable to load R code in package 'RProtoBuf'
+
+Works for me on amd64 with current Rcpp. I just committed the fix to the
+issue you found and cleaned three or four other 'g++ -Wall' issues -- then
+after 'cd pkg; ./cleanup; cd ..' a fresh R CMD INSTALL as all is well here:
+
+> library(RProtoBuf)
+Loading required package: Rcpp
+R>
+
+and e.g. 'demo(io)' runs fine.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From saptarshi.guha at gmail.com  Thu Dec 24 20:08:03 2009
+From: saptarshi.guha at gmail.com (Saptarshi Guha)
+Date: Thu, 24 Dec 2009 14:08:03 -0500
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <19251.44886.852276.917306@ron.nulle.part>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com> 
+	<19251.41595.446089.125533@ron.nulle.part>
+	<19251.42475.506310.965599@ron.nulle.part> 
+	<1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com> 
+	<19251.43541.352911.712091@ron.nulle.part>
+	<1e7471d50912240954v3498a392pca9aa8c14ebe5a97@mail.gmail.com> 
+	<19251.44886.852276.917306@ron.nulle.part>
+Message-ID: <1e7471d50912241108h5cecf68eje0f73f5eb7559d38@mail.gmail.com>
+
+Hello,
+I just checked out Rcpp(0.7.0.1)(from svn), built, installed and then
+checked our rprotobuf(revision 253).
+I still get
+** preparing package for lazy loading
+Loading required package: Rcpp
+Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+  methods can add arguments to the generic only if '...' is an
+argument to the generic
+Error: unable to load R code in package 'RProtoBuf'
+
+But loading Rcpp( library(Rcpp) ) in R works. Can I provide something else?
+Regards
+
+
+On Thu, Dec 24, 2009 at 1:13 PM, Dirk Eddelbuettel <edd at debian.org> wrote:
+>
+> On 24 December 2009 at 12:54, Saptarshi Guha wrote:
+> | Yes, it all compiled now(thanks), but ...
+> |
+> | ** preparing package for lazy loading
+> | Loading required package: Rcpp
+> | Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+> | ? methods can add arguments to the generic only if '...' is an
+> | argument to the generic
+> | Error: unable to load R code in package 'RProtoBuf'
+>
+> Works for me on amd64 with current Rcpp. I just committed the fix to the
+> issue you found and cleaned three or four other 'g++ -Wall' issues -- then
+> after 'cd pkg; ./cleanup; cd ..' a fresh R CMD INSTALL as all is well here:
+>
+>> library(RProtoBuf)
+> Loading required package: Rcpp
+> R>
+>
+> and e.g. 'demo(io)' runs fine.
+>
+> Dirk
+>
+> --
+> Three out of two people have difficulties with fractions.
+>
+
+From edd at debian.org  Thu Dec 24 20:58:29 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 24 Dec 2009 13:58:29 -0600
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <1e7471d50912241108h5cecf68eje0f73f5eb7559d38@mail.gmail.com>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>
+	<19251.41595.446089.125533@ron.nulle.part>
+	<19251.42475.506310.965599@ron.nulle.part>
+	<1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>
+	<19251.43541.352911.712091@ron.nulle.part>
+	<1e7471d50912240954v3498a392pca9aa8c14ebe5a97@mail.gmail.com>
+	<19251.44886.852276.917306@ron.nulle.part>
+	<1e7471d50912241108h5cecf68eje0f73f5eb7559d38@mail.gmail.com>
+Message-ID: <19251.51173.304462.116402@ron.nulle.part>
+
+
+On 24 December 2009 at 14:08, Saptarshi Guha wrote:
+| Hello,
+| I just checked out Rcpp(0.7.0.1)(from svn), built, installed and then
+| checked our rprotobuf(revision 253).
+| I still get
+| ** preparing package for lazy loading
+| Loading required package: Rcpp
+| Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+|   methods can add arguments to the generic only if '...' is an
+| argument to the generic
+| Error: unable to load R code in package 'RProtoBuf'
+| 
+| But loading Rcpp( library(Rcpp) ) in R works. Can I provide something else?
+
+Didn't one yout mails say R 2.8.* ?  I suspect that it is one of those S4
+aspects. 
+
+Dirk, who sticks to S3 most of the time
+
+| Regards
+| 
+| 
+| On Thu, Dec 24, 2009 at 1:13 PM, Dirk Eddelbuettel <edd at debian.org> wrote:
+| >
+| > On 24 December 2009 at 12:54, Saptarshi Guha wrote:
+| > | Yes, it all compiled now(thanks), but ...
+| > |
+| > | ** preparing package for lazy loading
+| > | Loading required package: Rcpp
+| > | Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+| > | ? methods can add arguments to the generic only if '...' is an
+| > | argument to the generic
+| > | Error: unable to load R code in package 'RProtoBuf'
+| >
+| > Works for me on amd64 with current Rcpp. I just committed the fix to the
+| > issue you found and cleaned three or four other 'g++ -Wall' issues -- then
+| > after 'cd pkg; ./cleanup; cd ..' a fresh R CMD INSTALL as all is well here:
+| >
+| >> library(RProtoBuf)
+| > Loading required package: Rcpp
+| > R>
+| >
+| > and e.g. 'demo(io)' runs fine.
+| >
+| > Dirk
+| >
+| > --
+| > Three out of two people have difficulties with fractions.
+| >
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Dec 26 10:57:23 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 26 Dec 2009 10:57:23 +0100
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <19251.51173.304462.116402@ron.nulle.part>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>	<19251.41595.446089.125533@ron.nulle.part>	<19251.42475.506310.965599@ron.nulle.part>	<1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>	<19251.43541.352911.712091@ron.nulle.part>	<1e7471d50912240954v3498a392pca9aa8c14ebe5a97@mail.gmail.com>	<19251.44886.852276.917306@ron.nulle.part>	<1e7471d50912241108h5cecf68eje0f73f5eb7559d38@mail.gmail.com>
+	<19251.51173.304462.116402@ron.nulle.part>
+Message-ID: <4B35DE03.2050505@dbmail.com>
+
+Sorry I have not been around for this issue.
+
+For the external_pointer thing, it is just something I played with, but 
+apparently I don't file my toys when I'm done with them. Thanks Dirk for 
+cleaning my mess. More on this below.
+
+For the S4 thing, I think this is die to a recent change in R. Which 
+version of R are you using ? I only plan to support current versions of 
+R, so if the problem still appears with current R, I'll have a look, 
+otherwise maybe not (maybe yes)
+
+I will enforce current version of R later.
+
+Romain
+
+On 12/24/2009 08:58 PM, Dirk Eddelbuettel wrote:
+>
+> On 24 December 2009 at 14:08, Saptarshi Guha wrote:
+> | Hello,
+> | I just checked out Rcpp(0.7.0.1)(from svn), built, installed and then
+> | checked our rprotobuf(revision 253).
+> | I still get
+> | ** preparing package for lazy loading
+> | Loading required package: Rcpp
+> | Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+> |   methods can add arguments to the generic only if '...' is an
+> | argument to the generic
+> | Error: unable to load R code in package 'RProtoBuf'
+> |
+> | But loading Rcpp( library(Rcpp) ) in R works. Can I provide something else?
+>
+> Didn't one yout mails say R 2.8.* ?  I suspect that it is one of those S4
+> aspects.
+>
+> Dirk, who sticks to S3 most of the time
+>
+> | Regards
+> |
+> |
+> | On Thu, Dec 24, 2009 at 1:13 PM, Dirk Eddelbuettel<edd at debian.org>  wrote:
+> |>
+> |>  On 24 December 2009 at 12:54, Saptarshi Guha wrote:
+> |>  | Yes, it all compiled now(thanks), but ...
+> |>  |
+> |>  | ** preparing package for lazy loading
+> |>  | Loading required package: Rcpp
+> |>  | Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+> |>  |   methods can add arguments to the generic only if '...' is an
+> |>  | argument to the generic
+> |>  | Error: unable to load R code in package 'RProtoBuf'
+> |>
+> |>  Works for me on amd64 with current Rcpp. I just committed the fix to the
+> |>  issue you found and cleaned three or four other 'g++ -Wall' issues -- then
+> |>  after 'cd pkg; ./cleanup; cd ..' a fresh R CMD INSTALL as all is well here:
+> |>
+> |>>  library(RProtoBuf)
+> |>  Loading required package: Rcpp
+> |>  R>
+> |>
+> |>  and e.g. 'demo(io)' runs fine.
+> |>
+> |>  Dirk
+> |>
+> |>  --
+> |>  Three out of two people have difficulties with fractions.
+> |>
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/IlMh : CPP package: exposing C++ objects
+|- http://tr.im/HlX9 : new package : bibtex
+`- http://tr.im/Gq7i : ohloh
+
+
+
+
+From romain.francois at dbmail.com  Sat Dec 26 11:11:11 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 26 Dec 2009 11:11:11 +0100
+Subject: [Rprotobuf-yada] Compiling on RHEL 64 bit Linux
+In-Reply-To: <4B35DE03.2050505@dbmail.com>
+References: <1e7471d50912240853i480d4b94id9fabfaf9fbbfd75@mail.gmail.com>	<19251.41595.446089.125533@ron.nulle.part>	<19251.42475.506310.965599@ron.nulle.part>	<1e7471d50912240944n4f4662d9rf7c5ed06e1307f57@mail.gmail.com>	<19251.43541.352911.712091@ron.nulle.part>	<1e7471d50912240954v3498a392pca9aa8c14ebe5a97@mail.gmail.com>	<19251.44886.852276.917306@ron.nulle.part>	<1e7471d50912241108h5cecf68eje0f73f5eb7559d38@mail.gmail.com>	<19251.51173.304462.116402@ron.nulle.part>
+	<4B35DE03.2050505@dbmail.com>
+Message-ID: <4B35E13F.8060100@dbmail.com>
+
+On 12/26/2009 10:57 AM, Romain Francois wrote:
+>
+> Sorry I have not been around for this issue.
+>
+> For the external_pointer thing, it is just something I played with, but
+> apparently I don't file my toys when I'm done with them. Thanks Dirk for
+> cleaning my mess. More on this below.
+>
+> For the S4 thing, I think this is die to a recent change in R. Which
+> version of R are you using ? I only plan to support current versions of
+> R, so if the problem still appears with current R, I'll have a look,
+> otherwise maybe not (maybe yes)
+>
+> I will enforce current version of R later.
+>
+> Romain
+
+(I forgot the "more on this below" that was advertised above.
+
+I now have a template x_ptr in package CPP to manage external pointers.
+
+This allows for things like this :
+
+SEXP foo( SEXP xp ){
+	// create a smart external pointer
+	x_ptr<Foo>(xp) p(xp) ;
+	
+	// now I can use p as a smart pointer to Foo
+	p->foobar( ) ;
+
+	return R_NilValue ;
+}
+
+
+I have not managed to do what I really wanted to do with it which was 
+using implicit conversion so that I could declare the function like this:
+
+SEXP foo( x_ptr<Foo> ) ;
+
+but it does not work.
+
+
+
+
+template <typename T>
+class x_ptr {
+	public:
+   		explicit x_ptr(SEXP xp) ;
+   		
+   		T& operator*() const ;
+   		T* operator->() const ;
+   		SEXP getProtected() ;
+   		SEXP getTag() ;
+   		SEXP getExternalPointer() ;
+   		
+   	private:
+   		x_ptr() ;
+   		SEXP xp;
+   		T* pointer;
+};
+
+template<typename T>
+x_ptr<T>::x_ptr(SEXP xp) : xp(xp) {
+	pointer = (T*)EXTPTR_PTR(xp) ;
+}
+
+template<typename T>
+T& x_ptr<T>::operator*() const {
+	return *pointer ;
+}
+
+template<typename T>
+T* x_ptr<T>::operator->() const {
+	return pointer ;
+}
+
+template<typename T>
+SEXP x_ptr<T>::getProtected(){
+	return EXTPTR_PROT(xp) ;
+}
+
+template<typename T>
+SEXP x_ptr<T>::getTag(){
+	return EXTPTR_TAG(xp) ;
+}
+
+template<typename T>
+SEXP x_ptr<T>::getExternalPointer(){
+	return xp ;
+}
+
+
+
+> On 12/24/2009 08:58 PM, Dirk Eddelbuettel wrote:
+>>
+>> On 24 December 2009 at 14:08, Saptarshi Guha wrote:
+>> | Hello,
+>> | I just checked out Rcpp(0.7.0.1)(from svn), built, installed and then
+>> | checked our rprotobuf(revision 253).
+>> | I still get
+>> | ** preparing package for lazy loading
+>> | Loading required package: Rcpp
+>> | Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+>> |   methods can add arguments to the generic only if '...' is an
+>> | argument to the generic
+>> | Error: unable to load R code in package 'RProtoBuf'
+>> |
+>> | But loading Rcpp( library(Rcpp) ) in R works. Can I provide something else?
+>>
+>> Didn't one yout mails say R 2.8.* ?  I suspect that it is one of those S4
+>> aspects.
+>>
+>> Dirk, who sticks to S3 most of the time
+>>
+>> | Regards
+>> |
+>> |
+>> | On Thu, Dec 24, 2009 at 1:13 PM, Dirk Eddelbuettel<edd at debian.org>   wrote:
+>> |>
+>> |>   On 24 December 2009 at 12:54, Saptarshi Guha wrote:
+>> |>   | Yes, it all compiled now(thanks), but ...
+>> |>   |
+>> |>   | ** preparing package for lazy loading
+>> |>   | Loading required package: Rcpp
+>> |>   | Error in rematchDefinition(definition, fdef, mnames, fnames, signature) :
+>> |>   |   methods can add arguments to the generic only if '...' is an
+>> |>   | argument to the generic
+>> |>   | Error: unable to load R code in package 'RProtoBuf'
+>> |>
+>> |>   Works for me on amd64 with current Rcpp. I just committed the fix to the
+>> |>   issue you found and cleaned three or four other 'g++ -Wall' issues -- then
+>> |>   after 'cd pkg; ./cleanup; cd ..' a fresh R CMD INSTALL as all is well here:
+>> |>
+>> |>>   library(RProtoBuf)
+>> |>   Loading required package: Rcpp
+>> |>   R>
+>> |>
+>> |>   and e.g. 'demo(io)' runs fine.
+>> |>
+>> |>   Dirk
+>> |>
+>> |>   --
+>> |>   Three out of two people have difficulties with fractions.
+>> |>
+>>
+>
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/IlMh : CPP package: exposing C++ objects
+|- http://tr.im/HlX9 : new package : bibtex
+`- http://tr.im/Gq7i : ohloh
+
+
+
+
+From francoisromain at free.fr  Sat Dec 26 13:26:34 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Sat, 26 Dec 2009 13:26:34 +0100
+Subject: [Rprotobuf-yada] package ready or unit tests
+Message-ID: <4B3600FA.5070405@free.fr>
+
+Hello,
+
+I've added bits and pieces (inspired from how the fUtilities package 
+does it) to prepare the package for unit testing.
+
+The RProtoBuf-unitTests vignette has been resurrected and now will run 
+the unit tests and fetch the text results (not that exciting, but this 
+will do just fine [1]) into the vignette.
+
+tests are stored in runit.*.R files in the inst/unitTests directory
+
+so all we have to do to run the unit tests is to run R CMD build pkg
+
+Now we need to populate the tests.
+
+Romain
+
+[1] maybe later I'll propose some patch to Matthias so that we would 
+have a printLatexProtocol in addition to printTextProtocol and 
+printHTMLProtocol for specific inclusion into vignettes.
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/IlMh : CPP package: exposing C++ objects
+|- http://tr.im/HlX9 : new package : bibtex
+`- http://tr.im/Gq7i : ohloh
+
+
+
+
+From edd at debian.org  Sat Dec 26 16:41:08 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 26 Dec 2009 09:41:08 -0600
+Subject: [Rprotobuf-yada] package ready or unit tests
+In-Reply-To: <4B3600FA.5070405@free.fr>
+References: <4B3600FA.5070405@free.fr>
+Message-ID: <19254.11924.79332.213230@ron.nulle.part>
+
+
+On 26 December 2009 at 13:26, Romain Fran?ois wrote:
+| I've added bits and pieces (inspired from how the fUtilities package 
+| does it) to prepare the package for unit testing.
+
+Nice. I like that setup too. But it fails 'R CMD check' from SVN and that
+sucks:
+
+* checking tests ...
+  Running ?doRUnit.R?
+ ERROR
+Running the tests in 'tests/doRUnit.R' failed.
+Last 13 lines of output:
+  +   pkg <- sub("\\.Rcheck$", '', basename(dirname(wd)))
+  +
+  +   library(package=pkg, character.only=TRUE)
+  +
+  +   path <- system.file("unitTests", package = pkg)
+  +
+  +   stopifnot(file.exists(path), file.info(path.expand(path))$isdir)
+  +
+  +   source(file.path(path, "runTests.R"), echo = TRUE)
+  + }
+  Error in library(package = pkg, character.only = TRUE) :
+    there is no package called 'pkg'
+  Execution halted
+edd at ron:~/svn/rprotobuf$
+
+That was running 'R CMD check pkg' as pkg/ is the subdir.  
+
+The best fix I ever found for that was to ... hardcode the package name
+above.  Which feels like a crutch. Can you think of anything better?
+
+| The RProtoBuf-unitTests vignette has been resurrected and now will run 
+| the unit tests and fetch the text results (not that exciting, but this 
+| will do just fine [1]) into the vignette.
+| 
+| tests are stored in runit.*.R files in the inst/unitTests directory
+| 
+| so all we have to do to run the unit tests is to run R CMD build pkg
+
+One I change to 
+
+  #wd <- getwd()
+  #pkg <- sub("\\.Rcheck$", '', basename(dirname(wd)))
+  pkg <- "RProtoBuf"
+
+it passes but doesn't build the vignette.
+ 
+| Now we need to populate the tests.
+
+Yup. 
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Sat Dec 26 17:17:57 2009
+From: francoisromain at free.fr (=?UTF-8?B?Um9tYWluIEZyYW7Dp29pcw==?=)
+Date: Sat, 26 Dec 2009 17:17:57 +0100
+Subject: [Rprotobuf-yada] package ready or unit tests
+In-Reply-To: <19254.11924.79332.213230@ron.nulle.part>
+References: <4B3600FA.5070405@free.fr>
+	<19254.11924.79332.213230@ron.nulle.part>
+Message-ID: <4B363735.3010605@free.fr>
+
+On 12/26/2009 04:41 PM, Dirk Eddelbuettel wrote:
+>
+> On 26 December 2009 at 13:26, Romain Fran?ois wrote:
+> | I've added bits and pieces (inspired from how the fUtilities package
+> | does it) to prepare the package for unit testing.
+>
+> Nice. I like that setup too. But it fails 'R CMD check' from SVN and that
+> sucks:
+>
+> * checking tests ...
+>    Running ?doRUnit.R?
+>   ERROR
+> Running the tests in 'tests/doRUnit.R' failed.
+> Last 13 lines of output:
+>    +   pkg<- sub("\\.Rcheck$", '', basename(dirname(wd)))
+>    +
+>    +   library(package=pkg, character.only=TRUE)
+>    +
+>    +   path<- system.file("unitTests", package = pkg)
+>    +
+>    +   stopifnot(file.exists(path), file.info(path.expand(path))$isdir)
+>    +
+>    +   source(file.path(path, "runTests.R"), echo = TRUE)
+>    + }
+>    Error in library(package = pkg, character.only = TRUE) :
+>      there is no package called 'pkg'
+>    Execution halted
+> edd at ron:~/svn/rprotobuf$
+>
+> That was running 'R CMD check pkg' as pkg/ is the subdir.
+>
+> The best fix I ever found for that was to ... hardcode the package name
+> above.  Which feels like a crutch. Can you think of anything better?
+
+Not really. I've put that in. Both making vignettes with R CMD build and 
+just checking with R CMD check should work now.
+
+I've also revisited the unit test vignette using brew.
+
+> | The RProtoBuf-unitTests vignette has been resurrected and now will run
+> | the unit tests and fetch the text results (not that exciting, but this
+> | will do just fine [1]) into the vignette.
+> |
+> | tests are stored in runit.*.R files in the inst/unitTests directory
+> |
+> | so all we have to do to run the unit tests is to run R CMD build pkg
+>
+> One I change to
+>
+>    #wd<- getwd()
+>    #pkg<- sub("\\.Rcheck$", '', basename(dirname(wd)))
+>    pkg<- "RProtoBuf"
+>
+> it passes but doesn't build the vignette.
+>
+> | Now we need to populate the tests.
+>
+> Yup.
+>
+> Dirk
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/IlMh : CPP package: exposing C++ objects
+|- http://tr.im/HlX9 : new package : bibtex
+`- http://tr.im/Gq7i : ohloh
+
+
+
+
+From edd at debian.org  Sat Dec 26 17:36:51 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 26 Dec 2009 10:36:51 -0600
+Subject: [Rprotobuf-yada] package ready or unit tests
+In-Reply-To: <4B363735.3010605@free.fr>
+References: <4B3600FA.5070405@free.fr>
+	<19254.11924.79332.213230@ron.nulle.part>
+	<4B363735.3010605@free.fr>
+Message-ID: <19254.15267.440949.701414@ron.nulle.part>
+
+
+On 26 December 2009 at 17:17, Romain Fran?ois wrote:
+| Not really. I've put that in. Both making vignettes with R CMD build and 
+| just checking with R CMD check should work now.
+
+Thanks. I also removed the now-redundant variable 'wd' there.
+
+I actually get a failure on R CMD check now:
+
+* checking tests ...
+  Running ?doRUnit.R?
+ ERROR
+Running the tests in 'tests/doRUnit.R' failed.
+Last 13 lines of output:
+  Error in func() : boom
+   done successfully.
+
+
+
+  Executing test function test.failure  ... Timing stopped at: 0 0 0.002
+  Error in checkEquals(1, 2) : Mean relative difference: 1
+   done successfully.
+
+  Error in eval.with.vis(expr, envir, enclos) :
+    one of the unit tests failed
+  Calls: source -> eval.with.vis -> eval.with.vis
+  Execution halted
+
+
+| I've also revisited the unit test vignette using brew.
+
+Gotta take a look at that. Brew is something nifty I haven't used enough yet.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Sat Dec 26 17:39:10 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 26 Dec 2009 10:39:10 -0600
+Subject: [Rprotobuf-yada] package ready or unit tests
+In-Reply-To: <4B363735.3010605@free.fr>
+References: <4B3600FA.5070405@free.fr>
+	<19254.11924.79332.213230@ron.nulle.part>
+	<4B363735.3010605@free.fr>
+Message-ID: <19254.15406.155822.787801@ron.nulle.part>
+
+
+On 26 December 2009 at 17:17, Romain Fran?ois wrote:
+| Not really. I've put that in. Both making vignettes with R CMD build and 
+| just checking with R CMD check should work now.
+
+Nope. 
+
+*** installing help indices
+** building package indices ...
+* DONE (RProtoBuf)
+* creating vignettes ... ERROR
+Loading required package: Rcpp
+Rscript --default-packages="RProtoBuf,tools" -e "Sweave( 'RProtoBuf.Rnw' ); texi2dvi( 'RProtoBuf.tex', pdf = TRUE )"
+Loading required package: Rcpp
+Loading required package: methods
+Error: could not find function "Sweave"
+Execution halted
+make: *** [RProtoBuf.pdf] Error 1
+Error in buildVignettes(dir = ".") : running 'make' failed
+Execution halted
+
+That's from 'R CMD build pkg' 
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Dec 26 17:44:48 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 26 Dec 2009 17:44:48 +0100
+Subject: [Rprotobuf-yada] package ready or unit tests
+In-Reply-To: <19254.15406.155822.787801@ron.nulle.part>
+References: <4B3600FA.5070405@free.fr>	<19254.11924.79332.213230@ron.nulle.part>	<4B363735.3010605@free.fr>
+	<19254.15406.155822.787801@ron.nulle.part>
+Message-ID: <4B363D80.30709@dbmail.com>
+
+On 12/26/2009 05:39 PM, Dirk Eddelbuettel wrote:
+>
+> On 26 December 2009 at 17:17, Romain Fran?ois wrote:
+> | Not really. I've put that in. Both making vignettes with R CMD build and
+> | just checking with R CMD check should work now.
+>
+> Nope.
+>
+> *** installing help indices
+> ** building package indices ...
+> * DONE (RProtoBuf)
+> * creating vignettes ... ERROR
+> Loading required package: Rcpp
+> Rscript --default-packages="RProtoBuf,tools" -e "Sweave( 'RProtoBuf.Rnw' ); texi2dvi( 'RProtoBuf.tex', pdf = TRUE )"
+> Loading required package: Rcpp
+> Loading required package: methods
+> Error: could not find function "Sweave"
+> Execution halted
+> make: *** [RProtoBuf.pdf] Error 1
+> Error in buildVignettes(dir = ".") : running 'make' failed
+> Execution halted
+>
+> That's from 'R CMD build pkg'
+>
+> Dirk
+
+grrrrrr
+
+I've added utils to the list of default packages used in the Makefile 
+that makes the vignettes. (Sweave is in utils)
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/IlMh : CPP package: exposing C++ objects
+|- http://tr.im/HlX9 : new package : bibtex
+`- http://tr.im/Gq7i : ohloh
+
+
+
+
+From edd at debian.org  Sat Dec 26 18:11:18 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 26 Dec 2009 11:11:18 -0600
+Subject: [Rprotobuf-yada] package ready or unit tests
+In-Reply-To: <4B363D80.30709@dbmail.com>
+References: <4B3600FA.5070405@free.fr>
+	<19254.11924.79332.213230@ron.nulle.part>
+	<4B363735.3010605@free.fr>
+	<19254.15406.155822.787801@ron.nulle.part>
+	<4B363D80.30709@dbmail.com>
+Message-ID: <19254.17334.206265.622100@ron.nulle.part>
+
+
+On 26 December 2009 at 17:44, Romain Francois wrote:
+| I've added utils to the list of default packages used in the Makefile 
+| that makes the vignettes. (Sweave is in utils)
+
+Doh, should have thought of that myself. Thanks!
+
+Build and check of the tarball work now, but I still bomb at
+
+Running the tests in 'tests/doRUnit.R' failed.
+Last 13 lines of output:
+  Error in func() : boom
+   done successfully.
+
+
+
+  Executing test function test.failure  ... Timing stopped at: 0.004 0 0.001
+  Error in checkEquals(1, 2) : Mean relative difference: 1
+   done successfully.
+
+  Error in eval.with.vis(expr, envir, enclos) :
+    one of the unit tests failed
+  Calls: source -> eval.with.vis -> eval.with.vis
+  Execution halted
+
+And from the installed package I get
+
+
+R> tests <- runTestSuite(testSuite)
+
+
+Executing test function test.draft  ... Error in eval(expr, envir = parent.frame()) : ouch
+ done successfully.
+
+
+
+Executing test function test.draft2  ... Error in eval(expr, envir = parent.frame()) : ouch
+ done successfully.
+
+
+
+Executing test function test.error  ... Timing stopped at: 0 0 0
+Error in func() : boom
+ done successfully.
+
+
+
+Executing test function test.failure  ... Timing stopped at: 0.004 0 0.002
+Error in checkEquals(1, 2) : Mean relative difference: 1
+ done successfully.
+
+R>
+
+I don't understand how 'Error in ...' and 'done successfully' can coexist here.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Dec 26 18:16:30 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 26 Dec 2009 18:16:30 +0100
+Subject: [Rprotobuf-yada] package ready or unit tests
+In-Reply-To: <19254.17334.206265.622100@ron.nulle.part>
+References: <4B3600FA.5070405@free.fr>	<19254.11924.79332.213230@ron.nulle.part>	<4B363735.3010605@free.fr>	<19254.15406.155822.787801@ron.nulle.part>	<4B363D80.30709@dbmail.com>
+	<19254.17334.206265.622100@ron.nulle.part>
+Message-ID: <4B3644EE.4090903@dbmail.com>
+
+On 12/26/2009 06:11 PM, Dirk Eddelbuettel wrote:
+> On 26 December 2009 at 17:44, Romain Francois wrote:
+> | I've added utils to the list of default packages used in the Makefile
+> | that makes the vignettes. (Sweave is in utils)
+>
+> Doh, should have thought of that myself. Thanks!
+>
+> Build and check of the tarball work now, but I still bomb at
+>
+> Running the tests in 'tests/doRUnit.R' failed.
+> Last 13 lines of output:
+>    Error in func() : boom
+>     done successfully.
+>
+>
+>
+>    Executing test function test.failure  ... Timing stopped at: 0.004 0 0.001
+>    Error in checkEquals(1, 2) : Mean relative difference: 1
+>     done successfully.
+>
+>    Error in eval.with.vis(expr, envir, enclos) :
+>      one of the unit tests failed
+>    Calls: source ->  eval.with.vis ->  eval.with.vis
+>    Execution halted
+>
+> And from the installed package I get
+>
+>
+> R>  tests<- runTestSuite(testSuite)
+>
+>
+> Executing test function test.draft  ... Error in eval(expr, envir = parent.frame()) : ouch
+>   done successfully.
+>
+>
+>
+> Executing test function test.draft2  ... Error in eval(expr, envir = parent.frame()) : ouch
+>   done successfully.
+>
+>
+>
+> Executing test function test.error  ... Timing stopped at: 0 0 0
+> Error in func() : boom
+>   done successfully.
+>
+>
+>
+> Executing test function test.failure  ... Timing stopped at: 0.004 0 0.002
+> Error in checkEquals(1, 2) : Mean relative difference: 1
+>   done successfully.
+>
+> R>
+>
+> I don't understand how 'Error in ...' and 'done successfully' can coexist here.
+>
+> Dirk
+
+I think this is the expected result. Currently I have a test that 
+generates an error (in runit.error.R)
+
+test.error <- function(){
+	stop( "boom" )
+}
+
+test.failure <- function(){
+	checkEquals( 1, 2 )
+}
+
+so the test.error generates an error, which is picked up by RUnit.
+
+Then, the way R CMD check and RUnit are combined is to fail R CMD check 
+if one unit test fails. not sure this is also the case for failures.
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/IlMh : CPP package: exposing C++ objects
+|- http://tr.im/HlX9 : new package : bibtex
+`- http://tr.im/Gq7i : ohloh
+
+
+
+
+From edd at debian.org  Sat Dec 26 18:33:33 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 26 Dec 2009 11:33:33 -0600
+Subject: [Rprotobuf-yada] package ready or unit tests
+In-Reply-To: <4B3644EE.4090903@dbmail.com>
+References: <4B3600FA.5070405@free.fr>
+	<19254.11924.79332.213230@ron.nulle.part>
+	<4B363735.3010605@free.fr>
+	<19254.15406.155822.787801@ron.nulle.part>
+	<4B363D80.30709@dbmail.com>
+	<19254.17334.206265.622100@ron.nulle.part>
+	<4B3644EE.4090903@dbmail.com>
+Message-ID: <19254.18669.190019.768520@ron.nulle.part>
+
+
+On 26 December 2009 at 18:16, Romain Francois wrote:
+| I think this is the expected result. Currently I have a test that 
+| generates an error (in runit.error.R)
+| 
+| test.error <- function(){
+| 	stop( "boom" )
+| }
+| 
+| test.failure <- function(){
+| 	checkEquals( 1, 2 )
+| }
+| 
+| so the test.error generates an error, which is picked up by RUnit.
+| 
+| Then, the way R CMD check and RUnit are combined is to fail R CMD check 
+| if one unit test fails. not sure this is also the case for failures.
+
+Ack -- but you need to catch that in try/catch or some other was as it does
+trip up R CMD check which would make us fail the 'Kurt' test of admission at
+CRAN :)
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+

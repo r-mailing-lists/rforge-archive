@@ -1,0 +1,3162 @@
+From yurii.aulchenko at gmail.com  Tue Aug 13 17:53:44 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Tue, 13 Aug 2013 19:53:44 +0400
+Subject: [GenABEL-dev] [Genabel-commits] r1286 - pkg/ProbABEL/src
+In-Reply-To: <20130808111930.DF8B91812ED@r-forge.r-project.org>
+References: <20130808111930.DF8B91812ED@r-forge.r-project.org>
+Message-ID: <5915617286991279267@unknownmsgid>
+
+This is a long-awaited-for improvement! - great work!
+
+----------------------
+Yurii Aulchenko
+(sent from mobile device)
+
+On 8 Aug 2013, at 15:19, "noreply at r-forge.r-project.org"
+<noreply at r-forge.r-project.org> wrote:
+
+> Author: lckarssen
+> Date: 2013-08-08 13:19:30 +0200 (Thu, 08 Aug 2013)
+> New Revision: 1286
+>
+> Modified:
+>   pkg/ProbABEL/src/eigen_mematrix.cpp
+>   pkg/ProbABEL/src/eigen_mematrix.h
+>   pkg/ProbABEL/src/main.cpp
+>   pkg/ProbABEL/src/mematri1.h
+>   pkg/ProbABEL/src/mematrix.h
+>   pkg/ProbABEL/src/reg1.cpp
+>   pkg/ProbABEL/src/regdata.cpp
+>   pkg/ProbABEL/src/regdata.h
+> Log:
+> Added chi^2 information to the ProbABEL output for linear regression.
+> NOTE: for palogist and pacoxph this still needs to be fixed!!!
+>
+> The chi^2 values are based on the LRT. The null model is calculated at
+> the beginning (this was already part of ProbABEL for a long time). In
+> the case of missing genotype data the null model is recalculated for
+> that SNP only. So for people with imputed data there should be no
+> difference in computation time.
+>
+> This is a bit of a rough implementation. Maybe some more work is
+> needed to make it better (in terms of programming style/efficiency).
+>
+> Changes per file:
+> src/main.cpp:
+> - Some small (unrelated) changes to the way progress information is printed
+> - Changed output precision of beta, se_beta, chi^2 to 6 instead of 9 digits
+> - around line 700 is where the recalculation of the null model is done.
+> src/regdata.h, src/regdata.cpp:
+> - Add a function remove_snp_from_X() that removes the genotype data
+>   from the design matrix. This is necessary, because in order to know
+>   which individuals have missing genotype data (and therefore should
+>   be excluded from the null estimation), we first need to have the
+>   genotype data in.
+> src/reg1.cpp:
+> - At the beginning of apply_model() check if we are calculating the
+>   null model. if so, we don't need to apply the genotypic model at
+>   all.
+> src/eigen_mematrix.h, src/eigen_mematrix.cpp:
+> - Implement the delete_column() function. When transitioning to Eigen
+>   this function wasn't used anywhere in the code, so it wasn't
+>   carried over from the mematrix files.
+> src/mematri1.h, src/mematrix.h:
+> - Set the col/row number argument to const in the delete_column() and
+>   delete_row() functions.
+>
+>
+>
+>
+>
+> Modified: pkg/ProbABEL/src/eigen_mematrix.cpp
+> ===================================================================
+> --- pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> +++ pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> @@ -362,4 +362,30 @@
+>     return temp;
+> }
+>
+> +
+> +template<class DT>
+> +void mematrix<DT>::delete_column(const int delcol)
+> +{
+> +    if (delcol > ncol || delcol < 0)
+> +    {
+> +        fprintf(stderr, "mematrix::delete_column: column out of range\n");
+> +        exit(1);
+> +    }
+> +
+> +    // Eigen::Matrix<DT,-1,-1,0,-1,-1> *auxdata =
+> +    //     new Eigen::Matrix<DT,-1,-1,0,-1,-1>;
+> +    MatrixXd auxdata = data;
+> +
+> +    data.resize(data.rows(), data.cols()-1);
+> +
+> +    int rightColsSize = auxdata.cols() - delcol - 1;
+> +
+> +    data.leftCols(delcol) = auxdata.leftCols(delcol);
+> +    data.rightCols(rightColsSize) = auxdata.rightCols(rightColsSize);
+> +
+> +    ncol--;
+> +}
+> +
+> +
+> +
+> #endif
+>
+> Modified: pkg/ProbABEL/src/eigen_mematrix.h
+> ===================================================================
+> --- pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 10:07:32 UTC (rev 1285)
+> +++ pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 11:19:30 UTC (rev 1286)
+> @@ -37,6 +37,8 @@
+>     mematrix operator*(const mematrix &M);
+>     mematrix operator*(const mematrix *M);
+>
+> +    void delete_column(const int delcol);
+> +
+>     void reinit(int nr, int nc);
+>
+>     unsigned int getnrow(void)
+>
+> Modified: pkg/ProbABEL/src/main.cpp
+> ===================================================================
+> --- pkg/ProbABEL/src/main.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> +++ pkg/ProbABEL/src/main.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> @@ -208,9 +208,9 @@
+>                 << input_var.getSep()
+>                 << "sebeta_SNP_recA1";
+>     *outfile[4] << input_var.getSep()
+> -                << "beta_SNP_odom"
+> +                << "beta_SNP_odomA1"
+>                 << input_var.getSep()
+> -                << "sebeta_SNP_odom";
+> +                << "sebeta_SNP_odomA1";
+>     if (input_var.getInteraction() != 0)
+>     {
+>         //Han Chen
+> @@ -263,7 +263,7 @@
+>     *outfile[1] << input_var.getSep() << "chi2_SNP_A1\n";   // "loglik\n";
+>     *outfile[2] << input_var.getSep() << "chi2_SNP_domA1\n";// "loglik\n";
+>     *outfile[3] << input_var.getSep() << "chi2_SNP_recA1\n";// "loglik\n";
+> -    *outfile[4] << input_var.getSep() << "chi2_SNP_odom\n"; // "loglik\n";
+> +    *outfile[4] << input_var.getSep() << "chi2_SNP_odomA1\n"; // "loglik\n";
+> }
+>
+> void create_header2(std::vector<std::ofstream*>& outfile, cmdvars& input_var,
+> @@ -389,7 +389,7 @@
+>
+>     masked_matrix invvarmatrix;
+>
+> -    std::cout << "Reading data ..." << std::flush;
+> +    std::cout << "Reading data..." << std::flush;
+>     if (input_var.getInverseFilename() != NULL)
+>     {
+>         loadInvSigma(input_var, phd, invvarmatrix);
+> @@ -412,7 +412,7 @@
+>                        phd.allmeasured, phd.idnames);
+>     }
+>
+> -    std::cout << " loaded genotypic data ..." << std::flush;
+> +    std::cout << " loaded genotypic data..." << std::flush;
+>
+>     // estimate null model
+> #if COXPH
+> @@ -421,7 +421,7 @@
+>     regdata nrgd = regdata(phd, gtd, -1, input_var.isIsInteractionExcluded());
+> #endif
+>
+> -    std::cout << " loaded null data ..." << std::flush;
+> +    std::cout << " loaded null data..." << std::flush;
+> #if LOGISTIC
+>     logistic_reg nrd = logistic_reg(nrgd);
+>     nrd.estimate(nrgd, 0, MAXITER, EPS, CHOLTOL, 0,
+> @@ -446,14 +446,14 @@
+> #endif
+>     double null_loglik = nrd.loglik;
+>
+> -    std::cout << " estimated null model ...";
+> +    std::cout << " estimated null model...";
+>     // end null
+> #if COXPH
+>     coxph_data rgd(phd, gtd, 0);
+> #else
+>     regdata rgd(phd, gtd, 0, input_var.isIsInteractionExcluded());
+> #endif
+> -    std::cout << " formed regression object ...";
+> +    std::cout << " formed regression object...\n";
+>
+>
+>     // Open a vector of files that will be used for output. Depending
+> @@ -505,13 +505,16 @@
+>     for (int i = 0; i < maxmod; i++)
+>     {
+>         beta_sebeta.push_back(new std::ostringstream());
+> -        beta_sebeta[i]->precision(9);
+> +        beta_sebeta[i]->precision(6);
+> +        //*beta_sebeta[i] << scientific;
+>         //Han Chen
+>         covvalue.push_back(new std::ostringstream());
+> -        covvalue[i]->precision(9);
+> +        covvalue[i]->precision(6);
+> +        //*covvalue[i] << scientific;
+>         //Oct 26, 2009
+>         chi2.push_back(new std::ostringstream());
+> -        chi2[i]->precision(9);
+> +        chi2[i]->precision(6);
+> +        //*chi2[i] << scientific;
+>     }
+>
+>
+> @@ -565,10 +568,10 @@
+>             poly = 0;
+>         }
+>
+> +        // Write mlinfo information to the output file(s)
+>         // Prob data: All models output. One file per model
+>         if (input_var.getNgpreds() == 2)
+>         {
+> -            // Write mlinfo to output:
+>             for (unsigned int file = 0; file < outfile.size(); file++)
+>             {
+>                 write_mlinfo(outfile, file, mli, csnp, input_var,
+> @@ -679,7 +682,7 @@
+>                 } // END for(pos = start_pos; pos < rd.beta.nrow; pos++)
+>
+>
+> -                //calculate chi2
+> +                //calculate chi^2
+>                 //________________________________
+>                 //cout <<  rd.loglik<<" "<<input_var.getNgpreds() << "\n";
+>
+> @@ -690,23 +693,41 @@
+>
+>                     if (input_var.getScore() == 0)
+>                     {
+> +                        double loglik = rd.loglik;
+>                         if (gcount != gtd.nids)
+>                         {
+>                             // If SNP data is missing we didn't
+>                             // correctly compute the null likelihood
+> -                            *chi2[model] << "NaN";
+> +
+> +                            // Recalculate null likelihood by
+> +                            // stripping the SNP data column(s) from
+> +                            // the X matrix in the regression object
+> +                            // and run the null model estimation again
+> +                            // for this SNP.
+> +// BEWARE, ONLY IMPLEMENTED FOR LINEAR REG!!!
+> +// TODO LCK
+> +#ifdef LINEAR
+> +                            regdata new_rgd = rgd;
+> +                            new_rgd.remove_snp_from_X();
+> +                            linear_reg new_null_rd(new_rgd);
+> +                            new_null_rd.estimate(new_rgd, 0, CHOLTOL, model,
+> +                                                 input_var.getInteraction(),
+> +                                                 input_var.getNgpreds(),
+> +                                                 invvarmatrix,
+> +                                                 input_var.getRobust(), 1);
+> +
+> +                            *chi2[model] << 2. * (loglik - new_null_rd.loglik);
+> +#endif
+>                         }
+>                         else
+>                         {
+>                             // No missing SNP data, we can compute the LRT
+> -                            *chi2[model] << 2. * (rd.loglik - null_loglik);
+> +                            *chi2[model] << 2. * (loglik - null_loglik);
+>                         }
+> -                        //*chi2[model] << rd.loglik;
+>                     } else
+>                     {
+>                         // We want score test output
+>                         *chi2[model] << rd.chi2_score;
+> -                        //*chi2[model] << "nan";
+>                     }
+>                 }
+>             } // END first part of if(poly); allele not too rare
+>
+> Modified: pkg/ProbABEL/src/mematri1.h
+> ===================================================================
+> --- pkg/ProbABEL/src/mematri1.h    2013-08-08 10:07:32 UTC (rev 1285)
+> +++ pkg/ProbABEL/src/mematri1.h    2013-08-08 11:19:30 UTC (rev 1286)
+> @@ -301,7 +301,7 @@
+> }
+>
+> template<class DT>
+> -void mematrix<DT>::delete_column(int delcol)
+> +void mematrix<DT>::delete_column(const int delcol)
+> {
+>     if (delcol > ncol || delcol < 0)
+>     {
+> @@ -333,7 +333,7 @@
+> }
+>
+> template<class DT>
+> -void mematrix<DT>::delete_row(int delrow)
+> +void mematrix<DT>::delete_row(const int delrow)
+> {
+>     if (delrow > nrow || delrow < 0)
+>     {
+>
+> Modified: pkg/ProbABEL/src/mematrix.h
+> ===================================================================
+> --- pkg/ProbABEL/src/mematrix.h    2013-08-08 10:07:32 UTC (rev 1285)
+> +++ pkg/ProbABEL/src/mematrix.h    2013-08-08 11:19:30 UTC (rev 1286)
+> @@ -48,8 +48,8 @@
+>     void put(DT value, int nr, int nc);
+>     DT column_mean(int nc);
+>     void print(void);
+> -    void delete_column(int delcol);
+> -    void delete_row(int delrow);
+> +    void delete_column(const int delcol);
+> +    void delete_row(const int delrow);
+>
+> };
+>
+>
+> Modified: pkg/ProbABEL/src/reg1.cpp
+> ===================================================================
+> --- pkg/ProbABEL/src/reg1.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> +++ pkg/ProbABEL/src/reg1.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> @@ -4,12 +4,22 @@
+> mematrix<double> apply_model(mematrix<double>& X, int model, int interaction,
+>                              int ngpreds, bool is_interaction_excluded,
+>                              bool iscox, int nullmodel)
+> +// if ngpreds==1 (dose data):
+> +// model 0 = additive 1 df
+> +// if ngpreds==2 (prob data):
+> // model 0 = 2 df
+> // model 1 = additive 1 df
+> // model 2 = dominant 1 df
+> // model 3 = recessive 1 df
+> // model 4 = over-dominant 1 df
+> {
+> +    if(nullmodel)
+> +    {
+> +        // No need to apply any genotypic model when calculating the
+> +        // null model
+> +        return (X);
+> +    }
+> +
+>     if (model == 0)
+>     {
+>         if (interaction != 0 && !nullmodel)
+> @@ -295,12 +305,13 @@
+>     if (verbose)
+>     {
+>         cout << rdata.is_interaction_excluded
+> -                << " <-irdata.is_interaction_excluded\n";
+> +             << " <-rdata.is_interaction_excluded\n";
+>         // std::cout << "invvarmatrix:\n";
+>         // invvarmatrixin.masked_data->print();
+>         std::cout << "rdata.X:\n";
+>         rdata.X.print();
+>     }
+> +
+>     mematrix<double> X = apply_model(rdata.X, model, interaction, ngpreds,
+>                                      rdata.is_interaction_excluded, false,
+>                                      nullmodel);
+> @@ -311,6 +322,7 @@
+>         std::cout << "Y:\n";
+>         rdata.Y.print();
+>     }
+> +
+>     int length_beta = X.ncol;
+>     beta.reinit(length_beta, 1);
+>     sebeta.reinit(length_beta, 1);
+>
+> Modified: pkg/ProbABEL/src/regdata.cpp
+> ===================================================================
+> --- pkg/ProbABEL/src/regdata.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> +++ pkg/ProbABEL/src/regdata.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> @@ -39,7 +39,7 @@
+>
+>     for (int i = 0; i < nids; i++)
+>     {
+> -        masked_data[i] = 0;
+> +        masked_data[i] = obj.masked_data[i];
+>     }
+> }
+>
+> @@ -95,6 +95,9 @@
+>
+> void regdata::update_snp(gendata &gend, int snpnum)
+> {
+> +    // Add genotypic data (dosage or probabilities) to the design
+> +    // matrix X.
+> +
+>     for (int j = 0; j < ngpreds; j++)
+>     {
+>         double snpdata[nids];
+> @@ -109,11 +112,34 @@
+>         {
+>             X.put(snpdata[i], i, (ncov - j));
+>             if (isnan(snpdata[i]))
+> +            {
+>                 masked_data[i] = 1;
+> +            }
+>         }
+>     }
+> }
+>
+> +void regdata::remove_snp_from_X()
+> +{
+> +    // update_snp() adds SNP information to the design matrix. This
+> +    // function allows you to strip that information from X again.
+> +    // This is used for example when calculating the null model.
+> +
+> +    if(ngpreds == 1)
+> +    {
+> +        X.delete_column(X.ncol -1);
+> +    }
+> +    else if(ngpreds == 2)
+> +    {
+> +        X.delete_column(X.ncol -1);
+> +        X.delete_column(X.ncol -1);
+> +    }
+> +    else
+> +    {
+> +        cerr << "ngpreds should be 1 or 2. you should never come here!\n";
+> +    }
+> +}
+> +
+> regdata::~regdata()
+> {
+>     delete[] regdata::masked_data;
+>
+> Modified: pkg/ProbABEL/src/regdata.h
+> ===================================================================
+> --- pkg/ProbABEL/src/regdata.h    2013-08-08 10:07:32 UTC (rev 1285)
+> +++ pkg/ProbABEL/src/regdata.h    2013-08-08 11:19:30 UTC (rev 1286)
+> @@ -34,6 +34,7 @@
+>             bool ext_is_interaction_excluded);
+>     mematrix<double> extract_genotypes();
+>     void update_snp(gendata &gend, int snpnum);
+> +    void remove_snp_from_X();
+>     regdata get_unmasked_data();
+>     ~regdata();
+>
+>
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+
+From lennart at karssen.org  Wed Aug 14 10:03:45 2013
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 14 Aug 2013 10:03:45 +0200
+Subject: [GenABEL-dev] Precision and scientific notation in ProbABEL
+In-Reply-To: <5B307B30-9137-4A17-8A36-D43FC2818B94@burlo.trieste.it>
+References: <51F76C1A.2000205@karssen.org>
+ <5B307B30-9137-4A17-8A36-D43FC2818B94@burlo.trieste.it>
+Message-ID: <520B39E1.5000409@karssen.org>
+
+Thanks for the input Nicola, I've set the output to 6 significant
+digits, although it seems that the cout function (used for printing)
+sometimes "eats" a trailing zero.
+
+
+Best,
+
+Lennart.
+
+
+On 30-07-13 10:33, Nicola Pirastu wrote:
+> Dear Lennart,
+> 
+> I think that switching to scientific notation is not really necessary and could lead to a little of loss in precision unless of course you still
+> use 6 significant digits which will translate in just a reduction of 0 in the values.
+> So if for example we were to choose scientific notation with 3 significant digits, although this would not affect very much the final results we could be asked to submit more and
+> would not be able to comply.
+> So to summarize I think that if it does not have any effect on performance of ProbABEL 6 significant digits without scientific notation is fine.
+> 
+> Best
+> 
+> Nicola
+> 
+> 
+> Dr. Nicola Pirastu PhD
+> Research Fellow
+> Medical Sciences, Chirurgical and Health Department
+> University of Trieste
+> Medical Genetics
+> IRCCS Burlo Garofolo
+> Via dell'Istria 65/1
+> 34137 Italy
+> tel. +390403785539
+> 
+> Il giorno 30/lug/2013, alle ore 09:32, "L.C. Karssen" <lennart at karssen.org> ha scritto:
+> 
+>> Dear list,
+>>
+>> I'm finalising version 0.4.0 of ProbABEL and there are two things I'd
+>> like your opinion on:
+>>
+>> 1) with what precision should we print the betas, standard errors and
+>> Chi^2 values to the output files?
+>>
+>> 2) Should we use scientific notation in the output (for betas, standard
+>> errors and Chi^2)?
+>>
+>> In ProbABEL v0.3.0 and earlier output was simply sent to cout without
+>> any explicit formatting. In practice this lead usually to 6 significant
+>> digits, but sometimes less. My proposal is to fix the precision at 6
+>> significant digits.
+>>
+>> Regarding item 2): most of the betas I see are in the range between 0
+>> and 10, although in case of no effect beta's can be of the order of
+>> 1e-2, 1e-3. All in all, I don't think switching to scientific notation
+>> will improve the output.
+>>
+>>
+>> What are your opinions?
+>>
+>>
+>> Thanks,
+>>
+>> Lennart.
+>> --
+>> -----------------------------------------------------------------
+>> L.C. Karssen
+>> Utrecht
+>> The Netherlands
+>>
+>> lennart at karssen.org
+>> http://blog.karssen.org
+>>
+>> Stuur mij aub geen Word of Powerpoint bestanden!
+>> Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+>> ------------------------------------------------------------------
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+> AVVISO DI RISERVATEZZA Informazioni riservate possono essere contenute nel messaggio o nei suoi allegati. Se non siete i destinatari indicati nel messaggio, o responsabili per la sua consegna alla persona, o se avete ricevuto il messaggio per errore, siete pregati di non trascriverlo, copiarlo o inviarlo a nessuno. In tal caso vi invitiamo a cancellare il messaggio ed i suoi allegati. Grazie. CONFIDENTIALITY NOTICE Confidential information may be contained in this message or in its attachments. If you are not the addressee indicated in this message, or responsible for message delivering to that person, or if you have received this message in error, you may not transcribe, copy or deliver this message to anyone. In that case, you should delete this message and its attachments. Thank you.
+> 
+
+
+-- 
+-----------------------------------------------------------------
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+
+Stuur mij aub geen Word of Powerpoint bestanden!
+Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+------------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 230 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130814/3552c5e3/attachment.sig>
+
+From lennart at karssen.org  Wed Aug 14 10:11:11 2013
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 14 Aug 2013 10:11:11 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1286 - pkg/ProbABEL/src
+In-Reply-To: <5915617286991279267@unknownmsgid>
+References: <20130808111930.DF8B91812ED@r-forge.r-project.org>
+ <5915617286991279267@unknownmsgid>
+Message-ID: <520B3B9F.4010602@karssen.org>
+
+On 13-08-13 17:53, Yurii Aulchenko wrote:
+> This is a long-awaited-for improvement! - great work!
+
+Thanks! As always it was a learning experience. With these larger
+changes you get to know the code better and better. And learn more
+statistics along the way :-).
+
+I decided to go for LRT instead of the Wald test for two reasons:
+- LRT is theoretically more superior
+- I found the equation for the Wald on 2df in the ProbABEL paper, but
+programming-wise I couldn't get it to work. The coxfit2() function for
+example says it returns the covariance matrix, but after extracting the
+sub-matrices I still didn't get answers that were close to the
+(beta/se_beta)^2 values for the 1df case. So, after spending some time,
+implementing the LRT while only recalculating the null model in the case
+of missing genotype data was the quickest.
+
+I've also added the LRT-chi^2 for Cox and logistic regression now, as
+well as R-based consistency checks.
+
+I haven't looked at the output when using the score option or the robust
+option at all yet. Any idea if that will require a lot of additional
+programming? Various people are waiting for the fixed Cox regression, so
+I would like to put out a new ProbABEL release ASAP.
+
+
+Thanks,
+
+Lennart.
+
+
+> 
+> ----------------------
+> Yurii Aulchenko
+> (sent from mobile device)
+> 
+> On 8 Aug 2013, at 15:19, "noreply at r-forge.r-project.org"
+> <noreply at r-forge.r-project.org> wrote:
+> 
+>> Author: lckarssen
+>> Date: 2013-08-08 13:19:30 +0200 (Thu, 08 Aug 2013)
+>> New Revision: 1286
+>>
+>> Modified:
+>>   pkg/ProbABEL/src/eigen_mematrix.cpp
+>>   pkg/ProbABEL/src/eigen_mematrix.h
+>>   pkg/ProbABEL/src/main.cpp
+>>   pkg/ProbABEL/src/mematri1.h
+>>   pkg/ProbABEL/src/mematrix.h
+>>   pkg/ProbABEL/src/reg1.cpp
+>>   pkg/ProbABEL/src/regdata.cpp
+>>   pkg/ProbABEL/src/regdata.h
+>> Log:
+>> Added chi^2 information to the ProbABEL output for linear regression.
+>> NOTE: for palogist and pacoxph this still needs to be fixed!!!
+>>
+>> The chi^2 values are based on the LRT. The null model is calculated at
+>> the beginning (this was already part of ProbABEL for a long time). In
+>> the case of missing genotype data the null model is recalculated for
+>> that SNP only. So for people with imputed data there should be no
+>> difference in computation time.
+>>
+>> This is a bit of a rough implementation. Maybe some more work is
+>> needed to make it better (in terms of programming style/efficiency).
+>>
+>> Changes per file:
+>> src/main.cpp:
+>> - Some small (unrelated) changes to the way progress information is printed
+>> - Changed output precision of beta, se_beta, chi^2 to 6 instead of 9 digits
+>> - around line 700 is where the recalculation of the null model is done.
+>> src/regdata.h, src/regdata.cpp:
+>> - Add a function remove_snp_from_X() that removes the genotype data
+>>   from the design matrix. This is necessary, because in order to know
+>>   which individuals have missing genotype data (and therefore should
+>>   be excluded from the null estimation), we first need to have the
+>>   genotype data in.
+>> src/reg1.cpp:
+>> - At the beginning of apply_model() check if we are calculating the
+>>   null model. if so, we don't need to apply the genotypic model at
+>>   all.
+>> src/eigen_mematrix.h, src/eigen_mematrix.cpp:
+>> - Implement the delete_column() function. When transitioning to Eigen
+>>   this function wasn't used anywhere in the code, so it wasn't
+>>   carried over from the mematrix files.
+>> src/mematri1.h, src/mematrix.h:
+>> - Set the col/row number argument to const in the delete_column() and
+>>   delete_row() functions.
+>>
+>>
+>>
+>>
+>>
+>> Modified: pkg/ProbABEL/src/eigen_mematrix.cpp
+>> ===================================================================
+>> --- pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+>> +++ pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+>> @@ -362,4 +362,30 @@
+>>     return temp;
+>> }
+>>
+>> +
+>> +template<class DT>
+>> +void mematrix<DT>::delete_column(const int delcol)
+>> +{
+>> +    if (delcol > ncol || delcol < 0)
+>> +    {
+>> +        fprintf(stderr, "mematrix::delete_column: column out of range\n");
+>> +        exit(1);
+>> +    }
+>> +
+>> +    // Eigen::Matrix<DT,-1,-1,0,-1,-1> *auxdata =
+>> +    //     new Eigen::Matrix<DT,-1,-1,0,-1,-1>;
+>> +    MatrixXd auxdata = data;
+>> +
+>> +    data.resize(data.rows(), data.cols()-1);
+>> +
+>> +    int rightColsSize = auxdata.cols() - delcol - 1;
+>> +
+>> +    data.leftCols(delcol) = auxdata.leftCols(delcol);
+>> +    data.rightCols(rightColsSize) = auxdata.rightCols(rightColsSize);
+>> +
+>> +    ncol--;
+>> +}
+>> +
+>> +
+>> +
+>> #endif
+>>
+>> Modified: pkg/ProbABEL/src/eigen_mematrix.h
+>> ===================================================================
+>> --- pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 10:07:32 UTC (rev 1285)
+>> +++ pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 11:19:30 UTC (rev 1286)
+>> @@ -37,6 +37,8 @@
+>>     mematrix operator*(const mematrix &M);
+>>     mematrix operator*(const mematrix *M);
+>>
+>> +    void delete_column(const int delcol);
+>> +
+>>     void reinit(int nr, int nc);
+>>
+>>     unsigned int getnrow(void)
+>>
+>> Modified: pkg/ProbABEL/src/main.cpp
+>> ===================================================================
+>> --- pkg/ProbABEL/src/main.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+>> +++ pkg/ProbABEL/src/main.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+>> @@ -208,9 +208,9 @@
+>>                 << input_var.getSep()
+>>                 << "sebeta_SNP_recA1";
+>>     *outfile[4] << input_var.getSep()
+>> -                << "beta_SNP_odom"
+>> +                << "beta_SNP_odomA1"
+>>                 << input_var.getSep()
+>> -                << "sebeta_SNP_odom";
+>> +                << "sebeta_SNP_odomA1";
+>>     if (input_var.getInteraction() != 0)
+>>     {
+>>         //Han Chen
+>> @@ -263,7 +263,7 @@
+>>     *outfile[1] << input_var.getSep() << "chi2_SNP_A1\n";   // "loglik\n";
+>>     *outfile[2] << input_var.getSep() << "chi2_SNP_domA1\n";// "loglik\n";
+>>     *outfile[3] << input_var.getSep() << "chi2_SNP_recA1\n";// "loglik\n";
+>> -    *outfile[4] << input_var.getSep() << "chi2_SNP_odom\n"; // "loglik\n";
+>> +    *outfile[4] << input_var.getSep() << "chi2_SNP_odomA1\n"; // "loglik\n";
+>> }
+>>
+>> void create_header2(std::vector<std::ofstream*>& outfile, cmdvars& input_var,
+>> @@ -389,7 +389,7 @@
+>>
+>>     masked_matrix invvarmatrix;
+>>
+>> -    std::cout << "Reading data ..." << std::flush;
+>> +    std::cout << "Reading data..." << std::flush;
+>>     if (input_var.getInverseFilename() != NULL)
+>>     {
+>>         loadInvSigma(input_var, phd, invvarmatrix);
+>> @@ -412,7 +412,7 @@
+>>                        phd.allmeasured, phd.idnames);
+>>     }
+>>
+>> -    std::cout << " loaded genotypic data ..." << std::flush;
+>> +    std::cout << " loaded genotypic data..." << std::flush;
+>>
+>>     // estimate null model
+>> #if COXPH
+>> @@ -421,7 +421,7 @@
+>>     regdata nrgd = regdata(phd, gtd, -1, input_var.isIsInteractionExcluded());
+>> #endif
+>>
+>> -    std::cout << " loaded null data ..." << std::flush;
+>> +    std::cout << " loaded null data..." << std::flush;
+>> #if LOGISTIC
+>>     logistic_reg nrd = logistic_reg(nrgd);
+>>     nrd.estimate(nrgd, 0, MAXITER, EPS, CHOLTOL, 0,
+>> @@ -446,14 +446,14 @@
+>> #endif
+>>     double null_loglik = nrd.loglik;
+>>
+>> -    std::cout << " estimated null model ...";
+>> +    std::cout << " estimated null model...";
+>>     // end null
+>> #if COXPH
+>>     coxph_data rgd(phd, gtd, 0);
+>> #else
+>>     regdata rgd(phd, gtd, 0, input_var.isIsInteractionExcluded());
+>> #endif
+>> -    std::cout << " formed regression object ...";
+>> +    std::cout << " formed regression object...\n";
+>>
+>>
+>>     // Open a vector of files that will be used for output. Depending
+>> @@ -505,13 +505,16 @@
+>>     for (int i = 0; i < maxmod; i++)
+>>     {
+>>         beta_sebeta.push_back(new std::ostringstream());
+>> -        beta_sebeta[i]->precision(9);
+>> +        beta_sebeta[i]->precision(6);
+>> +        //*beta_sebeta[i] << scientific;
+>>         //Han Chen
+>>         covvalue.push_back(new std::ostringstream());
+>> -        covvalue[i]->precision(9);
+>> +        covvalue[i]->precision(6);
+>> +        //*covvalue[i] << scientific;
+>>         //Oct 26, 2009
+>>         chi2.push_back(new std::ostringstream());
+>> -        chi2[i]->precision(9);
+>> +        chi2[i]->precision(6);
+>> +        //*chi2[i] << scientific;
+>>     }
+>>
+>>
+>> @@ -565,10 +568,10 @@
+>>             poly = 0;
+>>         }
+>>
+>> +        // Write mlinfo information to the output file(s)
+>>         // Prob data: All models output. One file per model
+>>         if (input_var.getNgpreds() == 2)
+>>         {
+>> -            // Write mlinfo to output:
+>>             for (unsigned int file = 0; file < outfile.size(); file++)
+>>             {
+>>                 write_mlinfo(outfile, file, mli, csnp, input_var,
+>> @@ -679,7 +682,7 @@
+>>                 } // END for(pos = start_pos; pos < rd.beta.nrow; pos++)
+>>
+>>
+>> -                //calculate chi2
+>> +                //calculate chi^2
+>>                 //________________________________
+>>                 //cout <<  rd.loglik<<" "<<input_var.getNgpreds() << "\n";
+>>
+>> @@ -690,23 +693,41 @@
+>>
+>>                     if (input_var.getScore() == 0)
+>>                     {
+>> +                        double loglik = rd.loglik;
+>>                         if (gcount != gtd.nids)
+>>                         {
+>>                             // If SNP data is missing we didn't
+>>                             // correctly compute the null likelihood
+>> -                            *chi2[model] << "NaN";
+>> +
+>> +                            // Recalculate null likelihood by
+>> +                            // stripping the SNP data column(s) from
+>> +                            // the X matrix in the regression object
+>> +                            // and run the null model estimation again
+>> +                            // for this SNP.
+>> +// BEWARE, ONLY IMPLEMENTED FOR LINEAR REG!!!
+>> +// TODO LCK
+>> +#ifdef LINEAR
+>> +                            regdata new_rgd = rgd;
+>> +                            new_rgd.remove_snp_from_X();
+>> +                            linear_reg new_null_rd(new_rgd);
+>> +                            new_null_rd.estimate(new_rgd, 0, CHOLTOL, model,
+>> +                                                 input_var.getInteraction(),
+>> +                                                 input_var.getNgpreds(),
+>> +                                                 invvarmatrix,
+>> +                                                 input_var.getRobust(), 1);
+>> +
+>> +                            *chi2[model] << 2. * (loglik - new_null_rd.loglik);
+>> +#endif
+>>                         }
+>>                         else
+>>                         {
+>>                             // No missing SNP data, we can compute the LRT
+>> -                            *chi2[model] << 2. * (rd.loglik - null_loglik);
+>> +                            *chi2[model] << 2. * (loglik - null_loglik);
+>>                         }
+>> -                        //*chi2[model] << rd.loglik;
+>>                     } else
+>>                     {
+>>                         // We want score test output
+>>                         *chi2[model] << rd.chi2_score;
+>> -                        //*chi2[model] << "nan";
+>>                     }
+>>                 }
+>>             } // END first part of if(poly); allele not too rare
+>>
+>> Modified: pkg/ProbABEL/src/mematri1.h
+>> ===================================================================
+>> --- pkg/ProbABEL/src/mematri1.h    2013-08-08 10:07:32 UTC (rev 1285)
+>> +++ pkg/ProbABEL/src/mematri1.h    2013-08-08 11:19:30 UTC (rev 1286)
+>> @@ -301,7 +301,7 @@
+>> }
+>>
+>> template<class DT>
+>> -void mematrix<DT>::delete_column(int delcol)
+>> +void mematrix<DT>::delete_column(const int delcol)
+>> {
+>>     if (delcol > ncol || delcol < 0)
+>>     {
+>> @@ -333,7 +333,7 @@
+>> }
+>>
+>> template<class DT>
+>> -void mematrix<DT>::delete_row(int delrow)
+>> +void mematrix<DT>::delete_row(const int delrow)
+>> {
+>>     if (delrow > nrow || delrow < 0)
+>>     {
+>>
+>> Modified: pkg/ProbABEL/src/mematrix.h
+>> ===================================================================
+>> --- pkg/ProbABEL/src/mematrix.h    2013-08-08 10:07:32 UTC (rev 1285)
+>> +++ pkg/ProbABEL/src/mematrix.h    2013-08-08 11:19:30 UTC (rev 1286)
+>> @@ -48,8 +48,8 @@
+>>     void put(DT value, int nr, int nc);
+>>     DT column_mean(int nc);
+>>     void print(void);
+>> -    void delete_column(int delcol);
+>> -    void delete_row(int delrow);
+>> +    void delete_column(const int delcol);
+>> +    void delete_row(const int delrow);
+>>
+>> };
+>>
+>>
+>> Modified: pkg/ProbABEL/src/reg1.cpp
+>> ===================================================================
+>> --- pkg/ProbABEL/src/reg1.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+>> +++ pkg/ProbABEL/src/reg1.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+>> @@ -4,12 +4,22 @@
+>> mematrix<double> apply_model(mematrix<double>& X, int model, int interaction,
+>>                              int ngpreds, bool is_interaction_excluded,
+>>                              bool iscox, int nullmodel)
+>> +// if ngpreds==1 (dose data):
+>> +// model 0 = additive 1 df
+>> +// if ngpreds==2 (prob data):
+>> // model 0 = 2 df
+>> // model 1 = additive 1 df
+>> // model 2 = dominant 1 df
+>> // model 3 = recessive 1 df
+>> // model 4 = over-dominant 1 df
+>> {
+>> +    if(nullmodel)
+>> +    {
+>> +        // No need to apply any genotypic model when calculating the
+>> +        // null model
+>> +        return (X);
+>> +    }
+>> +
+>>     if (model == 0)
+>>     {
+>>         if (interaction != 0 && !nullmodel)
+>> @@ -295,12 +305,13 @@
+>>     if (verbose)
+>>     {
+>>         cout << rdata.is_interaction_excluded
+>> -                << " <-irdata.is_interaction_excluded\n";
+>> +             << " <-rdata.is_interaction_excluded\n";
+>>         // std::cout << "invvarmatrix:\n";
+>>         // invvarmatrixin.masked_data->print();
+>>         std::cout << "rdata.X:\n";
+>>         rdata.X.print();
+>>     }
+>> +
+>>     mematrix<double> X = apply_model(rdata.X, model, interaction, ngpreds,
+>>                                      rdata.is_interaction_excluded, false,
+>>                                      nullmodel);
+>> @@ -311,6 +322,7 @@
+>>         std::cout << "Y:\n";
+>>         rdata.Y.print();
+>>     }
+>> +
+>>     int length_beta = X.ncol;
+>>     beta.reinit(length_beta, 1);
+>>     sebeta.reinit(length_beta, 1);
+>>
+>> Modified: pkg/ProbABEL/src/regdata.cpp
+>> ===================================================================
+>> --- pkg/ProbABEL/src/regdata.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+>> +++ pkg/ProbABEL/src/regdata.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+>> @@ -39,7 +39,7 @@
+>>
+>>     for (int i = 0; i < nids; i++)
+>>     {
+>> -        masked_data[i] = 0;
+>> +        masked_data[i] = obj.masked_data[i];
+>>     }
+>> }
+>>
+>> @@ -95,6 +95,9 @@
+>>
+>> void regdata::update_snp(gendata &gend, int snpnum)
+>> {
+>> +    // Add genotypic data (dosage or probabilities) to the design
+>> +    // matrix X.
+>> +
+>>     for (int j = 0; j < ngpreds; j++)
+>>     {
+>>         double snpdata[nids];
+>> @@ -109,11 +112,34 @@
+>>         {
+>>             X.put(snpdata[i], i, (ncov - j));
+>>             if (isnan(snpdata[i]))
+>> +            {
+>>                 masked_data[i] = 1;
+>> +            }
+>>         }
+>>     }
+>> }
+>>
+>> +void regdata::remove_snp_from_X()
+>> +{
+>> +    // update_snp() adds SNP information to the design matrix. This
+>> +    // function allows you to strip that information from X again.
+>> +    // This is used for example when calculating the null model.
+>> +
+>> +    if(ngpreds == 1)
+>> +    {
+>> +        X.delete_column(X.ncol -1);
+>> +    }
+>> +    else if(ngpreds == 2)
+>> +    {
+>> +        X.delete_column(X.ncol -1);
+>> +        X.delete_column(X.ncol -1);
+>> +    }
+>> +    else
+>> +    {
+>> +        cerr << "ngpreds should be 1 or 2. you should never come here!\n";
+>> +    }
+>> +}
+>> +
+>> regdata::~regdata()
+>> {
+>>     delete[] regdata::masked_data;
+>>
+>> Modified: pkg/ProbABEL/src/regdata.h
+>> ===================================================================
+>> --- pkg/ProbABEL/src/regdata.h    2013-08-08 10:07:32 UTC (rev 1285)
+>> +++ pkg/ProbABEL/src/regdata.h    2013-08-08 11:19:30 UTC (rev 1286)
+>> @@ -34,6 +34,7 @@
+>>             bool ext_is_interaction_excluded);
+>>     mematrix<double> extract_genotypes();
+>>     void update_snp(gendata &gend, int snpnum);
+>> +    void remove_snp_from_X();
+>>     regdata get_unmasked_data();
+>>     ~regdata();
+>>
+>>
+>> _______________________________________________
+>> Genabel-commits mailing list
+>> Genabel-commits at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+
+-- 
+-----------------------------------------------------------------
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+
+Stuur mij aub geen Word of Powerpoint bestanden!
+Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+------------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 230 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130814/3c8cdc92/attachment-0001.sig>
+
+From lennart at karssen.org  Wed Aug 14 19:08:53 2013
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 14 Aug 2013 19:08:53 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1286 - pkg/ProbABEL/src
+In-Reply-To: <520B3B9F.4010602@karssen.org>
+References: <20130808111930.DF8B91812ED@r-forge.r-project.org>
+ <5915617286991279267@unknownmsgid> <520B3B9F.4010602@karssen.org>
+Message-ID: <520BB9A5.4020307@karssen.org>
+
+Another question related to the LRT-based chi^2 implementation:
+
+Is there a reason why LRT-based chi^2 values would be wrong/nonsense
+when running palinear with the --mscore option?
+
+At the moment there is a big "if( !mmscore )" around the chi^2 section
+that was already in place from the old days when LRT-based chi^2 was in
+ProbABEL (but didn't take missing genotypes into account).
+
+I removed the if() and compared to the Wald statistic, the LRT chi^2
+seems a bit off, but not by much.
+
+
+Thanks for any insights!
+
+Lennart.
+
+
+
+On 14-08-13 10:11, L.C. Karssen wrote:
+> On 13-08-13 17:53, Yurii Aulchenko wrote:
+>> This is a long-awaited-for improvement! - great work!
+> 
+> Thanks! As always it was a learning experience. With these larger
+> changes you get to know the code better and better. And learn more
+> statistics along the way :-).
+> 
+> I decided to go for LRT instead of the Wald test for two reasons:
+> - LRT is theoretically more superior
+> - I found the equation for the Wald on 2df in the ProbABEL paper, but
+> programming-wise I couldn't get it to work. The coxfit2() function for
+> example says it returns the covariance matrix, but after extracting the
+> sub-matrices I still didn't get answers that were close to the
+> (beta/se_beta)^2 values for the 1df case. So, after spending some time,
+> implementing the LRT while only recalculating the null model in the case
+> of missing genotype data was the quickest.
+> 
+> I've also added the LRT-chi^2 for Cox and logistic regression now, as
+> well as R-based consistency checks.
+> 
+> I haven't looked at the output when using the score option or the robust
+> option at all yet. Any idea if that will require a lot of additional
+> programming? Various people are waiting for the fixed Cox regression, so
+> I would like to put out a new ProbABEL release ASAP.
+> 
+> 
+> Thanks,
+> 
+> Lennart.
+> 
+> 
+>>
+>> ----------------------
+>> Yurii Aulchenko
+>> (sent from mobile device)
+>>
+>> On 8 Aug 2013, at 15:19, "noreply at r-forge.r-project.org"
+>> <noreply at r-forge.r-project.org> wrote:
+>>
+>>> Author: lckarssen
+>>> Date: 2013-08-08 13:19:30 +0200 (Thu, 08 Aug 2013)
+>>> New Revision: 1286
+>>>
+>>> Modified:
+>>>   pkg/ProbABEL/src/eigen_mematrix.cpp
+>>>   pkg/ProbABEL/src/eigen_mematrix.h
+>>>   pkg/ProbABEL/src/main.cpp
+>>>   pkg/ProbABEL/src/mematri1.h
+>>>   pkg/ProbABEL/src/mematrix.h
+>>>   pkg/ProbABEL/src/reg1.cpp
+>>>   pkg/ProbABEL/src/regdata.cpp
+>>>   pkg/ProbABEL/src/regdata.h
+>>> Log:
+>>> Added chi^2 information to the ProbABEL output for linear regression.
+>>> NOTE: for palogist and pacoxph this still needs to be fixed!!!
+>>>
+>>> The chi^2 values are based on the LRT. The null model is calculated at
+>>> the beginning (this was already part of ProbABEL for a long time). In
+>>> the case of missing genotype data the null model is recalculated for
+>>> that SNP only. So for people with imputed data there should be no
+>>> difference in computation time.
+>>>
+>>> This is a bit of a rough implementation. Maybe some more work is
+>>> needed to make it better (in terms of programming style/efficiency).
+>>>
+>>> Changes per file:
+>>> src/main.cpp:
+>>> - Some small (unrelated) changes to the way progress information is printed
+>>> - Changed output precision of beta, se_beta, chi^2 to 6 instead of 9 digits
+>>> - around line 700 is where the recalculation of the null model is done.
+>>> src/regdata.h, src/regdata.cpp:
+>>> - Add a function remove_snp_from_X() that removes the genotype data
+>>>   from the design matrix. This is necessary, because in order to know
+>>>   which individuals have missing genotype data (and therefore should
+>>>   be excluded from the null estimation), we first need to have the
+>>>   genotype data in.
+>>> src/reg1.cpp:
+>>> - At the beginning of apply_model() check if we are calculating the
+>>>   null model. if so, we don't need to apply the genotypic model at
+>>>   all.
+>>> src/eigen_mematrix.h, src/eigen_mematrix.cpp:
+>>> - Implement the delete_column() function. When transitioning to Eigen
+>>>   this function wasn't used anywhere in the code, so it wasn't
+>>>   carried over from the mematrix files.
+>>> src/mematri1.h, src/mematrix.h:
+>>> - Set the col/row number argument to const in the delete_column() and
+>>>   delete_row() functions.
+>>>
+>>>
+>>>
+>>>
+>>>
+>>> Modified: pkg/ProbABEL/src/eigen_mematrix.cpp
+>>> ===================================================================
+>>> --- pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+>>> +++ pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+>>> @@ -362,4 +362,30 @@
+>>>     return temp;
+>>> }
+>>>
+>>> +
+>>> +template<class DT>
+>>> +void mematrix<DT>::delete_column(const int delcol)
+>>> +{
+>>> +    if (delcol > ncol || delcol < 0)
+>>> +    {
+>>> +        fprintf(stderr, "mematrix::delete_column: column out of range\n");
+>>> +        exit(1);
+>>> +    }
+>>> +
+>>> +    // Eigen::Matrix<DT,-1,-1,0,-1,-1> *auxdata =
+>>> +    //     new Eigen::Matrix<DT,-1,-1,0,-1,-1>;
+>>> +    MatrixXd auxdata = data;
+>>> +
+>>> +    data.resize(data.rows(), data.cols()-1);
+>>> +
+>>> +    int rightColsSize = auxdata.cols() - delcol - 1;
+>>> +
+>>> +    data.leftCols(delcol) = auxdata.leftCols(delcol);
+>>> +    data.rightCols(rightColsSize) = auxdata.rightCols(rightColsSize);
+>>> +
+>>> +    ncol--;
+>>> +}
+>>> +
+>>> +
+>>> +
+>>> #endif
+>>>
+>>> Modified: pkg/ProbABEL/src/eigen_mematrix.h
+>>> ===================================================================
+>>> --- pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 10:07:32 UTC (rev 1285)
+>>> +++ pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 11:19:30 UTC (rev 1286)
+>>> @@ -37,6 +37,8 @@
+>>>     mematrix operator*(const mematrix &M);
+>>>     mematrix operator*(const mematrix *M);
+>>>
+>>> +    void delete_column(const int delcol);
+>>> +
+>>>     void reinit(int nr, int nc);
+>>>
+>>>     unsigned int getnrow(void)
+>>>
+>>> Modified: pkg/ProbABEL/src/main.cpp
+>>> ===================================================================
+>>> --- pkg/ProbABEL/src/main.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+>>> +++ pkg/ProbABEL/src/main.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+>>> @@ -208,9 +208,9 @@
+>>>                 << input_var.getSep()
+>>>                 << "sebeta_SNP_recA1";
+>>>     *outfile[4] << input_var.getSep()
+>>> -                << "beta_SNP_odom"
+>>> +                << "beta_SNP_odomA1"
+>>>                 << input_var.getSep()
+>>> -                << "sebeta_SNP_odom";
+>>> +                << "sebeta_SNP_odomA1";
+>>>     if (input_var.getInteraction() != 0)
+>>>     {
+>>>         //Han Chen
+>>> @@ -263,7 +263,7 @@
+>>>     *outfile[1] << input_var.getSep() << "chi2_SNP_A1\n";   // "loglik\n";
+>>>     *outfile[2] << input_var.getSep() << "chi2_SNP_domA1\n";// "loglik\n";
+>>>     *outfile[3] << input_var.getSep() << "chi2_SNP_recA1\n";// "loglik\n";
+>>> -    *outfile[4] << input_var.getSep() << "chi2_SNP_odom\n"; // "loglik\n";
+>>> +    *outfile[4] << input_var.getSep() << "chi2_SNP_odomA1\n"; // "loglik\n";
+>>> }
+>>>
+>>> void create_header2(std::vector<std::ofstream*>& outfile, cmdvars& input_var,
+>>> @@ -389,7 +389,7 @@
+>>>
+>>>     masked_matrix invvarmatrix;
+>>>
+>>> -    std::cout << "Reading data ..." << std::flush;
+>>> +    std::cout << "Reading data..." << std::flush;
+>>>     if (input_var.getInverseFilename() != NULL)
+>>>     {
+>>>         loadInvSigma(input_var, phd, invvarmatrix);
+>>> @@ -412,7 +412,7 @@
+>>>                        phd.allmeasured, phd.idnames);
+>>>     }
+>>>
+>>> -    std::cout << " loaded genotypic data ..." << std::flush;
+>>> +    std::cout << " loaded genotypic data..." << std::flush;
+>>>
+>>>     // estimate null model
+>>> #if COXPH
+>>> @@ -421,7 +421,7 @@
+>>>     regdata nrgd = regdata(phd, gtd, -1, input_var.isIsInteractionExcluded());
+>>> #endif
+>>>
+>>> -    std::cout << " loaded null data ..." << std::flush;
+>>> +    std::cout << " loaded null data..." << std::flush;
+>>> #if LOGISTIC
+>>>     logistic_reg nrd = logistic_reg(nrgd);
+>>>     nrd.estimate(nrgd, 0, MAXITER, EPS, CHOLTOL, 0,
+>>> @@ -446,14 +446,14 @@
+>>> #endif
+>>>     double null_loglik = nrd.loglik;
+>>>
+>>> -    std::cout << " estimated null model ...";
+>>> +    std::cout << " estimated null model...";
+>>>     // end null
+>>> #if COXPH
+>>>     coxph_data rgd(phd, gtd, 0);
+>>> #else
+>>>     regdata rgd(phd, gtd, 0, input_var.isIsInteractionExcluded());
+>>> #endif
+>>> -    std::cout << " formed regression object ...";
+>>> +    std::cout << " formed regression object...\n";
+>>>
+>>>
+>>>     // Open a vector of files that will be used for output. Depending
+>>> @@ -505,13 +505,16 @@
+>>>     for (int i = 0; i < maxmod; i++)
+>>>     {
+>>>         beta_sebeta.push_back(new std::ostringstream());
+>>> -        beta_sebeta[i]->precision(9);
+>>> +        beta_sebeta[i]->precision(6);
+>>> +        //*beta_sebeta[i] << scientific;
+>>>         //Han Chen
+>>>         covvalue.push_back(new std::ostringstream());
+>>> -        covvalue[i]->precision(9);
+>>> +        covvalue[i]->precision(6);
+>>> +        //*covvalue[i] << scientific;
+>>>         //Oct 26, 2009
+>>>         chi2.push_back(new std::ostringstream());
+>>> -        chi2[i]->precision(9);
+>>> +        chi2[i]->precision(6);
+>>> +        //*chi2[i] << scientific;
+>>>     }
+>>>
+>>>
+>>> @@ -565,10 +568,10 @@
+>>>             poly = 0;
+>>>         }
+>>>
+>>> +        // Write mlinfo information to the output file(s)
+>>>         // Prob data: All models output. One file per model
+>>>         if (input_var.getNgpreds() == 2)
+>>>         {
+>>> -            // Write mlinfo to output:
+>>>             for (unsigned int file = 0; file < outfile.size(); file++)
+>>>             {
+>>>                 write_mlinfo(outfile, file, mli, csnp, input_var,
+>>> @@ -679,7 +682,7 @@
+>>>                 } // END for(pos = start_pos; pos < rd.beta.nrow; pos++)
+>>>
+>>>
+>>> -                //calculate chi2
+>>> +                //calculate chi^2
+>>>                 //________________________________
+>>>                 //cout <<  rd.loglik<<" "<<input_var.getNgpreds() << "\n";
+>>>
+>>> @@ -690,23 +693,41 @@
+>>>
+>>>                     if (input_var.getScore() == 0)
+>>>                     {
+>>> +                        double loglik = rd.loglik;
+>>>                         if (gcount != gtd.nids)
+>>>                         {
+>>>                             // If SNP data is missing we didn't
+>>>                             // correctly compute the null likelihood
+>>> -                            *chi2[model] << "NaN";
+>>> +
+>>> +                            // Recalculate null likelihood by
+>>> +                            // stripping the SNP data column(s) from
+>>> +                            // the X matrix in the regression object
+>>> +                            // and run the null model estimation again
+>>> +                            // for this SNP.
+>>> +// BEWARE, ONLY IMPLEMENTED FOR LINEAR REG!!!
+>>> +// TODO LCK
+>>> +#ifdef LINEAR
+>>> +                            regdata new_rgd = rgd;
+>>> +                            new_rgd.remove_snp_from_X();
+>>> +                            linear_reg new_null_rd(new_rgd);
+>>> +                            new_null_rd.estimate(new_rgd, 0, CHOLTOL, model,
+>>> +                                                 input_var.getInteraction(),
+>>> +                                                 input_var.getNgpreds(),
+>>> +                                                 invvarmatrix,
+>>> +                                                 input_var.getRobust(), 1);
+>>> +
+>>> +                            *chi2[model] << 2. * (loglik - new_null_rd.loglik);
+>>> +#endif
+>>>                         }
+>>>                         else
+>>>                         {
+>>>                             // No missing SNP data, we can compute the LRT
+>>> -                            *chi2[model] << 2. * (rd.loglik - null_loglik);
+>>> +                            *chi2[model] << 2. * (loglik - null_loglik);
+>>>                         }
+>>> -                        //*chi2[model] << rd.loglik;
+>>>                     } else
+>>>                     {
+>>>                         // We want score test output
+>>>                         *chi2[model] << rd.chi2_score;
+>>> -                        //*chi2[model] << "nan";
+>>>                     }
+>>>                 }
+>>>             } // END first part of if(poly); allele not too rare
+>>>
+>>> Modified: pkg/ProbABEL/src/mematri1.h
+>>> ===================================================================
+>>> --- pkg/ProbABEL/src/mematri1.h    2013-08-08 10:07:32 UTC (rev 1285)
+>>> +++ pkg/ProbABEL/src/mematri1.h    2013-08-08 11:19:30 UTC (rev 1286)
+>>> @@ -301,7 +301,7 @@
+>>> }
+>>>
+>>> template<class DT>
+>>> -void mematrix<DT>::delete_column(int delcol)
+>>> +void mematrix<DT>::delete_column(const int delcol)
+>>> {
+>>>     if (delcol > ncol || delcol < 0)
+>>>     {
+>>> @@ -333,7 +333,7 @@
+>>> }
+>>>
+>>> template<class DT>
+>>> -void mematrix<DT>::delete_row(int delrow)
+>>> +void mematrix<DT>::delete_row(const int delrow)
+>>> {
+>>>     if (delrow > nrow || delrow < 0)
+>>>     {
+>>>
+>>> Modified: pkg/ProbABEL/src/mematrix.h
+>>> ===================================================================
+>>> --- pkg/ProbABEL/src/mematrix.h    2013-08-08 10:07:32 UTC (rev 1285)
+>>> +++ pkg/ProbABEL/src/mematrix.h    2013-08-08 11:19:30 UTC (rev 1286)
+>>> @@ -48,8 +48,8 @@
+>>>     void put(DT value, int nr, int nc);
+>>>     DT column_mean(int nc);
+>>>     void print(void);
+>>> -    void delete_column(int delcol);
+>>> -    void delete_row(int delrow);
+>>> +    void delete_column(const int delcol);
+>>> +    void delete_row(const int delrow);
+>>>
+>>> };
+>>>
+>>>
+>>> Modified: pkg/ProbABEL/src/reg1.cpp
+>>> ===================================================================
+>>> --- pkg/ProbABEL/src/reg1.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+>>> +++ pkg/ProbABEL/src/reg1.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+>>> @@ -4,12 +4,22 @@
+>>> mematrix<double> apply_model(mematrix<double>& X, int model, int interaction,
+>>>                              int ngpreds, bool is_interaction_excluded,
+>>>                              bool iscox, int nullmodel)
+>>> +// if ngpreds==1 (dose data):
+>>> +// model 0 = additive 1 df
+>>> +// if ngpreds==2 (prob data):
+>>> // model 0 = 2 df
+>>> // model 1 = additive 1 df
+>>> // model 2 = dominant 1 df
+>>> // model 3 = recessive 1 df
+>>> // model 4 = over-dominant 1 df
+>>> {
+>>> +    if(nullmodel)
+>>> +    {
+>>> +        // No need to apply any genotypic model when calculating the
+>>> +        // null model
+>>> +        return (X);
+>>> +    }
+>>> +
+>>>     if (model == 0)
+>>>     {
+>>>         if (interaction != 0 && !nullmodel)
+>>> @@ -295,12 +305,13 @@
+>>>     if (verbose)
+>>>     {
+>>>         cout << rdata.is_interaction_excluded
+>>> -                << " <-irdata.is_interaction_excluded\n";
+>>> +             << " <-rdata.is_interaction_excluded\n";
+>>>         // std::cout << "invvarmatrix:\n";
+>>>         // invvarmatrixin.masked_data->print();
+>>>         std::cout << "rdata.X:\n";
+>>>         rdata.X.print();
+>>>     }
+>>> +
+>>>     mematrix<double> X = apply_model(rdata.X, model, interaction, ngpreds,
+>>>                                      rdata.is_interaction_excluded, false,
+>>>                                      nullmodel);
+>>> @@ -311,6 +322,7 @@
+>>>         std::cout << "Y:\n";
+>>>         rdata.Y.print();
+>>>     }
+>>> +
+>>>     int length_beta = X.ncol;
+>>>     beta.reinit(length_beta, 1);
+>>>     sebeta.reinit(length_beta, 1);
+>>>
+>>> Modified: pkg/ProbABEL/src/regdata.cpp
+>>> ===================================================================
+>>> --- pkg/ProbABEL/src/regdata.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+>>> +++ pkg/ProbABEL/src/regdata.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+>>> @@ -39,7 +39,7 @@
+>>>
+>>>     for (int i = 0; i < nids; i++)
+>>>     {
+>>> -        masked_data[i] = 0;
+>>> +        masked_data[i] = obj.masked_data[i];
+>>>     }
+>>> }
+>>>
+>>> @@ -95,6 +95,9 @@
+>>>
+>>> void regdata::update_snp(gendata &gend, int snpnum)
+>>> {
+>>> +    // Add genotypic data (dosage or probabilities) to the design
+>>> +    // matrix X.
+>>> +
+>>>     for (int j = 0; j < ngpreds; j++)
+>>>     {
+>>>         double snpdata[nids];
+>>> @@ -109,11 +112,34 @@
+>>>         {
+>>>             X.put(snpdata[i], i, (ncov - j));
+>>>             if (isnan(snpdata[i]))
+>>> +            {
+>>>                 masked_data[i] = 1;
+>>> +            }
+>>>         }
+>>>     }
+>>> }
+>>>
+>>> +void regdata::remove_snp_from_X()
+>>> +{
+>>> +    // update_snp() adds SNP information to the design matrix. This
+>>> +    // function allows you to strip that information from X again.
+>>> +    // This is used for example when calculating the null model.
+>>> +
+>>> +    if(ngpreds == 1)
+>>> +    {
+>>> +        X.delete_column(X.ncol -1);
+>>> +    }
+>>> +    else if(ngpreds == 2)
+>>> +    {
+>>> +        X.delete_column(X.ncol -1);
+>>> +        X.delete_column(X.ncol -1);
+>>> +    }
+>>> +    else
+>>> +    {
+>>> +        cerr << "ngpreds should be 1 or 2. you should never come here!\n";
+>>> +    }
+>>> +}
+>>> +
+>>> regdata::~regdata()
+>>> {
+>>>     delete[] regdata::masked_data;
+>>>
+>>> Modified: pkg/ProbABEL/src/regdata.h
+>>> ===================================================================
+>>> --- pkg/ProbABEL/src/regdata.h    2013-08-08 10:07:32 UTC (rev 1285)
+>>> +++ pkg/ProbABEL/src/regdata.h    2013-08-08 11:19:30 UTC (rev 1286)
+>>> @@ -34,6 +34,7 @@
+>>>             bool ext_is_interaction_excluded);
+>>>     mematrix<double> extract_genotypes();
+>>>     void update_snp(gendata &gend, int snpnum);
+>>> +    void remove_snp_from_X();
+>>>     regdata get_unmasked_data();
+>>>     ~regdata();
+>>>
+>>>
+>>> _______________________________________________
+>>> Genabel-commits mailing list
+>>> Genabel-commits at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>
+> 
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+-----------------------------------------------------------------
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+
+Stuur mij aub geen Word of Powerpoint bestanden!
+Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+------------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 230 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130814/9f1cf369/attachment.sig>
+
+From yurii.aulchenko at gmail.com  Thu Aug 15 15:27:56 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Thu, 15 Aug 2013 17:27:56 +0400
+Subject: [GenABEL-dev] [Genabel-commits] r1286 - pkg/ProbABEL/src
+In-Reply-To: <520B3B9F.4010602@karssen.org>
+References: <20130808111930.DF8B91812ED@r-forge.r-project.org>
+ <5915617286991279267@unknownmsgid> <520B3B9F.4010602@karssen.org>
+Message-ID: <CAHX9t6L1JDM7Wk6JbKrYosYo2mxoAodqXO6Fo_MRuNMHRMKHMg@mail.gmail.com>
+
+Score on 2df is almost the same to Wald on 2df - you do the same math but
+your input var-cov matrix is different (estimated under null for score and
+under the alternative or Wald)
+
+Robust - I am not sure at all you can use LRT - I mean these two may be
+theoretically incompatible (like you can do LRT if you use maximum
+likelihood, but not when you use restricted maximum likelihood - it is
+simply mathematically incorrect). But again, not 100% sure. Actually if
+ProbA can do that "technically" it is worth to figure this out and either
+disable or give a BIG warning.
+
+On the contrary, you can combine score/Wald with "robust"
+
+best wishes,
+Y
+
+On Wed, Aug 14, 2013 at 12:11 PM, L.C. Karssen <lennart at karssen.org> wrote:
+
+> On 13-08-13 17:53, Yurii Aulchenko wrote:
+> > This is a long-awaited-for improvement! - great work!
+>
+> Thanks! As always it was a learning experience. With these larger
+> changes you get to know the code better and better. And learn more
+> statistics along the way :-).
+>
+> I decided to go for LRT instead of the Wald test for two reasons:
+> - LRT is theoretically more superior
+> - I found the equation for the Wald on 2df in the ProbABEL paper, but
+> programming-wise I couldn't get it to work. The coxfit2() function for
+> example says it returns the covariance matrix, but after extracting the
+> sub-matrices I still didn't get answers that were close to the
+> (beta/se_beta)^2 values for the 1df case. So, after spending some time,
+> implementing the LRT while only recalculating the null model in the case
+> of missing genotype data was the quickest.
+>
+> I've also added the LRT-chi^2 for Cox and logistic regression now, as
+> well as R-based consistency checks.
+>
+> I haven't looked at the output when using the score option or the robust
+> option at all yet. Any idea if that will require a lot of additional
+> programming? Various people are waiting for the fixed Cox regression, so
+> I would like to put out a new ProbABEL release ASAP.
+>
+>
+> Thanks,
+>
+> Lennart.
+>
+>
+> >
+> > ----------------------
+> > Yurii Aulchenko
+> > (sent from mobile device)
+> >
+> > On 8 Aug 2013, at 15:19, "noreply at r-forge.r-project.org"
+> > <noreply at r-forge.r-project.org> wrote:
+> >
+> >> Author: lckarssen
+> >> Date: 2013-08-08 13:19:30 +0200 (Thu, 08 Aug 2013)
+> >> New Revision: 1286
+> >>
+> >> Modified:
+> >>   pkg/ProbABEL/src/eigen_mematrix.cpp
+> >>   pkg/ProbABEL/src/eigen_mematrix.h
+> >>   pkg/ProbABEL/src/main.cpp
+> >>   pkg/ProbABEL/src/mematri1.h
+> >>   pkg/ProbABEL/src/mematrix.h
+> >>   pkg/ProbABEL/src/reg1.cpp
+> >>   pkg/ProbABEL/src/regdata.cpp
+> >>   pkg/ProbABEL/src/regdata.h
+> >> Log:
+> >> Added chi^2 information to the ProbABEL output for linear regression.
+> >> NOTE: for palogist and pacoxph this still needs to be fixed!!!
+> >>
+> >> The chi^2 values are based on the LRT. The null model is calculated at
+> >> the beginning (this was already part of ProbABEL for a long time). In
+> >> the case of missing genotype data the null model is recalculated for
+> >> that SNP only. So for people with imputed data there should be no
+> >> difference in computation time.
+> >>
+> >> This is a bit of a rough implementation. Maybe some more work is
+> >> needed to make it better (in terms of programming style/efficiency).
+> >>
+> >> Changes per file:
+> >> src/main.cpp:
+> >> - Some small (unrelated) changes to the way progress information is
+> printed
+> >> - Changed output precision of beta, se_beta, chi^2 to 6 instead of 9
+> digits
+> >> - around line 700 is where the recalculation of the null model is done.
+> >> src/regdata.h, src/regdata.cpp:
+> >> - Add a function remove_snp_from_X() that removes the genotype data
+> >>   from the design matrix. This is necessary, because in order to know
+> >>   which individuals have missing genotype data (and therefore should
+> >>   be excluded from the null estimation), we first need to have the
+> >>   genotype data in.
+> >> src/reg1.cpp:
+> >> - At the beginning of apply_model() check if we are calculating the
+> >>   null model. if so, we don't need to apply the genotypic model at
+> >>   all.
+> >> src/eigen_mematrix.h, src/eigen_mematrix.cpp:
+> >> - Implement the delete_column() function. When transitioning to Eigen
+> >>   this function wasn't used anywhere in the code, so it wasn't
+> >>   carried over from the mematrix files.
+> >> src/mematri1.h, src/mematrix.h:
+> >> - Set the col/row number argument to const in the delete_column() and
+> >>   delete_row() functions.
+> >>
+> >>
+> >>
+> >>
+> >>
+> >> Modified: pkg/ProbABEL/src/eigen_mematrix.cpp
+> >> ===================================================================
+> >> --- pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 10:07:32 UTC (rev
+> 1285)
+> >> +++ pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 11:19:30 UTC (rev
+> 1286)
+> >> @@ -362,4 +362,30 @@
+> >>     return temp;
+> >> }
+> >>
+> >> +
+> >> +template<class DT>
+> >> +void mematrix<DT>::delete_column(const int delcol)
+> >> +{
+> >> +    if (delcol > ncol || delcol < 0)
+> >> +    {
+> >> +        fprintf(stderr, "mematrix::delete_column: column out of
+> range\n");
+> >> +        exit(1);
+> >> +    }
+> >> +
+> >> +    // Eigen::Matrix<DT,-1,-1,0,-1,-1> *auxdata =
+> >> +    //     new Eigen::Matrix<DT,-1,-1,0,-1,-1>;
+> >> +    MatrixXd auxdata = data;
+> >> +
+> >> +    data.resize(data.rows(), data.cols()-1);
+> >> +
+> >> +    int rightColsSize = auxdata.cols() - delcol - 1;
+> >> +
+> >> +    data.leftCols(delcol) = auxdata.leftCols(delcol);
+> >> +    data.rightCols(rightColsSize) = auxdata.rightCols(rightColsSize);
+> >> +
+> >> +    ncol--;
+> >> +}
+> >> +
+> >> +
+> >> +
+> >> #endif
+> >>
+> >> Modified: pkg/ProbABEL/src/eigen_mematrix.h
+> >> ===================================================================
+> >> --- pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 10:07:32 UTC (rev
+> 1285)
+> >> +++ pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 11:19:30 UTC (rev
+> 1286)
+> >> @@ -37,6 +37,8 @@
+> >>     mematrix operator*(const mematrix &M);
+> >>     mematrix operator*(const mematrix *M);
+> >>
+> >> +    void delete_column(const int delcol);
+> >> +
+> >>     void reinit(int nr, int nc);
+> >>
+> >>     unsigned int getnrow(void)
+> >>
+> >> Modified: pkg/ProbABEL/src/main.cpp
+> >> ===================================================================
+> >> --- pkg/ProbABEL/src/main.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> >> +++ pkg/ProbABEL/src/main.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> >> @@ -208,9 +208,9 @@
+> >>                 << input_var.getSep()
+> >>                 << "sebeta_SNP_recA1";
+> >>     *outfile[4] << input_var.getSep()
+> >> -                << "beta_SNP_odom"
+> >> +                << "beta_SNP_odomA1"
+> >>                 << input_var.getSep()
+> >> -                << "sebeta_SNP_odom";
+> >> +                << "sebeta_SNP_odomA1";
+> >>     if (input_var.getInteraction() != 0)
+> >>     {
+> >>         //Han Chen
+> >> @@ -263,7 +263,7 @@
+> >>     *outfile[1] << input_var.getSep() << "chi2_SNP_A1\n";   //
+> "loglik\n";
+> >>     *outfile[2] << input_var.getSep() << "chi2_SNP_domA1\n";//
+> "loglik\n";
+> >>     *outfile[3] << input_var.getSep() << "chi2_SNP_recA1\n";//
+> "loglik\n";
+> >> -    *outfile[4] << input_var.getSep() << "chi2_SNP_odom\n"; //
+> "loglik\n";
+> >> +    *outfile[4] << input_var.getSep() << "chi2_SNP_odomA1\n"; //
+> "loglik\n";
+> >> }
+> >>
+> >> void create_header2(std::vector<std::ofstream*>& outfile, cmdvars&
+> input_var,
+> >> @@ -389,7 +389,7 @@
+> >>
+> >>     masked_matrix invvarmatrix;
+> >>
+> >> -    std::cout << "Reading data ..." << std::flush;
+> >> +    std::cout << "Reading data..." << std::flush;
+> >>     if (input_var.getInverseFilename() != NULL)
+> >>     {
+> >>         loadInvSigma(input_var, phd, invvarmatrix);
+> >> @@ -412,7 +412,7 @@
+> >>                        phd.allmeasured, phd.idnames);
+> >>     }
+> >>
+> >> -    std::cout << " loaded genotypic data ..." << std::flush;
+> >> +    std::cout << " loaded genotypic data..." << std::flush;
+> >>
+> >>     // estimate null model
+> >> #if COXPH
+> >> @@ -421,7 +421,7 @@
+> >>     regdata nrgd = regdata(phd, gtd, -1,
+> input_var.isIsInteractionExcluded());
+> >> #endif
+> >>
+> >> -    std::cout << " loaded null data ..." << std::flush;
+> >> +    std::cout << " loaded null data..." << std::flush;
+> >> #if LOGISTIC
+> >>     logistic_reg nrd = logistic_reg(nrgd);
+> >>     nrd.estimate(nrgd, 0, MAXITER, EPS, CHOLTOL, 0,
+> >> @@ -446,14 +446,14 @@
+> >> #endif
+> >>     double null_loglik = nrd.loglik;
+> >>
+> >> -    std::cout << " estimated null model ...";
+> >> +    std::cout << " estimated null model...";
+> >>     // end null
+> >> #if COXPH
+> >>     coxph_data rgd(phd, gtd, 0);
+> >> #else
+> >>     regdata rgd(phd, gtd, 0, input_var.isIsInteractionExcluded());
+> >> #endif
+> >> -    std::cout << " formed regression object ...";
+> >> +    std::cout << " formed regression object...\n";
+> >>
+> >>
+> >>     // Open a vector of files that will be used for output. Depending
+> >> @@ -505,13 +505,16 @@
+> >>     for (int i = 0; i < maxmod; i++)
+> >>     {
+> >>         beta_sebeta.push_back(new std::ostringstream());
+> >> -        beta_sebeta[i]->precision(9);
+> >> +        beta_sebeta[i]->precision(6);
+> >> +        //*beta_sebeta[i] << scientific;
+> >>         //Han Chen
+> >>         covvalue.push_back(new std::ostringstream());
+> >> -        covvalue[i]->precision(9);
+> >> +        covvalue[i]->precision(6);
+> >> +        //*covvalue[i] << scientific;
+> >>         //Oct 26, 2009
+> >>         chi2.push_back(new std::ostringstream());
+> >> -        chi2[i]->precision(9);
+> >> +        chi2[i]->precision(6);
+> >> +        //*chi2[i] << scientific;
+> >>     }
+> >>
+> >>
+> >> @@ -565,10 +568,10 @@
+> >>             poly = 0;
+> >>         }
+> >>
+> >> +        // Write mlinfo information to the output file(s)
+> >>         // Prob data: All models output. One file per model
+> >>         if (input_var.getNgpreds() == 2)
+> >>         {
+> >> -            // Write mlinfo to output:
+> >>             for (unsigned int file = 0; file < outfile.size(); file++)
+> >>             {
+> >>                 write_mlinfo(outfile, file, mli, csnp, input_var,
+> >> @@ -679,7 +682,7 @@
+> >>                 } // END for(pos = start_pos; pos < rd.beta.nrow; pos++)
+> >>
+> >>
+> >> -                //calculate chi2
+> >> +                //calculate chi^2
+> >>                 //________________________________
+> >>                 //cout <<  rd.loglik<<" "<<input_var.getNgpreds() <<
+> "\n";
+> >>
+> >> @@ -690,23 +693,41 @@
+> >>
+> >>                     if (input_var.getScore() == 0)
+> >>                     {
+> >> +                        double loglik = rd.loglik;
+> >>                         if (gcount != gtd.nids)
+> >>                         {
+> >>                             // If SNP data is missing we didn't
+> >>                             // correctly compute the null likelihood
+> >> -                            *chi2[model] << "NaN";
+> >> +
+> >> +                            // Recalculate null likelihood by
+> >> +                            // stripping the SNP data column(s) from
+> >> +                            // the X matrix in the regression object
+> >> +                            // and run the null model estimation again
+> >> +                            // for this SNP.
+> >> +// BEWARE, ONLY IMPLEMENTED FOR LINEAR REG!!!
+> >> +// TODO LCK
+> >> +#ifdef LINEAR
+> >> +                            regdata new_rgd = rgd;
+> >> +                            new_rgd.remove_snp_from_X();
+> >> +                            linear_reg new_null_rd(new_rgd);
+> >> +                            new_null_rd.estimate(new_rgd, 0, CHOLTOL,
+> model,
+> >> +
+> input_var.getInteraction(),
+> >> +
+> input_var.getNgpreds(),
+> >> +                                                 invvarmatrix,
+> >> +
+> input_var.getRobust(), 1);
+> >> +
+> >> +                            *chi2[model] << 2. * (loglik -
+> new_null_rd.loglik);
+> >> +#endif
+> >>                         }
+> >>                         else
+> >>                         {
+> >>                             // No missing SNP data, we can compute the
+> LRT
+> >> -                            *chi2[model] << 2. * (rd.loglik -
+> null_loglik);
+> >> +                            *chi2[model] << 2. * (loglik -
+> null_loglik);
+> >>                         }
+> >> -                        //*chi2[model] << rd.loglik;
+> >>                     } else
+> >>                     {
+> >>                         // We want score test output
+> >>                         *chi2[model] << rd.chi2_score;
+> >> -                        //*chi2[model] << "nan";
+> >>                     }
+> >>                 }
+> >>             } // END first part of if(poly); allele not too rare
+> >>
+> >> Modified: pkg/ProbABEL/src/mematri1.h
+> >> ===================================================================
+> >> --- pkg/ProbABEL/src/mematri1.h    2013-08-08 10:07:32 UTC (rev 1285)
+> >> +++ pkg/ProbABEL/src/mematri1.h    2013-08-08 11:19:30 UTC (rev 1286)
+> >> @@ -301,7 +301,7 @@
+> >> }
+> >>
+> >> template<class DT>
+> >> -void mematrix<DT>::delete_column(int delcol)
+> >> +void mematrix<DT>::delete_column(const int delcol)
+> >> {
+> >>     if (delcol > ncol || delcol < 0)
+> >>     {
+> >> @@ -333,7 +333,7 @@
+> >> }
+> >>
+> >> template<class DT>
+> >> -void mematrix<DT>::delete_row(int delrow)
+> >> +void mematrix<DT>::delete_row(const int delrow)
+> >> {
+> >>     if (delrow > nrow || delrow < 0)
+> >>     {
+> >>
+> >> Modified: pkg/ProbABEL/src/mematrix.h
+> >> ===================================================================
+> >> --- pkg/ProbABEL/src/mematrix.h    2013-08-08 10:07:32 UTC (rev 1285)
+> >> +++ pkg/ProbABEL/src/mematrix.h    2013-08-08 11:19:30 UTC (rev 1286)
+> >> @@ -48,8 +48,8 @@
+> >>     void put(DT value, int nr, int nc);
+> >>     DT column_mean(int nc);
+> >>     void print(void);
+> >> -    void delete_column(int delcol);
+> >> -    void delete_row(int delrow);
+> >> +    void delete_column(const int delcol);
+> >> +    void delete_row(const int delrow);
+> >>
+> >> };
+> >>
+> >>
+> >> Modified: pkg/ProbABEL/src/reg1.cpp
+> >> ===================================================================
+> >> --- pkg/ProbABEL/src/reg1.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> >> +++ pkg/ProbABEL/src/reg1.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> >> @@ -4,12 +4,22 @@
+> >> mematrix<double> apply_model(mematrix<double>& X, int model, int
+> interaction,
+> >>                              int ngpreds, bool is_interaction_excluded,
+> >>                              bool iscox, int nullmodel)
+> >> +// if ngpreds==1 (dose data):
+> >> +// model 0 = additive 1 df
+> >> +// if ngpreds==2 (prob data):
+> >> // model 0 = 2 df
+> >> // model 1 = additive 1 df
+> >> // model 2 = dominant 1 df
+> >> // model 3 = recessive 1 df
+> >> // model 4 = over-dominant 1 df
+> >> {
+> >> +    if(nullmodel)
+> >> +    {
+> >> +        // No need to apply any genotypic model when calculating the
+> >> +        // null model
+> >> +        return (X);
+> >> +    }
+> >> +
+> >>     if (model == 0)
+> >>     {
+> >>         if (interaction != 0 && !nullmodel)
+> >> @@ -295,12 +305,13 @@
+> >>     if (verbose)
+> >>     {
+> >>         cout << rdata.is_interaction_excluded
+> >> -                << " <-irdata.is_interaction_excluded\n";
+> >> +             << " <-rdata.is_interaction_excluded\n";
+> >>         // std::cout << "invvarmatrix:\n";
+> >>         // invvarmatrixin.masked_data->print();
+> >>         std::cout << "rdata.X:\n";
+> >>         rdata.X.print();
+> >>     }
+> >> +
+> >>     mematrix<double> X = apply_model(rdata.X, model, interaction,
+> ngpreds,
+> >>                                      rdata.is_interaction_excluded,
+> false,
+> >>                                      nullmodel);
+> >> @@ -311,6 +322,7 @@
+> >>         std::cout << "Y:\n";
+> >>         rdata.Y.print();
+> >>     }
+> >> +
+> >>     int length_beta = X.ncol;
+> >>     beta.reinit(length_beta, 1);
+> >>     sebeta.reinit(length_beta, 1);
+> >>
+> >> Modified: pkg/ProbABEL/src/regdata.cpp
+> >> ===================================================================
+> >> --- pkg/ProbABEL/src/regdata.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> >> +++ pkg/ProbABEL/src/regdata.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> >> @@ -39,7 +39,7 @@
+> >>
+> >>     for (int i = 0; i < nids; i++)
+> >>     {
+> >> -        masked_data[i] = 0;
+> >> +        masked_data[i] = obj.masked_data[i];
+> >>     }
+> >> }
+> >>
+> >> @@ -95,6 +95,9 @@
+> >>
+> >> void regdata::update_snp(gendata &gend, int snpnum)
+> >> {
+> >> +    // Add genotypic data (dosage or probabilities) to the design
+> >> +    // matrix X.
+> >> +
+> >>     for (int j = 0; j < ngpreds; j++)
+> >>     {
+> >>         double snpdata[nids];
+> >> @@ -109,11 +112,34 @@
+> >>         {
+> >>             X.put(snpdata[i], i, (ncov - j));
+> >>             if (isnan(snpdata[i]))
+> >> +            {
+> >>                 masked_data[i] = 1;
+> >> +            }
+> >>         }
+> >>     }
+> >> }
+> >>
+> >> +void regdata::remove_snp_from_X()
+> >> +{
+> >> +    // update_snp() adds SNP information to the design matrix. This
+> >> +    // function allows you to strip that information from X again.
+> >> +    // This is used for example when calculating the null model.
+> >> +
+> >> +    if(ngpreds == 1)
+> >> +    {
+> >> +        X.delete_column(X.ncol -1);
+> >> +    }
+> >> +    else if(ngpreds == 2)
+> >> +    {
+> >> +        X.delete_column(X.ncol -1);
+> >> +        X.delete_column(X.ncol -1);
+> >> +    }
+> >> +    else
+> >> +    {
+> >> +        cerr << "ngpreds should be 1 or 2. you should never come
+> here!\n";
+> >> +    }
+> >> +}
+> >> +
+> >> regdata::~regdata()
+> >> {
+> >>     delete[] regdata::masked_data;
+> >>
+> >> Modified: pkg/ProbABEL/src/regdata.h
+> >> ===================================================================
+> >> --- pkg/ProbABEL/src/regdata.h    2013-08-08 10:07:32 UTC (rev 1285)
+> >> +++ pkg/ProbABEL/src/regdata.h    2013-08-08 11:19:30 UTC (rev 1286)
+> >> @@ -34,6 +34,7 @@
+> >>             bool ext_is_interaction_excluded);
+> >>     mematrix<double> extract_genotypes();
+> >>     void update_snp(gendata &gend, int snpnum);
+> >> +    void remove_snp_from_X();
+> >>     regdata get_unmasked_data();
+> >>     ~regdata();
+> >>
+> >>
+> >> _______________________________________________
+> >> Genabel-commits mailing list
+> >> Genabel-commits at lists.r-forge.r-project.org
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> > _______________________________________________
+> > genabel-devel mailing list
+> > genabel-devel at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> >
+>
+>
+> --
+> -----------------------------------------------------------------
+> L.C. Karssen
+> Utrecht
+> The Netherlands
+>
+> lennart at karssen.org
+> http://blog.karssen.org
+>
+> Stuur mij aub geen Word of Powerpoint bestanden!
+> Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+> ------------------------------------------------------------------
+>
+>
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>
+
+
+
+-- 
+-----------------------------------------------------
+Yurii S. Aulchenko
+
+[ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [
+Twitter<http://twitter.com/YuriiAulchenko>] [
+Blog <http://yurii-aulchenko.blogspot.nl/> ]
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130815/cb2c658a/attachment-0001.html>
+
+From yurii.aulchenko at gmail.com  Thu Aug 15 15:30:08 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Thu, 15 Aug 2013 17:30:08 +0400
+Subject: [GenABEL-dev] [Genabel-commits] r1286 - pkg/ProbABEL/src
+In-Reply-To: <520BB9A5.4020307@karssen.org>
+References: <20130808111930.DF8B91812ED@r-forge.r-project.org>
+ <5915617286991279267@unknownmsgid> <520B3B9F.4010602@karssen.org>
+ <520BB9A5.4020307@karssen.org>
+Message-ID: <CAHX9t6Kws66q8F_kOEn3YLg9o-7+C8oDQYQ7XVOWW-wPQUHV3Q@mail.gmail.com>
+
+Absolutely - the same staff as with "robust" described in previous mail
+
+with --mmscore, though, I am confident that LRT is a wrong thing to do -
+this is a REML-style procedure
+
+Yurii
+
+On Wed, Aug 14, 2013 at 9:08 PM, L.C. Karssen <lennart at karssen.org> wrote:
+
+> Another question related to the LRT-based chi^2 implementation:
+>
+> Is there a reason why LRT-based chi^2 values would be wrong/nonsense
+> when running palinear with the --mscore option?
+>
+> At the moment there is a big "if( !mmscore )" around the chi^2 section
+> that was already in place from the old days when LRT-based chi^2 was in
+> ProbABEL (but didn't take missing genotypes into account).
+>
+> I removed the if() and compared to the Wald statistic, the LRT chi^2
+> seems a bit off, but not by much.
+>
+>
+> Thanks for any insights!
+>
+> Lennart.
+>
+>
+>
+> On 14-08-13 10:11, L.C. Karssen wrote:
+> > On 13-08-13 17:53, Yurii Aulchenko wrote:
+> >> This is a long-awaited-for improvement! - great work!
+> >
+> > Thanks! As always it was a learning experience. With these larger
+> > changes you get to know the code better and better. And learn more
+> > statistics along the way :-).
+> >
+> > I decided to go for LRT instead of the Wald test for two reasons:
+> > - LRT is theoretically more superior
+> > - I found the equation for the Wald on 2df in the ProbABEL paper, but
+> > programming-wise I couldn't get it to work. The coxfit2() function for
+> > example says it returns the covariance matrix, but after extracting the
+> > sub-matrices I still didn't get answers that were close to the
+> > (beta/se_beta)^2 values for the 1df case. So, after spending some time,
+> > implementing the LRT while only recalculating the null model in the case
+> > of missing genotype data was the quickest.
+> >
+> > I've also added the LRT-chi^2 for Cox and logistic regression now, as
+> > well as R-based consistency checks.
+> >
+> > I haven't looked at the output when using the score option or the robust
+> > option at all yet. Any idea if that will require a lot of additional
+> > programming? Various people are waiting for the fixed Cox regression, so
+> > I would like to put out a new ProbABEL release ASAP.
+> >
+> >
+> > Thanks,
+> >
+> > Lennart.
+> >
+> >
+> >>
+> >> ----------------------
+> >> Yurii Aulchenko
+> >> (sent from mobile device)
+> >>
+> >> On 8 Aug 2013, at 15:19, "noreply at r-forge.r-project.org"
+> >> <noreply at r-forge.r-project.org> wrote:
+> >>
+> >>> Author: lckarssen
+> >>> Date: 2013-08-08 13:19:30 +0200 (Thu, 08 Aug 2013)
+> >>> New Revision: 1286
+> >>>
+> >>> Modified:
+> >>>   pkg/ProbABEL/src/eigen_mematrix.cpp
+> >>>   pkg/ProbABEL/src/eigen_mematrix.h
+> >>>   pkg/ProbABEL/src/main.cpp
+> >>>   pkg/ProbABEL/src/mematri1.h
+> >>>   pkg/ProbABEL/src/mematrix.h
+> >>>   pkg/ProbABEL/src/reg1.cpp
+> >>>   pkg/ProbABEL/src/regdata.cpp
+> >>>   pkg/ProbABEL/src/regdata.h
+> >>> Log:
+> >>> Added chi^2 information to the ProbABEL output for linear regression.
+> >>> NOTE: for palogist and pacoxph this still needs to be fixed!!!
+> >>>
+> >>> The chi^2 values are based on the LRT. The null model is calculated at
+> >>> the beginning (this was already part of ProbABEL for a long time). In
+> >>> the case of missing genotype data the null model is recalculated for
+> >>> that SNP only. So for people with imputed data there should be no
+> >>> difference in computation time.
+> >>>
+> >>> This is a bit of a rough implementation. Maybe some more work is
+> >>> needed to make it better (in terms of programming style/efficiency).
+> >>>
+> >>> Changes per file:
+> >>> src/main.cpp:
+> >>> - Some small (unrelated) changes to the way progress information is
+> printed
+> >>> - Changed output precision of beta, se_beta, chi^2 to 6 instead of 9
+> digits
+> >>> - around line 700 is where the recalculation of the null model is done.
+> >>> src/regdata.h, src/regdata.cpp:
+> >>> - Add a function remove_snp_from_X() that removes the genotype data
+> >>>   from the design matrix. This is necessary, because in order to know
+> >>>   which individuals have missing genotype data (and therefore should
+> >>>   be excluded from the null estimation), we first need to have the
+> >>>   genotype data in.
+> >>> src/reg1.cpp:
+> >>> - At the beginning of apply_model() check if we are calculating the
+> >>>   null model. if so, we don't need to apply the genotypic model at
+> >>>   all.
+> >>> src/eigen_mematrix.h, src/eigen_mematrix.cpp:
+> >>> - Implement the delete_column() function. When transitioning to Eigen
+> >>>   this function wasn't used anywhere in the code, so it wasn't
+> >>>   carried over from the mematrix files.
+> >>> src/mematri1.h, src/mematrix.h:
+> >>> - Set the col/row number argument to const in the delete_column() and
+> >>>   delete_row() functions.
+> >>>
+> >>>
+> >>>
+> >>>
+> >>>
+> >>> Modified: pkg/ProbABEL/src/eigen_mematrix.cpp
+> >>> ===================================================================
+> >>> --- pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 10:07:32 UTC
+> (rev 1285)
+> >>> +++ pkg/ProbABEL/src/eigen_mematrix.cpp    2013-08-08 11:19:30 UTC
+> (rev 1286)
+> >>> @@ -362,4 +362,30 @@
+> >>>     return temp;
+> >>> }
+> >>>
+> >>> +
+> >>> +template<class DT>
+> >>> +void mematrix<DT>::delete_column(const int delcol)
+> >>> +{
+> >>> +    if (delcol > ncol || delcol < 0)
+> >>> +    {
+> >>> +        fprintf(stderr, "mematrix::delete_column: column out of
+> range\n");
+> >>> +        exit(1);
+> >>> +    }
+> >>> +
+> >>> +    // Eigen::Matrix<DT,-1,-1,0,-1,-1> *auxdata =
+> >>> +    //     new Eigen::Matrix<DT,-1,-1,0,-1,-1>;
+> >>> +    MatrixXd auxdata = data;
+> >>> +
+> >>> +    data.resize(data.rows(), data.cols()-1);
+> >>> +
+> >>> +    int rightColsSize = auxdata.cols() - delcol - 1;
+> >>> +
+> >>> +    data.leftCols(delcol) = auxdata.leftCols(delcol);
+> >>> +    data.rightCols(rightColsSize) = auxdata.rightCols(rightColsSize);
+> >>> +
+> >>> +    ncol--;
+> >>> +}
+> >>> +
+> >>> +
+> >>> +
+> >>> #endif
+> >>>
+> >>> Modified: pkg/ProbABEL/src/eigen_mematrix.h
+> >>> ===================================================================
+> >>> --- pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 10:07:32 UTC (rev
+> 1285)
+> >>> +++ pkg/ProbABEL/src/eigen_mematrix.h    2013-08-08 11:19:30 UTC (rev
+> 1286)
+> >>> @@ -37,6 +37,8 @@
+> >>>     mematrix operator*(const mematrix &M);
+> >>>     mematrix operator*(const mematrix *M);
+> >>>
+> >>> +    void delete_column(const int delcol);
+> >>> +
+> >>>     void reinit(int nr, int nc);
+> >>>
+> >>>     unsigned int getnrow(void)
+> >>>
+> >>> Modified: pkg/ProbABEL/src/main.cpp
+> >>> ===================================================================
+> >>> --- pkg/ProbABEL/src/main.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> >>> +++ pkg/ProbABEL/src/main.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> >>> @@ -208,9 +208,9 @@
+> >>>                 << input_var.getSep()
+> >>>                 << "sebeta_SNP_recA1";
+> >>>     *outfile[4] << input_var.getSep()
+> >>> -                << "beta_SNP_odom"
+> >>> +                << "beta_SNP_odomA1"
+> >>>                 << input_var.getSep()
+> >>> -                << "sebeta_SNP_odom";
+> >>> +                << "sebeta_SNP_odomA1";
+> >>>     if (input_var.getInteraction() != 0)
+> >>>     {
+> >>>         //Han Chen
+> >>> @@ -263,7 +263,7 @@
+> >>>     *outfile[1] << input_var.getSep() << "chi2_SNP_A1\n";   //
+> "loglik\n";
+> >>>     *outfile[2] << input_var.getSep() << "chi2_SNP_domA1\n";//
+> "loglik\n";
+> >>>     *outfile[3] << input_var.getSep() << "chi2_SNP_recA1\n";//
+> "loglik\n";
+> >>> -    *outfile[4] << input_var.getSep() << "chi2_SNP_odom\n"; //
+> "loglik\n";
+> >>> +    *outfile[4] << input_var.getSep() << "chi2_SNP_odomA1\n"; //
+> "loglik\n";
+> >>> }
+> >>>
+> >>> void create_header2(std::vector<std::ofstream*>& outfile, cmdvars&
+> input_var,
+> >>> @@ -389,7 +389,7 @@
+> >>>
+> >>>     masked_matrix invvarmatrix;
+> >>>
+> >>> -    std::cout << "Reading data ..." << std::flush;
+> >>> +    std::cout << "Reading data..." << std::flush;
+> >>>     if (input_var.getInverseFilename() != NULL)
+> >>>     {
+> >>>         loadInvSigma(input_var, phd, invvarmatrix);
+> >>> @@ -412,7 +412,7 @@
+> >>>                        phd.allmeasured, phd.idnames);
+> >>>     }
+> >>>
+> >>> -    std::cout << " loaded genotypic data ..." << std::flush;
+> >>> +    std::cout << " loaded genotypic data..." << std::flush;
+> >>>
+> >>>     // estimate null model
+> >>> #if COXPH
+> >>> @@ -421,7 +421,7 @@
+> >>>     regdata nrgd = regdata(phd, gtd, -1,
+> input_var.isIsInteractionExcluded());
+> >>> #endif
+> >>>
+> >>> -    std::cout << " loaded null data ..." << std::flush;
+> >>> +    std::cout << " loaded null data..." << std::flush;
+> >>> #if LOGISTIC
+> >>>     logistic_reg nrd = logistic_reg(nrgd);
+> >>>     nrd.estimate(nrgd, 0, MAXITER, EPS, CHOLTOL, 0,
+> >>> @@ -446,14 +446,14 @@
+> >>> #endif
+> >>>     double null_loglik = nrd.loglik;
+> >>>
+> >>> -    std::cout << " estimated null model ...";
+> >>> +    std::cout << " estimated null model...";
+> >>>     // end null
+> >>> #if COXPH
+> >>>     coxph_data rgd(phd, gtd, 0);
+> >>> #else
+> >>>     regdata rgd(phd, gtd, 0, input_var.isIsInteractionExcluded());
+> >>> #endif
+> >>> -    std::cout << " formed regression object ...";
+> >>> +    std::cout << " formed regression object...\n";
+> >>>
+> >>>
+> >>>     // Open a vector of files that will be used for output. Depending
+> >>> @@ -505,13 +505,16 @@
+> >>>     for (int i = 0; i < maxmod; i++)
+> >>>     {
+> >>>         beta_sebeta.push_back(new std::ostringstream());
+> >>> -        beta_sebeta[i]->precision(9);
+> >>> +        beta_sebeta[i]->precision(6);
+> >>> +        //*beta_sebeta[i] << scientific;
+> >>>         //Han Chen
+> >>>         covvalue.push_back(new std::ostringstream());
+> >>> -        covvalue[i]->precision(9);
+> >>> +        covvalue[i]->precision(6);
+> >>> +        //*covvalue[i] << scientific;
+> >>>         //Oct 26, 2009
+> >>>         chi2.push_back(new std::ostringstream());
+> >>> -        chi2[i]->precision(9);
+> >>> +        chi2[i]->precision(6);
+> >>> +        //*chi2[i] << scientific;
+> >>>     }
+> >>>
+> >>>
+> >>> @@ -565,10 +568,10 @@
+> >>>             poly = 0;
+> >>>         }
+> >>>
+> >>> +        // Write mlinfo information to the output file(s)
+> >>>         // Prob data: All models output. One file per model
+> >>>         if (input_var.getNgpreds() == 2)
+> >>>         {
+> >>> -            // Write mlinfo to output:
+> >>>             for (unsigned int file = 0; file < outfile.size(); file++)
+> >>>             {
+> >>>                 write_mlinfo(outfile, file, mli, csnp, input_var,
+> >>> @@ -679,7 +682,7 @@
+> >>>                 } // END for(pos = start_pos; pos < rd.beta.nrow;
+> pos++)
+> >>>
+> >>>
+> >>> -                //calculate chi2
+> >>> +                //calculate chi^2
+> >>>                 //________________________________
+> >>>                 //cout <<  rd.loglik<<" "<<input_var.getNgpreds() <<
+> "\n";
+> >>>
+> >>> @@ -690,23 +693,41 @@
+> >>>
+> >>>                     if (input_var.getScore() == 0)
+> >>>                     {
+> >>> +                        double loglik = rd.loglik;
+> >>>                         if (gcount != gtd.nids)
+> >>>                         {
+> >>>                             // If SNP data is missing we didn't
+> >>>                             // correctly compute the null likelihood
+> >>> -                            *chi2[model] << "NaN";
+> >>> +
+> >>> +                            // Recalculate null likelihood by
+> >>> +                            // stripping the SNP data column(s) from
+> >>> +                            // the X matrix in the regression object
+> >>> +                            // and run the null model estimation again
+> >>> +                            // for this SNP.
+> >>> +// BEWARE, ONLY IMPLEMENTED FOR LINEAR REG!!!
+> >>> +// TODO LCK
+> >>> +#ifdef LINEAR
+> >>> +                            regdata new_rgd = rgd;
+> >>> +                            new_rgd.remove_snp_from_X();
+> >>> +                            linear_reg new_null_rd(new_rgd);
+> >>> +                            new_null_rd.estimate(new_rgd, 0, CHOLTOL,
+> model,
+> >>> +
+> input_var.getInteraction(),
+> >>> +
+> input_var.getNgpreds(),
+> >>> +                                                 invvarmatrix,
+> >>> +
+> input_var.getRobust(), 1);
+> >>> +
+> >>> +                            *chi2[model] << 2. * (loglik -
+> new_null_rd.loglik);
+> >>> +#endif
+> >>>                         }
+> >>>                         else
+> >>>                         {
+> >>>                             // No missing SNP data, we can compute the
+> LRT
+> >>> -                            *chi2[model] << 2. * (rd.loglik -
+> null_loglik);
+> >>> +                            *chi2[model] << 2. * (loglik -
+> null_loglik);
+> >>>                         }
+> >>> -                        //*chi2[model] << rd.loglik;
+> >>>                     } else
+> >>>                     {
+> >>>                         // We want score test output
+> >>>                         *chi2[model] << rd.chi2_score;
+> >>> -                        //*chi2[model] << "nan";
+> >>>                     }
+> >>>                 }
+> >>>             } // END first part of if(poly); allele not too rare
+> >>>
+> >>> Modified: pkg/ProbABEL/src/mematri1.h
+> >>> ===================================================================
+> >>> --- pkg/ProbABEL/src/mematri1.h    2013-08-08 10:07:32 UTC (rev 1285)
+> >>> +++ pkg/ProbABEL/src/mematri1.h    2013-08-08 11:19:30 UTC (rev 1286)
+> >>> @@ -301,7 +301,7 @@
+> >>> }
+> >>>
+> >>> template<class DT>
+> >>> -void mematrix<DT>::delete_column(int delcol)
+> >>> +void mematrix<DT>::delete_column(const int delcol)
+> >>> {
+> >>>     if (delcol > ncol || delcol < 0)
+> >>>     {
+> >>> @@ -333,7 +333,7 @@
+> >>> }
+> >>>
+> >>> template<class DT>
+> >>> -void mematrix<DT>::delete_row(int delrow)
+> >>> +void mematrix<DT>::delete_row(const int delrow)
+> >>> {
+> >>>     if (delrow > nrow || delrow < 0)
+> >>>     {
+> >>>
+> >>> Modified: pkg/ProbABEL/src/mematrix.h
+> >>> ===================================================================
+> >>> --- pkg/ProbABEL/src/mematrix.h    2013-08-08 10:07:32 UTC (rev 1285)
+> >>> +++ pkg/ProbABEL/src/mematrix.h    2013-08-08 11:19:30 UTC (rev 1286)
+> >>> @@ -48,8 +48,8 @@
+> >>>     void put(DT value, int nr, int nc);
+> >>>     DT column_mean(int nc);
+> >>>     void print(void);
+> >>> -    void delete_column(int delcol);
+> >>> -    void delete_row(int delrow);
+> >>> +    void delete_column(const int delcol);
+> >>> +    void delete_row(const int delrow);
+> >>>
+> >>> };
+> >>>
+> >>>
+> >>> Modified: pkg/ProbABEL/src/reg1.cpp
+> >>> ===================================================================
+> >>> --- pkg/ProbABEL/src/reg1.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> >>> +++ pkg/ProbABEL/src/reg1.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> >>> @@ -4,12 +4,22 @@
+> >>> mematrix<double> apply_model(mematrix<double>& X, int model, int
+> interaction,
+> >>>                              int ngpreds, bool is_interaction_excluded,
+> >>>                              bool iscox, int nullmodel)
+> >>> +// if ngpreds==1 (dose data):
+> >>> +// model 0 = additive 1 df
+> >>> +// if ngpreds==2 (prob data):
+> >>> // model 0 = 2 df
+> >>> // model 1 = additive 1 df
+> >>> // model 2 = dominant 1 df
+> >>> // model 3 = recessive 1 df
+> >>> // model 4 = over-dominant 1 df
+> >>> {
+> >>> +    if(nullmodel)
+> >>> +    {
+> >>> +        // No need to apply any genotypic model when calculating the
+> >>> +        // null model
+> >>> +        return (X);
+> >>> +    }
+> >>> +
+> >>>     if (model == 0)
+> >>>     {
+> >>>         if (interaction != 0 && !nullmodel)
+> >>> @@ -295,12 +305,13 @@
+> >>>     if (verbose)
+> >>>     {
+> >>>         cout << rdata.is_interaction_excluded
+> >>> -                << " <-irdata.is_interaction_excluded\n";
+> >>> +             << " <-rdata.is_interaction_excluded\n";
+> >>>         // std::cout << "invvarmatrix:\n";
+> >>>         // invvarmatrixin.masked_data->print();
+> >>>         std::cout << "rdata.X:\n";
+> >>>         rdata.X.print();
+> >>>     }
+> >>> +
+> >>>     mematrix<double> X = apply_model(rdata.X, model, interaction,
+> ngpreds,
+> >>>                                      rdata.is_interaction_excluded,
+> false,
+> >>>                                      nullmodel);
+> >>> @@ -311,6 +322,7 @@
+> >>>         std::cout << "Y:\n";
+> >>>         rdata.Y.print();
+> >>>     }
+> >>> +
+> >>>     int length_beta = X.ncol;
+> >>>     beta.reinit(length_beta, 1);
+> >>>     sebeta.reinit(length_beta, 1);
+> >>>
+> >>> Modified: pkg/ProbABEL/src/regdata.cpp
+> >>> ===================================================================
+> >>> --- pkg/ProbABEL/src/regdata.cpp    2013-08-08 10:07:32 UTC (rev 1285)
+> >>> +++ pkg/ProbABEL/src/regdata.cpp    2013-08-08 11:19:30 UTC (rev 1286)
+> >>> @@ -39,7 +39,7 @@
+> >>>
+> >>>     for (int i = 0; i < nids; i++)
+> >>>     {
+> >>> -        masked_data[i] = 0;
+> >>> +        masked_data[i] = obj.masked_data[i];
+> >>>     }
+> >>> }
+> >>>
+> >>> @@ -95,6 +95,9 @@
+> >>>
+> >>> void regdata::update_snp(gendata &gend, int snpnum)
+> >>> {
+> >>> +    // Add genotypic data (dosage or probabilities) to the design
+> >>> +    // matrix X.
+> >>> +
+> >>>     for (int j = 0; j < ngpreds; j++)
+> >>>     {
+> >>>         double snpdata[nids];
+> >>> @@ -109,11 +112,34 @@
+> >>>         {
+> >>>             X.put(snpdata[i], i, (ncov - j));
+> >>>             if (isnan(snpdata[i]))
+> >>> +            {
+> >>>                 masked_data[i] = 1;
+> >>> +            }
+> >>>         }
+> >>>     }
+> >>> }
+> >>>
+> >>> +void regdata::remove_snp_from_X()
+> >>> +{
+> >>> +    // update_snp() adds SNP information to the design matrix. This
+> >>> +    // function allows you to strip that information from X again.
+> >>> +    // This is used for example when calculating the null model.
+> >>> +
+> >>> +    if(ngpreds == 1)
+> >>> +    {
+> >>> +        X.delete_column(X.ncol -1);
+> >>> +    }
+> >>> +    else if(ngpreds == 2)
+> >>> +    {
+> >>> +        X.delete_column(X.ncol -1);
+> >>> +        X.delete_column(X.ncol -1);
+> >>> +    }
+> >>> +    else
+> >>> +    {
+> >>> +        cerr << "ngpreds should be 1 or 2. you should never come
+> here!\n";
+> >>> +    }
+> >>> +}
+> >>> +
+> >>> regdata::~regdata()
+> >>> {
+> >>>     delete[] regdata::masked_data;
+> >>>
+> >>> Modified: pkg/ProbABEL/src/regdata.h
+> >>> ===================================================================
+> >>> --- pkg/ProbABEL/src/regdata.h    2013-08-08 10:07:32 UTC (rev 1285)
+> >>> +++ pkg/ProbABEL/src/regdata.h    2013-08-08 11:19:30 UTC (rev 1286)
+> >>> @@ -34,6 +34,7 @@
+> >>>             bool ext_is_interaction_excluded);
+> >>>     mematrix<double> extract_genotypes();
+> >>>     void update_snp(gendata &gend, int snpnum);
+> >>> +    void remove_snp_from_X();
+> >>>     regdata get_unmasked_data();
+> >>>     ~regdata();
+> >>>
+> >>>
+> >>> _______________________________________________
+> >>> Genabel-commits mailing list
+> >>> Genabel-commits at lists.r-forge.r-project.org
+> >>>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> >> _______________________________________________
+> >> genabel-devel mailing list
+> >> genabel-devel at lists.r-forge.r-project.org
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> >>
+> >
+> >
+> >
+> >
+> > _______________________________________________
+> > genabel-devel mailing list
+> > genabel-devel at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> >
+>
+> --
+> -----------------------------------------------------------------
+> L.C. Karssen
+> Utrecht
+> The Netherlands
+>
+> lennart at karssen.org
+> http://blog.karssen.org
+>
+> Stuur mij aub geen Word of Powerpoint bestanden!
+> Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+> ------------------------------------------------------------------
+>
+>
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>
+
+
+
+-- 
+-----------------------------------------------------
+Yurii S. Aulchenko
+
+[ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [
+Twitter<http://twitter.com/YuriiAulchenko>] [
+Blog <http://yurii-aulchenko.blogspot.nl/> ]
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130815/0cc22368/attachment-0001.html>
+
+From yurii.aulchenko at gmail.com  Sat Aug 17 10:38:56 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Sat, 17 Aug 2013 12:38:56 +0400
+Subject: [GenABEL-dev] Precision and scientific notation in ProbABEL
+In-Reply-To: <520B39E1.5000409@karssen.org>
+References: <51F76C1A.2000205@karssen.org>
+ <5B307B30-9137-4A17-8A36-D43FC2818B94@burlo.trieste.it>
+ <520B39E1.5000409@karssen.org>
+Message-ID: <CAHX9t6JvdUXg2MAbinP7tD5qxorSqmjuDLbH8OW18MHC7JJ5fQ@mail.gmail.com>
+
+As a general rule I am for using scientific notation and 4 to 6 significant
+digits (e.g. 0.123456E-20). This may be my FORTRAN background though :)
+
+What if we decide to put say p-values in the outputs? Does the output
+automatically switch to sci notation in this case?
+
+YA
+
+
+On Wed, Aug 14, 2013 at 12:03 PM, L.C. Karssen <lennart at karssen.org> wrote:
+
+> Thanks for the input Nicola, I've set the output to 6 significant
+> digits, although it seems that the cout function (used for printing)
+> sometimes "eats" a trailing zero.
+>
+>
+> Best,
+>
+> Lennart.
+>
+>
+> On 30-07-13 10:33, Nicola Pirastu wrote:
+> > Dear Lennart,
+> >
+> > I think that switching to scientific notation is not really necessary
+> and could lead to a little of loss in precision unless of course you still
+> > use 6 significant digits which will translate in just a reduction of 0
+> in the values.
+> > So if for example we were to choose scientific notation with 3
+> significant digits, although this would not affect very much the final
+> results we could be asked to submit more and
+> > would not be able to comply.
+> > So to summarize I think that if it does not have any effect on
+> performance of ProbABEL 6 significant digits without scientific notation is
+> fine.
+> >
+> > Best
+> >
+> > Nicola
+> >
+> >
+> > Dr. Nicola Pirastu PhD
+> > Research Fellow
+> > Medical Sciences, Chirurgical and Health Department
+> > University of Trieste
+> > Medical Genetics
+> > IRCCS Burlo Garofolo
+> > Via dell'Istria 65/1
+> > 34137 Italy
+> > tel. +390403785539
+> >
+> > Il giorno 30/lug/2013, alle ore 09:32, "L.C. Karssen" <
+> lennart at karssen.org> ha scritto:
+> >
+> >> Dear list,
+> >>
+> >> I'm finalising version 0.4.0 of ProbABEL and there are two things I'd
+> >> like your opinion on:
+> >>
+> >> 1) with what precision should we print the betas, standard errors and
+> >> Chi^2 values to the output files?
+> >>
+> >> 2) Should we use scientific notation in the output (for betas, standard
+> >> errors and Chi^2)?
+> >>
+> >> In ProbABEL v0.3.0 and earlier output was simply sent to cout without
+> >> any explicit formatting. In practice this lead usually to 6 significant
+> >> digits, but sometimes less. My proposal is to fix the precision at 6
+> >> significant digits.
+> >>
+> >> Regarding item 2): most of the betas I see are in the range between 0
+> >> and 10, although in case of no effect beta's can be of the order of
+> >> 1e-2, 1e-3. All in all, I don't think switching to scientific notation
+> >> will improve the output.
+> >>
+> >>
+> >> What are your opinions?
+> >>
+> >>
+> >> Thanks,
+> >>
+> >> Lennart.
+> >> --
+> >> -----------------------------------------------------------------
+> >> L.C. Karssen
+> >> Utrecht
+> >> The Netherlands
+> >>
+> >> lennart at karssen.org
+> >> http://blog.karssen.org
+> >>
+> >> Stuur mij aub geen Word of Powerpoint bestanden!
+> >> Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+> >> ------------------------------------------------------------------
+> >>
+> >> _______________________________________________
+> >> genabel-devel mailing list
+> >> genabel-devel at lists.r-forge.r-project.org
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> >
+> > AVVISO DI RISERVATEZZA Informazioni riservate possono essere contenute
+> nel messaggio o nei suoi allegati. Se non siete i destinatari indicati nel
+> messaggio, o responsabili per la sua consegna alla persona, o se avete
+> ricevuto il messaggio per errore, siete pregati di non trascriverlo,
+> copiarlo o inviarlo a nessuno. In tal caso vi invitiamo a cancellare il
+> messaggio ed i suoi allegati. Grazie. CONFIDENTIALITY NOTICE Confidential
+> information may be contained in this message or in its attachments. If you
+> are not the addressee indicated in this message, or responsible for message
+> delivering to that person, or if you have received this message in error,
+> you may not transcribe, copy or deliver this message to anyone. In that
+> case, you should delete this message and its attachments. Thank you.
+> >
+>
+>
+> --
+> -----------------------------------------------------------------
+> L.C. Karssen
+> Utrecht
+> The Netherlands
+>
+> lennart at karssen.org
+> http://blog.karssen.org
+>
+> Stuur mij aub geen Word of Powerpoint bestanden!
+> Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+> ------------------------------------------------------------------
+>
+>
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>
+
+
+
+-- 
+-----------------------------------------------------
+Yurii S. Aulchenko
+
+[ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [
+Twitter<http://twitter.com/YuriiAulchenko>] [
+Blog <http://yurii-aulchenko.blogspot.nl/> ]
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130817/db332e26/attachment.html>
+
+From lennart at karssen.org  Sun Aug 18 23:20:38 2013
+From: lennart at karssen.org (L.C. Karssen)
+Date: Sun, 18 Aug 2013 23:20:38 +0200
+Subject: [GenABEL-dev] Precision and scientific notation in ProbABEL
+In-Reply-To: <CAHX9t6JvdUXg2MAbinP7tD5qxorSqmjuDLbH8OW18MHC7JJ5fQ@mail.gmail.com>
+References: <51F76C1A.2000205@karssen.org>
+ <5B307B30-9137-4A17-8A36-D43FC2818B94@burlo.trieste.it>
+ <520B39E1.5000409@karssen.org>
+ <CAHX9t6JvdUXg2MAbinP7tD5qxorSqmjuDLbH8OW18MHC7JJ5fQ@mail.gmail.com>
+Message-ID: <52113AA6.8040100@karssen.org>
+
+On 08/17/2013 10:38 AM, Yurii Aulchenko wrote:
+> As a general rule I am for using scientific notation and 4 to 6
+> significant digits (e.g. 0.123456E-20). This may be my FORTRAN
+> background though :)
+
+That seems too precise, given that most imput dosages/probabilities are
+known to ~3 or 4 digits and I don't think that many phenotypes will be
+measured more precisely.
+
+> 
+> What if we decide to put say p-values in the outputs? Does the output
+> automatically switch to sci notation in this case? 
+
+For p-values I would definitely go for scientific notation. We can turn
+the on/off per output column (as each column is coded as a stringstream).
+
+
+Lennart.
+
+> 
+> YA
+> 
+> 
+> On Wed, Aug 14, 2013 at 12:03 PM, L.C. Karssen <lennart at karssen.org
+> <mailto:lennart at karssen.org>> wrote:
+> 
+>     Thanks for the input Nicola, I've set the output to 6 significant
+>     digits, although it seems that the cout function (used for printing)
+>     sometimes "eats" a trailing zero.
+> 
+> 
+>     Best,
+> 
+>     Lennart.
+> 
+> 
+>     On 30-07-13 10:33, Nicola Pirastu wrote:
+>     > Dear Lennart,
+>     >
+>     > I think that switching to scientific notation is not really
+>     necessary and could lead to a little of loss in precision unless of
+>     course you still
+>     > use 6 significant digits which will translate in just a reduction
+>     of 0 in the values.
+>     > So if for example we were to choose scientific notation with 3
+>     significant digits, although this would not affect very much the
+>     final results we could be asked to submit more and
+>     > would not be able to comply.
+>     > So to summarize I think that if it does not have any effect on
+>     performance of ProbABEL 6 significant digits without scientific
+>     notation is fine.
+>     >
+>     > Best
+>     >
+>     > Nicola
+>     >
+>     >
+>     > Dr. Nicola Pirastu PhD
+>     > Research Fellow
+>     > Medical Sciences, Chirurgical and Health Department
+>     > University of Trieste
+>     > Medical Genetics
+>     > IRCCS Burlo Garofolo
+>     > Via dell'Istria 65/1
+>     > 34137 Italy
+>     > tel. +390403785539
+>     >
+>     > Il giorno 30/lug/2013, alle ore 09:32, "L.C. Karssen"
+>     <lennart at karssen.org <mailto:lennart at karssen.org>> ha scritto:
+>     >
+>     >> Dear list,
+>     >>
+>     >> I'm finalising version 0.4.0 of ProbABEL and there are two things I'd
+>     >> like your opinion on:
+>     >>
+>     >> 1) with what precision should we print the betas, standard errors and
+>     >> Chi^2 values to the output files?
+>     >>
+>     >> 2) Should we use scientific notation in the output (for betas,
+>     standard
+>     >> errors and Chi^2)?
+>     >>
+>     >> In ProbABEL v0.3.0 and earlier output was simply sent to cout without
+>     >> any explicit formatting. In practice this lead usually to 6
+>     significant
+>     >> digits, but sometimes less. My proposal is to fix the precision at 6
+>     >> significant digits.
+>     >>
+>     >> Regarding item 2): most of the betas I see are in the range between 0
+>     >> and 10, although in case of no effect beta's can be of the order of
+>     >> 1e-2, 1e-3. All in all, I don't think switching to scientific
+>     notation
+>     >> will improve the output.
+>     >>
+>     >>
+>     >> What are your opinions?
+>     >>
+>     >>
+>     >> Thanks,
+>     >>
+>     >> Lennart.
+>     >> --
+>     >> -----------------------------------------------------------------
+>     >> L.C. Karssen
+>     >> Utrecht
+>     >> The Netherlands
+>     >>
+>     >> lennart at karssen.org <mailto:lennart at karssen.org>
+>     >> http://blog.karssen.org
+>     >>
+>     >> Stuur mij aub geen Word of Powerpoint bestanden!
+>     >> Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+>     >> ------------------------------------------------------------------
+>     >>
+>     >> _______________________________________________
+>     >> genabel-devel mailing list
+>     >> genabel-devel at lists.r-forge.r-project.org
+>     <mailto:genabel-devel at lists.r-forge.r-project.org>
+>     >>
+>     https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>     >
+>     > AVVISO DI RISERVATEZZA Informazioni riservate possono essere
+>     contenute nel messaggio o nei suoi allegati. Se non siete i
+>     destinatari indicati nel messaggio, o responsabili per la sua
+>     consegna alla persona, o se avete ricevuto il messaggio per errore,
+>     siete pregati di non trascriverlo, copiarlo o inviarlo a nessuno. In
+>     tal caso vi invitiamo a cancellare il messaggio ed i suoi allegati.
+>     Grazie. CONFIDENTIALITY NOTICE Confidential information may be
+>     contained in this message or in its attachments. If you are not the
+>     addressee indicated in this message, or responsible for message
+>     delivering to that person, or if you have received this message in
+>     error, you may not transcribe, copy or deliver this message to
+>     anyone. In that case, you should delete this message and its
+>     attachments. Thank you.
+>     >
+> 
+> 
+>     --
+>     -----------------------------------------------------------------
+>     L.C. Karssen
+>     Utrecht
+>     The Netherlands
+> 
+>     lennart at karssen.org <mailto:lennart at karssen.org>
+>     http://blog.karssen.org
+> 
+>     Stuur mij aub geen Word of Powerpoint bestanden!
+>     Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+>     ------------------------------------------------------------------
+> 
+> 
+>     _______________________________________________
+>     genabel-devel mailing list
+>     genabel-devel at lists.r-forge.r-project.org
+>     <mailto:genabel-devel at lists.r-forge.r-project.org>
+>     https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+> 
+> 
+> 
+> -- 
+> -----------------------------------------------------
+> Yurii S. Aulchenko
+> 
+> [ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [ Twitter
+> <http://twitter.com/YuriiAulchenko> ] [ Blog
+> <http://yurii-aulchenko.blogspot.nl/> ]
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 230 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130818/c107fab2/attachment.sig>
+
+From yurii.aulchenko at gmail.com  Tue Aug 27 20:52:34 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Tue, 27 Aug 2013 20:52:34 +0200
+Subject: [GenABEL-dev] Fwd: CRAN package GenABEL
+In-Reply-To: <5218A899.8030205@stats.ox.ac.uk>
+References: <5218A899.8030205@stats.ox.ac.uk>
+Message-ID: <CAHX9t6KwWvKNSdckgnongqiWotmJdPpPtZVRLipasBEgEVe+Zg@mail.gmail.com>
+
+Dear All,
+
+following the request below I think I should disable the version checks for
+the GenA-package.
+
+I do not like this, but the only way around I can see would be to keep the
+most current version in some file on one of our servers (we did that with
+earlier versions). This, however, is an extra maintenance cost - there will
+be 4 places to change the version on update (CHANGES.LOG, DESCRIPTION,
+zzz.R, and the remote version-file).
+
+So I am going to comment out the whole version-checking part of
+GenA-package, in the style if (FALSE) {xxx}... Interestingly enough, DatA
+does the same thing, but I did not get request about DatA.
+
+I think the same thing applies to some packages other than GenA and DatA,
+and respective package maintainers should have received similar requests.
+
+best regards,
+Y
+
+---------- Forwarded message ----------
+From: Prof Brian Ripley <ripley at stats.ox.ac.uk>
+Date: Sat, Aug 24, 2013 at 2:35 PM
+Subject: CRAN package GenABEL
+To: Yurii Aulchenko <yurii at bionet.nsc.ru>
+Cc: CRAN <CRAN at r-project.org>
+
+
+This is currently failing to load with
+
+* checking whether the package can be loaded ... ERROR
+Loading required package: MASS
+Error in stringSplit[[1]] : subscript out of bounds
+GenABEL v. 1.7-6 (May 16, 2013) loaded
+
+That's because you insist on looking on CRAN every time the namespace is
+loaded, and your error catching is not good enough.  Please remove the
+test.  Apart from anything else, it is an unreasonable load: R CMD check is
+going to access CRAN ca 20 times.
+
+
+-- 
+Brian D. Ripley,                  ripley at stats.ox.ac.uk
+Professor of Applied Statistics,
+http://www.stats.ox.ac.uk/~**ripley/<http://www.stats.ox.ac.uk/~ripley/>
+University of Oxford,             Tel:  +44 1865 272861 (self)
+1 South Parks Road,                     +44 1865 272866 (PA)
+Oxford OX1 3TG, UK                Fax:  +44 1865 272595
+
+
+
+-- 
+-----------------------------------------------------
+Yurii S. Aulchenko
+
+[ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [
+Twitter<http://twitter.com/YuriiAulchenko>] [
+Blog <http://yurii-aulchenko.blogspot.nl/> ]
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130827/912b6265/attachment.html>
+

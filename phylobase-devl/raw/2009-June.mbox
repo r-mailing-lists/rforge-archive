@@ -1,0 +1,833 @@
+From regetz at nceas.ucsb.edu  Thu Jun 18 00:54:27 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 17 Jun 2009 15:54:27 -0700
+Subject: [Phylobase-devl] improving getNode handling of NA_character_ and
+	missing node IDs
+Message-ID: <4A397423.9010606@nceas.ucsb.edu>
+
+Hi all,
+
+This is a followup to my recent r-forge bug report [#458]. See there for 
+details. Sorry to split between these two modes of communication; my 
+impression is that this list is the way to go for proposing/discussing 
+changes, yet I'm definitely inclined to use the bug tracker for, well, 
+tracking bugs. I'm certainly happy to do things differently in the 
+future if its preferable.
+
+The attached treewalk.R patch represents my proposed changes to getNode. 
+In this revision, the result vector returns NA values with <NA> names 
+both for nonexistent integer node IDs (i.e., those not occurring in the 
+tree) and for NA characters, and the missingness check works in both cases.
+
+I've also eliminated what seemed to be superfluous code that struck me 
+as a holdover from when the function relied on a version of labels() 
+that only matched tips. The updated version checks out well in my 
+testing. However, it would be great if someone (Ben, as original 
+author?) could do a sanity check.
+
+Side question: are folks generally fine with communicating proposed 
+changes in the form of attached patch (unified diff), as I've done here?
+
+Thanks!
+Jim
+
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: treewalk.R.patch
+Url: http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090617/8eb78056/attachment.txt 
+
+From francois.michonneau at gmail.com  Thu Jun 18 23:26:39 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Thu, 18 Jun 2009 17:26:39 -0400
+Subject: [Phylobase-devl] improving getNode handling of NA_character_
+ and missing node IDs
+In-Reply-To: <4A397423.9010606@nceas.ucsb.edu>
+References: <4A397423.9010606@nceas.ucsb.edu>
+Message-ID: <1245360399.4969.19.camel@dell>
+
+Hi Jim
+
+  Thanks for this.
+
+  Personally I don't have much preference between the mailing or the
+tracker. If we had a much more intense level of discussion about bugs
+and patches then the tracker would probably better.
+
+  Your patch looks good to me.
+
+  There are indeed, here and there, parts of the code that are
+superfluous. I have been trying to clean it up and suppress
+redundancies. I hope to have more time to finish and commit some of
+these changes soon.
+
+  Cheers,
+  -- Fran?ois
+
+  
+
+
+On Wed, 2009-06-17 at 15:54 -0700, Jim Regetz wrote:
+> Hi all,
+> 
+> This is a followup to my recent r-forge bug report [#458]. See there for 
+> details. Sorry to split between these two modes of communication; my 
+> impression is that this list is the way to go for proposing/discussing 
+> changes, yet I'm definitely inclined to use the bug tracker for, well, 
+> tracking bugs. I'm certainly happy to do things differently in the 
+> future if its preferable.
+> 
+> The attached treewalk.R patch represents my proposed changes to getNode. 
+> In this revision, the result vector returns NA values with <NA> names 
+> both for nonexistent integer node IDs (i.e., those not occurring in the 
+> tree) and for NA characters, and the missingness check works in both cases.
+> 
+> I've also eliminated what seemed to be superfluous code that struck me 
+> as a holdover from when the function relied on a version of labels() 
+> that only matched tips. The updated version checks out well in my 
+> testing. However, it would be great if someone (Ben, as original 
+> author?) could do a sanity check.
+> 
+> Side question: are folks generally fine with communicating proposed 
+> changes in the form of attached patch (unified diff), as I've done here?
+> 
+> Thanks!
+> Jim
+> 
+> plain text document attachment (treewalk.R.patch)
+> Index: treewalk.R
+> ===================================================================
+> --- treewalk.R	(revision 438)
+> +++ treewalk.R	(working copy)
+> @@ -12,31 +12,18 @@
+>      if (is.numeric(node) && all(floor(node)==node,na.rm=TRUE)) {
+>          node <- as.integer(node)
+>      }
+> -  nolabs <- rep(!hasNodeLabels(phy),length(node))
+> +    nt <- nTips(phy)
+>      if (is.character(node)) {
+> -        ## old getNodeByLabel()
+> -        nt <- nTips(phy)
+> -        tipmatch <- match(node,labels(phy,"allnode"))
+> -        vals <- ifelse(!is.na(tipmatch),
+> -                       tipmatch,
+> -                       ifelse(nolabs,NA,nt+match(node,nodeLabels(phy))))
+> -        names(vals) <- node
+> -        rval <- vals
+> +        rval <- match(node, labels(phy, "allnode"))
+> +        # return NA for any NA_character_ inputs
+> +        rval[is.na(node)] <- NA
+> +        names(rval) <- node
+>      } else if (is.integer(node)) {
+> -        ## old getLabelByNode
+> -        nt <- nTips(phy)
+> -        vals <- ifelse(node<=nt,  ## tips
+> -                       labels(phy,"allnode")[node],
+> -                       ifelse(node<=nt+nNodes(phy),
+> -                              ifelse(nolabs,NA,
+> -                                     nodeLabels(phy)[pmax(0,node-nt)]),
+> -                              NA))
+> -        ## pmax above to avoid error from negative indices
+> -        names(node) <- vals
+> -        rval <- node
+> +        rval <- match(node, seq_len(nt + nNodes(phy)))
+> +        names(rval) <- labels(phy,"allnode")[rval]
+>      } else stop("node must be integer or character")
+>    if (any(is.na(rval))) {
+> -    missnodes <- names(rval)[is.na(rval)]
+> +    missnodes <- node[is.na(rval)]
+>      msg <- paste("some nodes missing from tree: ",paste(missnodes,collapse=","))
+>      switch(missing,
+>             fail=stop(msg),
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From regetz at nceas.ucsb.edu  Wed Jun 24 09:45:07 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 24 Jun 2009 00:45:07 -0700
+Subject: [Phylobase-devl] several proposed additions
+Message-ID: <4A41D983.5080103@nceas.ucsb.edu>
+
+Hi all,
+
+I'd love to get feedback on any/all of the following. Below, when I talk 
+about things I've done, I mean in my local sources -- I haven't actually 
+committed any of the following. But it is all more or less ready to go, 
+albeit with a couple of minor rough edges that we can discuss further if 
+folks want to move ahead on any of these:
+
+* NAMESPACE: I've created one. Seems to work fine. I'm basically 
+exporting all functions and methods now. I figure it's easier to start 
+with a liberal approach, and later remove whatever items folks agree are 
+only required internally.
+
+* Unit tests: I've created a handful of RUnit tests, and added the 
+necessary "run tests" machinery as documented here: 
+http://wiki.r-project.org/rwiki/doku.php?id=developers:runit
+
+The tests are not even remotely comprehensive, but they do test against 
+the bug fixes I've implemented in the last week or so. I find unit tests 
+to be hugely helpful in making sure that fixed bugs stay fixed, and that 
+code changes in one area don't unexpectedly break things somewhere else. 
+And I find RUnit testing to provide better structure and test 
+expressivity than you get with unstructured test scripts in the pkg/test 
+directory.
+
+I'm not 100% certain that R-forge would do the right thing with these 
+tests without some additional tweaking, but they are successfully run by 
+R CMD CHECK on my local machine (at least as long as phylobase is 
+already installed).
+
+* phylo4 generic: Any reason why there has been a generic for phylo4d, 
+but not phylo4? I've now created a phylo4 generic, along with two 
+methods: one with signature x="matrix" (replacing the original phylo4 
+constructor function), and one with signature x="phylo" (imports phylo 
+to phylo4). I updated the associated doc pages to match, plus fixed a 
+few places in the examples and sources where phylo(edge=...) was called 
+explicitly (the first argument is now the more generic 'x', not 'edge').
+
+* Dealing with messy node labels: My motivation for creating the phylo4 
+generic was to expose an option allowing node labels to be dropped (or, 
+in the case of phylo4d, added to the tree data) during phylo import. 
+This is basically just a modified implementation of what Fran?ois did to 
+deal with MrBayes sorts of trees, except now focused specifically on 
+phylo import (it could be added elsewhere too), and now with user-level 
+control of the behavior. I'm glossing over the details, but for those 
+not paying attention to the bug tracker, see more discussion here:
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=466&group_id=111&atid=488
+
+FYI, R CMD CHECK passes on all the above changes (well, aside from a 
+latex documentation issue that I think has been around for some time).
+
+I'll be traveling much of the next month, but would be happy to discuss 
+any of this further. And of course, I can push some/all of this up to 
+the repository at any time, or send relevant code to the list if requested.
+
+Thanks,
+Jim
+
+From hlapp at duke.edu  Wed Jun 24 15:04:09 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Wed, 24 Jun 2009 09:04:09 -0400
+Subject: [Phylobase-devl] several proposed additions
+In-Reply-To: <4A41D983.5080103@nceas.ucsb.edu>
+References: <4A41D983.5080103@nceas.ucsb.edu>
+Message-ID: <B361AB08-5E46-41E4-A88B-3A7AD7B793E2@duke.edu>
+
+Hi Jim -
+
+this sounds great! I can't speak on behalf of the phylobase leads, but  
+can you commit all your changes to a branch? That would make it  
+easiest for people to check out and play with your code. The unit  
+tests sound cool - haven't been aware of this, but if it is what the  
+name suggests it will be highly useful.
+
+	-hilmar
+
+On Jun 24, 2009, at 3:45 AM, Jim Regetz wrote:
+
+> Hi all,
+>
+> I'd love to get feedback on any/all of the following. Below, when I  
+> talk
+> about things I've done, I mean in my local sources -- I haven't  
+> actually
+> committed any of the following. But it is all more or less ready to  
+> go,
+> albeit with a couple of minor rough edges that we can discuss  
+> further if
+> folks want to move ahead on any of these:
+>
+> * NAMESPACE: I've created one. Seems to work fine. I'm basically
+> exporting all functions and methods now. I figure it's easier to start
+> with a liberal approach, and later remove whatever items folks agree  
+> are
+> only required internally.
+>
+> * Unit tests: I've created a handful of RUnit tests, and added the
+> necessary "run tests" machinery as documented here:
+> http://wiki.r-project.org/rwiki/doku.php?id=developers:runit
+>
+> The tests are not even remotely comprehensive, but they do test  
+> against
+> the bug fixes I've implemented in the last week or so. I find unit  
+> tests
+> to be hugely helpful in making sure that fixed bugs stay fixed, and  
+> that
+> code changes in one area don't unexpectedly break things somewhere  
+> else.
+> And I find RUnit testing to provide better structure and test
+> expressivity than you get with unstructured test scripts in the pkg/ 
+> test
+> directory.
+>
+> I'm not 100% certain that R-forge would do the right thing with these
+> tests without some additional tweaking, but they are successfully  
+> run by
+> R CMD CHECK on my local machine (at least as long as phylobase is
+> already installed).
+>
+> * phylo4 generic: Any reason why there has been a generic for phylo4d,
+> but not phylo4? I've now created a phylo4 generic, along with two
+> methods: one with signature x="matrix" (replacing the original phylo4
+> constructor function), and one with signature x="phylo" (imports phylo
+> to phylo4). I updated the associated doc pages to match, plus fixed a
+> few places in the examples and sources where phylo(edge=...) was  
+> called
+> explicitly (the first argument is now the more generic 'x', not  
+> 'edge').
+>
+> * Dealing with messy node labels: My motivation for creating the  
+> phylo4
+> generic was to expose an option allowing node labels to be dropped  
+> (or,
+> in the case of phylo4d, added to the tree data) during phylo import.
+> This is basically just a modified implementation of what Fran?ois  
+> did to
+> deal with MrBayes sorts of trees, except now focused specifically on
+> phylo import (it could be added elsewhere too), and now with user- 
+> level
+> control of the behavior. I'm glossing over the details, but for those
+> not paying attention to the bug tracker, see more discussion here:
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=466&group_id=111&atid=488
+>
+> FYI, R CMD CHECK passes on all the above changes (well, aside from a
+> latex documentation issue that I think has been around for some time).
+>
+> I'll be traveling much of the next month, but would be happy to  
+> discuss
+> any of this further. And of course, I can push some/all of this up to
+> the repository at any time, or send relevant code to the list if  
+> requested.
+>
+> Thanks,
+> Jim
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+
+From bolker at ufl.edu  Wed Jun 24 15:13:46 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Wed, 24 Jun 2009 09:13:46 -0400
+Subject: [Phylobase-devl] several proposed additions
+In-Reply-To: <B361AB08-5E46-41E4-A88B-3A7AD7B793E2@duke.edu>
+References: <4A41D983.5080103@nceas.ucsb.edu>
+	<B361AB08-5E46-41E4-A88B-3A7AD7B793E2@duke.edu>
+Message-ID: <4A42268A.4010601@ufl.edu>
+
+Hilmar Lapp wrote:
+> Hi Jim -
+> 
+> this sounds great! I can't speak on behalf of the phylobase leads, but  
+> can you commit all your changes to a branch? That would make it  
+> easiest for people to check out and play with your code. The unit  
+> tests sound cool - haven't been aware of this, but if it is what the  
+> name suggests it will be highly useful.
+> 
+> 	-hilmar
+> 
+> On Jun 24, 2009, at 3:45 AM, Jim Regetz wrote:
+> 
+>> Hi all,
+>>
+>> I'd love to get feedback on any/all of the following. Below, when I  
+>> talk
+>> about things I've done, I mean in my local sources -- I haven't  
+>> actually
+>> committed any of the following. But it is all more or less ready to  
+>> go,
+>> albeit with a couple of minor rough edges that we can discuss  
+>> further if
+>> folks want to move ahead on any of these:
+>>
+>> * NAMESPACE: I've created one. Seems to work fine. I'm basically
+>> exporting all functions and methods now. I figure it's easier to start
+>> with a liberal approach, and later remove whatever items folks agree  
+>> are
+>> only required internally.
+
+  We've had a lot of arguments about whether to use namespaces or
+not (I have been very frustrated by namespaces in the past, partly
+because I don't really understand them), but I don't think it's
+a bad idea.
+
+>>
+>> * Unit tests: I've created a handful of RUnit tests, and added the
+>> necessary "run tests" machinery as documented here:
+>> http://wiki.r-project.org/rwiki/doku.php?id=developers:runit
+>>
+>> The tests are not even remotely comprehensive, but they do test  
+>> against
+>> the bug fixes I've implemented in the last week or so. I find unit  
+>> tests
+>> to be hugely helpful in making sure that fixed bugs stay fixed, and  
+>> that
+>> code changes in one area don't unexpectedly break things somewhere  
+>> else.
+>> And I find RUnit testing to provide better structure and test
+>> expressivity than you get with unstructured test scripts in the pkg/ 
+>> test
+>> directory.
+>>
+
+  sounds great.
+>> I'm not 100% certain that R-forge would do the right thing with these
+>> tests without some additional tweaking, but they are successfully  
+>> run by
+>> R CMD CHECK on my local machine (at least as long as phylobase is
+>> already installed).
+>>
+>> * phylo4 generic: Any reason why there has been a generic for phylo4d,
+>> but not phylo4? I've now created a phylo4 generic, along with two
+>> methods: one with signature x="matrix" (replacing the original phylo4
+>> constructor function), and one with signature x="phylo" (imports phylo
+>> to phylo4). I updated the associated doc pages to match, plus fixed a
+>> few places in the examples and sources where phylo(edge=...) was  
+>> called
+>> explicitly (the first argument is now the more generic 'x', not  
+>> 'edge').
+>>
+>> * Dealing with messy node labels: My motivation for creating the  
+>> phylo4
+>> generic was to expose an option allowing node labels to be dropped  
+>> (or,
+>> in the case of phylo4d, added to the tree data) during phylo import.
+>> This is basically just a modified implementation of what Fran?ois  
+>> did to
+>> deal with MrBayes sorts of trees, except now focused specifically on
+>> phylo import (it could be added elsewhere too), and now with user- 
+>> level
+>> control of the behavior. I'm glossing over the details, but for those
+>> not paying attention to the bug tracker, see more discussion here:
+>> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=466&group_id=111&atid=488
+>>
+>> FYI, R CMD CHECK passes on all the above changes (well, aside from a
+>> latex documentation issue that I think has been around for some time).
+>>
+>> I'll be traveling much of the next month, but would be happy to  
+>> discuss
+>> any of this further. And of course, I can push some/all of this up to
+>> the repository at any time, or send relevant code to the list if  
+>> requested.
+>>
+
+  Please do push.  We need to move ahead.  I want to spend more time
+working this summer (maybe with Francois), but probably won't happen
+until second half of July ...
+
+  Ben
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 260 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090624/d18ade14/attachment.pgp 
+
+From regetz at nceas.ucsb.edu  Thu Jun 25 02:45:38 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 24 Jun 2009 17:45:38 -0700
+Subject: [Phylobase-devl] several proposed additions
+In-Reply-To: <4A42268A.4010601@ufl.edu>
+References: <4A41D983.5080103@nceas.ucsb.edu>
+	<B361AB08-5E46-41E4-A88B-3A7AD7B793E2@duke.edu>
+	<4A42268A.4010601@ufl.edu>
+Message-ID: <4A42C8B2.3030501@nceas.ucsb.edu>
+
+Followup responses/questions throughout, below:
+
+Ben Bolker wrote:
+> Hilmar Lapp wrote:
+>> Hi Jim -
+>>
+>> this sounds great! I can't speak on behalf of the phylobase leads, but  
+>> can you commit all your changes to a branch? That would make it  
+>> easiest for people to check out and play with your code. The unit  
+>> tests sound cool - haven't been aware of this, but if it is what the  
+>> name suggests it will be highly useful.
+>>
+>> 	-hilmar
+
+Hilmar: I was thinking of this too, but the changes are not as extensive 
+as they seem at first blush. The namespace is just a single file that we 
+can easily take out if it causes hassles. The tests don't affect the 
+functioning of the package in any way, so no harm there. And I've tried 
+to ensure that the phylo4 methods changes don't change any existing 
+behavior other than how it handles numeric node labels (and this needed 
+to be massaged in any case). Trunk commit should be fine -- agreed?
+
+>> On Jun 24, 2009, at 3:45 AM, Jim Regetz wrote:
+>>>
+>>> * NAMESPACE: I've created one. Seems to work fine. I'm basically
+>>> exporting all functions and methods now. I figure it's easier to start
+>>> with a liberal approach, and later remove whatever items folks agree  
+>>> are
+>>> only required internally.
+> 
+>   We've had a lot of arguments about whether to use namespaces or
+> not (I have been very frustrated by namespaces in the past, partly
+> because I don't really understand them), but I don't think it's
+> a bad idea.
+> 
+
+Ben: Did your frustration involve creating namespaces, or working with 
+packages that use them? I acknowledge one issue is that it complicates 
+on-the-fly modification of functions within an R session, which can be a 
+little annoying when debugging/developing: e.g., if you use fix() to 
+modify function getNode in an R session, other exported phylobase 
+functions will nevertheless continue to use the original getNode 
+definition. But using fixInNamespace() or just sourcing the pkg/R 
+directory when developing can help.
+
+An advantage is that other packages can leverage phylobase by flexibly 
+importing its methods/generics. For example, I'm working on new package 
+that depends on phylobase. To use subset("phylo4", ...), I currently 
+have to specify phylobase:::subset() in my code because it's otherwise 
+not treated as an S4 generic. However, if subset is exported in the 
+phylobase NAMESPACE, I can import it in my package's NAMESPACE and 
+method dispatch works as expected.
+
+Also FYI, I think the namespace will also obviate the need for the line 
+of code in methods-phylo4.R that masks ape::nTips, because nTips as 
+defined in phylobase will always take precedence? (I'm going out on a 
+limb a little bit here, because I'm not quite sure what the masking 
+problem was in the first place :)
+
+And of course, there are the standard benefits of hiding internal 
+functions, and knowing that functions will work right regardless of what 
+synonymous objects users create in their global environment or load via 
+other packages.
+
+Perhaps these are somewhat minor benefits in isolation, but I think it's 
+the right way to go given that phylobase is intended to serve as a 
+foundation package that more specialized phylo packages will depend on.
+
+>>> * Unit tests: I've created a handful of RUnit tests, and added the
+>>> necessary "run tests" machinery as documented here:
+>>> http://wiki.r-project.org/rwiki/doku.php?id=developers:runit
+>>>
+>>> The tests are not even remotely comprehensive, but they do test  
+>>> against
+>>> the bug fixes I've implemented in the last week or so. I find unit  
+>>> tests
+>>> to be hugely helpful in making sure that fixed bugs stay fixed, and  
+>>> that
+>>> code changes in one area don't unexpectedly break things somewhere  
+>>> else.
+>>> And I find RUnit testing to provide better structure and test
+>>> expressivity than you get with unstructured test scripts in the pkg/ 
+>>> test
+>>> directory.
+>>>
+> 
+>   sounds great.
+
+OK I'll commit them when I get a chance. Worse case scenario is that 
+they break the R-forge check; as standalone tests, they certainly don't 
+affect package functioning in anyway.
+
+>>> I'm not 100% certain that R-forge would do the right thing with these
+>>> tests without some additional tweaking, but they are successfully  
+>>> run by
+>>> R CMD CHECK on my local machine (at least as long as phylobase is
+>>> already installed).
+>>>
+>>> * phylo4 generic: Any reason why there has been a generic for phylo4d,
+>>> but not phylo4? I've now created a phylo4 generic, along with two
+>>> methods: one with signature x="matrix" (replacing the original phylo4
+>>> constructor function), and one with signature x="phylo" (imports phylo
+>>> to phylo4). I updated the associated doc pages to match, plus fixed a
+>>> few places in the examples and sources where phylo(edge=...) was  
+>>> called
+>>> explicitly (the first argument is now the more generic 'x', not  
+>>> 'edge').
+>>>
+>>> * Dealing with messy node labels: My motivation for creating the  
+>>> phylo4
+>>> generic was to expose an option allowing node labels to be dropped  
+>>> (or,
+>>> in the case of phylo4d, added to the tree data) during phylo import.
+>>> This is basically just a modified implementation of what Fran?ois  
+>>> did to
+>>> deal with MrBayes sorts of trees, except now focused specifically on
+>>> phylo import (it could be added elsewhere too), and now with user- 
+>>> level
+>>> control of the behavior. I'm glossing over the details, but for those
+>>> not paying attention to the bug tracker, see more discussion here:
+>>> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=466&group_id=111&atid=488
+>>>
+>>> FYI, R CMD CHECK passes on all the above changes (well, aside from a
+>>> latex documentation issue that I think has been around for some time).
+>>>
+>>> I'll be traveling much of the next month, but would be happy to  
+>>> discuss
+>>> any of this further. And of course, I can push some/all of this up to
+>>> the repository at any time, or send relevant code to the list if  
+>>> requested.
+>>>
+> 
+>   Please do push.  We need to move ahead.  I want to spend more time
+> working this summer (maybe with Francois), but probably won't happen
+> until second half of July ...
+
+Great! Fran?ois, can I commit these phylo4/phylo4d changes without 
+disrupting you? I prefer to deal with this before the namespace and unit 
+tests, because they both reflect the local changes I've made to 
+phylo4/phylo4d.
+
+To summarize, dropping node labels will become an optional feature of 
+both phylo4(x="phylo") (which is itself a new method) and 
+phylo4d(x="phylo"), with the latter also allowing the node labels to be 
+preserved as tree data. In the labels-as-data case, the code currently 
+uses the same as.numeric() call that you had, resulting in NAs if you 
+try to convert non-number-like node labels (e.g., "a", "b") to data. But 
+it would be easy enough to add smarter handling of this later if we're 
+happy with the overall approach.
+
+Out of curiosity, in the short term do we want this node label dropping 
+option to exist in places beyond just ape tree import functions?
+
+Thanks!
+Jim
+
+>   Ben
+> 
+
+From hlapp at duke.edu  Thu Jun 25 03:05:02 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Wed, 24 Jun 2009 21:05:02 -0400
+Subject: [Phylobase-devl] several proposed additions
+In-Reply-To: <4A42C8B2.3030501@nceas.ucsb.edu>
+References: <4A41D983.5080103@nceas.ucsb.edu>
+	<B361AB08-5E46-41E4-A88B-3A7AD7B793E2@duke.edu>
+	<4A42268A.4010601@ufl.edu> <4A42C8B2.3030501@nceas.ucsb.edu>
+Message-ID: <0B6C791D-01E3-4FFB-86F4-65D20128FBDE@duke.edu>
+
+
+On Jun 24, 2009, at 8:45 PM, Jim Regetz wrote:
+
+> Hilmar: [...] Trunk commit should be fine -- agreed?
+
+
+Oh absolutely - and I'm not making any calls here anyway. I merely  
+intended it as a suggestion to simplify getting your code in as it  
+sounded like you were rather reluctant to commit this to the trunk  
+before people have had a chance to check it out.
+
+	-hilmar
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+
+From francois.michonneau at gmail.com  Thu Jun 25 14:27:39 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Thu, 25 Jun 2009 08:27:39 -0400
+Subject: [Phylobase-devl] several proposed additions
+In-Reply-To: <4A42C8B2.3030501@nceas.ucsb.edu>
+References: <4A41D983.5080103@nceas.ucsb.edu>
+	<B361AB08-5E46-41E4-A88B-3A7AD7B793E2@duke.edu>
+	<4A42268A.4010601@ufl.edu> <4A42C8B2.3030501@nceas.ucsb.edu>
+Message-ID: <1245932859.14243.18.camel@dell>
+
+Hi Jim
+
+  Go ahead and commit your fixes. I don't think your changes should
+affect me too much. I have mostly been working on redesigning the way
+data and tree are matched and on cleaning up the code.
+
+  The masking problem of nTips from ape is resolved since we changed the
+naming convention of the functions to camelCase (I think).
+
+  RUnit sounds really useful. I'm definitely going to look more into
+this.
+
+  I don't know much about namespaces, but if they make the life of
+people using phylobase to build their packages easier, then we should
+use it.
+
+  Cheers,
+  -- Fran?ois
+
+On Wed, 2009-06-24 at 17:45 -0700, Jim Regetz wrote:
+> Followup responses/questions throughout, below:
+> 
+> Ben Bolker wrote:
+> > Hilmar Lapp wrote:
+> >> Hi Jim -
+> >>
+> >> this sounds great! I can't speak on behalf of the phylobase leads, but  
+> >> can you commit all your changes to a branch? That would make it  
+> >> easiest for people to check out and play with your code. The unit  
+> >> tests sound cool - haven't been aware of this, but if it is what the  
+> >> name suggests it will be highly useful.
+> >>
+> >> 	-hilmar
+> 
+> Hilmar: I was thinking of this too, but the changes are not as extensive 
+> as they seem at first blush. The namespace is just a single file that we 
+> can easily take out if it causes hassles. The tests don't affect the 
+> functioning of the package in any way, so no harm there. And I've tried 
+> to ensure that the phylo4 methods changes don't change any existing 
+> behavior other than how it handles numeric node labels (and this needed 
+> to be massaged in any case). Trunk commit should be fine -- agreed?
+> 
+> >> On Jun 24, 2009, at 3:45 AM, Jim Regetz wrote:
+> >>>
+> >>> * NAMESPACE: I've created one. Seems to work fine. I'm basically
+> >>> exporting all functions and methods now. I figure it's easier to start
+> >>> with a liberal approach, and later remove whatever items folks agree  
+> >>> are
+> >>> only required internally.
+> > 
+> >   We've had a lot of arguments about whether to use namespaces or
+> > not (I have been very frustrated by namespaces in the past, partly
+> > because I don't really understand them), but I don't think it's
+> > a bad idea.
+> > 
+> 
+> Ben: Did your frustration involve creating namespaces, or working with 
+> packages that use them? I acknowledge one issue is that it complicates 
+> on-the-fly modification of functions within an R session, which can be a 
+> little annoying when debugging/developing: e.g., if you use fix() to 
+> modify function getNode in an R session, other exported phylobase 
+> functions will nevertheless continue to use the original getNode 
+> definition. But using fixInNamespace() or just sourcing the pkg/R 
+> directory when developing can help.
+> 
+> An advantage is that other packages can leverage phylobase by flexibly 
+> importing its methods/generics. For example, I'm working on new package 
+> that depends on phylobase. To use subset("phylo4", ...), I currently 
+> have to specify phylobase:::subset() in my code because it's otherwise 
+> not treated as an S4 generic. However, if subset is exported in the 
+> phylobase NAMESPACE, I can import it in my package's NAMESPACE and 
+> method dispatch works as expected.
+> 
+> Also FYI, I think the namespace will also obviate the need for the line 
+> of code in methods-phylo4.R that masks ape::nTips, because nTips as 
+> defined in phylobase will always take precedence? (I'm going out on a 
+> limb a little bit here, because I'm not quite sure what the masking 
+> problem was in the first place :)
+> 
+> And of course, there are the standard benefits of hiding internal 
+> functions, and knowing that functions will work right regardless of what 
+> synonymous objects users create in their global environment or load via 
+> other packages.
+> 
+> Perhaps these are somewhat minor benefits in isolation, but I think it's 
+> the right way to go given that phylobase is intended to serve as a 
+> foundation package that more specialized phylo packages will depend on.
+> 
+> >>> * Unit tests: I've created a handful of RUnit tests, and added the
+> >>> necessary "run tests" machinery as documented here:
+> >>> http://wiki.r-project.org/rwiki/doku.php?id=developers:runit
+> >>>
+> >>> The tests are not even remotely comprehensive, but they do test  
+> >>> against
+> >>> the bug fixes I've implemented in the last week or so. I find unit  
+> >>> tests
+> >>> to be hugely helpful in making sure that fixed bugs stay fixed, and  
+> >>> that
+> >>> code changes in one area don't unexpectedly break things somewhere  
+> >>> else.
+> >>> And I find RUnit testing to provide better structure and test
+> >>> expressivity than you get with unstructured test scripts in the pkg/ 
+> >>> test
+> >>> directory.
+> >>>
+> > 
+> >   sounds great.
+> 
+> OK I'll commit them when I get a chance. Worse case scenario is that 
+> they break the R-forge check; as standalone tests, they certainly don't 
+> affect package functioning in anyway.
+> 
+> >>> I'm not 100% certain that R-forge would do the right thing with these
+> >>> tests without some additional tweaking, but they are successfully  
+> >>> run by
+> >>> R CMD CHECK on my local machine (at least as long as phylobase is
+> >>> already installed).
+> >>>
+> >>> * phylo4 generic: Any reason why there has been a generic for phylo4d,
+> >>> but not phylo4? I've now created a phylo4 generic, along with two
+> >>> methods: one with signature x="matrix" (replacing the original phylo4
+> >>> constructor function), and one with signature x="phylo" (imports phylo
+> >>> to phylo4). I updated the associated doc pages to match, plus fixed a
+> >>> few places in the examples and sources where phylo(edge=...) was  
+> >>> called
+> >>> explicitly (the first argument is now the more generic 'x', not  
+> >>> 'edge').
+> >>>
+> >>> * Dealing with messy node labels: My motivation for creating the  
+> >>> phylo4
+> >>> generic was to expose an option allowing node labels to be dropped  
+> >>> (or,
+> >>> in the case of phylo4d, added to the tree data) during phylo import.
+> >>> This is basically just a modified implementation of what Fran?ois  
+> >>> did to
+> >>> deal with MrBayes sorts of trees, except now focused specifically on
+> >>> phylo import (it could be added elsewhere too), and now with user- 
+> >>> level
+> >>> control of the behavior. I'm glossing over the details, but for those
+> >>> not paying attention to the bug tracker, see more discussion here:
+> >>> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=466&group_id=111&atid=488
+> >>>
+> >>> FYI, R CMD CHECK passes on all the above changes (well, aside from a
+> >>> latex documentation issue that I think has been around for some time).
+> >>>
+> >>> I'll be traveling much of the next month, but would be happy to  
+> >>> discuss
+> >>> any of this further. And of course, I can push some/all of this up to
+> >>> the repository at any time, or send relevant code to the list if  
+> >>> requested.
+> >>>
+> > 
+> >   Please do push.  We need to move ahead.  I want to spend more time
+> > working this summer (maybe with Francois), but probably won't happen
+> > until second half of July ...
+> 
+> Great! Fran?ois, can I commit these phylo4/phylo4d changes without 
+> disrupting you? I prefer to deal with this before the namespace and unit 
+> tests, because they both reflect the local changes I've made to 
+> phylo4/phylo4d.
+> 
+> To summarize, dropping node labels will become an optional feature of 
+> both phylo4(x="phylo") (which is itself a new method) and 
+> phylo4d(x="phylo"), with the latter also allowing the node labels to be 
+> preserved as tree data. In the labels-as-data case, the code currently 
+> uses the same as.numeric() call that you had, resulting in NAs if you 
+> try to convert non-number-like node labels (e.g., "a", "b") to data. But 
+> it would be easy enough to add smarter handling of this later if we're 
+> happy with the overall approach.
+> 
+> Out of curiosity, in the short term do we want this node label dropping 
+> option to exist in places beyond just ape tree import functions?
+> 
+> Thanks!
+> Jim
+> 
+> >   Ben
+> > 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+

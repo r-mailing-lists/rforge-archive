@@ -1,0 +1,262 @@
+From hause.lin at mail.utoronto.ca  Mon Aug 15 18:53:49 2016
+From: hause.lin at mail.utoronto.ca (Hause Lin)
+Date: Mon, 15 Aug 2016 12:53:49 -0400
+Subject: [Mediation-information] Error message for models fitted with lmer:
+	Mediator model not yet implemented?
+Message-ID: <CAD6_QGM2wspTuKR0NwC5C2BPygObrrgmMqkPEYcugNcvf5aFkA@mail.gmail.com>
+
+Hi,
+
+I've previously used this package to fit simple linear models and it worked
+very well. But recently I've been trying to do this with multilevel models
+(lmer) and I'm getting this message:
+
+Error in mediation::mediate(model.m = mediatorModel, model.y =
+outcomeModel,  :
+  mediator model is not yet implemented
+
+Below are my models. Can anyone tell why I'm getting that error message?
+
+mediatorModel <- lmer(m ~ x1 + x2 + (1 | id), data = df)
+
+outcomeModel <- lmer(y ~ m + x1 + x2 + (1 | id), data = df)
+
+mediation <- mediate(model.m = mediatorModel, model.y = outcomeModel, sims
+= 100, robustSE = F, treat = "x2", mediator = "m")
+
+I really appreciate any help anyone can provide. Thanks!
+
+Best,
+Hause
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/mediation-information/attachments/20160815/918b6123/attachment.html>
+
+From hirose1981 at gmail.com  Mon Aug 15 19:46:41 2016
+From: hirose1981 at gmail.com (Kentaro Hirose)
+Date: Tue, 16 Aug 2016 02:46:41 +0900
+Subject: [Mediation-information] Error message for models fitted with
+ lmer: Mediator model not yet implemented?
+In-Reply-To: <CAD6_QGM2wspTuKR0NwC5C2BPygObrrgmMqkPEYcugNcvf5aFkA@mail.gmail.com>
+References: <CAD6_QGM2wspTuKR0NwC5C2BPygObrrgmMqkPEYcugNcvf5aFkA@mail.gmail.com>
+Message-ID: <CAJsn+MnS9Gys6ZQpb8M4O=8Lr0OrjCX9q1_eUu-Z1fk_QPb=UQ@mail.gmail.com>
+
+Hi Hause,
+
+The error message "mediator model is not yet implemented" appears when the
+lmer model is not estimated properly. Can you check if (1)
+inherits(mediatorModel, "merMod") returns TRUE and (2)
+getCall(mediatorModel)[[1]] returns lmer?
+
+It might be also helpful to compare your model with the following toy
+example as a way to figure out the problem (e.g., data, code, etc):
+
+-----------------------
+library(mediation)
+library(lme4)
+
+mediatorModel <- lmer(depress1 ~ treat + age + (1|job_disc), data = jobs)
+outcomeModel <- lmer(econ_hard ~ depress1 + treat + age + (1|job_disc),
+data = jobs)
+
+mediation <- mediate(model.m = mediatorModel, model.y = outcomeModel, sims
+= 100, robustSE = F, treat = "treat", mediator = "depress1")
+summary(mediation)
+-----------------------
+
+Best,
+Kentaro
+
+
+
+
+2016-08-16 1:53 GMT+09:00 Hause Lin <hause.lin at mail.utoronto.ca>:
+
+> Hi,
+>
+> I've previously used this package to fit simple linear models and it
+> worked very well. But recently I've been trying to do this with multilevel
+> models (lmer) and I'm getting this message:
+>
+> Error in mediation::mediate(model.m = mediatorModel, model.y =
+> outcomeModel,  :
+>   mediator model is not yet implemented
+>
+> Below are my models. Can anyone tell why I'm getting that error message?
+>
+> mediatorModel <- lmer(m ~ x1 + x2 + (1 | id), data = df)
+>
+> outcomeModel <- lmer(y ~ m + x1 + x2 + (1 | id), data = df)
+>
+> mediation <- mediate(model.m = mediatorModel, model.y = outcomeModel, sims
+> = 100, robustSE = F, treat = "x2", mediator = "m")
+>
+> I really appreciate any help anyone can provide. Thanks!
+>
+> Best,
+> Hause
+>
+>
+> _______________________________________________
+> Mediation-information mailing list
+> Mediation-information at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/
+> listinfo/mediation-information
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/mediation-information/attachments/20160816/c88cc742/attachment.html>
+
+From hause.lin at mail.utoronto.ca  Mon Aug 15 20:27:49 2016
+From: hause.lin at mail.utoronto.ca (Hause Lin)
+Date: Mon, 15 Aug 2016 14:27:49 -0400
+Subject: [Mediation-information] Error message for models fitted with
+ lmer: Mediator model not yet implemented?
+In-Reply-To: <CAJsn+MnS9Gys6ZQpb8M4O=8Lr0OrjCX9q1_eUu-Z1fk_QPb=UQ@mail.gmail.com>
+References: <CAD6_QGM2wspTuKR0NwC5C2BPygObrrgmMqkPEYcugNcvf5aFkA@mail.gmail.com>
+ <CAJsn+MnS9Gys6ZQpb8M4O=8Lr0OrjCX9q1_eUu-Z1fk_QPb=UQ@mail.gmail.com>
+Message-ID: <CAD6_QGORKi-i1jJndEhV3ZsmrRkcLm7-cyQ0bVoZuPvR4SrAHw@mail.gmail.com>
+
+Hi Kentaro,
+
+Thanks for your reply. After fiddling with my code and testing your toy
+example, I've identified the problem. Both inherits() and getCall() return
+the expected results.
+
+> inherits(mediatorModel, "merMod")
+[1] TRUE
+> getCall(mediatorModel)[[1]]
+lme4::lmer
+
+The issue lies with the lmerTest package which I have loaded too. After
+detaching lmerTest, your mediate function works perfectly again. Thanks so
+much for your help!
+
+Best,
+Hause
+
+
+
+
+
+On 15 August 2016 at 13:46, Kentaro Hirose <hirose1981 at gmail.com> wrote:
+
+> Hi Hause,
+>
+> The error message "mediator model is not yet implemented" appears when
+> the lmer model is not estimated properly. Can you check if (1)
+> inherits(mediatorModel, "merMod") returns TRUE and (2)
+> getCall(mediatorModel)[[1]] returns lmer?
+>
+> It might be also helpful to compare your model with the following toy
+> example as a way to figure out the problem (e.g., data, code, etc):
+>
+> -----------------------
+> library(mediation)
+> library(lme4)
+>
+> mediatorModel <- lmer(depress1 ~ treat + age + (1|job_disc), data = jobs)
+> outcomeModel <- lmer(econ_hard ~ depress1 + treat + age + (1|job_disc),
+> data = jobs)
+>
+> mediation <- mediate(model.m = mediatorModel, model.y = outcomeModel, sims
+> = 100, robustSE = F, treat = "treat", mediator = "depress1")
+> summary(mediation)
+> -----------------------
+>
+> Best,
+> Kentaro
+>
+>
+>
+>
+> 2016-08-16 1:53 GMT+09:00 Hause Lin <hause.lin at mail.utoronto.ca>:
+>
+>> Hi,
+>>
+>> I've previously used this package to fit simple linear models and it
+>> worked very well. But recently I've been trying to do this with multilevel
+>> models (lmer) and I'm getting this message:
+>>
+>> Error in mediation::mediate(model.m = mediatorModel, model.y =
+>> outcomeModel,  :
+>>   mediator model is not yet implemented
+>>
+>> Below are my models. Can anyone tell why I'm getting that error message?
+>>
+>> mediatorModel <- lmer(m ~ x1 + x2 + (1 | id), data = df)
+>>
+>> outcomeModel <- lmer(y ~ m + x1 + x2 + (1 | id), data = df)
+>>
+>> mediation <- mediate(model.m = mediatorModel, model.y = outcomeModel,
+>> sims = 100, robustSE = F, treat = "x2", mediator = "m")
+>>
+>> I really appreciate any help anyone can provide. Thanks!
+>>
+>> Best,
+>> Hause
+>>
+>>
+>> _______________________________________________
+>> Mediation-information mailing list
+>> Mediation-information at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo
+>> /mediation-information
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/mediation-information/attachments/20160815/7c789b55/attachment-0001.html>
+
+From kimai at princeton.edu  Sun Aug 28 21:34:20 2016
+From: kimai at princeton.edu (Kosuke Imai)
+Date: Sun, 28 Aug 2016 15:34:20 -0400
+Subject: [Mediation-information] Survival mediation inquiry
+In-Reply-To: <MWHPR03MB2704409536CE94D988141F49FFEC0@MWHPR03MB2704.namprd03.prod.outlook.com>
+References: <MWHPR03MB2704409536CE94D988141F49FFEC0@MWHPR03MB2704.namprd03.prod.outlook.com>
+Message-ID: <CAFiYZ5xq72fdsH3TCyjbtO02OiLrz7wSk1nELQdiQQH_Cr7_wQ@mail.gmail.com>
+
+Our package allows one to use some survival analyses although I'm not sure
+if your situation fits it.  See
+http://imai.princeton.edu/research/files/mediationR2.pdf
+
+Kosuke Imai
+Professor, Department of Politics
+Center for Statistics and Machine Learning
+Princeton University
+http://imai.princeton.edu
+
+
+On Fri, Aug 26, 2016 at 12:10 PM, Lauren Lapointe-Shaw <
+lauren.lapointe.shaw at mail.utoronto.ca> wrote:
+
+> Dear Dr Imai
+>
+>
+> I am a PhD Student in Clinical Epidemiology at the University of Toronto.
+>
+>
+> I am hoping to use mediation analysis for one of my thesis projects. I
+> will be looking at a survival outcome, with a single time-varying mediator.
+> Do you know of methods in survival mediation analysis which allow for
+> inclusion of time-varying mediators? And are such methods available in
+> either SAS or R?
+>
+>
+> Thanks very much for your insights and expertise on the matter,
+>
+>
+> Lauren Lapointe-Shaw
+>
+> General Internist, MD, FRCPC
+>
+> Doctoral Student, Clinical Epidemiology and Healthcare Research
+>
+> University of Toronto
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/mediation-information/attachments/20160828/a248d4cf/attachment.html>
+

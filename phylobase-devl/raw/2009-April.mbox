@@ -1,0 +1,576 @@
+From regetz at nceas.ucsb.edu  Tue Apr 14 02:14:13 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Mon, 13 Apr 2009 17:14:13 -0700
+Subject: [Phylobase-devl] phylo vs phylo4 'order' attribute conflict
+Message-ID: <49E3D555.4050301@nceas.ucsb.edu>
+
+Hi all,
+
+I'd be happy to enter this via the R-forge bug tracker instead, but it 
+doesn't look like there is a lot going on there so I'll start out on the 
+mailing list.
+
+When it exists, the 'order' attribute of a phylo object can be either 
+"cladewise" or "pruningwise". This attribute is preserved when coercing 
+from phylo to phylo4. However, valid phylo4 objects can only take on the 
+order values "unknown", "preorder", or "postorder", as specified in the 
+built-in vector phylo4_orderings. Hence the following error:
+
+ > data(bird.families)
+ > tr <- reorder(bird.families)
+ > as(tr, "phylo4d")
+Error in checkTree(object) :
+   unknown order: allowed values are unknown,preorder,postorder
+
+I suppose the coercion method should either ignore the phylo order 
+attribute if it isn't relevant for phylo4 objects, or deal with it in a 
+way that doesn't conflict with the phylobase usage of this attribute.
+
+On a related note, I believe phylobase::subset always fails with ape 
+2.3, because the newly revised ape::drop.tip (called internally by 
+subset) explicitly reorders trees as cladewise, creating an order 
+attribute that phylobase currently regards as invalid.
+
+FYI, I'm using ape 2.3 and the r426 build of phylobase.
+
+Thanks,
+Jim
+
+From Johan.Nylander at abc.se  Mon Apr 20 11:04:35 2009
+From: Johan.Nylander at abc.se (Johan Nylander)
+Date: Mon, 20 Apr 2009 11:04:35 +0200
+Subject: [Phylobase-devl] Phylobase on R-forge status?
+Message-ID: <1240218275.19709.9.camel@nylander-laptop>
+
+Dear all,
+I was trying to access the phylobase source on R-forge
+(http://r-forge.r-project.org/src/contrib/phylobase_0.4.tar.gz), but I
+got the dreaded "PAGE NOT FOUND" message. Can anyone give an update on
+the current R-forge status?
+Cheers
+Johan
+
+P.S. The links to the Win and Mac bins are also dead. SVN checkout
+works. D.S.
+
+
+
+From pdc at berkeley.edu  Mon Apr 20 18:28:34 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Mon, 20 Apr 2009 09:28:34 -0700
+Subject: [Phylobase-devl] Phylobase on R-forge status?
+In-Reply-To: <1240218275.19709.9.camel@nylander-laptop>
+References: <1240218275.19709.9.camel@nylander-laptop>
+Message-ID: <1931C1C0-E54D-4409-ABDE-0495FC402182@berkeley.edu>
+
+Johan,
+
+Thanks for sending in the note.  I was able to download the plain  
+source package (the one linked) as well as the Mac one, however the  
+window package did fail.
+
+The reason is that the vignette isn't building.  The vignette isn't  
+building because there is a bug in how we check for tree ordering.   
+This was just reported by Jim Regetz the other day.  Hopefully, we'll  
+get it all straightened out and the package will build again in the  
+next couple of days.
+
+Peter
+
+On Apr 20, 2009, at 2:04 AM, Johan Nylander wrote:
+
+> Dear all,
+> I was trying to access the phylobase source on R-forge
+> (http://r-forge.r-project.org/src/contrib/phylobase_0.4.tar.gz), but I
+> got the dreaded "PAGE NOT FOUND" message. Can anyone give an update on
+> the current R-forge status?
+> Cheers
+> Johan
+>
+> P.S. The links to the Win and Mac bins are also dead. SVN checkout
+> works. D.S.
+>
+>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From pdc at berkeley.edu  Mon Apr 20 18:36:40 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Mon, 20 Apr 2009 09:36:40 -0700
+Subject: [Phylobase-devl] phylo vs phylo4 'order' attribute conflict
+In-Reply-To: <49E3D555.4050301@nceas.ucsb.edu>
+References: <49E3D555.4050301@nceas.ucsb.edu>
+Message-ID: <F746A096-9B22-461C-A4FA-F4CA7BAE9899@berkeley.edu>
+
+
+On Apr 13, 2009, at 5:14 PM, Jim Regetz wrote:
+
+> Hi all,
+>
+> I'd be happy to enter this via the R-forge bug tracker instead, but it
+> doesn't look like there is a lot going on there so I'll start out on  
+> the
+> mailing list.
+
+Jim, either one works well.  Thanks for sending in this report!
+
+> When it exists, the 'order' attribute of a phylo object can be either
+> "cladewise" or "pruningwise". This attribute is preserved when  
+> coercing
+> from phylo to phylo4. However, valid phylo4 objects can only take on  
+> the
+> order values "unknown", "preorder", or "postorder", as specified in  
+> the
+> built-in vector phylo4_orderings. Hence the following error:
+>
+>> data(bird.families)
+>> tr <- reorder(bird.families)
+>> as(tr, "phylo4d")
+> Error in checkTree(object) :
+>   unknown order: allowed values are unknown,preorder,postorder
+>
+> I suppose the coercion method should either ignore the phylo order
+> attribute if it isn't relevant for phylo4 objects, or deal with it  
+> in a
+> way that doesn't conflict with the phylobase usage of this attribute.
+
+Agreed.  Currently every time we make a phylo4 or phylo4d object we  
+run checkTree() to ensure that it makes sense.  Apparently we were a  
+bit over aggressive with the ordering.  On import of ape trees we  
+should do one of the following:
+
+1. Set order to unknown
+2. Add cladewise and pruningwise as possible orderings for trees even  
+though we have no command that take or output a tree in those orderings.
+
+I favor #2.  Any objections?
+
+> On a related note, I believe phylobase::subset always fails with ape
+> 2.3, because the newly revised ape::drop.tip (called internally by
+> subset) explicitly reorders trees as cladewise, creating an order
+> attribute that phylobase currently regards as invalid.
+>
+> FYI, I'm using ape 2.3 and the r426 build of phylobase.
+
+ape 2.3 hasn't hit cran for the Mac yet, and my attempts to build from  
+SVN failed, due to some missing file.  So I can't confirm this, but  
+perhaps it's time for our own tree subsetting function.
+
+Thanks,
+
+Peter
+
+> Thanks,
+> Jim
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From regetz at nceas.ucsb.edu  Mon Apr 20 21:31:00 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Mon, 20 Apr 2009 12:31:00 -0700
+Subject: [Phylobase-devl] phylo vs phylo4 'order' attribute conflict
+In-Reply-To: <F746A096-9B22-461C-A4FA-F4CA7BAE9899@berkeley.edu>
+References: <49E3D555.4050301@nceas.ucsb.edu>
+	<F746A096-9B22-461C-A4FA-F4CA7BAE9899@berkeley.edu>
+Message-ID: <49ECCD74.5080804@nceas.ucsb.edu>
+
+Thanks for the response. A few comments below...
+
+Peter Cowan wrote:
+> 
+> On Apr 13, 2009, at 5:14 PM, Jim Regetz wrote:
+> 
+>> Hi all,
+>>
+>> I'd be happy to enter this via the R-forge bug tracker instead, but it
+>> doesn't look like there is a lot going on there so I'll start out on the
+>> mailing list.
+> 
+> Jim, either one works well.  Thanks for sending in this report!
+> 
+>> When it exists, the 'order' attribute of a phylo object can be either
+>> "cladewise" or "pruningwise". This attribute is preserved when coercing
+>> from phylo to phylo4. However, valid phylo4 objects can only take on the
+>> order values "unknown", "preorder", or "postorder", as specified in the
+>> built-in vector phylo4_orderings. Hence the following error:
+>>
+>>> data(bird.families)
+>>> tr <- reorder(bird.families)
+>>> as(tr, "phylo4d")
+>> Error in checkTree(object) :
+>>   unknown order: allowed values are unknown,preorder,postorder
+>>
+>> I suppose the coercion method should either ignore the phylo order
+>> attribute if it isn't relevant for phylo4 objects, or deal with it in a
+>> way that doesn't conflict with the phylobase usage of this attribute.
+> 
+> Agreed.  Currently every time we make a phylo4 or phylo4d object we run 
+> checkTree() to ensure that it makes sense.  Apparently we were a bit 
+> over aggressive with the ordering.  On import of ape trees we should do 
+> one of the following:
+> 
+> 1. Set order to unknown
+> 2. Add cladewise and pruningwise as possible orderings for trees even 
+> though we have no command that take or output a tree in those orderings.
+> 
+> I favor #2.  Any objections?
+
+I do think #1 seems a shame because it discards something that *is* 
+known about the order. That said, a potential downside of #2 is that 
+some cladewise trees would be imported as 'unknown' and others as 
+'cladewise', depending only on the superficial difference of whether the 
+(phylo) order attribute had been set.
+
+Perhaps this gets into thorny territory, but any reason not to have this 
+phylo import code do more or less the reverse of what the export code 
+currently does? I acknowledge I am ignorant of any bigger picture 
+ordering issues you all may have grappled with previously.
+
+Either way, my vote (if I actually had one :) would be for a quick fix 
+that has minimal side effects elsewhere and leaves open the possibility 
+for more elegant handling of tree ordering later.
+
+>> On a related note, I believe phylobase::subset always fails with ape
+>> 2.3, because the newly revised ape::drop.tip (called internally by
+>> subset) explicitly reorders trees as cladewise, creating an order
+>> attribute that phylobase currently regards as invalid.
+>>
+>> FYI, I'm using ape 2.3 and the r426 build of phylobase.
+> 
+> ape 2.3 hasn't hit cran for the Mac yet, and my attempts to build from 
+> SVN failed, due to some missing file.  So I can't confirm this, but 
+> perhaps it's time for our own tree subsetting function.
+
+Perhaps a mirror problem? I actually use the Berkeley CRAN mirror, and 
+have successfully installed ape 2.3 on OS X (both using R 2.8.1 and now 
+R 2.9.0).
+
+And yes, I recall the missing file problem building ape from SVN. But 
+IIRC, what's missing are the sample tree files "bird.families.tre" and 
+"bird.orders.tre", which I just manually copied into my working copy of 
+ape/dev/ape/data/ from the ape source available on CRAN.
+
+Jim
+
+> Thanks,
+> 
+> Peter
+> 
+>> Thanks,
+>> Jim
+
+
+From pdc at berkeley.edu  Mon Apr 20 21:55:44 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Mon, 20 Apr 2009 12:55:44 -0700
+Subject: [Phylobase-devl] phylo vs phylo4 'order' attribute conflict
+In-Reply-To: <49ECCD74.5080804@nceas.ucsb.edu>
+References: <49E3D555.4050301@nceas.ucsb.edu>
+	<F746A096-9B22-461C-A4FA-F4CA7BAE9899@berkeley.edu>
+	<49ECCD74.5080804@nceas.ucsb.edu>
+Message-ID: <2855647D-787F-4578-A65B-991C5C489823@berkeley.edu>
+
+
+On Apr 20, 2009, at 12:31 PM, Jim Regetz wrote:
+
+> Thanks for the response. A few comments below...
+>
+> Peter Cowan wrote:
+>>
+>> On Apr 13, 2009, at 5:14 PM, Jim Regetz wrote:
+
+[snip]
+
+>>>
+>>> I suppose the coercion method should either ignore the phylo order
+>>> attribute if it isn't relevant for phylo4 objects, or deal with it  
+>>> in a
+>>> way that doesn't conflict with the phylobase usage of this  
+>>> attribute.
+>>
+>> Agreed.  Currently every time we make a phylo4 or phylo4d object we  
+>> run
+>> checkTree() to ensure that it makes sense.  Apparently we were a bit
+>> over aggressive with the ordering.  On import of ape trees we  
+>> should do
+>> one of the following:
+>>
+>> 1. Set order to unknown
+>> 2. Add cladewise and pruningwise as possible orderings for trees even
+>> though we have no command that take or output a tree in those  
+>> orderings.
+>>
+>> I favor #2.  Any objections?
+>
+> I do think #1 seems a shame because it discards something that *is*
+> known about the order. That said, a potential downside of #2 is that
+> some cladewise trees would be imported as 'unknown' and others as
+> 'cladewise', depending only on the superficial difference of whether  
+> the
+> (phylo) order attribute had been set.
+
+Agreed.  I'm less worried about missing cases that are 'cladewise' but  
+not identified by ape.  For one reason, we can't know if a tree is in  
+a particular order or not without basically reordering it, and it  
+would be unwise to assume that unmarked trees in ape are cladewise, as  
+it is very possible to change the order and not update the order flag.
+
+Secondly, to the best of my knowledge the order slot really only  
+serves to improve performance.  Reordering trees in cpu intensive (and  
+the phylobase reorder commands are in R).  It shouldn't cause problems  
+to import trees as 'unknown' because the phylobase reorder commands  
+are (or should be) insensitive to prior order.
+
+> Perhaps this gets into thorny territory, but any reason not to have  
+> this
+> phylo import code do more or less the reverse of what the export code
+> currently does? I acknowledge I am ignorant of any bigger picture
+> ordering issues you all may have grappled with previously.
+
+Actually the way we export trees is a bad idea.  While, "cladewise" is  
+the same as pre order, "pruningwise" isn't exactly postorder.  In  
+fact, there is a TODO in the export command to rectify that.   
+"Pruningwise" is actually what's called a 'bottom-up' traversal.  I  
+considered adding a reorder method for that, but didn't have a use  
+case for it aside from compatibility with ape, so I've held off.
+
+> Either way, my vote (if I actually had one :) would be for a quick fix
+> that has minimal side effects elsewhere and leaves open the  
+> possibility
+> for more elegant handling of tree ordering later.
+
+If I don't hear any objects by the end of the day, I'll go ahead and  
+commit option 2.
+
+>>> On a related note, I believe phylobase::subset always fails with ape
+>>> 2.3, because the newly revised ape::drop.tip (called internally by
+>>> subset) explicitly reorders trees as cladewise, creating an order
+>>> attribute that phylobase currently regards as invalid.
+>>>
+>>> FYI, I'm using ape 2.3 and the r426 build of phylobase.
+>>
+>> ape 2.3 hasn't hit cran for the Mac yet, and my attempts to build  
+>> from
+>> SVN failed, due to some missing file.  So I can't confirm this, but
+>> perhaps it's time for our own tree subsetting function.
+>
+> Perhaps a mirror problem? I actually use the Berkeley CRAN mirror, and
+> have successfully installed ape 2.3 on OS X (both using R 2.8.1 and  
+> now
+> R 2.9.0).
+>
+> And yes, I recall the missing file problem building ape from SVN. But
+> IIRC, what's missing are the sample tree files "bird.families.tre" and
+> "bird.orders.tre", which I just manually copied into my working copy  
+> of
+> ape/dev/ape/data/ from the ape source available on CRAN.
+
+Hmm, that's the mirror I use, and sure enough it appears to have 2.3.   
+I must be losing it.
+
+Peter
+
+From phylobase-bugs at r-forge.r-project.org  Tue Apr 21 17:18:25 2009
+From: phylobase-bugs at r-forge.r-project.org (phylobase-bugs at r-forge.r-project.org)
+Date: Tue, 21 Apr 2009 17:18:25 +0200 (CEST)
+Subject: [Phylobase-devl] =?utf-8?q?=5Bphylobase-Bugs=5D=5B416=5D_Coerce_m?=
+	=?utf-8?q?ethod_from_phylo_to_phylo4_is_broken?=
+Message-ID: <20090421151825.976579C75D@r-forge.r-project.org>
+
+Bugs item #416, was opened at 2009-04-21 11:18
+Status: Open
+Priority: 3
+Submitted By: Fran?ois Michonneau (francois)
+Assigned to: Fran?ois Michonneau (francois)
+Summary: Coerce method from phylo to phylo4 is broken 
+Component: None
+Resolution: None
+Severity: None
+Version: None
+Operating System: None
+URL: 
+
+
+Initial Comment:
+
+
+Example:
+> as(tree.owls[[1]], "phylo4")
+          label node ancestr edge.length node.type
+5     Tyto_alba    5      NA        13.5      root
+6 Athene_noctua    6       5         7.3  internal
+7     Asio_otus    7       6         4.2  internal
+1          owls    1       7          NA       tip
+2   Strix_aluco    2       7         4.2       tip
+3                  3       6         3.1       tip
+4                  4       5         6.3       tip
+
+----------------------------------------------------------------------
+
+You can respond by visiting: 
+http://r-forge.r-project.org/tracker/?func=detail&atid=488&aid=416&group_id=111
+
+From phylobase-bugs at r-forge.r-project.org  Tue Apr 21 17:19:18 2009
+From: phylobase-bugs at r-forge.r-project.org (phylobase-bugs at r-forge.r-project.org)
+Date: Tue, 21 Apr 2009 17:19:18 +0200 (CEST)
+Subject: [Phylobase-devl] =?utf-8?q?=5Bphylobase-Bugs=5D=5B417=5D_Coerce_m?=
+	=?utf-8?q?ethod_from_multiPhylo_to_phylo4_doesn=27t_exit_=28=3F=3F?=
+	=?utf-8?q?=29?=
+Message-ID: <20090421151918.CE6BF9C775@r-forge.r-project.org>
+
+Bugs item #417, was opened at 2009-04-21 11:19
+Status: Open
+Priority: 3
+Submitted By: Fran?ois Michonneau (francois)
+Assigned to: Fran?ois Michonneau (francois)
+Summary: Coerce method from multiPhylo to phylo4 doesn't exit (??) 
+Component: None
+Resolution: None
+Severity: None
+Version: None
+Operating System: None
+URL: 
+
+
+Initial Comment:
+Coerce method from multiPhylo to phylo4 doesn't exit (??)
+
+----------------------------------------------------------------------
+
+You can respond by visiting: 
+http://r-forge.r-project.org/tracker/?func=detail&atid=488&aid=417&group_id=111
+
+From phylobase-bugs at r-forge.r-project.org  Wed Apr 22 15:20:24 2009
+From: phylobase-bugs at r-forge.r-project.org (phylobase-bugs at r-forge.r-project.org)
+Date: Wed, 22 Apr 2009 15:20:24 +0200 (CEST)
+Subject: [Phylobase-devl] =?utf-8?q?=5Bphylobase-Bugs=5D=5B416=5D_Coerce_m?=
+	=?utf-8?q?ethod_from_phylo_to_phylo4_is_broken?=
+Message-ID: <20090422132024.C962E9C335@r-forge.r-project.org>
+
+Bugs item #416, was opened at 2009-04-21 11:18
+Status: Open
+Priority: 3
+Submitted By: Fran?ois Michonneau (francois)
+Assigned to: Fran?ois Michonneau (francois)
+Summary: Coerce method from phylo to phylo4 is broken 
+Component: None
+>Resolution: Invalid
+Severity: None
+Version: None
+Operating System: None
+URL: 
+
+
+Initial Comment:
+
+
+Example:
+> as(tree.owls[[1]], "phylo4")
+          label node ancestr edge.length node.type
+5     Tyto_alba    5      NA        13.5      root
+6 Athene_noctua    6       5         7.3  internal
+7     Asio_otus    7       6         4.2  internal
+1          owls    1       7          NA       tip
+2   Strix_aluco    2       7         4.2       tip
+3                  3       6         3.1       tip
+4                  4       5         6.3       tip
+
+----------------------------------------------------------------------
+
+>Comment By: Fran?ois Michonneau (francois)
+Date: 2009-04-22 09:20
+
+Message:
+Coerce method works well. The problem comes from a typo in the examples of 'read.tree' from 'ape'. I sent a message to E. Paradis.
+
+
+----------------------------------------------------------------------
+
+You can respond by visiting: 
+http://r-forge.r-project.org/tracker/?func=detail&atid=488&aid=416&group_id=111
+
+From phylobase-bugs at r-forge.r-project.org  Wed Apr 22 17:43:44 2009
+From: phylobase-bugs at r-forge.r-project.org (phylobase-bugs at r-forge.r-project.org)
+Date: Wed, 22 Apr 2009 17:43:44 +0200 (CEST)
+Subject: [Phylobase-devl] =?utf-8?q?=5Bphylobase-Bugs=5D=5B417=5D_Coerce_m?=
+	=?utf-8?q?ethod_from_multiPhylo_to_phylo4_doesn=27t_exit_=28=3F=3F?=
+	=?utf-8?q?=29?=
+Message-ID: <20090422154344.7698A9C34E@r-forge.r-project.org>
+
+Bugs item #417, was opened at 2009-04-21 11:19
+>Status: Closed
+Priority: 3
+Submitted By: Fran?ois Michonneau (francois)
+Assigned to: Fran?ois Michonneau (francois)
+Summary: Coerce method from multiPhylo to phylo4 doesn't exit (??) 
+Component: None
+>Resolution: Fixed
+Severity: None
+Version: None
+Operating System: None
+URL: 
+
+
+Initial Comment:
+Coerce method from multiPhylo to phylo4 doesn't exit (??)
+
+----------------------------------------------------------------------
+
+You can respond by visiting: 
+http://r-forge.r-project.org/tracker/?func=detail&atid=488&aid=417&group_id=111
+
+From phylobase-bugs at r-forge.r-project.org  Wed Apr 22 17:44:05 2009
+From: phylobase-bugs at r-forge.r-project.org (phylobase-bugs at r-forge.r-project.org)
+Date: Wed, 22 Apr 2009 17:44:05 +0200 (CEST)
+Subject: [Phylobase-devl] =?utf-8?q?=5Bphylobase-Bugs=5D=5B416=5D_Coerce_m?=
+	=?utf-8?q?ethod_from_phylo_to_phylo4_is_broken?=
+Message-ID: <20090422154405.A79A09C34E@r-forge.r-project.org>
+
+Bugs item #416, was opened at 2009-04-21 11:18
+>Status: Closed
+Priority: 3
+Submitted By: Fran?ois Michonneau (francois)
+Assigned to: Fran?ois Michonneau (francois)
+Summary: Coerce method from phylo to phylo4 is broken 
+Component: None
+Resolution: Invalid
+Severity: None
+Version: None
+Operating System: None
+URL: 
+
+
+Initial Comment:
+
+
+Example:
+> as(tree.owls[[1]], "phylo4")
+          label node ancestr edge.length node.type
+5     Tyto_alba    5      NA        13.5      root
+6 Athene_noctua    6       5         7.3  internal
+7     Asio_otus    7       6         4.2  internal
+1          owls    1       7          NA       tip
+2   Strix_aluco    2       7         4.2       tip
+3                  3       6         3.1       tip
+4                  4       5         6.3       tip
+
+----------------------------------------------------------------------
+
+Comment By: Fran?ois Michonneau (francois)
+Date: 2009-04-22 09:20
+
+Message:
+Coerce method works well. The problem comes from a typo in the examples of 'read.tree' from 'ape'. I sent a message to E. Paradis.
+
+
+----------------------------------------------------------------------
+
+You can respond by visiting: 
+http://r-forge.r-project.org/tracker/?func=detail&atid=488&aid=416&group_id=111
+

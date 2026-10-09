@@ -1,0 +1,678 @@
+From edzer.pebesma at uni-muenster.de  Sun Jul 10 13:28:26 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Sun, 10 Jul 2011 13:28:26 +0200
+Subject: [Rspatial-devel] Fwd: [R-sig-Geo] coercing SpatialGrid to
+	SpatialPoints
+Message-ID: <4E198CDA.3030305@uni-muenster.de>
+
+Regarding the message below, simply adding in sp to
+SpatialGrid-methods.R the coercion function
+
+setAs("SpatialGrid", "SpatialPoints", function(from)
+    as(as(from, "SpatialPixels"), "SpatialPoints")
+)
+
+was something we tried earlier (100521) but reverted back (100607), as
+it broke the book code (asdar), at chapter 6,
+http://www.asdar-book.org/data.php?chapter=5 .
+
+I now committed it again, and out-commented in csdacm.Rnw the following
+line:
+
+setIs("SpatialTimeGridDataFrame", "SpatialTimeGrid")
+
+so that this code runs again (committed to cvs, which still runs in
+geo.uu.nl). An errata for ch 6 is then needed.
+
+I cannot explain well why this setIs causes problems later on, but it
+seems somewhere to remove the @data slot on some automatic but unwanted
+coercion. setIs() has caused me more trouble in the past.
+
+After the sp commit, R CMD check failed; some coercion (it turned out, a
+proj4string(obj) = sth inside fullgrid<- ) automatically coerced a
+SpatialGrid into an object of class Spatial which should NEVER happen! I
+"solved" this by changing the "proj4string<-" definition from an S4
+function (SetReplacemethod...) to S3, and modified Spatial-methods.R and
+NAMESPACE accordingly. Why this came up, and why this solution worked,
+is more than the setIs() issue, complete black magic to me.
+
+In case of no comments, I will continue and release the current sp in svn.
+
+Best wishes,
+
+
+-------- Original Message --------
+Subject: [R-sig-Geo] coercing SpatialGrid to SpatialPoints
+Date: Fri, 8 Jul 2011 11:18:34 -0700
+From: David Holstius <david.holstius at berkeley.edu>
+To: r-sig-geo at r-project.org
+
+Hi all,
+
+I'm trying to figure out why coercing a SpatialGrid directly to a
+SpatialPoints doesn't result in the same thing as coercing it via an
+intermediate SpatialPixels. Here's a minimal example:
+
+  require(sp)
+  grd <- SpatialGrid(GridTopology(c(0,0), c(10,10), c(4,4)))
+  as(as(grd, "SpatialPixels"), "SpatialPoints")	# result == what I expect
+  as(grd, "SpatialPoints")	# result != expected
+
+Is this behavior as expected? Maybe I am doing it wrong?
+
+Many thanks,
+David
+
+--
+David Holstius
+PhD Student in Environmental Health Sciences
+UC Berkeley School of Public Health
+
+_______________________________________________
+R-sig-Geo mailing list
+R-sig-Geo at r-project.org
+https://stat.ethz.ch/mailman/listinfo/r-sig-geo
+
+From edzer.pebesma at uni-muenster.de  Sun Jul 10 16:01:22 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Sun, 10 Jul 2011 16:01:22 +0200
+Subject: [Rspatial-devel] points2grid
+Message-ID: <4E19B0B2.5000509@uni-muenster.de>
+
+The following case,
+
+require(rgdal)
+gr = GridTopology(c(0,0), c(1,1), c(20,20))
+griLL = SpatialGrid(gr, proj4string = CRS("+init=epsg:4326"))
+griMoll = spTransform(griLL, CRS("+proj=moll +lon_0+x_0+y_0"))
+griLL2 = spTransform(griMoll, CRS("+init=epsg:4326"))
+gridded(griLL2) = TRUE
+Error in if (ret at cells.dim[i]>  nr/2) warning(paste("grid topology may
+be corrupt in dimension",  :
+
+noted by Jon Skoien, should now also work with sp in svn.  I added the
+check:
+
+            if (ru.difx[1] / ru.difx[2] < tolerance) {
+                difx = difx[difx > ru.difx[2] * tolerance]
+                ru.difx = range(unique(difx)) # reset
+            }
+
+it tries to find e.g. x coordinates along a single column that are
+nearly identical, ie the difx contains values VERY close to 0.
+
+One of the tests in fail.R now passes, but I believe it does so for good
+reasons.
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From edzer.pebesma at uni-muenster.de  Mon Jul 11 23:34:29 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Mon, 11 Jul 2011 23:34:29 +0200
+Subject: [Rspatial-devel] sp_0.9-84.tar.gz
+Message-ID: <4E1B6C65.3030108@uni-muenster.de>
+
+now submitted to cran; should solve
+https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From edzer.pebesma at uni-muenster.de  Tue Jul 12 14:26:40 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Tue, 12 Jul 2011 14:26:40 +0200
+Subject: [Rspatial-devel] vignette that depends on PosgreSQL data base access
+Message-ID: <4E1C3D80.40708@uni-muenster.de>
+
+I wrote a vignette for package spacetime that explains how massive
+spacetime data sets in a PosgreSQL data base can be proxied by R objects
+in package spacetime; see
+https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw
+
+To compile it, it needs read/write access to a postgresql data base that
+has postgis extensions. I assume CRAN doesn't have these. How do I carry
+on with this? Can I tell CRAN to not try to compile it, or should I
+upload it somewhere else? Or simply upload & ignore?
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From ligges at statistik.tu-dortmund.de  Tue Jul 12 21:54:56 2011
+From: ligges at statistik.tu-dortmund.de (Uwe Ligges)
+Date: Tue, 12 Jul 2011 21:54:56 +0200
+Subject: [Rspatial-devel] vignette that depends on PosgreSQL data base
+	access
+In-Reply-To: <4E1C3D80.40708@uni-muenster.de>
+References: <4E1C3D80.40708@uni-muenster.de>
+Message-ID: <4E1CA690.7050206@statistik.tu-dortmund.de>
+
+
+
+On 12.07.2011 14:26, Edzer Pebesma wrote:
+> I wrote a vignette for package spacetime that explains how massive
+> spacetime data sets in a PosgreSQL data base can be proxied by R objects
+> in package spacetime; see
+> https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw
+>
+> To compile it, it needs read/write access to a postgresql data base that
+> has postgis extensions. I assume CRAN doesn't have these. How do I carry
+> on with this? Can I tell CRAN to not try to compile it, or should I
+> upload it somewhere else? Or simply upload&  ignore?
+
+Edzer,
+
+you can think about
+
+1. if it is possible to include some objects derived from the data 
+rather than the whole data, but that contradicts the aim of the package, 
+as far as I understand.
+
+2. just provide the pdf rather than the Rnw and calculate the vignette 
+for yourself only, but this way the users cannot run the code, if that 
+is relevant.
+
+3. ask CRAN maintainers not to check the vignettes of your package. This 
+is not standard and I am a bit reluctant to suggest exceptions, but 
+since most (if not all) of us have code in place to easily omit vignette 
+checks for particular packages this might be the most appropriate 
+solution here.
+
+
+Kurt is on vacations, so it may take a while to get his response on 
+this. CCing Brian Ripley who runs checks for CRAN but does not read CRAN at ...
+
+
+Best wishes,
+Uwe
+
+From edzer.pebesma at uni-muenster.de  Fri Jul 15 19:36:37 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Fri, 15 Jul 2011 19:36:37 +0200
+Subject: [Rspatial-devel] vignette that depends on PosgreSQL data base
+	access
+In-Reply-To: <4E1CA690.7050206@statistik.tu-dortmund.de>
+References: <4E1C3D80.40708@uni-muenster.de>
+	<4E1CA690.7050206@statistik.tu-dortmund.de>
+Message-ID: <4E207AA5.5000408@uni-muenster.de>
+
+Thanks Uwe! I decided to have the database sections with eval=FALSE, and
+upload a fully evaluated version off-CRAN; it's not a big deal after all.
+
+spacetime 0.5-1 is now on /incoming on CRAN.
+
+Best wishes,
+
+On 07/12/2011 09:54 PM, Uwe Ligges wrote:
+> 
+> 
+> On 12.07.2011 14:26, Edzer Pebesma wrote:
+>> I wrote a vignette for package spacetime that explains how massive
+>> spacetime data sets in a PosgreSQL data base can be proxied by R objects
+>> in package spacetime; see
+>> https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw
+>>
+>>
+>> To compile it, it needs read/write access to a postgresql data base that
+>> has postgis extensions. I assume CRAN doesn't have these. How do I carry
+>> on with this? Can I tell CRAN to not try to compile it, or should I
+>> upload it somewhere else? Or simply upload&  ignore?
+> 
+> Edzer,
+> 
+> you can think about
+> 
+> 1. if it is possible to include some objects derived from the data
+> rather than the whole data, but that contradicts the aim of the package,
+> as far as I understand.
+> 
+> 2. just provide the pdf rather than the Rnw and calculate the vignette
+> for yourself only, but this way the users cannot run the code, if that
+> is relevant.
+> 
+> 3. ask CRAN maintainers not to check the vignettes of your package. This
+> is not standard and I am a bit reluctant to suggest exceptions, but
+> since most (if not all) of us have code in place to easily omit vignette
+> checks for particular packages this might be the most appropriate
+> solution here.
+> 
+> 
+> Kurt is on vacations, so it may take a while to get his response on
+> this. CCing Brian Ripley who runs checks for CRAN but does not read
+> CRAN at ...
+> 
+> 
+> Best wishes,
+> Uwe
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From ligges at statistik.tu-dortmund.de  Sat Jul 16 15:40:35 2011
+From: ligges at statistik.tu-dortmund.de (Uwe Ligges)
+Date: Sat, 16 Jul 2011 15:40:35 +0200
+Subject: [Rspatial-devel] vignette that depends on PosgreSQL data base
+	access
+In-Reply-To: <4E207AA5.5000408@uni-muenster.de>
+References: <4E1C3D80.40708@uni-muenster.de>
+	<4E1CA690.7050206@statistik.tu-dortmund.de>
+	<4E207AA5.5000408@uni-muenster.de>
+Message-ID: <4E2194D3.1060709@statistik.tu-dortmund.de>
+
+
+
+On 15.07.2011 19:36, Edzer Pebesma wrote:
+> Thanks Uwe! I decided to have the database sections with eval=FALSE, and
+> upload a fully evaluated version off-CRAN; it's not a big deal after all.
+>
+> spacetime 0.5-1 is now on /incoming on CRAN.
+
+
+Great, thanks,
+uwe
+
+> Best wishes,
+>
+> On 07/12/2011 09:54 PM, Uwe Ligges wrote:
+>>
+>>
+>> On 12.07.2011 14:26, Edzer Pebesma wrote:
+>>> I wrote a vignette for package spacetime that explains how massive
+>>> spacetime data sets in a PosgreSQL data base can be proxied by R objects
+>>> in package spacetime; see
+>>> https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw
+>>>
+>>>
+>>> To compile it, it needs read/write access to a postgresql data base that
+>>> has postgis extensions. I assume CRAN doesn't have these. How do I carry
+>>> on with this? Can I tell CRAN to not try to compile it, or should I
+>>> upload it somewhere else? Or simply upload&   ignore?
+>>
+>> Edzer,
+>>
+>> you can think about
+>>
+>> 1. if it is possible to include some objects derived from the data
+>> rather than the whole data, but that contradicts the aim of the package,
+>> as far as I understand.
+>>
+>> 2. just provide the pdf rather than the Rnw and calculate the vignette
+>> for yourself only, but this way the users cannot run the code, if that
+>> is relevant.
+>>
+>> 3. ask CRAN maintainers not to check the vignettes of your package. This
+>> is not standard and I am a bit reluctant to suggest exceptions, but
+>> since most (if not all) of us have code in place to easily omit vignette
+>> checks for particular packages this might be the most appropriate
+>> solution here.
+>>
+>>
+>> Kurt is on vacations, so it may take a while to get his response on
+>> this. CCing Brian Ripley who runs checks for CRAN but does not read
+>> CRAN at ...
+>>
+>>
+>> Best wishes,
+>> Uwe
+>
+
+From edzer.pebesma at uni-muenster.de  Sat Jul 23 17:13:38 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Sat, 23 Jul 2011 17:13:38 +0200
+Subject: [Rspatial-devel] sp_0.9-84.tar.gz
+In-Reply-To: <20010.56267.204192.425792@fangorn.hornik.net>
+References: <4E1B6C65.3030108@uni-muenster.de>
+	<20010.56267.204192.425792@fangorn.hornik.net>
+Message-ID: <4E2AE522.2000600@uni-muenster.de>
+
+
+
+On 07/23/2011 04:33 PM, Kurt Hornik wrote:
+>>>>>> Edzer Pebesma writes:
+> 
+>> now submitted to cran; should solve
+>> https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html
+> 
+> I get
+> 
+> * checking Rd cross-references ... WARNING
+> Missing link(s) in documentation object ?/home/Hornik/tmp/CRAN/sp.Rcheck/00_pkg_src/sp/man/gridlines.Rd?:
+>   ?[rgdal]{llgridlines}?
+> 
+> Can you pls fix?
+> 
+Should be fixed now.
+
+Bests,
+
+> Best
+> -k
+>   
+>> -- 
+>> Edzer Pebesma
+>> Institute for Geoinformatics (ifgi), University of M?nster
+>> Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+>> 8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+>> http://www.52north.org/geostatistics      e.pebesma at wwu.de
+> 
+> 
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From Kurt.Hornik at wu.ac.at  Sat Jul 23 16:33:47 2011
+From: Kurt.Hornik at wu.ac.at (Kurt Hornik)
+Date: Sat, 23 Jul 2011 16:33:47 +0200
+Subject: [Rspatial-devel] sp_0.9-84.tar.gz
+In-Reply-To: <4E1B6C65.3030108@uni-muenster.de>
+References: <4E1B6C65.3030108@uni-muenster.de>
+Message-ID: <20010.56267.204192.425792@fangorn.hornik.net>
+
+>>>>> Edzer Pebesma writes:
+
+> now submitted to cran; should solve
+> https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html
+
+I get
+
+* checking Rd cross-references ... WARNING
+Missing link(s) in documentation object ?/home/Hornik/tmp/CRAN/sp.Rcheck/00_pkg_src/sp/man/gridlines.Rd?:
+  ?[rgdal]{llgridlines}?
+
+Can you pls fix?
+
+Best
+-k
+  
+> -- 
+> Edzer Pebesma
+> Institute for Geoinformatics (ifgi), University of M?nster
+> Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+> 8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+> http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+
+
+From Kurt.Hornik at wu.ac.at  Sat Jul 23 16:50:04 2011
+From: Kurt.Hornik at wu.ac.at (Kurt Hornik)
+Date: Sat, 23 Jul 2011 16:50:04 +0200
+Subject: [Rspatial-devel] vignette that depends on PosgreSQL data base
+	access
+In-Reply-To: <4E2194D3.1060709@statistik.tu-dortmund.de>
+References: <4E1C3D80.40708@uni-muenster.de>
+	<4E1CA690.7050206@statistik.tu-dortmund.de>
+	<4E207AA5.5000408@uni-muenster.de>
+	<4E2194D3.1060709@statistik.tu-dortmund.de>
+Message-ID: <20010.57244.966492.832945@fangorn.hornik.net>
+
+>>>>> Uwe Ligges writes:
+
+> On 15.07.2011 19:36, Edzer Pebesma wrote:
+>> Thanks Uwe! I decided to have the database sections with eval=FALSE, and
+>> upload a fully evaluated version off-CRAN; it's not a big deal after all.
+>> 
+>> spacetime 0.5-1 is now on /incoming on CRAN.
+
+Thanks, on CRAN now.
+
+Best
+-k
+
+
+
+> Great, thanks,
+> uwe
+
+>> Best wishes,
+>> 
+>> On 07/12/2011 09:54 PM, Uwe Ligges wrote:
+>>> 
+>>> 
+>>> On 12.07.2011 14:26, Edzer Pebesma wrote:
+>>>> I wrote a vignette for package spacetime that explains how massive
+>>>> spacetime data sets in a PosgreSQL data base can be proxied by R objects
+>>>> in package spacetime; see
+>>>> https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw
+>>>> 
+>>>> 
+>>>> To compile it, it needs read/write access to a postgresql data base that
+>>>> has postgis extensions. I assume CRAN doesn't have these. How do I carry
+>>>> on with this? Can I tell CRAN to not try to compile it, or should I
+>>>> upload it somewhere else? Or simply upload&   ignore?
+>>> 
+>>> Edzer,
+>>> 
+>>> you can think about
+>>> 
+>>> 1. if it is possible to include some objects derived from the data
+>>> rather than the whole data, but that contradicts the aim of the package,
+>>> as far as I understand.
+>>> 
+>>> 2. just provide the pdf rather than the Rnw and calculate the vignette
+>>> for yourself only, but this way the users cannot run the code, if that
+>>> is relevant.
+>>> 
+>>> 3. ask CRAN maintainers not to check the vignettes of your package. This
+>>> is not standard and I am a bit reluctant to suggest exceptions, but
+>>> since most (if not all) of us have code in place to easily omit vignette
+>>> checks for particular packages this might be the most appropriate
+>>> solution here.
+>>> 
+>>> 
+>>> Kurt is on vacations, so it may take a while to get his response on
+>>> this. CCing Brian Ripley who runs checks for CRAN but does not read
+>>> CRAN at ...
+>>> 
+>>> 
+>>> Best wishes,
+>>> Uwe
+>> 
+
+
+
+From Kurt.Hornik at wu.ac.at  Sat Jul 23 17:56:18 2011
+From: Kurt.Hornik at wu.ac.at (Kurt Hornik)
+Date: Sat, 23 Jul 2011 17:56:18 +0200
+Subject: [Rspatial-devel] sp_0.9-84.tar.gz
+In-Reply-To: <4E2AE522.2000600@uni-muenster.de>
+References: <4E1B6C65.3030108@uni-muenster.de>
+	<20010.56267.204192.425792@fangorn.hornik.net>
+	<4E2AE522.2000600@uni-muenster.de>
+Message-ID: <20010.61218.783884.116633@fangorn.hornik.net>
+
+>>>>> Edzer Pebesma writes:
+
+> On 07/23/2011 04:33 PM, Kurt Hornik wrote:
+>>>>>>> Edzer Pebesma writes:
+>> 
+>>> now submitted to cran; should solve
+>>> https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html
+>> 
+>> I get
+>> 
+>> * checking Rd cross-references ... WARNING
+>> Missing link(s) in documentation object ?/home/Hornik/tmp/CRAN/sp.Rcheck/00_pkg_src/sp/man/gridlines.Rd?:
+>> ?[rgdal]{llgridlines}?
+>> 
+>> Can you pls fix?
+>> 
+
+> Should be fixed now.
+
+Thanks, on CRAN now.
+
+Best
+-k
+
+
+> Bests,
+
+>> Best
+>> -k
+>> 
+>>> -- 
+>>> Edzer Pebesma
+>>> Institute for Geoinformatics (ifgi), University of M?nster
+>>> Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+>>> 8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+>>> http://www.52north.org/geostatistics      e.pebesma at wwu.de
+>> 
+>> 
+
+> -- 
+> Edzer Pebesma
+> Institute for Geoinformatics (ifgi), University of M?nster
+> Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+> 8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+> http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+
+From edzer.pebesma at uni-muenster.de  Mon Jul 25 18:47:27 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Mon, 25 Jul 2011 18:47:27 +0200
+Subject: [Rspatial-devel] SpatialLinesDataFrame/match.ID-bug
+In-Reply-To: <CAMbo+YV8QJG9wP2_0HxjZi0Xer_pvfSVi0wx98pDh35X93qGaQ@mail.gmail.com>
+References: <CAMbo+YV8QJG9wP2_0HxjZi0Xer_pvfSVi0wx98pDh35X93qGaQ@mail.gmail.com>
+Message-ID: <4E2D9E1F.2070609@uni-muenster.de>
+
+I fixed this and committed to svn; it seems the same bug was there for
+Points and Polygons as well. The line:
+
+        row.names(data) = data[match.ID[1]]
+
+did not what we hoped it did, as data[match.ID[1]] returns a data.frame
+and not sth that can be coerced to a character vector. I changed this
+for Lines, Points and Polygons into:
+
+        row.names(data) = data[, match.ID[1]]
+
+which does set the row.names properly.
+
+Thanks for the clear report,
+
+
+On 07/25/2011 05:39 PM, Thomas Schlesinger wrote:
+> Hey.
+> 
+> My name is thomas Schlesinger and I found a bug in the match.ID paramater in
+> sp:::SpatialLinesDataFrame. I'm writing the problem down:
+> 
+> bodSouth<-data.frame(lat=c(8.94,9.49,9.72), lon=c(47.73,47.48,47.50))
+> bodNorth<-data.frame(lat=c(9.05,9.48,9.75), lon=c(47.8,47.65,47.51))
+> bodSouthLine<-Line(bodSouth)
+> bodNorthLine<-Line(bodNorth)
+> bodLines<-Lines(list(bodSouthLine,bodNorthLine), ID="Bodensee")
+> crs<- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+> SPBoden<-SpatialLines(list(bodLines), proj4string=crs)
+> bodenData<-data.frame(name="Bodensee", deep=254, height=395)
+> SPDFboden<-SpatialLinesDataFrame(SPBoden, bodenData, match.ID="name")
+> It should match the ID "Bodensee" with the Lines-ID "Bodensee". but it
+> doesn't.
+> 
+> I think the problem is solved if you change the 2nd line in the
+> SpatialLinesDataFrame-function from
+> row.names(data) = data[match.ID[1]]    (this is class data.frame)
+> to
+> row.names(data) = data[match.ID[1]][,1]   (this is class factor)
+> 
+> I hope this solves the problem. Please let me know, if it worked.
+> 
+> greetings :)
+> Thomas
+> 
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From edzer.pebesma at uni-muenster.de  Mon Jul 25 18:55:16 2011
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Mon, 25 Jul 2011 18:55:16 +0200
+Subject: [Rspatial-devel] SpatialLinesDataFrame/match.ID-bug
+In-Reply-To: <4E2D9E1F.2070609@uni-muenster.de>
+References: <CAMbo+YV8QJG9wP2_0HxjZi0Xer_pvfSVi0wx98pDh35X93qGaQ@mail.gmail.com>
+	<4E2D9E1F.2070609@uni-muenster.de>
+Message-ID: <4E2D9FF4.60200@uni-muenster.de>
+
+Of course, Thomas, your solution also worked, as would have
+
+  row.names(data) = data[[ match.ID[1] ]]
+
+but mine was shorter ;-) A question remains why this ever worked, or
+didn't it?
+
+On 07/25/2011 06:47 PM, Edzer Pebesma wrote:
+> I fixed this and committed to svn; it seems the same bug was there for
+> Points and Polygons as well. The line:
+> 
+>         row.names(data) = data[match.ID[1]]
+> 
+> did not what we hoped it did, as data[match.ID[1]] returns a data.frame
+> and not sth that can be coerced to a character vector. I changed this
+> for Lines, Points and Polygons into:
+> 
+>         row.names(data) = data[, match.ID[1]]
+> 
+> which does set the row.names properly.
+> 
+> Thanks for the clear report,
+> 
+> 
+> On 07/25/2011 05:39 PM, Thomas Schlesinger wrote:
+>> Hey.
+>>
+>> My name is thomas Schlesinger and I found a bug in the match.ID paramater in
+>> sp:::SpatialLinesDataFrame. I'm writing the problem down:
+>>
+>> bodSouth<-data.frame(lat=c(8.94,9.49,9.72), lon=c(47.73,47.48,47.50))
+>> bodNorth<-data.frame(lat=c(9.05,9.48,9.75), lon=c(47.8,47.65,47.51))
+>> bodSouthLine<-Line(bodSouth)
+>> bodNorthLine<-Line(bodNorth)
+>> bodLines<-Lines(list(bodSouthLine,bodNorthLine), ID="Bodensee")
+>> crs<- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+>> SPBoden<-SpatialLines(list(bodLines), proj4string=crs)
+>> bodenData<-data.frame(name="Bodensee", deep=254, height=395)
+>> SPDFboden<-SpatialLinesDataFrame(SPBoden, bodenData, match.ID="name")
+>> It should match the ID "Bodensee" with the Lines-ID "Bodensee". but it
+>> doesn't.
+>>
+>> I think the problem is solved if you change the 2nd line in the
+>> SpatialLinesDataFrame-function from
+>> row.names(data) = data[match.ID[1]]    (this is class data.frame)
+>> to
+>> row.names(data) = data[match.ID[1]][,1]   (this is class factor)
+>>
+>> I hope this solves the problem. Please let me know, if it worked.
+>>
+>> greetings :)
+>> Thomas
+>>
+> 
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+

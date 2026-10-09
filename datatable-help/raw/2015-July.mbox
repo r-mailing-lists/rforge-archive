@@ -1,0 +1,1170 @@
+From my.r.help at gmail.com  Wed Jul  1 03:32:51 2015
+From: my.r.help at gmail.com (Michael Smith)
+Date: Wed, 01 Jul 2015 09:32:51 +0800
+Subject: [datatable-help] Integration with magrittr
+In-Reply-To: <CAHA9McPvjHri_34gEOrMnwn9aHygVMaa+zQ5xz+FWwiyAsoyzQ@mail.gmail.com>
+References: <5591EBA2.1060505@gmail.com>
+ <CAHA9McPvjHri_34gEOrMnwn9aHygVMaa+zQ5xz+FWwiyAsoyzQ@mail.gmail.com>
+Message-ID: <55934343.4070102@gmail.com>
+
+Steve,
+
+You're absolutely right that DT[, a := a * 2] is easier to read, but 
+that's not my point.
+
+Maybe I have not pointed this out clearly enough and I'm sorry about 
+that, but my point is NOT how to multiply a number by two.
+
+Instead, my point is how to do some calculation with a variable and then 
+reassign that result back to that variable. (That's the whole rationale 
+behind `%<>%` in magrittr!)
+
+This calculation could IN REALITY be of course more complicated than *2, 
+and could involve many functions chained together and a long variable 
+name that is cumbersome to read/type repeatedly, e.g.
+
+DT[, long.variable.name := long.variable.name %>% function.a %>% function.b]
+
+I do think that the other version would be more easy to read and type:
+
+DT[, long.variable.name %<>% function.a %>% function.b]
+
+Hope that clarifies.
+
+M
+
+On 07/01/2015 04:06 AM, Steve Lianoglou wrote:
+> Hi,
+>
+>> I love data.table and I also love magrittr.
+>
+> I really love both of these, too.
+>
+>> However, some things don't work,
+>> e.g.
+>>
+>> DT <- data.table(a = 1:3, b = 4:6)
+>> DT[, a %<>% `*`(2)]    # instead of DT[, a := a %>% `*`(2)]
+>
+> In my personal opinion, though, I feel like this might be going a
+> stretch too far.
+>
+> Although this might just be a contrived example, it's hard for me to
+> divine an instance where this would look any less contrived. I mean,
+> is:
+>
+> DT[, a %<>% `*`(2)] ## or
+> DT[, a := a %>% `*`(2)]
+>
+> Really any more useful/simpler than:
+>
+> DT[, a := a * 2]
+>
+> Can't think of when I'd prefer the magrittr'ized version ... perhaps
+> when the column name (`a`) is actually a much longer? (so that %<>%
+> saves you some typing), or?
+>
+> -steve
+>
+
+From lianoglou.steve at gene.com  Wed Jul  1 18:47:00 2015
+From: lianoglou.steve at gene.com (Steve Lianoglou)
+Date: Wed, 1 Jul 2015 09:47:00 -0700
+Subject: [datatable-help] Integration with magrittr
+In-Reply-To: <55934343.4070102@gmail.com>
+References: <5591EBA2.1060505@gmail.com>
+ <CAHA9McPvjHri_34gEOrMnwn9aHygVMaa+zQ5xz+FWwiyAsoyzQ@mail.gmail.com>
+ <55934343.4070102@gmail.com>
+Message-ID: <CAHA9McOO_D2RZybyVyNW=EV6iODREZnr3yrBB_X_pts0GVhenw@mail.gmail.com>
+
+Hi Michael
+
+> Maybe I have not pointed this out clearly enough and I'm sorry about that,
+> but my point is NOT how to multiply a number by two.
+
+No -- I knew you were giving a shorter example for something that
+might be more complicated ... I mentioned that I couldn't imagine a
+"not contrived" example where this would really be a win, but I'll
+grant you that we are in a very subjective realm now.
+
+> This calculation could IN REALITY be of course more complicated than *2, and
+> could involve many functions chained together and a long variable name that
+
+These were the types of scenarios I was trying to think of as well.
+
+> is cumbersome to read/type repeatedly, e.g.
+>
+> DT[, long.variable.name := long.variable.name %>% function.a %>% function.b]
+
+In the case of long function chaining w/ magrittr, I almost always
+prefer breaking them up by line, so if I wanted to use it in
+data.table.[, it'd look something like this:
+
+DT[, long.variable.name := {
+  long.variable.name %>%
+  function.a %>%
+  function.b
+}]
+
+But again, we are in "personal taste" land -- I don't like having long
+lines stretch across my code ;-) ... anyway,  so not much one can
+objectively say here.
+
+We can talk about what it would take to implement %<>% in an objective
+sense, though -- first, not sure it's even possible w/o having to
+sniff for %<>% and rewrite the expression as `LHS := LHS %>% RHS ...`
+before evaluating? Is that right? Is that, perhaps, a thorny
+situation, and is it worth the effort?
+
+If I recall correctly, there's something magical about the `:=`
+operator that enabled it to modify the data.table by reference, but
+Matthew or Arun can come chime in here w/ more details ...
+
+-steve
+
+-- 
+Steve Lianoglou
+Computational Biologist
+Genentech
+
+From my.r.help at gmail.com  Thu Jul  2 03:25:45 2015
+From: my.r.help at gmail.com (Michael Smith)
+Date: Thu, 02 Jul 2015 09:25:45 +0800
+Subject: [datatable-help] Integration with magrittr
+In-Reply-To: <CAHA9McOO_D2RZybyVyNW=EV6iODREZnr3yrBB_X_pts0GVhenw@mail.gmail.com>
+References: <5591EBA2.1060505@gmail.com>	<CAHA9McPvjHri_34gEOrMnwn9aHygVMaa+zQ5xz+FWwiyAsoyzQ@mail.gmail.com>	<55934343.4070102@gmail.com>
+ <CAHA9McOO_D2RZybyVyNW=EV6iODREZnr3yrBB_X_pts0GVhenw@mail.gmail.com>
+Message-ID: <55949319.5090307@gmail.com>
+
+Hi Steve,
+
+Okay glad to hear we're on the same page and thanks for your thoughts 
+and views. You're right, we're in "personal taste" land and what is 
+"better" is subjective here.
+
+What I had in mind was exactly what you've mentioned, i.e. to parse 
+LHS%<>%RHS as LHS:=LHS%>%RHS in data.table before evaluating.
+
+In my mind, that should not be so difficult to do, since `:=` is already 
+implemented. But maybe I'm wrong and it's difficult to do (I still 
+should finish reading Hadley's chapters on metaprogramming in his 
+"Advanced R" book.) Would also be interesting to hear Matthew's or 
+Arun's opinions.
+
+Cheers,
+M
+
+On 07/02/2015 12:47 AM, Steve Lianoglou wrote:
+> Hi Michael
+>
+>> Maybe I have not pointed this out clearly enough and I'm sorry about that,
+>> but my point is NOT how to multiply a number by two.
+>
+> No -- I knew you were giving a shorter example for something that
+> might be more complicated ... I mentioned that I couldn't imagine a
+> "not contrived" example where this would really be a win, but I'll
+> grant you that we are in a very subjective realm now.
+>
+>> This calculation could IN REALITY be of course more complicated than *2, and
+>> could involve many functions chained together and a long variable name that
+>
+> These were the types of scenarios I was trying to think of as well.
+>
+>> is cumbersome to read/type repeatedly, e.g.
+>>
+>> DT[, long.variable.name := long.variable.name %>% function.a %>% function.b]
+>
+> In the case of long function chaining w/ magrittr, I almost always
+> prefer breaking them up by line, so if I wanted to use it in
+> data.table.[, it'd look something like this:
+>
+> DT[, long.variable.name := {
+>    long.variable.name %>%
+>    function.a %>%
+>    function.b
+> }]
+>
+> But again, we are in "personal taste" land -- I don't like having long
+> lines stretch across my code ;-) ... anyway,  so not much one can
+> objectively say here.
+>
+> We can talk about what it would take to implement %<>% in an objective
+> sense, though -- first, not sure it's even possible w/o having to
+> sniff for %<>% and rewrite the expression as `LHS := LHS %>% RHS ...`
+> before evaluating? Is that right? Is that, perhaps, a thorny
+> situation, and is it worth the effort?
+>
+> If I recall correctly, there's something magical about the `:=`
+> operator that enabled it to modify the data.table by reference, but
+> Matthew or Arun can come chime in here w/ more details ...
+>
+> -steve
+>
+
+From sfischme at uwaterloo.ca  Mon Jul 20 17:39:01 2015
+From: sfischme at uwaterloo.ca (Sebastian Fischmeister)
+Date: Mon, 20 Jul 2015 11:39:01 -0400
+Subject: [datatable-help] updating subsets
+Message-ID: <87r3o2c087.fsf@uwaterloo.ca>
+
+Hi,
+
+I'm trying to split a data.table and then update the individual
+splits. Does anyone have an idea, why this doesn't work?
+
+Thanks,
+  Sebastian
+
+
+
+library(data.table)
+
+## this doesn't work
+q <- list(data.table(runif(9)),data.table(runif(9)))
+lapply( q, function(xx) { qq <- split(xx, 1:nrow(xx) %/% 5)
+                          lapply(qq, function(xx) { xx[, freq:=.N, by="V1"] })
+                      })
+
+## this doesn't work either although freq now exists
+q <- list(data.table(runif(9)),data.table(runif(9)))
+lapply(q, function(xx) xx[,freq:=-1] )
+lapply( q, function(xx) { qq <- split(xx, 1:nrow(xx) %/% 5)
+                          lapply(qq, function(xx) { xx[, freq:=.N, by="V1"] })
+                      })
+
+
+
+
+From fperickson at wisc.edu  Mon Jul 20 17:48:11 2015
+From: fperickson at wisc.edu (Frank Erickson)
+Date: Mon, 20 Jul 2015 11:48:11 -0400
+Subject: [datatable-help] updating subsets
+In-Reply-To: <87r3o2c087.fsf@uwaterloo.ca>
+References: <87r3o2c087.fsf@uwaterloo.ca>
+Message-ID: <CAJd-hd=ZmTBkTe63DhMwkhGY_yecb+X=ni1eefjAFfhY6Fg_3Q@mail.gmail.com>
+
+I think you should use a single data.table; it's much more straightforward
+in that case:
+
+qq <- data.table(runif(18),id=rep(1:2,each=9))
+qq[,freq:=.N,by=.(id,seq(nrow(qq))%/%5)]
+
+This differs from your code, but I doubt that you really meant to do by=V1,
+since V1 is continuous and therefore is almost guaranteed to have groups of
+size one.
+
+--Frank
+
+
+
+On Mon, Jul 20, 2015 at 11:39 AM, Sebastian Fischmeister <
+sfischme at uwaterloo.ca> wrote:
+
+> Hi,
+>
+> I'm trying to split a data.table and then update the individual
+> splits. Does anyone have an idea, why this doesn't work?
+>
+> Thanks,
+>   Sebastian
+>
+>
+>
+> library(data.table)
+>
+> ## this doesn't work
+> q <- list(data.table(runif(9)),data.table(runif(9)))
+> lapply( q, function(xx) { qq <- split(xx, 1:nrow(xx) %/% 5)
+>                           lapply(qq, function(xx) { xx[, freq:=.N,
+> by="V1"] })
+>                       })
+>
+> ## this doesn't work either although freq now exists
+> q <- list(data.table(runif(9)),data.table(runif(9)))
+> lapply(q, function(xx) xx[,freq:=-1] )
+> lapply( q, function(xx) { qq <- split(xx, 1:nrow(xx) %/% 5)
+>                           lapply(qq, function(xx) { xx[, freq:=.N,
+> by="V1"] })
+>                       })
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150720/6a92e0c7/attachment.html>
+
+From sfischme at uwaterloo.ca  Mon Jul 20 17:55:59 2015
+From: sfischme at uwaterloo.ca (Sebastian Fischmeister)
+Date: Mon, 20 Jul 2015 11:55:59 -0400
+Subject: [datatable-help] updating subsets
+In-Reply-To: <CAJd-hd=ZmTBkTe63DhMwkhGY_yecb+X=ni1eefjAFfhY6Fg_3Q@mail.gmail.com>
+References: <87r3o2c087.fsf@uwaterloo.ca>
+ <CAJd-hd=ZmTBkTe63DhMwkhGY_yecb+X=ni1eefjAFfhY6Fg_3Q@mail.gmail.com>
+Message-ID: <87egk2bz9t.fsf@uwaterloo.ca>
+
+
+
+> I think you should use a single data.table; it's much more straightforward
+> in that case:
+>
+> qq <- data.table(runif(18),id=rep(1:2,each=9))
+> qq[,freq:=.N,by=.(id,seq(nrow(qq))%/%5)]
+
+Thanks for the idea, unfortunately I need lists. The example is just a
+minimal example to show the problem. The actual code will use large
+data.tables in lists and I want to eventually use mclapply to
+parallelize the computation.
+
+  Sebastian
+
+From fperickson at wisc.edu  Mon Jul 20 18:14:34 2015
+From: fperickson at wisc.edu (Frank Erickson)
+Date: Mon, 20 Jul 2015 12:14:34 -0400
+Subject: [datatable-help] updating subsets
+In-Reply-To: <87egk2bz9t.fsf@uwaterloo.ca>
+References: <87r3o2c087.fsf@uwaterloo.ca>
+ <CAJd-hd=ZmTBkTe63DhMwkhGY_yecb+X=ni1eefjAFfhY6Fg_3Q@mail.gmail.com>
+ <87egk2bz9t.fsf@uwaterloo.ca>
+Message-ID: <CAJd-hdn0+ixkzOOQ=nb0hAaZHi0h7-3z9F5LRE4pY97qCD_a9Q@mail.gmail.com>
+
+Ah ok. mclapply is a little beyond my depth, but I think you can always put
+the variable you are splitting by (1:nrow(xx) %/% 5 here) directly into the
+by argument of xx[i,j,by], so...
+
+q <- list(data.table(runif(9)),data.table(runif(9)))
+lapply( q, function(xx) xx[, freq:=.N, by=.(V1,1:nrow(xx) %/% 5)] )
+
+works for me, on data.table 1.9.4.
+
+On Mon, Jul 20, 2015 at 11:55 AM, Sebastian Fischmeister <
+sfischme at uwaterloo.ca> wrote:
+
+>
+>
+> > I think you should use a single data.table; it's much more
+> straightforward
+> > in that case:
+> >
+> > qq <- data.table(runif(18),id=rep(1:2,each=9))
+> > qq[,freq:=.N,by=.(id,seq(nrow(qq))%/%5)]
+>
+> Thanks for the idea, unfortunately I need lists. The example is just a
+> minimal example to show the problem. The actual code will use large
+> data.tables in lists and I want to eventually use mclapply to
+> parallelize the computation.
+>
+>   Sebastian
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150720/a1294f1c/attachment.html>
+
+From sfischme at uwaterloo.ca  Tue Jul 21 21:38:50 2015
+From: sfischme at uwaterloo.ca (Sebastian Fischmeister)
+Date: Tue, 21 Jul 2015 15:38:50 -0400
+Subject: [datatable-help] updating subsets
+In-Reply-To: <CAJd-hdn0+ixkzOOQ=nb0hAaZHi0h7-3z9F5LRE4pY97qCD_a9Q@mail.gmail.com>
+References: <87r3o2c087.fsf@uwaterloo.ca>
+ <CAJd-hd=ZmTBkTe63DhMwkhGY_yecb+X=ni1eefjAFfhY6Fg_3Q@mail.gmail.com>
+ <87egk2bz9t.fsf@uwaterloo.ca>
+ <CAJd-hdn0+ixkzOOQ=nb0hAaZHi0h7-3z9F5LRE4pY97qCD_a9Q@mail.gmail.com>
+Message-ID: <87si8hwbzs.fsf@uwaterloo.ca>
+
+As a follow-up. This is working. Apparently it was mostly a type error
+in R and not a problem in data.table:
+
+
+## this works; important things are to (1) create the columns in advance
+## and not on the subsets, and (2) use the correct data type
+
+q <- list(data.table(runif(9)),data.table(runif(9)))
+lapply(q, function(xx) xx[,freq:=-1L] )
+lapply( q, function(xx) { qq <- split(xx, 1:nrow(xx) %/% 5)
+                          lapply(qq, function(xx) { xx[, freq:=.N, by="V1"] })
+                      })
+
+
+
+Frank Erickson <fperickson at wisc.edu> writes:
+
+> Ah ok. mclapply is a little beyond my depth, but I think you can always put
+> the variable you are splitting by (1:nrow(xx) %/% 5 here) directly into the
+> by argument of xx[i,j,by], so...
+>
+> q <- list(data.table(runif(9)),data.table(runif(9)))
+> lapply( q, function(xx) xx[, freq:=.N, by=.(V1,1:nrow(xx) %/% 5)] )
+>
+> works for me, on data.table 1.9.4.
+>
+> On Mon, Jul 20, 2015 at 11:55 AM, Sebastian Fischmeister <
+> sfischme at uwaterloo.ca> wrote:
+>
+>>
+>>
+>> > I think you should use a single data.table; it's much more
+>> straightforward
+>> > in that case:
+>> >
+>> > qq <- data.table(runif(18),id=rep(1:2,each=9))
+>> > qq[,freq:=.N,by=.(id,seq(nrow(qq))%/%5)]
+>>
+>> Thanks for the idea, unfortunately I need lists. The example is just a
+>> minimal example to show the problem. The actual code will use large
+>> data.tables in lists and I want to eventually use mclapply to
+>> parallelize the computation.
+>>
+>>   Sebastian
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+
+From DBetebenner at nciea.org  Wed Jul 22 12:10:31 2015
+From: DBetebenner at nciea.org (Damian Betebenner)
+Date: Wed, 22 Jul 2015 10:10:31 +0000
+Subject: [datatable-help] Any date for 1.9.6 push to CRAN?
+Message-ID: <FC68AD47-F30E-4FC4-B3D6-90321CB30D4F@nciea.org>
+
+Hi all,
+
+It was mentioned recently that 1.9.6 would be pushed to CRAN soon. Any rough dates when that might occur?
+
+Alway appreciative for the great work!
+
+Damian
+
+From statquant at outlook.com  Thu Jul 23 11:51:14 2015
+From: statquant at outlook.com (statquant3)
+Date: Thu, 23 Jul 2015 02:51:14 -0700 (PDT)
+Subject: [datatable-help] create empty data.table
+Message-ID: <1437645074911-4710237.post@n4.nabble.com>
+
+I wanted to create a function that creates an empty data.table with specified
+column types.
+emptyDT <- function(colNames,colTypes){...}
+I would call
+emptyDT(c('date','id','value'),c('Date','Character','Numeric'))
+
+Is there something available for this already ?
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/create-empty-data-table-tp4710237.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From statquant at outlook.com  Thu Jul 23 14:04:03 2015
+From: statquant at outlook.com (statquant3)
+Date: Thu, 23 Jul 2015 05:04:03 -0700 (PDT)
+Subject: [datatable-help] [data.table] Aggregate as vector
+In-Reply-To: <CA+ssMORuusFzumErUt5WXz-6kyN7RoaVzEzkY4A66js6qn+=2A@mail.gmail.com>
+References: <CA+ssMORuusFzumErUt5WXz-6kyN7RoaVzEzkY4A66js6qn+=2A@mail.gmail.com>
+Message-ID: <1437653043836-4710244.post@n4.nabble.com>
+
+Try this, works on 1.9.5
+dt[,.(list(V1)),.(V2)]
+
+   V2  V1
+1:  a 1,4
+2:  b 2,3
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/data-table-Aggregate-as-vector-tp4709068p4710244.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From jmtruppia at gmail.com  Thu Jul 23 14:53:12 2015
+From: jmtruppia at gmail.com (Juan Manuel Truppia)
+Date: Thu, 23 Jul 2015 12:53:12 +0000
+Subject: [datatable-help] Create empty data.table
+In-Reply-To: <mailman.3.1437645604.5525.datatable-help@lists.r-forge.r-project.org>
+References: <mailman.3.1437645604.5525.datatable-help@lists.r-forge.r-project.org>
+Message-ID: <CAO2XSvfD1yT1dUz-PpZyD1+ejoG2xCdQAyeE3SUNjnpAPPD_5g@mail.gmail.com>
+
+There is nothing already written that I'm aware of, but you can create an
+empty dt easily by edt = data.table (a = numeric(0), b = character(0)),
+that is, by providing arguments of 0 length as column.
+Writing a function that wraps that isn't difficult.
+
+On Thu, Jul 23, 2015, 07:00  <
+datatable-help-request at lists.r-forge.r-project.org> wrote:
+
+> Send datatable-help mailing list submissions to
+>         datatable-help at lists.r-forge.r-project.org
+>
+> To subscribe or unsubscribe via the World Wide Web, visit
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+> or, via email, send a message with subject or body 'help' to
+>         datatable-help-request at lists.r-forge.r-project.org
+>
+> You can reach the person managing the list at
+>         datatable-help-owner at lists.r-forge.r-project.org
+>
+> When replying, please edit your Subject line so it is more specific
+> than "Re: Contents of datatable-help digest..."
+>
+>
+> Today's Topics:
+>
+>    1. Any date for 1.9.6 push to CRAN? (Damian Betebenner)
+>    2. create empty data.table (statquant3)
+>
+>
+> ----------------------------------------------------------------------
+>
+> Message: 1
+> Date: Wed, 22 Jul 2015 10:10:31 +0000
+> From: Damian Betebenner <DBetebenner at nciea.org>
+> To: "datatable-help at lists.r-forge.r-project.org"
+>         <datatable-help at lists.r-forge.r-project.org>
+> Subject: [datatable-help] Any date for 1.9.6 push to CRAN?
+> Message-ID: <FC68AD47-F30E-4FC4-B3D6-90321CB30D4F at nciea.org>
+> Content-Type: text/plain; charset="us-ascii"
+>
+> Hi all,
+>
+> It was mentioned recently that 1.9.6 would be pushed to CRAN soon. Any
+> rough dates when that might occur?
+>
+> Alway appreciative for the great work!
+>
+> Damian
+>
+> ------------------------------
+>
+> Message: 2
+> Date: Thu, 23 Jul 2015 02:51:14 -0700 (PDT)
+> From: statquant3 <statquant at outlook.com>
+> To: datatable-help at lists.r-forge.r-project.org
+> Subject: [datatable-help] create empty data.table
+> Message-ID: <1437645074911-4710237.post at n4.nabble.com>
+> Content-Type: text/plain; charset=us-ascii
+>
+> I wanted to create a function that creates an empty data.table with
+> specified
+> column types.
+> emptyDT <- function(colNames,colTypes){...}
+> I would call
+> emptyDT(c('date','id','value'),c('Date','Character','Numeric'))
+>
+> Is there something available for this already ?
+>
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/create-empty-data-table-tp4710237.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+>
+>
+> ------------------------------
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+> End of datatable-help Digest, Vol 65, Issue 5
+> *********************************************
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150723/085daa96/attachment.html>
+
+From fperickson at wisc.edu  Thu Jul 23 14:53:20 2015
+From: fperickson at wisc.edu (Frank Erickson)
+Date: Thu, 23 Jul 2015 08:53:20 -0400
+Subject: [datatable-help] create empty data.table
+In-Reply-To: <1437645074911-4710237.post@n4.nabble.com>
+References: <1437645074911-4710237.post@n4.nabble.com>
+Message-ID: <CAJd-hdnU+rSqCVZn7PmACeM04+3s-gJRY8LT7UsqHNKhZEGPWA@mail.gmail.com>
+
+You can make a wrapper for something like
+
+> DT <- data.table(date=Sys.Date()[0],id=character(0),value=numeric(0))
+
+# examine structure
+> str(DT)
+Classes ?data.table? and 'data.frame':  0 obs. of  3 variables:
+ $ date :Class 'Date'  num(0)
+ $ id   : chr
+ $ value: num
+ - attr(*, ".internal.selfref")=<externalptr>
+
+# try appending
+> str(rbind(DT,list(Sys.Date(),"A",1)))
+Classes ?data.table? and 'data.frame':  1 obs. of  3 variables:
+ $ date : Date, format: "2015-07-23"
+ $ id   : chr "A"
+ $ value: num 1
+ - attr(*, ".internal.selfref")=<externalptr>
+
+--Frank
+
+On Thu, Jul 23, 2015 at 5:51 AM, statquant3 <statquant at outlook.com> wrote:
+
+> I wanted to create a function that creates an empty data.table with
+> specified
+> column types.
+> emptyDT <- function(colNames,colTypes){...}
+> I would call
+> emptyDT(c('date','id','value'),c('Date','Character','Numeric'))
+>
+> Is there something available for this already ?
+>
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/create-empty-data-table-tp4710237.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150723/271cd332/attachment.html>
+
+From chetal.gaurav at gmail.com  Thu Jul 23 14:54:16 2015
+From: chetal.gaurav at gmail.com (Gaurav Chetal)
+Date: Thu, 23 Jul 2015 18:24:16 +0530
+Subject: [datatable-help] Disable mailing list
+Message-ID: <CAN6uNrWYnnK4D6K-RyXfyzk3ZHwBWh8Z6P-zm-1MUbJX7saf7Q@mail.gmail.com>
+
+-- 
+
+Gaurav Chetal
+PhD Research Scholar , School of Basic Sciences
+Academic Block ,
+Indian Institute of Technology Mandi
+Mandi , H.P.-175001
+
+Cell- +91-8894873344
+
+
+
+?I don't have dreams.I have Goals.?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150723/ca2516a0/attachment.html>
+
+From fperickson at wisc.edu  Thu Jul 23 14:55:46 2015
+From: fperickson at wisc.edu (Frank Erickson)
+Date: Thu, 23 Jul 2015 08:55:46 -0400
+Subject: [datatable-help] Disable mailing list
+In-Reply-To: <CAN6uNrWYnnK4D6K-RyXfyzk3ZHwBWh8Z6P-zm-1MUbJX7saf7Q@mail.gmail.com>
+References: <CAN6uNrWYnnK4D6K-RyXfyzk3ZHwBWh8Z6P-zm-1MUbJX7saf7Q@mail.gmail.com>
+Message-ID: <CAJd-hdnDVF2qvjqcbA2OOXMfGQOVQSMvUgQPTpvuetFBEFFjzA@mail.gmail.com>
+
+You have to disable it yourself using the link at the bottom of every
+email:
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+Scroll to the bottom.
+
+On Thu, Jul 23, 2015 at 8:54 AM, Gaurav Chetal <chetal.gaurav at gmail.com>
+wrote:
+
+>
+>
+> --
+>
+> Gaurav Chetal
+> PhD Research Scholar , School of Basic Sciences
+> Academic Block ,
+> Indian Institute of Technology Mandi
+> Mandi , H.P.-175001
+>
+> Cell- +91-8894873344
+>
+>
+>
+> ?I don't have dreams.I have Goals.?
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150723/2c83bbe5/attachment.html>
+
+From my.r.help at gmail.com  Thu Jul 23 16:30:21 2015
+From: my.r.help at gmail.com (Michael Smith)
+Date: Thu, 23 Jul 2015 22:30:21 +0800
+Subject: [datatable-help] Bug When Using data.table with lubridate?
+Message-ID: <55B0FA7D.7000400@gmail.com>
+
+
+I get the following subsetting error with the dev version of data.table. 
+The problem occurs when a column contains a time interval object from 
+lubridate.
+
+library("lubridate")
+library("data.table")
+Sys.setenv(TZ = "GMT")
+d <- seq(Sys.Date() - 88, Sys.Date() - 8, "month")
+DT <- data.table(start = d, end = d + 8)
+DT[, itvl := interval(start, end)]
+DT[1]
+
+Error in `rownames<-`(`*tmp*`, value = paste(format(rn, right = TRUE),  :
+   length of 'dimnames' [1] not equal to array extent
+
+
+
+Is there any way to get around this, or is this a bug?
+
+Thanks,
+
+M
+
+From mattjdowle at gmail.com  Thu Jul 23 16:44:40 2015
+From: mattjdowle at gmail.com (Matt Dowle)
+Date: Thu, 23 Jul 2015 07:44:40 -0700
+Subject: [datatable-help] Any date for 1.9.6 push to CRAN?
+In-Reply-To: <FC68AD47-F30E-4FC4-B3D6-90321CB30D4F@nciea.org>
+References: <FC68AD47-F30E-4FC4-B3D6-90321CB30D4F@nciea.org>
+Message-ID: <CAOuOy3fC4HwgMqutPiTLMZXAoLSiNu+pzx_4x3CPiUu+P-4CJA@mail.gmail.com>
+
+Hi Damian,
+valgrind is reporting 3 issues and there's a https:// issue in the
+vignette when run on win-builder.  But all cran + bioconductor
+packages downstream are checked ok and we're passing big endian as
+emulated thanks to qemu so we can be sure to pass solaris sparc.
+Hard to give an eta.
+Matt
+
+
+On Wed, Jul 22, 2015 at 3:10 AM, Damian Betebenner
+<DBetebenner at nciea.org> wrote:
+> Hi all,
+>
+> It was mentioned recently that 1.9.6 would be pushed to CRAN soon. Any rough dates when that might occur?
+>
+> Alway appreciative for the great work!
+>
+> Damian
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From statquant at outlook.com  Thu Jul 23 20:34:01 2015
+From: statquant at outlook.com (statquant3)
+Date: Thu, 23 Jul 2015 11:34:01 -0700 (PDT)
+Subject: [datatable-help] create empty data.table
+In-Reply-To: <CAJd-hdnU+rSqCVZn7PmACeM04+3s-gJRY8LT7UsqHNKhZEGPWA@mail.gmail.com>
+References: <1437645074911-4710237.post@n4.nabble.com>
+ <CAJd-hdnU+rSqCVZn7PmACeM04+3s-gJRY8LT7UsqHNKhZEGPWA@mail.gmail.com>
+Message-ID: <1437676441310-4710261.post@n4.nabble.com>
+
+Doing DT <- data.table(date=Sys.Date()[0],id=character(0),value=numeric(0))
+is exactly what I want to do... programatically.
+I just want to provide column names and type of columns...
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/create-empty-data-table-tp4710237p4710261.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From fperickson at wisc.edu  Thu Jul 23 20:37:58 2015
+From: fperickson at wisc.edu (Frank Erickson)
+Date: Thu, 23 Jul 2015 14:37:58 -0400
+Subject: [datatable-help] create empty data.table
+In-Reply-To: <1437676441310-4710261.post@n4.nabble.com>
+References: <1437645074911-4710237.post@n4.nabble.com>
+ <CAJd-hdnU+rSqCVZn7PmACeM04+3s-gJRY8LT7UsqHNKhZEGPWA@mail.gmail.com>
+ <1437676441310-4710261.post@n4.nabble.com>
+Message-ID: <CAJd-hdnUF3E4kZZMAWZEoO-eJR-ac+=Wv-525hC1-08=iXKSwA@mail.gmail.com>
+
+I think you know how to make a wrapper. Consider something like
+
+setDT(setnames(lapply(coltypes,function(x){ if (x=="char")
+return(character(0)); if (x=="numeric") return(numeric(0))}),colnames))
+
+On Thu, Jul 23, 2015 at 2:34 PM, statquant3 <statquant at outlook.com> wrote:
+
+> Doing DT <- data.table(date=Sys.Date()[0],id=character(0),value=numeric(0))
+> is exactly what I want to do... programatically.
+> I just want to provide column names and type of columns...
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/create-empty-data-table-tp4710237p4710261.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150723/2397b48b/attachment.html>
+
+From statquant at outlook.com  Thu Jul 23 21:01:00 2015
+From: statquant at outlook.com (statquant3)
+Date: Thu, 23 Jul 2015 12:01:00 -0700 (PDT)
+Subject: [datatable-help] create empty data.table
+In-Reply-To: <CAJd-hdnUF3E4kZZMAWZEoO-eJR-ac+=Wv-525hC1-08=iXKSwA@mail.gmail.com>
+References: <1437645074911-4710237.post@n4.nabble.com>
+ <CAJd-hdnU+rSqCVZn7PmACeM04+3s-gJRY8LT7UsqHNKhZEGPWA@mail.gmail.com>
+ <1437676441310-4710261.post@n4.nabble.com>
+ <CAJd-hdnUF3E4kZZMAWZEoO-eJR-ac+=Wv-525hC1-08=iXKSwA@mail.gmail.com>
+Message-ID: <1437678060851-4710263.post@n4.nabble.com>
+
+My convoluted way
+
+#@usage: create empty vector
+newVec <- function(char){
+	if(char=='D') return(as.Date(integer(0)))
+	if(char=='N') return(numeric(0))
+	if(char=='C') return(character(0))
+	if(char=='I') return(integer(0))
+	return(numeric(0))
+}
+
+#@usage: create empty data.table with given types
+#@example: 
+#	colNames <- c('col1','col2','col3'); colTypes <- 'DNC'; DT <-
+emptyDT(colNames,colTypes)
+emptyDT <- function(colNames,colTypes){
+	DT <- data.table(X=newVec(substr(colTypes,1L,1L)))
+	setnames(DT,'X',colNames[1L])
+	N <- length(colNames)
+	if(N>1){
+		for(i in 2:N){
+			DT[,X:=newVec(substr(colTypes,i,i))]
+			setnames(DT,'X',colNames[i])
+		}
+	}
+	return(DT)
+}
+
+R) colNames <- c('col1','col2','col3'); colTypes <- 'DNC'; DT <-
+emptyDT(colNames,colTypes)
+R) str(DT)
+Classes 'data.table' and 'data.frame':  0 obs. of  3 variables:
+ $ col1:Class 'Date'  num(0) 
+ $ col2: num 
+ $ col3: chr 
+ - attr(*, ".internal.selfref")=<externalptr> 
+
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/create-empty-data-table-tp4710237p4710263.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From statquant at outlook.com  Thu Jul 23 21:13:32 2015
+From: statquant at outlook.com (statquant3)
+Date: Thu, 23 Jul 2015 12:13:32 -0700 (PDT)
+Subject: [datatable-help] What's the trick to paste several columns together
+	in one
+Message-ID: <1437678812967-4710266.post@n4.nabble.com>
+
+R) data.table(x=letters[1:5],y=rnorm(5),z=LETTERS[1:5])
+    x                     y  z
+1: a  0.5551301186 A
+2: b  0.1092535710 B
+3: c -2.4319115661 C
+4: d  1.6915588561 D
+5: e -1.5163715976 E
+
+colNames = c('y','z')
+newName = 't'
+
+How do I add a column 't' such that t:=paste(y,x,sep='_')
+
+    x                     y  z t
+1: a  0.5551301186 A 0.5551301186_A
+2: b  0.1092535710 B 0.1092535710_B
+3: c -2.4319115661 C ...
+4: d  1.6915588561 D ...
+5: e -1.5163715976 E ...
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/What-s-the-trick-to-paste-several-columns-together-in-one-tp4710266.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From fperickson at wisc.edu  Thu Jul 23 21:19:18 2015
+From: fperickson at wisc.edu (Frank Erickson)
+Date: Thu, 23 Jul 2015 15:19:18 -0400
+Subject: [datatable-help] What's the trick to paste several columns
+ together in one
+In-Reply-To: <1437678812967-4710266.post@n4.nabble.com>
+References: <1437678812967-4710266.post@n4.nabble.com>
+Message-ID: <CAJd-hdmYwgK0Pvv6tO6UWoW27vTeestK62JqzSd+FfKC=ziOYg@mail.gmail.com>
+
+I think you want
+
+DT[,(newName):=do.call(paste,c(list(sep="_"),.SD)),.SDcols=colNames]
+
+This is probably the sort of thing that would come naturally after studying
+all the vignettes and such on the site:
+https://github.com/Rdatatable/data.table/wiki/Getting-started Dunno that
+you want to be sending so much stuff to everyone on a mailing list. Your
+call, though.
+
+--Frank
+
+On Thu, Jul 23, 2015 at 3:13 PM, statquant3 <statquant at outlook.com> wrote:
+
+> R) data.table(x=letters[1:5],y=rnorm(5),z=LETTERS[1:5])
+>     x                     y  z
+> 1: a  0.5551301186 A
+> 2: b  0.1092535710 B
+> 3: c -2.4319115661 C
+> 4: d  1.6915588561 D
+> 5: e -1.5163715976 E
+>
+> colNames = c('y','z')
+> newName = 't'
+>
+> How do I add a column 't' such that t:=paste(y,x,sep='_')
+>
+>     x                     y  z t
+> 1: a  0.5551301186 A 0.5551301186_A
+> 2: b  0.1092535710 B 0.1092535710_B
+> 3: c -2.4319115661 C ...
+> 4: d  1.6915588561 D ...
+> 5: e -1.5163715976 E ...
+>
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/What-s-the-trick-to-paste-several-columns-together-in-one-tp4710266.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150723/43f9aeb8/attachment.html>
+
+From eduard.antonyan at gmail.com  Thu Jul 23 21:32:30 2015
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Thu, 23 Jul 2015 14:32:30 -0500
+Subject: [datatable-help] create empty data.table
+In-Reply-To: <1437678060851-4710263.post@n4.nabble.com>
+References: <1437645074911-4710237.post@n4.nabble.com>
+ <CAJd-hdnU+rSqCVZn7PmACeM04+3s-gJRY8LT7UsqHNKhZEGPWA@mail.gmail.com>
+ <1437676441310-4710261.post@n4.nabble.com>
+ <CAJd-hdnUF3E4kZZMAWZEoO-eJR-ac+=Wv-525hC1-08=iXKSwA@mail.gmail.com>
+ <1437678060851-4710263.post@n4.nabble.com>
+Message-ID: <CAHZcBOr9O0EAaR0RFgC2=8y8CDRmW3EnwCBKK7T1963OiqqHMw@mail.gmail.com>
+
+Perhaps smth like this:
+
+nameToClass = data.table(name = c('Date', 'Numeric', 'Character'), class =
+list(Sys.Date()[0], numeric(0), character(0)), key = 'name')
+
+emptyDT = function(names, types) nameToClass[types,
+setnames(as.data.table(class), names)]
+
+On Thu, Jul 23, 2015 at 2:01 PM, statquant3 <statquant at outlook.com> wrote:
+
+> My convoluted way
+>
+> #@usage: create empty vector
+> newVec <- function(char){
+>         if(char=='D') return(as.Date(integer(0)))
+>         if(char=='N') return(numeric(0))
+>         if(char=='C') return(character(0))
+>         if(char=='I') return(integer(0))
+>         return(numeric(0))
+> }
+>
+> #@usage: create empty data.table with given types
+> #@example:
+> #       colNames <- c('col1','col2','col3'); colTypes <- 'DNC'; DT <-
+> emptyDT(colNames,colTypes)
+> emptyDT <- function(colNames,colTypes){
+>         DT <- data.table(X=newVec(substr(colTypes,1L,1L)))
+>         setnames(DT,'X',colNames[1L])
+>         N <- length(colNames)
+>         if(N>1){
+>                 for(i in 2:N){
+>                         DT[,X:=newVec(substr(colTypes,i,i))]
+>                         setnames(DT,'X',colNames[i])
+>                 }
+>         }
+>         return(DT)
+> }
+>
+> R) colNames <- c('col1','col2','col3'); colTypes <- 'DNC'; DT <-
+> emptyDT(colNames,colTypes)
+> R) str(DT)
+> Classes 'data.table' and 'data.frame':  0 obs. of  3 variables:
+>  $ col1:Class 'Date'  num(0)
+>  $ col2: num
+>  $ col3: chr
+>  - attr(*, ".internal.selfref")=<externalptr>
+>
+>
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/create-empty-data-table-tp4710237p4710263.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150723/1b2b3679/attachment-0001.html>
+
+From eduard.antonyan at gmail.com  Thu Jul 23 21:34:47 2015
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Thu, 23 Jul 2015 14:34:47 -0500
+Subject: [datatable-help] What's the trick to paste several columns
+ together in one
+In-Reply-To: <CAJd-hdmYwgK0Pvv6tO6UWoW27vTeestK62JqzSd+FfKC=ziOYg@mail.gmail.com>
+References: <1437678812967-4710266.post@n4.nabble.com>
+ <CAJd-hdmYwgK0Pvv6tO6UWoW27vTeestK62JqzSd+FfKC=ziOYg@mail.gmail.com>
+Message-ID: <CAHZcBOqHy=ydPPWV4ABk3S0_dNSHnBJV_wvWutWf=zGa3j9oZw@mail.gmail.com>
+
+Agreed, SO is much more suited for this and previous questions.
+
+On Thu, Jul 23, 2015 at 2:19 PM, Frank Erickson <fperickson at wisc.edu> wrote:
+
+> I think you want
+>
+> DT[,(newName):=do.call(paste,c(list(sep="_"),.SD)),.SDcols=colNames]
+>
+> This is probably the sort of thing that would come naturally after
+> studying all the vignettes and such on the site:
+> https://github.com/Rdatatable/data.table/wiki/Getting-started Dunno that
+> you want to be sending so much stuff to everyone on a mailing list. Your
+> call, though.
+>
+> --Frank
+>
+> On Thu, Jul 23, 2015 at 3:13 PM, statquant3 <statquant at outlook.com> wrote:
+>
+>> R) data.table(x=letters[1:5],y=rnorm(5),z=LETTERS[1:5])
+>>     x                     y  z
+>> 1: a  0.5551301186 A
+>> 2: b  0.1092535710 B
+>> 3: c -2.4319115661 C
+>> 4: d  1.6915588561 D
+>> 5: e -1.5163715976 E
+>>
+>> colNames = c('y','z')
+>> newName = 't'
+>>
+>> How do I add a column 't' such that t:=paste(y,x,sep='_')
+>>
+>>     x                     y  z t
+>> 1: a  0.5551301186 A 0.5551301186_A
+>> 2: b  0.1092535710 B 0.1092535710_B
+>> 3: c -2.4319115661 C ...
+>> 4: d  1.6915588561 D ...
+>> 5: e -1.5163715976 E ...
+>>
+>>
+>>
+>>
+>> --
+>> View this message in context:
+>> http://r.789695.n4.nabble.com/What-s-the-trick-to-paste-several-columns-together-in-one-tp4710266.html
+>> Sent from the datatable-help mailing list archive at Nabble.com.
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20150723/aa5bf7a2/attachment.html>
+
+From statquant at outlook.com  Thu Jul 23 23:05:46 2015
+From: statquant at outlook.com (statquant3)
+Date: Thu, 23 Jul 2015 14:05:46 -0700 (PDT)
+Subject: [datatable-help] What's the trick to paste several columns
+	together in one
+In-Reply-To: <CAJd-hdmYwgK0Pvv6tO6UWoW27vTeestK62JqzSd+FfKC=ziOYg@mail.gmail.com>
+References: <1437678812967-4710266.post@n4.nabble.com>
+ <CAJd-hdmYwgK0Pvv6tO6UWoW27vTeestK62JqzSd+FfKC=ziOYg@mail.gmail.com>
+Message-ID: <1437685546697-4710280.post@n4.nabble.com>
+
+Hello,
+the data.table syntax was not the issue. do.call was :), there is no mention
+of this kind of row-oriented operations in the vignettes btw.
+About posting, we do not have access to SO anymore so I'll keep posting on
+the list.
+When you said "so much stuff" were you refering to the number of posts ?
+
+Cheers
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/What-s-the-trick-to-paste-several-columns-together-in-one-tp4710266p4710280.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From statquant at outlook.com  Thu Jul 23 23:10:39 2015
+From: statquant at outlook.com (statquant3)
+Date: Thu, 23 Jul 2015 14:10:39 -0700 (PDT)
+Subject: [datatable-help] create empty data.table
+In-Reply-To: <CAHZcBOr9O0EAaR0RFgC2=8y8CDRmW3EnwCBKK7T1963OiqqHMw@mail.gmail.com>
+References: <1437645074911-4710237.post@n4.nabble.com>
+ <CAJd-hdnU+rSqCVZn7PmACeM04+3s-gJRY8LT7UsqHNKhZEGPWA@mail.gmail.com>
+ <1437676441310-4710261.post@n4.nabble.com>
+ <CAJd-hdnUF3E4kZZMAWZEoO-eJR-ac+=Wv-525hC1-08=iXKSwA@mail.gmail.com>
+ <1437678060851-4710263.post@n4.nabble.com>
+ <CAHZcBOr9O0EAaR0RFgC2=8y8CDRmW3EnwCBKK7T1963OiqqHMw@mail.gmail.com>
+Message-ID: <1437685839888-4710281.post@n4.nabble.com>
+
+Much more elegant yes !
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/create-empty-data-table-tp4710237p4710281.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+

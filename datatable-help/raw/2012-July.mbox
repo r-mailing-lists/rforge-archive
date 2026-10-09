@@ -1,0 +1,1357 @@
+From viviannevilar at gmail.com  Mon Jul  2 19:35:06 2012
+From: viviannevilar at gmail.com (Vivianne Vilar)
+Date: Mon, 2 Jul 2012 13:35:06 -0400
+Subject: [datatable-help] No error message when trying to use a column which
+	doesn't exist
+In-Reply-To: <CAAUD0PQqtvfyrMxy7wictLb=B0GtsFZ05GCMxdpRMyT3a1UfoQ@mail.gmail.com>
+References: <CAAUD0PQqtvfyrMxy7wictLb=B0GtsFZ05GCMxdpRMyT3a1UfoQ@mail.gmail.com>
+Message-ID: <CAAUD0PReqpyDRKtyCYgjGWwNmuKho0z1ALBY0Aeh+6Q4MbBkCg@mail.gmail.com>
+
+Hi there,
+
+I have just installed the new version of data.table and used the "fresh"
+function combining *:= in j *with *by*, and I am very happy with it. So
+first I want to thank the maintainers/developers for the library and the
+new function.
+
+The main reason for my email, though, is the following: I had a variable
+called results62. I created a column of NAs called LAGMKTCAP and
+subsequently tried to change the values of this column using
+
+results62[,LAGMKTCAP :=
+results62$MKTCAP[match(results62$PM,results62$TM)],by=PERMNO]
+
+without having created the column TM beforehand. I received the output from
+R of the head and tail of my object results62, as expected, but the column
+LAGMKTCAP hadn't been changed. Only later did I realise I had forgotten to
+create the column TM.
+
+Wouldn't it be desirable to return an error when trying to use a column of
+the data.table object which doesn't yet exist? Is this normal behaviour or
+a bug?
+
+
+
+Vivianne
+----------------------------------------------
+?Don't worry about the world coming to an end today. It is already tomorrow
+in Australia.?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120702/edd6224f/attachment.html>
+
+From mdowle at mdowle.plus.com  Mon Jul  2 22:54:39 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 2 Jul 2012 21:54:39 +0100
+Subject: [datatable-help] No error message when trying to use a column
+ which doesn't exist
+In-Reply-To: <CAAUD0PReqpyDRKtyCYgjGWwNmuKho0z1ALBY0Aeh+6Q4MbBkCg@mail.gmail.com>
+References: <CAAUD0PQqtvfyrMxy7wictLb=B0GtsFZ05GCMxdpRMyT3a1UfoQ@mail.gmail.com>
+ <CAAUD0PReqpyDRKtyCYgjGWwNmuKho0z1ALBY0Aeh+6Q4MbBkCg@mail.gmail.com>
+Message-ID: <ef30cd99a37e27ac659404f09247c9ed.squirrel@webmail.plus.net>
+
+> Hi there,
+>
+> I have just installed the new version of data.table and used the "fresh"
+> function combining *:= in j *with *by*, and I am very happy with it. So
+> first I want to thank the maintainers/developers for the library and the
+> new function.
+
+Great, nice to hear. Welcome to the list.
+
+> The main reason for my email, though, is the following: I had a variable
+> called results62. I created a column of NAs called LAGMKTCAP and
+> subsequently tried to change the values of this column using
+>
+> results62[,LAGMKTCAP :=
+> results62$MKTCAP[match(results62$PM,results62$TM)],by=PERMNO]
+
+You don't need the 3 repeats of "results62$". Just :
+
+results62[,LAGMKTCAP:=MKTCAP[match(PM,TM)],by=PERMNO]
+
+That's why j is evaluated within the frame of DT, so you don't have to use
+$.  However it's probably better to do that op using a setkey(PERMNO,date)
+and then joining with roll=TRUE with lag applied to date.
+
+> without having created the column TM beforehand. I received the output
+> from
+> R of the head and tail of my object results62, as expected, but the column
+> LAGMKTCAP hadn't been changed. Only later did I realise I had forgotten to
+> create the column TM.
+>
+> Wouldn't it be desirable to return an error when trying to use a column of
+> the data.table object which doesn't yet exist? Is this normal behaviour or
+> a bug?
+
+It's normal and good behaviour for base R's $. Using data.table as above
+will return an error if TM doesn't exist at all. If it isn't a column name
+but is in calling scope then it will find it there, though.
+
+There is a feature request to add an argument 'inherits=FALSE' to
+[.data.table.  That would allow more control. It would mean use column
+names and only columns and don't look in calling scope.
+
+HTH.
+
+>
+>
+>
+> Vivianne
+> ----------------------------------------------
+> ?Don't worry about the world coming to an end today. It is already
+> tomorrow
+> in Australia.?
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From PSTERKEN at its.jnj.com  Tue Jul 10 15:11:09 2012
+From: PSTERKEN at its.jnj.com (Sterkens, Patrick [JRDBE])
+Date: Tue, 10 Jul 2012 15:11:09 +0200
+Subject: [datatable-help] Extract/Subset a data.table with multiple indices
+Message-ID: <5502BDEB1F9D5A45989E13F64364D10F379C20@JNJBEBEGMS06.eu.jnj.com>
+
+R.experts,
+The following may be asked & answered but I was not able to find the
+answer. So here goes my first R-question.
+I am using data.table v1.8.1 to benefit from the :=  with by=.
+
+(stringAsFactors=F)
+
+Say I have 
+>DT=data.table(expand.grid(ID=c("ID1","ID2","ID3"),Tx=c("Ctl","Low","Med
+ium","High"),>Target=c("IS","G1","G2")))
+>setkey(DT, Target,Tx,ID)
+>set.seed(1)
+>DT[,value:=rnorm(36)]
+
+
+..and I want to subset the data.table with all "Ctl"  (i.e. from the
+second key Target) with a binary search.
+Doing this
+
+> DT["Ctl"] 
+
+Does not generate the  desired result, because it searches under the
+first key for "Ctl"
+
+  Target ID Tx value TX
+1:    Ctl NA NA    NA NA
+
+
+While vector search does
+> DT[Tx=="Ctl"]
+    ID  Tx Target      value
+1: ID1 Ctl     IS  0.6107264
+2: ID2 Ctl     IS -0.9340976
+3: ID3 Ctl     IS -1.2536334
+4: ID1 Ctl     G1  0.5939462
+5: ID2 Ctl     G1  0.3329504
+6: ID3 Ctl     G1  1.0630998
+7: ID1 Ctl     G2 -1.2765922
+8: ID2 Ctl     G2 -0.5732654
+9: ID3 Ctl     G2 -1.2246126
+
+Is it possible to do a binary search on one of the keas only ? if yes,
+how do you tell  data.table that ?
+
+Thanks
+Patrick
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120710/74c2e339/attachment.html>
+
+From mdowle at mdowle.plus.com  Tue Jul 10 15:32:48 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 10 Jul 2012 14:32:48 +0100
+Subject: [datatable-help] Extract/Subset a data.table with multiple
+ indices
+In-Reply-To: <5502BDEB1F9D5A45989E13F64364D10F379C20@JNJBEBEGMS06.eu.jnj.com>
+References: <5502BDEB1F9D5A45989E13F64364D10F379C20@JNJBEBEGMS06.eu.jnj.com>
+Message-ID: <61105f47effd6555712a9c9df5d969a7.squirrel@webmail.plus.net>
+
+Hi. Welcome to the list.
+
+Short answer is you can't, not yet. However, the buzz phrase to search for
+is "secondary key". That should bring up examples and discussions :
+   i) manual secondary key
+   ii) rekey using setkey
+   iii) store a copy with a different key
+   iv) merge()
+
+Building in secondary keys is FR#1007
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+
+HTH
+Matthew
+
+> R.experts,
+> The following may be asked & answered but I was not able to find the
+> answer. So here goes my first R-question.
+> I am using data.table v1.8.1 to benefit from the :=  with by=.
+>
+> (stringAsFactors=F)
+>
+> Say I have
+>>DT=data.table(expand.grid(ID=c("ID1","ID2","ID3"),Tx=c("Ctl","Low","Med
+> ium","High"),>Target=c("IS","G1","G2")))
+>>setkey(DT, Target,Tx,ID)
+>>set.seed(1)
+>>DT[,value:=rnorm(36)]
+>
+>
+> ..and I want to subset the data.table with all "Ctl"  (i.e. from the
+> second key Target) with a binary search.
+> Doing this
+>
+>> DT["Ctl"]
+>
+> Does not generate the  desired result, because it searches under the
+> first key for "Ctl"
+>
+>   Target ID Tx value TX
+> 1:    Ctl NA NA    NA NA
+>
+>
+> While vector search does
+>> DT[Tx=="Ctl"]
+>     ID  Tx Target      value
+> 1: ID1 Ctl     IS  0.6107264
+> 2: ID2 Ctl     IS -0.9340976
+> 3: ID3 Ctl     IS -1.2536334
+> 4: ID1 Ctl     G1  0.5939462
+> 5: ID2 Ctl     G1  0.3329504
+> 6: ID3 Ctl     G1  1.0630998
+> 7: ID1 Ctl     G2 -1.2765922
+> 8: ID2 Ctl     G2 -0.5732654
+> 9: ID3 Ctl     G2 -1.2246126
+>
+> Is it possible to do a binary search on one of the keas only ? if yes,
+> how do you tell  data.table that ?
+>
+> Thanks
+> Patrick
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From ripley at stats.ox.ac.uk  Thu Jul 12 09:52:59 2012
+From: ripley at stats.ox.ac.uk (Prof Brian Ripley)
+Date: Thu, 12 Jul 2012 08:52:59 +0100
+Subject: [datatable-help] data.table 1.8.2 now in incoming
+In-Reply-To: <f694c7178466771a137263fa18dda6de.squirrel@webmail.plus.net>
+References: <f694c7178466771a137263fa18dda6de.squirrel@webmail.plus.net>
+Message-ID: <4FFE825B.8060304@stats.ox.ac.uk>
+
+On 12/07/2012 02:51, Matthew Dowle wrote:
+>
+> Hi,
+>
+> This is quite a big release: 11 new feaures, 26 bug fixes, over 700 unit
+> tests.  It's been on R-Forge in beta for a while and that has caught 7
+> bugs before release to CRAN.  So, hopefully, this should be clean.
+>
+> It's just passed winbuilder (R-devel), and also passes on my build of
+> latest R-devel rev 59733 with --as-cran on 64bit Linux.
+>
+> All LENGTH= and TRUELENGTH= have been changed to SETLENGTH() and
+> SET_TRUELENGTH() as per Prof Ripley's notification.
+>
+> Thanks as always,
+> Matthew
+>
+
+You are not submitting from the maintainer address,
+
+Maintainer: ?M Dowle <datatable-help at lists.r-forge.r-project.org>?
+
+As per the CRAN policies, we need confirmation from that address (and 
+far too often recently the address in a submitted package has not 
+worked).  Please also follow
+
+'using the subject line `CRAN submission PACKAGE VERSION', where PACKAGE 
+and VERSION are the package name and version, respectively.'
+
+since we do filter on the subject line.
+
+-- 
+Brian D. Ripley,                  ripley at stats.ox.ac.uk
+Professor of Applied Statistics,  http://www.stats.ox.ac.uk/~ripley/
+University of Oxford,             Tel:  +44 1865 272861 (self)
+1 South Parks Road,                     +44 1865 272866 (PA)
+Oxford OX1 3TG, UK                Fax:  +44 1865 272595
+
+
+
+From mdowle at mdowle.plus.com  Mon Jul 16 10:06:03 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 16 Jul 2012 09:06:03 +0100
+Subject: [datatable-help] packages data.table and treemap, tabplot
+In-Reply-To: <500294B6.9020302@R-Project.org>
+References: <500294B6.9020302@R-Project.org>
+Message-ID: <04886a27b8ef42deca8a19ddc3a58144.squirrel@webmail.plus.net>
+
+
+Uwe, CRAN maintainers and Martijn,
+cc datatable-help
+
+Sincere apologies. I had checked dependent packages but not before some
+last minute changes. I should know better to recheck.
+
+In addition to treemap and tabplot now failing, it's failing on Mac too.
+Likely due to new tests with non-ascii characters. I had anticipated
+encoding issues and coded for that, though. I tested on Linux, winbuilder
+for Windows, and it passes checks on Mac on R-Forge. So will need to
+investigate why encoding doesn't pass Mac on CRAN.
+
+I'll endeavour to subsmit v1.8.3 tonight or tomorrow.
+
+Apologies again,
+Matthew
+
+> Dear package maintainers of data.table and treemap, tabplot,
+>
+> probably due to yesterday's data.table update on CRAN, we see treemap
+> and tabplot failing now, this will shortly be reported on
+>
+> http://cran.r-project.org/web/checks/check_results_treemap.html
+> http://cran.r-project.org/web/checks/check_results_tabplot.html
+>
+> Can you please negotiate further actions and fix the problem. Please
+> upload fixed version(s) of the package(s) with increased version
+> number(s) to CRAN in the usual way and report to cran at R-project.org.
+>
+> In principle, according to CRAN policies, we have to revert the
+> data.table update, since it is the maintainer's responsibility to check
+> an update breaks other packages.
+> We will revert if we do not get a response to this message within 24
+> hours from now.
+>
+>
+> For now, the relevant part of the logfiles are, for treemap:
+>
+> * checking examples ...
+> ** running examples for arch 'i386' ... ERROR
+> Running examples in 'treemap-Ex.R' failed
+> The error most likely occurred in:
+>
+>  > ### Name: tmPlot
+>  > ### Title: Create treemap
+>  > ### Aliases: tmPlot
+>  >
+>  > ### ** Examples
+>  >
+>  > #########################################
+>  > ### quick example
+>  > ###
+>  > ### data: Gross national income data
+>  > #########################################
+>  >
+>  > # load Gross national income data
+>  > data(GNI2010)
+>  >
+>  > # create treemap
+>  > tmPlot(GNI2010,
+> +        index=c("continent", "iso3"),
+> +        vSize="population",
+> +        vColor="GNI",
+> +        type="value")
+>  >
+>  >
+>  >
+>  > #########################################
+>  > ### extended examples
+>  > ###
+>  > ### data: fictive structural business statistics data
+>  > #########################################
+>  >
+>  > ### load fictive structural business statistics data
+>  > data(sbsData)
+>  > sbsData$employees.growth <- sbsData$employees09 - sbsData$employees08
+>  >
+>  >
+>  > #########################################
+>  > ### types
+>  > #########################################
+>  >
+>  > # value treemap: the color variable is directly mapped to the colors
+>  > tmPlot(sbsData,
+> +        index=c("section", "subsection"),
+> +        vSize="employees09",
+> +        vColor="employees.growth",
+> +        type="value")
+> Error in rbindlist(allargs) :
+>    Column 1 of item 2 is type 'integer', inconsistent with column 1 of
+> item 1's type ('double')
+> Calls: tmPlot ... baseTreemap -> rbind -> rbind -> .rbind.data.table ->
+> rbindlist
+> Execution halted
+>
+>
+>
+>
+> for tabplot:
+>
+> ** running examples for arch 'i386' ... ERROR
+> Running examples in 'tabplot-Ex.R' failed
+> The error most likely occurred in:
+>
+>  > ### Name: tableChange
+>  > ### Title: Change a tabplot-object
+>  > ### Aliases: tableChange
+>  >
+>  > ### ** Examples
+>  >
+>  > # load diamonds dataset from ggplot2
+>  > require(ggplot2)
+> Loading required package: ggplot2
+>  > data(diamonds)
+>  >
+>  > # assign tableplot as tabplot object
+>  > tab <- tableplot(diamonds, plot=FALSE)
+> Error in tabulate(get(col), nbins = nlev) :
+>    'bin' must be numeric or a factor
+> Calls: tableplot ... getFreqTable_DT -> matrix -> [ -> [.data.table ->
+> tabulate
+> Execution halted
+>
+>
+>
+> Best wishes,
+> Uwe Ligges
+>
+
+
+
+From PSTERKEN at its.jnj.com  Mon Jul 16 10:44:39 2012
+From: PSTERKEN at its.jnj.com (Sterkens, Patrick [JRDBE])
+Date: Mon, 16 Jul 2012 10:44:39 +0200
+Subject: [datatable-help] Normalize/average with grouping
+Message-ID: <5502BDEB1F9D5A45989E13F64364D10F3B3F28@JNJBEBEGMS06.eu.jnj.com>
+
+Hi,
+Data.table has been most helpful in the preparation of my data set thus
+far; now I am just looking for an elegant way to do the last step.
+Say I have 3 endpoints and 4 treatments:
+
+DT=data.table(expand.grid(Tx=c("Ctl","Low","Medium","High"),EP=c("EP1","
+EP2","EP3")))
+set.seed(1)
+DT[,value:=rnorm(12,mean=20,sd=5)]
+
+
+I want to normalize the Tx (Low, Medium, High) w.r.t. the Ctl value in
+each of the endpoints EP, and subsequently average the normalized values
+across EP for the Tx.
+My current approach is 
+
+setkey(DT,EP)
+DT[,nvalue:=value/value[Tx=='Ctl'],by=EP]
+setkey(DT,Tx)
+DT[,mean(nvalue),by=Tx]
+
+1:    Ctl 1.0000000
+2:    Low 0.9273154
+3: Medium 1.0596754
+4:   High 1.2374553
+
+Is it possible to normalize and average in one go, even if the grouping
+differs for each of the functions ?
+Thanks
+Patrick
+
+From mdowle at mdowle.plus.com  Mon Jul 16 10:48:03 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 16 Jul 2012 09:48:03 +0100
+Subject: [datatable-help] packages data.table and treemap,
+	tabplot and SGP
+In-Reply-To: <5003CD87.4080305@stats.ox.ac.uk>
+References: <500294B6.9020302@R-Project.org>
+ <04886a27b8ef42deca8a19ddc3a58144.squirrel@webmail.plus.net>
+ <5003CD87.4080305@stats.ox.ac.uk>
+Message-ID: <8ad49077b7d2378a7c1741db939703ba.squirrel@webmail.plus.net>
+
+> On 16/07/2012 09:06, Matthew Dowle wrote:
+>>
+>> Uwe, CRAN maintainers and Martijn,
+>> cc datatable-help
+>>
+>> Sincere apologies. I had checked dependent packages but not before some
+>> last minute changes. I should know better to recheck.
+>>
+>> In addition to treemap and tabplot now failing, it's failing on Mac too.
+>> Likely due to new tests with non-ascii characters. I had anticipated
+>> encoding issues and coded for that, though. I tested on Linux,
+>> winbuilder
+>> for Windows, and it passes checks on Mac on R-Forge. So will need to
+>> investigate why encoding doesn't pass Mac on CRAN.
+
+Brian Ripley wrote :
+
+> It's not Mac, it is that the CRAN Mac checks are done in the C locale
+> for some reason best known to Simon Urbanek.  So you need to check the
+> locale before running the tests.
+
+Ok, thank you. Will do.
+
+>
+> Also, please check SGP, which now gives
+>
+> * checking R code for possible problems ... NOTE
+> abcSGP: no visible global function definition for ?J?
+> ... many more of the same.
+
+That was the main thing I checked dependent packages for. I am sure SGP
+passed when I ran it. I really don't know what happened here.  Honestly I
+ran R CMD check on SGP and it passed fine. I wonder if J() was being
+defined separately in my environment, somehow. R CMD check runs under
+--vanilla, so that can't be it.  Unless ... when I ran the dependent
+package checks maybe I hadn't actually R CMD INSTALL'd the very latest
+version of data.table. Or had reverted to a previous version to test
+something and had forgotten to install again.  Oh no ... I bet that was
+it.
+
+I think I can still get a fix for this too, tonight. Will have to keep J
+defined and allow longer to deprecate it. There is a detailed NEWS item
+about it, and advance warning to datatable-help, but I mistakenly believed
+dependent packages didn't use it outside DT[].
+
+For clarity ... no dependent packages should need to change. It's all
+data.table's fault. Will submit 1.8.3 asap.
+
+Matthew
+
+
+>>
+>> I'll endeavour to subsmit v1.8.3 tonight or tomorrow.
+>>
+>> Apologies again,
+>> Matthew
+>>
+>>> Dear package maintainers of data.table and treemap, tabplot,
+>>>
+>>> probably due to yesterday's data.table update on CRAN, we see treemap
+>>> and tabplot failing now, this will shortly be reported on
+>>>
+>>> http://cran.r-project.org/web/checks/check_results_treemap.html
+>>> http://cran.r-project.org/web/checks/check_results_tabplot.html
+>>>
+>>> Can you please negotiate further actions and fix the problem. Please
+>>> upload fixed version(s) of the package(s) with increased version
+>>> number(s) to CRAN in the usual way and report to cran at R-project.org.
+>>>
+>>> In principle, according to CRAN policies, we have to revert the
+>>> data.table update, since it is the maintainer's responsibility to check
+>>> an update breaks other packages.
+>>> We will revert if we do not get a response to this message within 24
+>>> hours from now.
+>>>
+>>>
+>>> For now, the relevant part of the logfiles are, for treemap:
+>>>
+>>> * checking examples ...
+>>> ** running examples for arch 'i386' ... ERROR
+>>> Running examples in 'treemap-Ex.R' failed
+>>> The error most likely occurred in:
+>>>
+>>>   > ### Name: tmPlot
+>>>   > ### Title: Create treemap
+>>>   > ### Aliases: tmPlot
+>>>   >
+>>>   > ### ** Examples
+>>>   >
+>>>   > #########################################
+>>>   > ### quick example
+>>>   > ###
+>>>   > ### data: Gross national income data
+>>>   > #########################################
+>>>   >
+>>>   > # load Gross national income data
+>>>   > data(GNI2010)
+>>>   >
+>>>   > # create treemap
+>>>   > tmPlot(GNI2010,
+>>> +        index=c("continent", "iso3"),
+>>> +        vSize="population",
+>>> +        vColor="GNI",
+>>> +        type="value")
+>>>   >
+>>>   >
+>>>   >
+>>>   > #########################################
+>>>   > ### extended examples
+>>>   > ###
+>>>   > ### data: fictive structural business statistics data
+>>>   > #########################################
+>>>   >
+>>>   > ### load fictive structural business statistics data
+>>>   > data(sbsData)
+>>>   > sbsData$employees.growth <- sbsData$employees09 -
+>>> sbsData$employees08
+>>>   >
+>>>   >
+>>>   > #########################################
+>>>   > ### types
+>>>   > #########################################
+>>>   >
+>>>   > # value treemap: the color variable is directly mapped to the
+>>> colors
+>>>   > tmPlot(sbsData,
+>>> +        index=c("section", "subsection"),
+>>> +        vSize="employees09",
+>>> +        vColor="employees.growth",
+>>> +        type="value")
+>>> Error in rbindlist(allargs) :
+>>>     Column 1 of item 2 is type 'integer', inconsistent with column 1 of
+>>> item 1's type ('double')
+>>> Calls: tmPlot ... baseTreemap -> rbind -> rbind -> .rbind.data.table ->
+>>> rbindlist
+>>> Execution halted
+>>>
+>>>
+>>>
+>>>
+>>> for tabplot:
+>>>
+>>> ** running examples for arch 'i386' ... ERROR
+>>> Running examples in 'tabplot-Ex.R' failed
+>>> The error most likely occurred in:
+>>>
+>>>   > ### Name: tableChange
+>>>   > ### Title: Change a tabplot-object
+>>>   > ### Aliases: tableChange
+>>>   >
+>>>   > ### ** Examples
+>>>   >
+>>>   > # load diamonds dataset from ggplot2
+>>>   > require(ggplot2)
+>>> Loading required package: ggplot2
+>>>   > data(diamonds)
+>>>   >
+>>>   > # assign tableplot as tabplot object
+>>>   > tab <- tableplot(diamonds, plot=FALSE)
+>>> Error in tabulate(get(col), nbins = nlev) :
+>>>     'bin' must be numeric or a factor
+>>> Calls: tableplot ... getFreqTable_DT -> matrix -> [ -> [.data.table ->
+>>> tabulate
+>>> Execution halted
+>>>
+>>>
+>>>
+>>> Best wishes,
+>>> Uwe Ligges
+>>>
+>>
+>>
+>
+>
+> --
+> Brian D. Ripley,                  ripley at stats.ox.ac.uk
+> Professor of Applied Statistics,  http://www.stats.ox.ac.uk/~ripley/
+> University of Oxford,             Tel:  +44 1865 272861 (self)
+> 1 South Parks Road,                     +44 1865 272866 (PA)
+> Oxford OX1 3TG, UK                Fax:  +44 1865 272595
+>
+>
+>
+
+
+
+From mdowle at mdowle.plus.com  Mon Jul 16 11:08:59 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 16 Jul 2012 10:08:59 +0100
+Subject: [datatable-help] Normalize/average with grouping
+In-Reply-To: <5502BDEB1F9D5A45989E13F64364D10F3B3F28@JNJBEBEGMS06.eu.jnj.com>
+References: <5502BDEB1F9D5A45989E13F64364D10F3B3F28@JNJBEBEGMS06.eu.jnj.com>
+Message-ID: <75ba509e8d715efc0a1c4ac40d9ff6d0.squirrel@webmail.plus.net>
+
+
+Hi,
+
+If the two groupings are different, it'll need two groupings. But you
+don't need the two setkeys so it can be one line instead of four :
+
+> DT[,nvalue:=value/value[Tx=='Ctl'],by=EP][,mean(nvalue),by=Tx]
+       Tx        V1
+1:    Ctl 1.0000000
+2:    Low 0.9273154
+3: Medium 1.0596754
+4:   High 1.2374553
+
+Thanks for the nice example btw (above is tested).
+
+Matthew
+
+> Hi,
+> Data.table has been most helpful in the preparation of my data set thus
+> far; now I am just looking for an elegant way to do the last step.
+> Say I have 3 endpoints and 4 treatments:
+>
+> DT=data.table(expand.grid(Tx=c("Ctl","Low","Medium","High"),EP=c("EP1","
+> EP2","EP3")))
+> set.seed(1)
+> DT[,value:=rnorm(12,mean=20,sd=5)]
+>
+>
+> I want to normalize the Tx (Low, Medium, High) w.r.t. the Ctl value in
+> each of the endpoints EP, and subsequently average the normalized values
+> across EP for the Tx.
+> My current approach is
+>
+> setkey(DT,EP)
+> DT[,nvalue:=value/value[Tx=='Ctl'],by=EP]
+> setkey(DT,Tx)
+> DT[,mean(nvalue),by=Tx]
+>
+> 1:    Ctl 1.0000000
+> 2:    Low 0.9273154
+> 3: Medium 1.0596754
+> 4:   High 1.2374553
+>
+> Is it possible to normalize and average in one go, even if the grouping
+> differs for each of the functions ?
+> Thanks
+> Patrick
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From mdowle at mdowle.plus.com  Wed Jul 18 19:26:14 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 18 Jul 2012 18:26:14 +0100
+Subject: [datatable-help] data.table 1.8.2 now on CRAN
+Message-ID: <059d2776471af4f941a1ff2ccc5b4c4d.squirrel@webmail.plus.net>
+
+
+All,
+
+data.table 1.8.1 was on R-Forge for a while with quite a few people
+upgrading to it. Thank you for all the reports and feedback. All known
+bugs have been cleared and released as 1.8.2 to CRAN. Even if you very
+recently upgraded to 1.8.1, please upgrade to 1.8.2 to receive last minute
+bug fixes.
+
+The NEWS is lengthy but please do go through it with fine toothcomb :
+
+https://r-forge.r-project.org/scm/viewvc.php/pkg/NEWS?view=markup&root=datatable
+
+CRAN checks are passing on Linux and Mac. Such is the maturity, automation
+and strain on CRAN that an estimate for the Windows binary build exists:
+for R release at 02:40am CEST 19 July, and oldrelease at 16:40.
+
+I am on holiday next week for 2 weeks. But if you have any problems you
+can always roll back to 1.8.0.
+
+Matthew
+
+http://datatable.r-forge.r-project.org/
+
+
+
+
+From mdowle at mdowle.plus.com  Wed Jul 18 23:13:14 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 18 Jul 2012 22:13:14 +0100
+Subject: [datatable-help] data.table 1.8.2 now on CRAN
+In-Reply-To: <059d2776471af4f941a1ff2ccc5b4c4d.squirrel@webmail.plus.net>
+References: <059d2776471af4f941a1ff2ccc5b4c4d.squirrel@webmail.plus.net>
+Message-ID: <5444ada9f128f0d70b64dbbe1086e87a.squirrel@webmail.plus.net>
+
+
+Due to some off list comments and questions :
+
+1. Although on CRAN, it may not have found its way to all mirrors yet. If
+you can't wait, check the CRAN mirror status page :
+
+    http://cran.r-project.org/mirmon_report.html
+
+For example if you're in Australia that currently shows cran.csiro.au as
+24 hours stale (iiuc) and which mirrors are more up to date.
+
+2. Don't (now) install from R-Forge. It's been in "building" state for
+over a day now due to upstream issues (I guess). Can't trust the tarball
+either from R-Forge (i.e. installing from source from R-Forge), stale. The
+*only* method that is always safe on R-Forge is an 'svn up' followed by R
+CMD build followed by R CMD INSTALL.
+
+3. We always get one or two bug reports just after release from
+installations where, somehow, it turns out the upgrade hasn't properly
+installed. This appears to be a (likely rare) R thing which I've never
+worked out. I suspect it's related to having older R sessions (possibly
+zombie) holding some sort of lock. If this is raised as a possibility,
+users have to date always reported that a reboot and re-install of
+data.table fixed it. I've never experienced this myself. But I'm careful
+to close down all R sessions, check with "ps aux | grep R", first, before
+upgrading. If you observe a failed upgrade and work out why, please let me
+know!
+
+4. If you're on Windows, the Windows binary hasn't been built on CRAN yet
+but the estimate is tomorrow. Only Linux and Mac versions are available
+from CRAN already.
+
+Anyway ... to check your installation that's why test.data.table() is
+provided for user use, and, why in the NOTES section of NEWS it is written
+how many tests that version has.
+
+To test your installation :
+
+require(data.table)
+test.data.table()
+... snip ...
+All 717 tests in test.data.table() completed ok in 54.099sec
+
+If it says 717, then you're 100% good.
+
+Matthew
+
+
+>
+> All,
+>
+> data.table 1.8.1 was on R-Forge for a while with quite a few people
+> upgrading to it. Thank you for all the reports and feedback. All known
+> bugs have been cleared and released as 1.8.2 to CRAN. Even if you very
+> recently upgraded to 1.8.1, please upgrade to 1.8.2 to receive last minute
+> bug fixes.
+>
+> The NEWS is lengthy but please do go through it with fine toothcomb :
+>
+> https://r-forge.r-project.org/scm/viewvc.php/pkg/NEWS?view=markup&root=datatable
+>
+> CRAN checks are passing on Linux and Mac. Such is the maturity, automation
+> and strain on CRAN that an estimate for the Windows binary build exists:
+> for R release at 02:40am CEST 19 July, and oldrelease at 16:40.
+>
+> I am on holiday next week for 2 weeks. But if you have any problems you
+> can always roll back to 1.8.0.
+>
+> Matthew
+>
+> http://datatable.r-forge.r-project.org/
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From karl at huftis.org  Thu Jul 19 10:00:54 2012
+From: karl at huftis.org (Karl Ove Hufthammer)
+Date: Thu, 19 Jul 2012 10:00:54 +0200
+Subject: [datatable-help] data.table 1.8.2 now on CRAN
+References: <059d2776471af4f941a1ff2ccc5b4c4d.squirrel@webmail.plus.net>
+ <5444ada9f128f0d70b64dbbe1086e87a.squirrel@webmail.plus.net>
+Message-ID: <ju8erm$5cm$1@dough.gmane.org>
+
+Matthew Dowle wrote:
+
+> To test your installation :
+> 
+> require(data.table)
+> test.data.table()
+> ... snip ...
+> All 717 tests in test.data.table() completed ok in 54.099sec
+> 
+> If it says 717, then you're 100% good.
+
+Note that test.data.table() won?t necessarily work properly under a 
+non-English locale, as some of the warnings or error messages may
+come out translated. On my (Norwegian Nynorsk) Windows system, 31 tests 
+failed. But if I start R from the command line by typing
+
+  SET LC_ALL=C
+  c:\Path-To-R...\Rgui.exe
+
+everything worked fine.
+
+-- 
+Karl Ove Hufthammer
+
+
+From mdowle at mdowle.plus.com  Thu Jul 19 10:34:33 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 19 Jul 2012 09:34:33 +0100
+Subject: [datatable-help] data.table 1.8.2 now on CRAN
+In-Reply-To: <ju8erm$5cm$1@dough.gmane.org>
+References: <059d2776471af4f941a1ff2ccc5b4c4d.squirrel@webmail.plus.net>
+ <5444ada9f128f0d70b64dbbe1086e87a.squirrel@webmail.plus.net>
+ <ju8erm$5cm$1@dough.gmane.org>
+Message-ID: <b314592b33fd9ca280e2e00465ce887c.squirrel@webmail.plus.net>
+
+> Matthew Dowle wrote:
+>
+>> To test your installation :
+>>
+>> require(data.table)
+>> test.data.table()
+>> ... snip ...
+>> All 717 tests in test.data.table() completed ok in 54.099sec
+>>
+>> If it says 717, then you're 100% good.
+>
+> Note that test.data.table() won???t necessarily work properly under a
+> non-English locale, as some of the warnings or error messages may
+> come out translated. On my (Norwegian Nynorsk) Windows system, 31 tests
+> failed. But if I start R from the command line by typing
+>
+>   SET LC_ALL=C
+>   c:\Path-To-R...\Rgui.exe
+>
+> everything worked fine.
+
+Never knew that before. Thanks for letting us know.
+
+Maybe test.data.table() can Sys.setlocale() to an English one for the
+duration of the tests, then, and then set it back to what it was. Now
+raised as FR#2156 :
+
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=2156&group_id=240&atid=978
+
+I raised something similar on r-devel about the new non ascii bug fix
+tests (thanks to your bug report) not working on CRAN's Mac due to its C
+locale, but didn't here back yet :
+
+https://stat.ethz.ch/pipermail/r-devel/2012-July/064419.html
+
+Those tests of non ascii characters (708-712) had to be removed (fully
+removed from the test file so it can be read and parsed, not just
+commented out) until I'm advised how that should be done.  CRAN's Mac is
+the only problem there. Those non-ascii tests work on all other CRAN
+machines and even on R-Forge's Mac.
+
+Matthew
+
+> --
+> Karl Ove Hufthammer
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From George.Kaupas at spansion.com  Wed Jul 25 23:03:26 2012
+From: George.Kaupas at spansion.com (Kaupas, George)
+Date: Wed, 25 Jul 2012 14:03:26 -0700
+Subject: [datatable-help] add a column specifying new column name via a
+	variable
+Message-ID: <4638FCC8C3C4D543B4C53024563E5C4C02418FBC8D@US2K7EXMBPF1.spansion.com>
+
+I'm trying to add empty columns to data.tables using a variable containing the name of the desired column, but I'm unable to figure out how to dereference the variable value to satisfy the := operator.
+
+Here's a simple example:
+
+require(data.table);
+dt <- data.table(read.table(text="N1 N2\nA B\nC D\n", header=TRUE));
+new_col_name = "N3";
+dt[, new_col_name := NA];
+
+That creates a column literally named "new_col_name", rather than "N3" as desired.
+
+I can work around it this way:
+
+dt[, workaround := NA];
+setnames(dt, "workaround", new_col_name);
+
+I have tried wrapping the new_col_name variable in all sorts of functions such as eval(), c(), list(), quote(), etc; all of these generate an error such as:
+
+Error in `[.data.table`(dt, , `:=`(quote(new_col_name), NA)) : 
+  LHS of := must be a single column name when with=TRUE. When with=FALSE the LHS may be a vector of column names or positions.
+
+Surely I am overlooking something trivial; please advise.
+
+Thanks
+George
+http://stackoverflow.com/users/1313052/gkaupas
+
+
+From caneff at gmail.com  Wed Jul 25 23:25:28 2012
+From: caneff at gmail.com (Chris Neff)
+Date: Wed, 25 Jul 2012 14:25:28 -0700
+Subject: [datatable-help] add a column specifying new column name via a
+	variable
+In-Reply-To: <4638FCC8C3C4D543B4C53024563E5C4C02418FBC8D@US2K7EXMBPF1.spansion.com>
+References: <4638FCC8C3C4D543B4C53024563E5C4C02418FBC8D@US2K7EXMBPF1.spansion.com>
+Message-ID: <CAAuY0RWTduPBLc=jri5s8d6x336DJMMjAHusuaTY-A7Yoqibpg@mail.gmail.com>
+
+Hmmm I would have liked to see
+
+set(dt, j=new_col_name, value=NA)
+
+work but that doesn't. Any reason why necessarily?
+
+On Wed, Jul 25, 2012 at 2:03 PM, Kaupas, George
+<George.Kaupas at spansion.com> wrote:
+> I'm trying to add empty columns to data.tables using a variable containing the name of the desired column, but I'm unable to figure out how to dereference the variable value to satisfy the := operator.
+>
+> Here's a simple example:
+>
+> require(data.table);
+> dt <- data.table(read.table(text="N1 N2\nA B\nC D\n", header=TRUE));
+> new_col_name = "N3";
+> dt[, new_col_name := NA];
+>
+> That creates a column literally named "new_col_name", rather than "N3" as desired.
+>
+> I can work around it this way:
+>
+> dt[, workaround := NA];
+> setnames(dt, "workaround", new_col_name);
+>
+> I have tried wrapping the new_col_name variable in all sorts of functions such as eval(), c(), list(), quote(), etc; all of these generate an error such as:
+>
+> Error in `[.data.table`(dt, , `:=`(quote(new_col_name), NA)) :
+>   LHS of := must be a single column name when with=TRUE. When with=FALSE the LHS may be a vector of column names or positions.
+>
+> Surely I am overlooking something trivial; please advise.
+>
+> Thanks
+> George
+> http://stackoverflow.com/users/1313052/gkaupas
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From mdowle at mdowle.plus.com  Thu Jul 26 22:20:57 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 26 Jul 2012 21:20:57 +0100
+Subject: [datatable-help] add a column specifying new column name via a
+ variable
+In-Reply-To: <CAAuY0RWTduPBLc=jri5s8d6x336DJMMjAHusuaTY-A7Yoqibpg@mail.gmail.com>
+References: <4638FCC8C3C4D543B4C53024563E5C4C02418FBC8D@US2K7EXMBPF1.spansion.com>
+ <CAAuY0RWTduPBLc=jri5s8d6x336DJMMjAHusuaTY-A7Yoqibpg@mail.gmail.com>
+Message-ID: <2bb98e7b953919e2e23732d354e5192e.squirrel@webmail.plus.net>
+
+
+There was a clue in the error message :
+
+>> Error in `[.data.table`(dt, , `:=`(quote(new_col_name), NA)) :
+>>   LHS of := must be a single column name when with=TRUE. When with=FALSE
+>> the LHS may be a vector of column names or positions.
+
+Trying with=FALSE :
+
+    DT = data.table(a=1:3,b=4:6)
+    newcolname = "FOO"
+    DT[,newcolname:=NA,with=FALSE]
+       a b FOO
+    1: 1 4  NA
+    2: 2 5  NA
+    3: 3 6  NA
+
+But I'm thinking that wrapping the LHS with eval() or c() [the things
+George tried] should have worked too, and are more natural given that's
+what we do elsewhere. I seem to remember either some TO DO in the source
+or a feature request to improve that. Will take another look.
+
+Trying set() gives error as Chris said :
+
+    newcolname = "BAR"
+    set(DT, j=newcolname, value=NA)
+    Error in set(DT, j = newcolname, value = NA) :
+      'BAR' is not a column name. Cannot add columns with set(), use :=
+    instead to add columns by reference.
+
+This is already FR#2077 "Improve set()'s messages to explain why it
+doesn't add new columns" :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=2077&group_id=240&atid=978
+
+The thinking there was that set()'s purpose is for very fast updating
+single cells by reference, suitable inside a loop in the rare situations a
+loop is needed. To branch if the column didn't exist, and add it, would
+take time to branch.  That was when character column names weren't
+acceptable to set() either, though;  for speed, to save looking up the
+same column name over and over.  Integer i (already warns if not) and
+integer j (should warn if not) should be much faster due to the avoidance
+of small allocations to coerce.
+
+So the short answer is that set() could add new columns, but need to make
+sure not at the expense of speed in the integer cases,  and with suitable
+warnings to encourage use of integer j, in set() only, for speed inside
+loops.  I'm probably over egging the problem and it would be simple to
+achieve that, but those were the worries anyway.
+
+
+> Hmmm I would have liked to see
+>
+> set(dt, j=new_col_name, value=NA)
+>
+> work but that doesn't. Any reason why necessarily?
+>
+> On Wed, Jul 25, 2012 at 2:03 PM, Kaupas, George
+> <George.Kaupas at spansion.com> wrote:
+>> I'm trying to add empty columns to data.tables using a variable
+>> containing the name of the desired column, but I'm unable to figure out
+>> how to dereference the variable value to satisfy the := operator.
+>>
+>> Here's a simple example:
+>>
+>> require(data.table);
+>> dt <- data.table(read.table(text="N1 N2\nA B\nC D\n", header=TRUE));
+>> new_col_name = "N3";
+>> dt[, new_col_name := NA];
+>>
+>> That creates a column literally named "new_col_name", rather than "N3"
+>> as desired.
+>>
+>> I can work around it this way:
+>>
+>> dt[, workaround := NA];
+>> setnames(dt, "workaround", new_col_name);
+>>
+>> I have tried wrapping the new_col_name variable in all sorts of
+>> functions such as eval(), c(), list(), quote(), etc; all of these
+>> generate an error such as:
+>>
+>> Error in `[.data.table`(dt, , `:=`(quote(new_col_name), NA)) :
+>>   LHS of := must be a single column name when with=TRUE. When with=FALSE
+>> the LHS may be a vector of column names or positions.
+>>
+>> Surely I am overlooking something trivial; please advise.
+>>
+>> Thanks
+>> George
+>> http://stackoverflow.com/users/1313052/gkaupas
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From alok.jadhav at credit-suisse.com  Fri Jul 27 02:51:09 2012
+From: alok.jadhav at credit-suisse.com (Alok Jadhav)
+Date: Thu, 26 Jul 2012 17:51:09 -0700 (PDT)
+Subject: [datatable-help] why querying Sybase IQ using RODBC returns error
+Message-ID: <1343350269290-4638029.post@n4.nabble.com>
+
+Hello team,
+
+ I am not able to query Sybase IQ database from R using RODBC package. 
+Check the below code
+
+R> sybaseiq.query <- function (sql, ..., as.is = FALSE)
+{
+  connstr <- "Driver={Sybase
+IQ};UID=ajadhav2;PWD=*****;ServerName=PSGSESHR01A_IQ;CommLinks=SharedMemory,TCPIP{host=psgseshr01_iq.sg.csfb.com;port=3051}"
+  chan <- odbcDriverConnect(connstr)
+  on.exit(odbcClose(chan))
+  if (length(list(...)) > 0)
+    sql <- sprintf(sql, ...)
+  x <- sqlQuery(chan, sql, as.is = as.is)
+  return(x)
+}
+R>
+R>
+R>
+R> x <- sybaseiq.query("select * from syagprd1.orders where
+tradedate='120727' and acct='DVW'")
+*Error in .Call(C_RODBCFetchRows, attr(channel, "handle_ptr"), max,
+buffsize,  : 
+  negative length vectors are not allowed*
+R> x
+[1] "42000 -131 [Sybase][ODBC Driver][Sybase IQ]Syntax error near 'order' on
+line 1"                                                            
+[2] "[RODBC] ERROR: Could not SQLExecDirect 'select * from syagprd1.order
+where tradedate='120727' and acct='DVW' and ptag=-1 and sym='BHP.AX''"
+
+
+This is true for empty datasets also
+
+R> x <- agora.query.iq("select * from syagprd1.orders where 1=2")
+Error in .Call(C_RODBCFetchRows, attr(channel, "handle_ptr"), max, buffsize, 
+: 
+  negative length vectors are not allowed
+
+I am not sure what is wrong. Are their some arguments I need to know while I
+create chan to resolve this issue?
+
+Thanks for your help in advance.
+
+Regards,
+Alok
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/why-querying-Sybase-IQ-using-RODBC-returns-error-tp4638029.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From andrii.riabushenko at barclays.com  Mon Jul 30 15:00:47 2012
+From: andrii.riabushenko at barclays.com (andrii.riabushenko at barclays.com)
+Date: Mon, 30 Jul 2012 14:00:47 +0100
+Subject: [datatable-help] What is the fastest way to determine that
+	data.table is empty
+Message-ID: <554293863BD233489FBDF474ADD1F20502D4C7F49D@LDNPCMMGMB01.INTRANET.BARCAPINT.COM>
+
+Hi,
+
+I have found that if(nrow(d.table) != 0) is significantly reduces performance of my application.
+
+Could you please advise on faster ways to figure that data.table doesn't contains any rows. The fastest I have found is length(d.table$column) != 0.
+
+
+Andrii Riabushenko
+BARCLAYS CAPITAL
+30 Fizkultury street
+Kiev 03150, Ukraine
+Global Dial: 8593 4077
+External Dial: +380 4459 34077
+Andrii.Riabushenko at barclays.com<mailto:Andrii.Riabushenko at barclays.com>
+
+
+
+_______________________________________________
+
+This e-mail may contain information that is confidential, privileged or otherwise protected from 
+disclosure. If you are not an intended recipient of this e-mail, do not duplicate or redistribute 
+it by any means. Please delete it and any attachments and notify the sender that you have received 
+it in error. Unless specifically indicated, this e-mail is not an offer to buy or sell or a 
+solicitation to buy or sell any securities, investment products or other financial product or 
+service, an official confirmation of any transaction, or an official statement of Barclays. Any 
+views or opinions presented are solely those of the author and do not necessarily represent those 
+of Barclays. This e-mail is subject to terms available at the following link: www.barclays.com/emaildisclaimer. 
+By messaging with Barclays you consent to the foregoing.  Barclays offers premier investment banking 
+products and services to its clients through Barclays Bank PLC, a company registered in England 
+(number 1026167) with its registered office at 1 Churchill Place, London, E14 5HP.  This email may 
+relate to or be sent from other members of the Barclays Group.
+
+_______________________________________________
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120730/8abaa0df/attachment.html>
+
+From mdowle at mdowle.plus.com  Mon Jul 30 22:49:51 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 30 Jul 2012 21:49:51 +0100
+Subject: [datatable-help] What is the fastest way to determine that
+ data.table is empty
+In-Reply-To: <554293863BD233489FBDF474ADD1F20502D4C7F49D@LDNPCMMGMB01.INTRANET.BARCAPINT.COM>
+References: <554293863BD233489FBDF474ADD1F20502D4C7F49D@LDNPCMMGMB01.INTRANET.BARCAPINT.COM>
+Message-ID: <6ce26a39c59fab77721522def7541304.squirrel@webmail.plus.net>
+
+
+I can't beat that. nrow isn't primitive (unlike length and $), so just
+searching for and finding nrow in base is going to take time in a loop.
+Having said that, even dim(DT) is relatively slow and dim is primitive, so
+that can't be the whole reason.
+
+> DT=data.table(a=1:3,b=4:6)
+> system.time(for (i in 1:10000) nrow(DT))
+   user  system elapsed
+  1.128   0.004   1.138
+> system.time(for (i in 1:10000) NROW(DT))
+   user  system elapsed
+  1.112   0.008   1.123
+> system.time(for (i in 1:10000) dim(DT))
+   user  system elapsed
+  1.056   0.000   1.056
+> system.time(for (i in 1:10000) length(DT[[1L]]))
+   user  system elapsed
+  0.568   0.000   0.572
+> system.time(for (i in 1:10000) length(DT$a))  # yours is indeed fastest
+   user  system elapsed
+  0.168   0.000   0.169
+
+However, are you 100% sure that Rprof() is telling you that's really the
+bottleneck? The branch itself, or whatever is done inside the branch,
+perhaps. And, you know to vectorize I assume. I usually roll my eyes when
+people find significant differences of insignificant times (like this)
+unless they really do need to loop for some reason.
+
+My only thought to go faster than length(DT$a), is a direct .External call
+to a C function that returns LENGTH(VECTOR_ELT(DT,0)).  As soon as that's
+wrapped up in a function call, though, it'll go slower than the primitive
+calls in length(DT$a) I guess.
+
+You call also drop the != 0 part.
+
+    if ( length(...) != 0 )
+
+is the same as :
+
+    if ( length(...) )
+
+Matthew
+
+
+> Hi,
+>
+> I have found that if(nrow(d.table) != 0) is significantly reduces
+> performance of my application.
+>
+> Could you please advise on faster ways to figure that data.table doesn't
+> contains any rows. The fastest I have found is length(d.table$column) !=
+> 0.
+>
+>
+> Andrii Riabushenko
+> BARCLAYS CAPITAL
+> 30 Fizkultury street
+> Kiev 03150, Ukraine
+> Global Dial: 8593 4077
+> External Dial: +380 4459 34077
+> Andrii.Riabushenko at barclays.com<mailto:Andrii.Riabushenko at barclays.com>
+>
+>
+>
+> _______________________________________________
+>
+> This e-mail may contain information that is confidential, privileged or
+> otherwise protected from
+> disclosure. If you are not an intended recipient of this e-mail, do not
+> duplicate or redistribute
+> it by any means. Please delete it and any attachments and notify the
+> sender that you have received
+> it in error. Unless specifically indicated, this e-mail is not an offer to
+> buy or sell or a
+> solicitation to buy or sell any securities, investment products or other
+> financial product or
+> service, an official confirmation of any transaction, or an official
+> statement of Barclays. Any
+> views or opinions presented are solely those of the author and do not
+> necessarily represent those
+> of Barclays. This e-mail is subject to terms available at the following
+> link: www.barclays.com/emaildisclaimer.
+> By messaging with Barclays you consent to the foregoing.  Barclays offers
+> premier investment banking
+> products and services to its clients through Barclays Bank PLC, a company
+> registered in England
+> (number 1026167) with its registered office at 1 Churchill Place, London,
+> E14 5HP.  This email may
+> relate to or be sent from other members of the Barclays Group.
+>
+> _______________________________________________
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+

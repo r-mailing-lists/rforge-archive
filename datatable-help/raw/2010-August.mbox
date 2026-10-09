@@ -1,0 +1,6015 @@
+From harishv_99 at yahoo.com  Sun Aug  1 04:45:03 2010
+From: harishv_99 at yahoo.com (Harish)
+Date: Sat, 31 Jul 2010 19:45:03 -0700 (PDT)
+Subject: [datatable-help] Unexpected behavior with mult="all"
+Message-ID: <514872.2322.qm@web30803.mail.mud.yahoo.com>
+
+Thanks for the detailed explanation.? My question about #1 is resolved.  You certainly gave me a lot to ponder over.
+
+I still am doubtful about my question #2 -- not getting NAs.
+
+x <- data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3,4), key="a,b")
+y <- data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+x[y]? ? ? ? ? ? ? ? ? ? ? # Expected: Getting NAs
+x[y,mult="all"]           # Expected: Getting NAs with mult="all"
+x[y,list(d)]? ? ? ? ? ? ? # Expected: Getting NAs with i
+x[y,list(d),mult="all"]???# Unexpected: No NAs with i & mult="all"
+
+> x[y]
+? ? ? ? a? ? b? d
+[1,]? ? a? ? A? 1
+[2,]? ? b? ? A? 2
+[3,] <NA> <NA> NA
+[4,] <NA> <NA> NA
+
+> x[y,mult="all"]
+        a    b  d
+[1,]    a    A  1
+[2,]    b    A  2
+[3,] <NA> <NA> NA
+[4,] <NA> <NA> NA
+
+> x[y,list(d)]
+? ? ? d
+[1,]? 1
+[2,]? 2
+[3,] NA
+[4,] NA
+
+> x[y,list(d),mult="all"]
+? ???a b d
+[1,] a A 1
+[2,] b A 2
+
+
+As you can see, the combination of having both i and mult="all" is not generating the NAs.  Is there a reason for this?
+
+
+Regards,
+Harish
+
+
+--- On Sat, 7/31/10, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+
+> From: Matthew Dowle <mdowle at mdowle.plus.com>
+> Subject: Re: [datatable-help] Unexpected behavior with mult="all"
+> To: "Harish" <harishv_99 at yahoo.com>
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Date: Saturday, July 31, 2010, 7:25 AM
+> This is how I think about it
+> currently :
+> 
+> [1] The syntax of "x[y,d]" plus knowing how mult's default
+> value is set
+> ('first' in this case) means that a vector as long as the
+> number of rows
+> in y is the result so data.table does the least work it can
+> and returns
+> just the vector without adding in the data already in y.
+> Changing mult
+> to "all" however means you'll usually get a varying number
+> of items back
+> for each row in y, so data.table includes the y columns as
+> a convenience
+> since if it didn't the result would be difficult to use
+> (you wouldn't
+> know the correspondence). data.table tries to do the
+> minimum, most
+> efficient thing. If you want to be less efficient (e.g.
+> adding columns
+> you already know) then it's for the user to add them back.
+> This is sort
+> of a principle.
+> 
+> [2] nomatch is by default NA so this is the same as [1]. Is
+> that any
+> chance a typo and you meant nomatch=0 ?? If so then
+> you might have a
+> point and perhaps something needs changing there.
+> 
+> The other way I think about mult='all' is grouping. The
+> documentation
+> sometimes mentions 'by without by', or I might be recalling
+> emails or
+> posts. Remember mult='all' gets automatically set to 'all'
+> when you
+> match to not all of the columns of x's key. When mult='all'
+> I think to
+> myself "for each row of y fetch me all the rows from x that
+> match and
+> eval j for that group, then move on to the next row in
+> y".? Its kind of
+> like a data specific 'by'. Once you realise mult='all' is
+> like a 'by'
+> remember that 'by' automatically adds in the 'by' columns
+> to the result.
+> Hence mult='all' behaves more like a 'by' with respect to
+> returning
+> data.table rather than vector.
+> 
+> Example :
+> 
+> ? X = data.table(x=1:3, y=1:4, z=rnorm(12),
+> key="x,y")
+> ? Y = data.table(x=1:3) 
+> ? X[Y,sum(z)] same as X[,sum(z),by=x]
+> 
+> Then going further :
+> 
+> ? X[Y[<having>],sum(z)] faster than
+> X[,sum(z),by=x][<having>]
+> 
+> Lets say <having> are groups where x>2 (just one
+> group in this
+> example) :
+> 
+> ? X[Y[x>2],sum(z)] same but faster than
+> X[,sum(z),by=x][x>2] 
+> 
+> which is the same as 
+> 
+> ? X[J(3),sum(z)]
+> 
+> if we knew we wanted group '3' in advance for example.
+> 
+> These constructs (e.g. 'by without by') generalise to
+> list() of
+> expressions and function calls of column variables in the
+> usual way.
+> 
+> Sometimes you do want mult='all', and run the j expression
+> on the result
+> as a whole, not by row of Y.? In that case, assuming Y
+> has less columns
+> than key(X) meaning mult='all' (as it is in this example)
+> :
+> 
+> ??? X[Y,length(z)]??? ?
+> # j eval'd by row of Y, result 3 rows
+> ??? X[Y][,length(z)]? # length 1 vector
+> value 12
+> 
+> HTH?
+> Matthew
+> 
+> 
+> On Fri, 2010-07-30 at 19:28 -0700, Harish wrote:
+> > I am getting some unexpected behavior with
+> mult="all".
+> > 
+> > 1) Getting a data table when I expect a vector
+> > 2) Not getting NA's when I expect them (because of
+> nomatch=NA)
+> > 
+> > ==========
+> > 
+> > Common code for examples below
+> > 
+> > x <-
+> data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3,4),
+> key="a,b")
+> > y <-
+> data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> > 
+> > ==========
+> > 
+> > Issue #1: Getting a data table when I expect a vector
+> > 
+> > I am not following the logic of when a data.table is
+> returned and when a vector is returned.? Initially, I
+> thought that if j had only one item without a list(), a
+> vector is returned, but I am seeing some contrary behavior.
+> > 
+> > x[y,d]? # Returns a vector as expected
+> > x[y,d,mult="all"]? # Returns a data.table.?
+> Why?
+> > 
+> > Would someone help me understand why I should not
+> expect a vector in the last query?
+> > 
+> > ==========
+> > Issue #2: Not getting NA's when I expect them (because
+> of nomatch=NA)
+> > 
+> > x[y,d,nomatch=NA]? # Expected: returns a vector
+> with NAs in them
+> > x[y,d,nomatch=NA,mult="all]? # Unexpected: NAs
+> not appearing
+> > 
+> > Am I missing something?
+> > 
+> > Harish
+> > 
+> > 
+> > 
+> >? ? ???
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+>
+
+
+
+      
+
+From mdowle at mdowle.plus.com  Sun Aug  1 23:06:03 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 01 Aug 2010 22:06:03 +0100
+Subject: [datatable-help] Unexpected behavior with mult="all"
+In-Reply-To: <514872.2322.qm@web30803.mail.mud.yahoo.com>
+References: <514872.2322.qm@web30803.mail.mud.yahoo.com>
+Message-ID: <1280696763.25542.32.camel@Adam>
+
+Thanks for sticking with it. The reason that's happening is that
+internally the same code that does grouping via 'by' also does grouping
+via mult='all'. So its the same reason as the other thread where we
+talking about 'by' collapsing away NULL groups.
+
+But when you present it in that way I see what you mean. I'm almost
+convinced. If Tom agrees that'll tip me and I'll add it as a bug to
+fix.  
+
+As an aside to illustrate, the j gets evaluated for each group with the
+mult='all', but just once without :
+
+> x[y,{cat('running j\n');list(d)}]
+running j
+[[1]]
+[1]  1  2 NA NA
+
+> x[y,{cat('running j\n');list(d)},mult='all']
+running j
+running j
+     a b V1
+[1,] a A  1
+[2,] b A  2
+> 
+
+
+
+On Sat, 2010-07-31 at 19:45 -0700, Harish wrote:
+> Thanks for the detailed explanation.  My question about #1 is resolved.  You certainly gave me a lot to ponder over.
+> 
+> I still am doubtful about my question #2 -- not getting NAs.
+> 
+> x <- data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3,4), key="a,b")
+> y <- data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> x[y]                      # Expected: Getting NAs
+> x[y,mult="all"]           # Expected: Getting NAs with mult="all"
+> x[y,list(d)]              # Expected: Getting NAs with i
+> x[y,list(d),mult="all"]   # Unexpected: No NAs with i & mult="all"
+> 
+> > x[y]
+>         a    b  d
+> [1,]    a    A  1
+> [2,]    b    A  2
+> [3,] <NA> <NA> NA
+> [4,] <NA> <NA> NA
+> 
+> > x[y,mult="all"]
+>         a    b  d
+> [1,]    a    A  1
+> [2,]    b    A  2
+> [3,] <NA> <NA> NA
+> [4,] <NA> <NA> NA
+> 
+> > x[y,list(d)]
+>       d
+> [1,]  1
+> [2,]  2
+> [3,] NA
+> [4,] NA
+> 
+> > x[y,list(d),mult="all"]
+>      a b d
+> [1,] a A 1
+> [2,] b A 2
+> 
+> 
+> As you can see, the combination of having both i and mult="all" is not generating the NAs.  Is there a reason for this?
+> 
+> 
+> Regards,
+> Harish
+> 
+> 
+> --- On Sat, 7/31/10, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> 
+> > From: Matthew Dowle <mdowle at mdowle.plus.com>
+> > Subject: Re: [datatable-help] Unexpected behavior with mult="all"
+> > To: "Harish" <harishv_99 at yahoo.com>
+> > Cc: datatable-help at lists.r-forge.r-project.org
+> > Date: Saturday, July 31, 2010, 7:25 AM
+> > This is how I think about it
+> > currently :
+> > 
+> > [1] The syntax of "x[y,d]" plus knowing how mult's default
+> > value is set
+> > ('first' in this case) means that a vector as long as the
+> > number of rows
+> > in y is the result so data.table does the least work it can
+> > and returns
+> > just the vector without adding in the data already in y.
+> > Changing mult
+> > to "all" however means you'll usually get a varying number
+> > of items back
+> > for each row in y, so data.table includes the y columns as
+> > a convenience
+> > since if it didn't the result would be difficult to use
+> > (you wouldn't
+> > know the correspondence). data.table tries to do the
+> > minimum, most
+> > efficient thing. If you want to be less efficient (e.g.
+> > adding columns
+> > you already know) then it's for the user to add them back.
+> > This is sort
+> > of a principle.
+> > 
+> > [2] nomatch is by default NA so this is the same as [1]. Is
+> > that any
+> > chance a typo and you meant nomatch=0 ?  If so then
+> > you might have a
+> > point and perhaps something needs changing there.
+> > 
+> > The other way I think about mult='all' is grouping. The
+> > documentation
+> > sometimes mentions 'by without by', or I might be recalling
+> > emails or
+> > posts. Remember mult='all' gets automatically set to 'all'
+> > when you
+> > match to not all of the columns of x's key. When mult='all'
+> > I think to
+> > myself "for each row of y fetch me all the rows from x that
+> > match and
+> > eval j for that group, then move on to the next row in
+> > y".  Its kind of
+> > like a data specific 'by'. Once you realise mult='all' is
+> > like a 'by'
+> > remember that 'by' automatically adds in the 'by' columns
+> > to the result.
+> > Hence mult='all' behaves more like a 'by' with respect to
+> > returning
+> > data.table rather than vector.
+> > 
+> > Example :
+> > 
+> >   X = data.table(x=1:3, y=1:4, z=rnorm(12),
+> > key="x,y")
+> >   Y = data.table(x=1:3) 
+> >   X[Y,sum(z)] same as X[,sum(z),by=x]
+> > 
+> > Then going further :
+> > 
+> >   X[Y[<having>],sum(z)] faster than
+> > X[,sum(z),by=x][<having>]
+> > 
+> > Lets say <having> are groups where x>2 (just one
+> > group in this
+> > example) :
+> > 
+> >   X[Y[x>2],sum(z)] same but faster than
+> > X[,sum(z),by=x][x>2] 
+> > 
+> > which is the same as 
+> > 
+> >   X[J(3),sum(z)]
+> > 
+> > if we knew we wanted group '3' in advance for example.
+> > 
+> > These constructs (e.g. 'by without by') generalise to
+> > list() of
+> > expressions and function calls of column variables in the
+> > usual way.
+> > 
+> > Sometimes you do want mult='all', and run the j expression
+> > on the result
+> > as a whole, not by row of Y.  In that case, assuming Y
+> > has less columns
+> > than key(X) meaning mult='all' (as it is in this example)
+> > :
+> > 
+> >     X[Y,length(z)]     
+> > # j eval'd by row of Y, result 3 rows
+> >     X[Y][,length(z)]  # length 1 vector
+> > value 12
+> > 
+> > HTH?
+> > Matthew
+> > 
+> > 
+> > On Fri, 2010-07-30 at 19:28 -0700, Harish wrote:
+> > > I am getting some unexpected behavior with
+> > mult="all".
+> > > 
+> > > 1) Getting a data table when I expect a vector
+> > > 2) Not getting NA's when I expect them (because of
+> > nomatch=NA)
+> > > 
+> > > ==========
+> > > 
+> > > Common code for examples below
+> > > 
+> > > x <-
+> > data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3,4),
+> > key="a,b")
+> > > y <-
+> > data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> > > 
+> > > ==========
+> > > 
+> > > Issue #1: Getting a data table when I expect a vector
+> > > 
+> > > I am not following the logic of when a data.table is
+> > returned and when a vector is returned.  Initially, I
+> > thought that if j had only one item without a list(), a
+> > vector is returned, but I am seeing some contrary behavior.
+> > > 
+> > > x[y,d]  # Returns a vector as expected
+> > > x[y,d,mult="all"]  # Returns a data.table. 
+> > Why?
+> > > 
+> > > Would someone help me understand why I should not
+> > expect a vector in the last query?
+> > > 
+> > > ==========
+> > > Issue #2: Not getting NA's when I expect them (because
+> > of nomatch=NA)
+> > > 
+> > > x[y,d,nomatch=NA]  # Expected: returns a vector
+> > with NAs in them
+> > > x[y,d,nomatch=NA,mult="all]  # Unexpected: NAs
+> > not appearing
+> > > 
+> > > Am I missing something?
+> > > 
+> > > Harish
+> > > 
+> > > 
+> > > 
+> > >       
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > 
+> > 
+> >
+> 
+> 
+> 
+>       
+
+
+
+From TShort at epri.com  Mon Aug  2 02:00:07 2010
+From: TShort at epri.com (Short, Tom)
+Date: Sun, 1 Aug 2010 17:00:07 -0700
+Subject: [datatable-help] Unexpected behavior with mult="all"
+In-Reply-To: <1280696763.25542.32.camel@Adam>
+References: <514872.2322.qm@web30803.mail.mud.yahoo.com>
+	<1280696763.25542.32.camel@Adam>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E305B9FEA1@uspalex03.epri.com>
+
+I think I agree with Harish (not enough to look into it myself right
+now, though :).
+
+- Tom
+
+ 
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Matthew Dowle
+> Sent: Sunday, August 01, 2010 17:06
+> To: Harish
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Unexpected behavior with mult="all"
+> 
+> Thanks for sticking with it. The reason that's happening is 
+> that internally the same code that does grouping via 'by' 
+> also does grouping via mult='all'. So its the same reason as 
+> the other thread where we talking about 'by' collapsing away 
+> NULL groups.
+> 
+> But when you present it in that way I see what you mean. I'm 
+> almost convinced. If Tom agrees that'll tip me and I'll add 
+> it as a bug to fix.  
+> 
+> As an aside to illustrate, the j gets evaluated for each 
+> group with the mult='all', but just once without :
+> 
+> > x[y,{cat('running j\n');list(d)}]
+> running j
+> [[1]]
+> [1]  1  2 NA NA
+> 
+> > x[y,{cat('running j\n');list(d)},mult='all']
+> running j
+> running j
+>      a b V1
+> [1,] a A  1
+> [2,] b A  2
+> > 
+> 
+> 
+> 
+> On Sat, 2010-07-31 at 19:45 -0700, Harish wrote:
+> > Thanks for the detailed explanation.  My question about #1 
+> is resolved.  You certainly gave me a lot to ponder over.
+> > 
+> > I still am doubtful about my question #2 -- not getting NAs.
+> > 
+> > x <- 
+> > 
+> data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3
+> ,4), key="a,b") y <- 
+> data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> > x[y]                      # Expected: Getting NAs
+> > x[y,mult="all"]           # Expected: Getting NAs with mult="all"
+> > x[y,list(d)]              # Expected: Getting NAs with i
+> > x[y,list(d),mult="all"]   # Unexpected: No NAs with i & mult="all"
+> > 
+> > > x[y]
+> >         a    b  d
+> > [1,]    a    A  1
+> > [2,]    b    A  2
+> > [3,] <NA> <NA> NA
+> > [4,] <NA> <NA> NA
+> > 
+> > > x[y,mult="all"]
+> >         a    b  d
+> > [1,]    a    A  1
+> > [2,]    b    A  2
+> > [3,] <NA> <NA> NA
+> > [4,] <NA> <NA> NA
+> > 
+> > > x[y,list(d)]
+> >       d
+> > [1,]  1
+> > [2,]  2
+> > [3,] NA
+> > [4,] NA
+> > 
+> > > x[y,list(d),mult="all"]
+> >      a b d
+> > [1,] a A 1
+> > [2,] b A 2
+> > 
+> > 
+> > As you can see, the combination of having both i and 
+> mult="all" is not generating the NAs.  Is there a reason for this?
+> > 
+> > 
+> > Regards,
+> > Harish
+> > 
+> > 
+> > --- On Sat, 7/31/10, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > 
+> > > From: Matthew Dowle <mdowle at mdowle.plus.com>
+> > > Subject: Re: [datatable-help] Unexpected behavior with mult="all"
+> > > To: "Harish" <harishv_99 at yahoo.com>
+> > > Cc: datatable-help at lists.r-forge.r-project.org
+> > > Date: Saturday, July 31, 2010, 7:25 AM This is how I 
+> think about it 
+> > > currently :
+> > > 
+> > > [1] The syntax of "x[y,d]" plus knowing how mult's 
+> default value is 
+> > > set ('first' in this case) means that a vector as long as 
+> the number 
+> > > of rows in y is the result so data.table does the least 
+> work it can 
+> > > and returns just the vector without adding in the data 
+> already in y.
+> > > Changing mult
+> > > to "all" however means you'll usually get a varying 
+> number of items 
+> > > back for each row in y, so data.table includes the y columns as a 
+> > > convenience since if it didn't the result would be 
+> difficult to use 
+> > > (you wouldn't know the correspondence). data.table tries 
+> to do the 
+> > > minimum, most efficient thing. If you want to be less efficient 
+> > > (e.g.
+> > > adding columns
+> > > you already know) then it's for the user to add them back.
+> > > This is sort
+> > > of a principle.
+> > > 
+> > > [2] nomatch is by default NA so this is the same as [1]. 
+> Is that any 
+> > > chance a typo and you meant nomatch=0 ?  If so then you 
+> might have a 
+> > > point and perhaps something needs changing there.
+> > > 
+> > > The other way I think about mult='all' is grouping. The 
+> > > documentation sometimes mentions 'by without by', or I might be 
+> > > recalling emails or posts. Remember mult='all' gets automatically 
+> > > set to 'all'
+> > > when you
+> > > match to not all of the columns of x's key. When mult='all'
+> > > I think to
+> > > myself "for each row of y fetch me all the rows from x that match 
+> > > and eval j for that group, then move on to the next row 
+> in y".  Its 
+> > > kind of like a data specific 'by'. Once you realise mult='all' is 
+> > > like a 'by'
+> > > remember that 'by' automatically adds in the 'by' columns to the 
+> > > result.
+> > > Hence mult='all' behaves more like a 'by' with respect to 
+> returning 
+> > > data.table rather than vector.
+> > > 
+> > > Example :
+> > > 
+> > >   X = data.table(x=1:3, y=1:4, z=rnorm(12),
+> > > key="x,y")
+> > >   Y = data.table(x=1:3) 
+> > >   X[Y,sum(z)] same as X[,sum(z),by=x]
+> > > 
+> > > Then going further :
+> > > 
+> > >   X[Y[<having>],sum(z)] faster than
+> > > X[,sum(z),by=x][<having>]
+> > > 
+> > > Lets say <having> are groups where x>2 (just one group in this
+> > > example) :
+> > > 
+> > >   X[Y[x>2],sum(z)] same but faster than X[,sum(z),by=x][x>2]
+> > > 
+> > > which is the same as
+> > > 
+> > >   X[J(3),sum(z)]
+> > > 
+> > > if we knew we wanted group '3' in advance for example.
+> > > 
+> > > These constructs (e.g. 'by without by') generalise to
+> > > list() of
+> > > expressions and function calls of column variables in the 
+> usual way.
+> > > 
+> > > Sometimes you do want mult='all', and run the j expression on the 
+> > > result as a whole, not by row of Y.  In that case, assuming Y has 
+> > > less columns than key(X) meaning mult='all' (as it is in this 
+> > > example)
+> > > :
+> > > 
+> > >     X[Y,length(z)]     
+> > > # j eval'd by row of Y, result 3 rows
+> > >     X[Y][,length(z)]  # length 1 vector value 12
+> > > 
+> > > HTH?
+> > > Matthew
+> > > 
+> > > 
+> > > On Fri, 2010-07-30 at 19:28 -0700, Harish wrote:
+> > > > I am getting some unexpected behavior with
+> > > mult="all".
+> > > > 
+> > > > 1) Getting a data table when I expect a vector
+> > > > 2) Not getting NA's when I expect them (because of
+> > > nomatch=NA)
+> > > > 
+> > > > ==========
+> > > > 
+> > > > Common code for examples below
+> > > > 
+> > > > x <-
+> > > data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3,4),
+> > > key="a,b")
+> > > > y <-
+> > > data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> > > > 
+> > > > ==========
+> > > > 
+> > > > Issue #1: Getting a data table when I expect a vector
+> > > > 
+> > > > I am not following the logic of when a data.table is
+> > > returned and when a vector is returned.  Initially, I 
+> thought that 
+> > > if j had only one item without a list(), a vector is 
+> returned, but I 
+> > > am seeing some contrary behavior.
+> > > > 
+> > > > x[y,d]  # Returns a vector as expected x[y,d,mult="all"]  # 
+> > > > Returns a data.table.
+> > > Why?
+> > > > 
+> > > > Would someone help me understand why I should not
+> > > expect a vector in the last query?
+> > > > 
+> > > > ==========
+> > > > Issue #2: Not getting NA's when I expect them (because
+> > > of nomatch=NA)
+> > > > 
+> > > > x[y,d,nomatch=NA]  # Expected: returns a vector
+> > > with NAs in them
+> > > > x[y,d,nomatch=NA,mult="all]  # Unexpected: NAs
+> > > not appearing
+> > > > 
+> > > > Am I missing something?
+> > > > 
+> > > > Harish
+> > > > 
+> > > > 
+> > > > 
+> > > >       
+> > > > _______________________________________________
+> > > > datatable-help mailing list
+> > > > datatable-help at lists.r-forge.r-project.org
+> > > > 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datat
+> > > > able-help
+> > > 
+> > > 
+> > >
+> > 
+> > 
+> > 
+> >       
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From harishv_99 at yahoo.com  Mon Aug  2 08:36:30 2010
+From: harishv_99 at yahoo.com (Harish)
+Date: Sun, 1 Aug 2010 23:36:30 -0700 (PDT)
+Subject: [datatable-help] Unexpected behavior with mult="all"
+Message-ID: <587667.96608.qm@web30801.mail.mud.yahoo.com>
+
+Tom, thanks for your vote.  :)
+
+Matthew, since Tom is on board on the change, I am curious whether this change will impact the 'by' query behavior as well since both use the same code (and are conceptually similar).? So, to get the current behavior, one has to use nomatch=0 with the 'by' query to remove the NAs.? Do I understand this correctly?
+
+I also thank you for so patiently listening to my questioning and engaging me in a conversation.
+
+
+Harish
+
+
+--- On Sun, 8/1/10, Short, Tom <TShort at epri.com> wrote:
+
+> From: Short, Tom <TShort at epri.com>
+> Subject: RE: [datatable-help] Unexpected behavior with mult="all"
+> To: mdowle at mdowle.plus.com, "Harish" <harishv_99 at yahoo.com>
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Date: Sunday, August 1, 2010, 5:00 PM
+> I think I agree with Harish (not
+> enough to look into it myself right
+> now, though :).
+> 
+> - Tom
+> 
+>? 
+> 
+> > -----Original Message-----
+> > From: datatable-help-bounces at lists.r-forge.r-project.org
+> 
+> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> 
+> > On Behalf Of Matthew Dowle
+> > Sent: Sunday, August 01, 2010 17:06
+> > To: Harish
+> > Cc: datatable-help at lists.r-forge.r-project.org
+> > Subject: Re: [datatable-help] Unexpected behavior with
+> mult="all"
+> > 
+> > Thanks for sticking with it. The reason that's
+> happening is 
+> > that internally the same code that does grouping via
+> 'by' 
+> > also does grouping via mult='all'. So its the same
+> reason as 
+> > the other thread where we talking about 'by'
+> collapsing away 
+> > NULL groups.
+> > 
+> > But when you present it in that way I see what you
+> mean. I'm 
+> > almost convinced. If Tom agrees that'll tip me and
+> I'll add 
+> > it as a bug to fix.? 
+> > 
+> > As an aside to illustrate, the j gets evaluated for
+> each 
+> > group with the mult='all', but just once without :
+> > 
+> > > x[y,{cat('running j\n');list(d)}]
+> > running j
+> > [[1]]
+> > [1]? 1? 2 NA NA
+> > 
+> > > x[y,{cat('running j\n');list(d)},mult='all']
+> > running j
+> > running j
+> >? ? ? a b V1
+> > [1,] a A? 1
+> > [2,] b A? 2
+> > > 
+> > 
+> > 
+> > 
+> > On Sat, 2010-07-31 at 19:45 -0700, Harish wrote:
+> > > Thanks for the detailed explanation.? My
+> question about #1 
+> > is resolved.? You certainly gave me a lot to
+> ponder over.
+> > > 
+> > > I still am doubtful about my question #2 -- not
+> getting NAs.
+> > > 
+> > > x <- 
+> > > 
+> >
+> data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3
+> > ,4), key="a,b") y <- 
+> > data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> > > x[y]? ? ? ? ? ?
+> ? ? ? ? ? # Expected: Getting NAs
+> > > x[y,mult="all"]? ? ? ?
+> ???# Expected: Getting NAs with mult="all"
+> > > x[y,list(d)]? ? ? ? ?
+> ? ? # Expected: Getting NAs with i
+> > > x[y,list(d),mult="all"]???#
+> Unexpected: No NAs with i & mult="all"
+> > > 
+> > > > x[y]
+> > >? ? ? ???a?
+> ? b? d
+> > > [1,]? ? a? ? A? 1
+> > > [2,]? ? b? ? A? 2
+> > > [3,] <NA> <NA> NA
+> > > [4,] <NA> <NA> NA
+> > > 
+> > > > x[y,mult="all"]
+> > >? ? ? ???a?
+> ? b? d
+> > > [1,]? ? a? ? A? 1
+> > > [2,]? ? b? ? A? 2
+> > > [3,] <NA> <NA> NA
+> > > [4,] <NA> <NA> NA
+> > > 
+> > > > x[y,list(d)]
+> > >? ? ???d
+> > > [1,]? 1
+> > > [2,]? 2
+> > > [3,] NA
+> > > [4,] NA
+> > > 
+> > > > x[y,list(d),mult="all"]
+> > >? ? ? a b d
+> > > [1,] a A 1
+> > > [2,] b A 2
+> > > 
+> > > 
+> > > As you can see, the combination of having both i
+> and 
+> > mult="all" is not generating the NAs.? Is there a
+> reason for this?
+> > > 
+> > > 
+> > > Regards,
+> > > Harish
+> > > 
+> > > 
+> > > --- On Sat, 7/31/10, Matthew Dowle <mdowle at mdowle.plus.com>
+> wrote:
+> > > 
+> > > > From: Matthew Dowle <mdowle at mdowle.plus.com>
+> > > > Subject: Re: [datatable-help] Unexpected
+> behavior with mult="all"
+> > > > To: "Harish" <harishv_99 at yahoo.com>
+> > > > Cc: datatable-help at lists.r-forge.r-project.org
+> > > > Date: Saturday, July 31, 2010, 7:25 AM This
+> is how I 
+> > think about it 
+> > > > currently :
+> > > > 
+> > > > [1] The syntax of "x[y,d]" plus knowing how
+> mult's 
+> > default value is 
+> > > > set ('first' in this case) means that a
+> vector as long as 
+> > the number 
+> > > > of rows in y is the result so data.table
+> does the least 
+> > work it can 
+> > > > and returns just the vector without adding
+> in the data 
+> > already in y.
+> > > > Changing mult
+> > > > to "all" however means you'll usually get a
+> varying 
+> > number of items 
+> > > > back for each row in y, so data.table
+> includes the y columns as a 
+> > > > convenience since if it didn't the result
+> would be 
+> > difficult to use 
+> > > > (you wouldn't know the correspondence).
+> data.table tries 
+> > to do the 
+> > > > minimum, most efficient thing. If you want
+> to be less efficient 
+> > > > (e.g.
+> > > > adding columns
+> > > > you already know) then it's for the user to
+> add them back.
+> > > > This is sort
+> > > > of a principle.
+> > > > 
+> > > > [2] nomatch is by default NA so this is the
+> same as [1]. 
+> > Is that any 
+> > > > chance a typo and you meant nomatch=0
+> ?? If so then you 
+> > might have a 
+> > > > point and perhaps something needs changing
+> there.
+> > > > 
+> > > > The other way I think about mult='all' is
+> grouping. The 
+> > > > documentation sometimes mentions 'by without
+> by', or I might be 
+> > > > recalling emails or posts. Remember
+> mult='all' gets automatically 
+> > > > set to 'all'
+> > > > when you
+> > > > match to not all of the columns of x's key.
+> When mult='all'
+> > > > I think to
+> > > > myself "for each row of y fetch me all the
+> rows from x that match 
+> > > > and eval j for that group, then move on to
+> the next row 
+> > in y".? Its 
+> > > > kind of like a data specific 'by'. Once you
+> realise mult='all' is 
+> > > > like a 'by'
+> > > > remember that 'by' automatically adds in the
+> 'by' columns to the 
+> > > > result.
+> > > > Hence mult='all' behaves more like a 'by'
+> with respect to 
+> > returning 
+> > > > data.table rather than vector.
+> > > > 
+> > > > Example :
+> > > > 
+> > > >???X = data.table(x=1:3,
+> y=1:4, z=rnorm(12),
+> > > > key="x,y")
+> > > >???Y = data.table(x=1:3) 
+> > > >???X[Y,sum(z)] same as
+> X[,sum(z),by=x]
+> > > > 
+> > > > Then going further :
+> > > > 
+> > > >???X[Y[<having>],sum(z)]
+> faster than
+> > > > X[,sum(z),by=x][<having>]
+> > > > 
+> > > > Lets say <having> are groups where
+> x>2 (just one group in this
+> > > > example) :
+> > > > 
+> > > >???X[Y[x>2],sum(z)] same
+> but faster than X[,sum(z),by=x][x>2]
+> > > > 
+> > > > which is the same as
+> > > > 
+> > > >???X[J(3),sum(z)]
+> > > > 
+> > > > if we knew we wanted group '3' in advance
+> for example.
+> > > > 
+> > > > These constructs (e.g. 'by without by')
+> generalise to
+> > > > list() of
+> > > > expressions and function calls of column
+> variables in the 
+> > usual way.
+> > > > 
+> > > > Sometimes you do want mult='all', and run
+> the j expression on the 
+> > > > result as a whole, not by row of Y.? In
+> that case, assuming Y has 
+> > > > less columns than key(X) meaning mult='all'
+> (as it is in this 
+> > > > example)
+> > > > :
+> > > > 
+> > > >? ???X[Y,length(z)]?
+> ???
+> > > > # j eval'd by row of Y, result 3 rows
+> > > >?
+> ???X[Y][,length(z)]? # length 1 vector
+> value 12
+> > > > 
+> > > > HTH?
+> > > > Matthew
+> > > > 
+> > > > 
+> > > > On Fri, 2010-07-30 at 19:28 -0700, Harish
+> wrote:
+> > > > > I am getting some unexpected behavior
+> with
+> > > > mult="all".
+> > > > > 
+> > > > > 1) Getting a data table when I expect a
+> vector
+> > > > > 2) Not getting NA's when I expect them
+> (because of
+> > > > nomatch=NA)
+> > > > > 
+> > > > > ==========
+> > > > > 
+> > > > > Common code for examples below
+> > > > > 
+> > > > > x <-
+> > > >
+> data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3,4),
+> > > > key="a,b")
+> > > > > y <-
+> > > >
+> data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> > > > > 
+> > > > > ==========
+> > > > > 
+> > > > > Issue #1: Getting a data table when I
+> expect a vector
+> > > > > 
+> > > > > I am not following the logic of when a
+> data.table is
+> > > > returned and when a vector is
+> returned.? Initially, I 
+> > thought that 
+> > > > if j had only one item without a list(), a
+> vector is 
+> > returned, but I 
+> > > > am seeing some contrary behavior.
+> > > > > 
+> > > > > x[y,d]? # Returns a vector as
+> expected x[y,d,mult="all"]? # 
+> > > > > Returns a data.table.
+> > > > Why?
+> > > > > 
+> > > > > Would someone help me understand why I
+> should not
+> > > > expect a vector in the last query?
+> > > > > 
+> > > > > ==========
+> > > > > Issue #2: Not getting NA's when I
+> expect them (because
+> > > > of nomatch=NA)
+> > > > > 
+> > > > > x[y,d,nomatch=NA]? # Expected:
+> returns a vector
+> > > > with NAs in them
+> > > > > x[y,d,nomatch=NA,mult="all]? #
+> Unexpected: NAs
+> > > > not appearing
+> > > > > 
+> > > > > Am I missing something?
+> > > > > 
+> > > > > Harish
+> > > > > 
+> > > > > 
+> > > > > 
+> > > > >? ? ???
+> > > > >
+> _______________________________________________
+> > > > > datatable-help mailing list
+> > > > > datatable-help at lists.r-forge.r-project.org
+> > > > > 
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datat
+> > > > > able-help
+> > > > 
+> > > > 
+> > > >
+> > > 
+> > > 
+> > > 
+> > >? ? ???
+> > 
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> atatable-help
+> > 
+>
+
+
+
+      
+
+From mdowle at mdowle.plus.com  Mon Aug  2 11:29:51 2010
+From: mdowle at mdowle.plus.com (mdowle at mdowle.plus.com)
+Date: Mon, 2 Aug 2010 10:29:51 +0100
+Subject: [datatable-help] Unexpected behavior with mult="all"
+In-Reply-To: <587667.96608.qm@web30801.mail.mud.yahoo.com>
+References: <587667.96608.qm@web30801.mail.mud.yahoo.com>
+Message-ID: <9cbbc6372f8364cd9a202a3bcf4cbf49.squirrel@webmail.plus.net>
+
+
+This change shouldn't impact 'by', if I'm thinking correctly. Think of
+'by' as first finding the unique groups present and then splitting up the
+dataset by group. So there *is* a match for all groups when using 'by';
+every group does have data by construction therefore the 'nomatch'
+argument doesn't come into it. In the other thread the discussion was when
+j returns no rows when run on a group with data, not that there was no
+matching data for the group.
+
+Using i with mult='all' may be a general form of "key'd by" not just an
+alternative. [I say 'may' because I'm only 80% sure - you've got me
+thinking now.] With i and mult='all' you can :
+
+ i) restrict to a subset of groups (likely a small subset)
+ ii) include groups which may not be present (=> nomatch relevant)
+ iii) maintain the order of the group results (determined by the order of i)
+
+The special case X[SJ(unique(grpcol)),...] is equivalent to key'd by,  I
+think.  Also note that X[SJ(grp),...] will be faster than X[J(grp),...]
+which is why 'by' does the former, but you have more control using the
+general form i and mult='all'.
+
+Does that all make sense?  Regardless, I'll add this change to the list -
+thanks.
+
+Best, Matthew
+
+
+> Tom, thanks for your vote.  :)
+>
+> Matthew, since Tom is on board on the change, I am curious whether this
+> change will impact the 'by' query behavior as well since both use the same
+> code (and are conceptually similar).? So, to get the current behavior, one
+> has to use nomatch=0 with the 'by' query to remove the NAs.? Do I
+> understand this correctly?
+>
+> I also thank you for so patiently listening to my questioning and engaging
+> me in a conversation.
+>
+>
+> Harish
+>
+>
+> --- On Sun, 8/1/10, Short, Tom <TShort at epri.com> wrote:
+>
+>> From: Short, Tom <TShort at epri.com>
+>> Subject: RE: [datatable-help] Unexpected behavior with mult="all"
+>> To: mdowle at mdowle.plus.com, "Harish" <harishv_99 at yahoo.com>
+>> Cc: datatable-help at lists.r-forge.r-project.org
+>> Date: Sunday, August 1, 2010, 5:00 PM
+>> I think I agree with Harish (not
+>> enough to look into it myself right
+>> now, though :).
+>>
+>> - Tom
+>>
+>>?
+>>
+>> > -----Original Message-----
+>> > From: datatable-help-bounces at lists.r-forge.r-project.org
+>>
+>> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>>
+>> > On Behalf Of Matthew Dowle
+>> > Sent: Sunday, August 01, 2010 17:06
+>> > To: Harish
+>> > Cc: datatable-help at lists.r-forge.r-project.org
+>> > Subject: Re: [datatable-help] Unexpected behavior with
+>> mult="all"
+>> >
+>> > Thanks for sticking with it. The reason that's
+>> happening is
+>> > that internally the same code that does grouping via
+>> 'by'
+>> > also does grouping via mult='all'. So its the same
+>> reason as
+>> > the other thread where we talking about 'by'
+>> collapsing away
+>> > NULL groups.
+>> >
+>> > But when you present it in that way I see what you
+>> mean. I'm
+>> > almost convinced. If Tom agrees that'll tip me and
+>> I'll add
+>> > it as a bug to fix.?
+>> >
+>> > As an aside to illustrate, the j gets evaluated for
+>> each
+>> > group with the mult='all', but just once without :
+>> >
+>> > > x[y,{cat('running j\n');list(d)}]
+>> > running j
+>> > [[1]]
+>> > [1]? 1? 2 NA NA
+>> >
+>> > > x[y,{cat('running j\n');list(d)},mult='all']
+>> > running j
+>> > running j
+>> >? ? ? a b V1
+>> > [1,] a A? 1
+>> > [2,] b A? 2
+>> > >
+>> >
+>> >
+>> >
+>> > On Sat, 2010-07-31 at 19:45 -0700, Harish wrote:
+>> > > Thanks for the detailed explanation.? My
+>> question about #1
+>> > is resolved.? You certainly gave me a lot to
+>> ponder over.
+>> > >
+>> > > I still am doubtful about my question #2 -- not
+>> getting NAs.
+>> > >
+>> > > x <-
+>> > >
+>> >
+>> data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3
+>> > ,4), key="a,b") y <-
+>> > data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+>> > > x[y]? ? ? ? ? ?
+>> ? ? ? ? ? # Expected: Getting NAs
+>> > > x[y,mult="all"]? ? ? ?
+>> ???# Expected: Getting NAs with mult="all"
+>> > > x[y,list(d)]? ? ? ? ?
+>> ? ? # Expected: Getting NAs with i
+>> > > x[y,list(d),mult="all"]???#
+>> Unexpected: No NAs with i & mult="all"
+>> > >
+>> > > > x[y]
+>> > >? ? ? ???a?
+>> ? b? d
+>> > > [1,]? ? a? ? A? 1
+>> > > [2,]? ? b? ? A? 2
+>> > > [3,] <NA> <NA> NA
+>> > > [4,] <NA> <NA> NA
+>> > >
+>> > > > x[y,mult="all"]
+>> > >? ? ? ???a?
+>> ? b? d
+>> > > [1,]? ? a? ? A? 1
+>> > > [2,]? ? b? ? A? 2
+>> > > [3,] <NA> <NA> NA
+>> > > [4,] <NA> <NA> NA
+>> > >
+>> > > > x[y,list(d)]
+>> > >? ? ???d
+>> > > [1,]? 1
+>> > > [2,]? 2
+>> > > [3,] NA
+>> > > [4,] NA
+>> > >
+>> > > > x[y,list(d),mult="all"]
+>> > >? ? ? a b d
+>> > > [1,] a A 1
+>> > > [2,] b A 2
+>> > >
+>> > >
+>> > > As you can see, the combination of having both i
+>> and
+>> > mult="all" is not generating the NAs.? Is there a
+>> reason for this?
+>> > >
+>> > >
+>> > > Regards,
+>> > > Harish
+>> > >
+>> > >
+>> > > --- On Sat, 7/31/10, Matthew Dowle <mdowle at mdowle.plus.com>
+>> wrote:
+>> > >
+>> > > > From: Matthew Dowle <mdowle at mdowle.plus.com>
+>> > > > Subject: Re: [datatable-help] Unexpected
+>> behavior with mult="all"
+>> > > > To: "Harish" <harishv_99 at yahoo.com>
+>> > > > Cc: datatable-help at lists.r-forge.r-project.org
+>> > > > Date: Saturday, July 31, 2010, 7:25 AM This
+>> is how I
+>> > think about it
+>> > > > currently :
+>> > > >
+>> > > > [1] The syntax of "x[y,d]" plus knowing how
+>> mult's
+>> > default value is
+>> > > > set ('first' in this case) means that a
+>> vector as long as
+>> > the number
+>> > > > of rows in y is the result so data.table
+>> does the least
+>> > work it can
+>> > > > and returns just the vector without adding
+>> in the data
+>> > already in y.
+>> > > > Changing mult
+>> > > > to "all" however means you'll usually get a
+>> varying
+>> > number of items
+>> > > > back for each row in y, so data.table
+>> includes the y columns as a
+>> > > > convenience since if it didn't the result
+>> would be
+>> > difficult to use
+>> > > > (you wouldn't know the correspondence).
+>> data.table tries
+>> > to do the
+>> > > > minimum, most efficient thing. If you want
+>> to be less efficient
+>> > > > (e.g.
+>> > > > adding columns
+>> > > > you already know) then it's for the user to
+>> add them back.
+>> > > > This is sort
+>> > > > of a principle.
+>> > > >
+>> > > > [2] nomatch is by default NA so this is the
+>> same as [1].
+>> > Is that any
+>> > > > chance a typo and you meant nomatch=0
+>> ?? If so then you
+>> > might have a
+>> > > > point and perhaps something needs changing
+>> there.
+>> > > >
+>> > > > The other way I think about mult='all' is
+>> grouping. The
+>> > > > documentation sometimes mentions 'by without
+>> by', or I might be
+>> > > > recalling emails or posts. Remember
+>> mult='all' gets automatically
+>> > > > set to 'all'
+>> > > > when you
+>> > > > match to not all of the columns of x's key.
+>> When mult='all'
+>> > > > I think to
+>> > > > myself "for each row of y fetch me all the
+>> rows from x that match
+>> > > > and eval j for that group, then move on to
+>> the next row
+>> > in y".? Its
+>> > > > kind of like a data specific 'by'. Once you
+>> realise mult='all' is
+>> > > > like a 'by'
+>> > > > remember that 'by' automatically adds in the
+>> 'by' columns to the
+>> > > > result.
+>> > > > Hence mult='all' behaves more like a 'by'
+>> with respect to
+>> > returning
+>> > > > data.table rather than vector.
+>> > > >
+>> > > > Example :
+>> > > >
+>> > > >???X = data.table(x=1:3,
+>> y=1:4, z=rnorm(12),
+>> > > > key="x,y")
+>> > > >???Y = data.table(x=1:3)
+>> > > >???X[Y,sum(z)] same as
+>> X[,sum(z),by=x]
+>> > > >
+>> > > > Then going further :
+>> > > >
+>> > > >???X[Y[<having>],sum(z)]
+>> faster than
+>> > > > X[,sum(z),by=x][<having>]
+>> > > >
+>> > > > Lets say <having> are groups where
+>> x>2 (just one group in this
+>> > > > example) :
+>> > > >
+>> > > >???X[Y[x>2],sum(z)] same
+>> but faster than X[,sum(z),by=x][x>2]
+>> > > >
+>> > > > which is the same as
+>> > > >
+>> > > >???X[J(3),sum(z)]
+>> > > >
+>> > > > if we knew we wanted group '3' in advance
+>> for example.
+>> > > >
+>> > > > These constructs (e.g. 'by without by')
+>> generalise to
+>> > > > list() of
+>> > > > expressions and function calls of column
+>> variables in the
+>> > usual way.
+>> > > >
+>> > > > Sometimes you do want mult='all', and run
+>> the j expression on the
+>> > > > result as a whole, not by row of Y.? In
+>> that case, assuming Y has
+>> > > > less columns than key(X) meaning mult='all'
+>> (as it is in this
+>> > > > example)
+>> > > > :
+>> > > >
+>> > > >? ???X[Y,length(z)]?
+>> ???
+>> > > > # j eval'd by row of Y, result 3 rows
+>> > > >?
+>> ???X[Y][,length(z)]? # length 1 vector
+>> value 12
+>> > > >
+>> > > > HTH?
+>> > > > Matthew
+>> > > >
+>> > > >
+>> > > > On Fri, 2010-07-30 at 19:28 -0700, Harish
+>> wrote:
+>> > > > > I am getting some unexpected behavior
+>> with
+>> > > > mult="all".
+>> > > > >
+>> > > > > 1) Getting a data table when I expect a
+>> vector
+>> > > > > 2) Not getting NA's when I expect them
+>> (because of
+>> > > > nomatch=NA)
+>> > > > >
+>> > > > > ==========
+>> > > > >
+>> > > > > Common code for examples below
+>> > > > >
+>> > > > > x <-
+>> > > >
+>> data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3,4),
+>> > > > key="a,b")
+>> > > > > y <-
+>> > > >
+>> data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+>> > > > >
+>> > > > > ==========
+>> > > > >
+>> > > > > Issue #1: Getting a data table when I
+>> expect a vector
+>> > > > >
+>> > > > > I am not following the logic of when a
+>> data.table is
+>> > > > returned and when a vector is
+>> returned.? Initially, I
+>> > thought that
+>> > > > if j had only one item without a list(), a
+>> vector is
+>> > returned, but I
+>> > > > am seeing some contrary behavior.
+>> > > > >
+>> > > > > x[y,d]? # Returns a vector as
+>> expected x[y,d,mult="all"]? #
+>> > > > > Returns a data.table.
+>> > > > Why?
+>> > > > >
+>> > > > > Would someone help me understand why I
+>> should not
+>> > > > expect a vector in the last query?
+>> > > > >
+>> > > > > ==========
+>> > > > > Issue #2: Not getting NA's when I
+>> expect them (because
+>> > > > of nomatch=NA)
+>> > > > >
+>> > > > > x[y,d,nomatch=NA]? # Expected:
+>> returns a vector
+>> > > > with NAs in them
+>> > > > > x[y,d,nomatch=NA,mult="all]? #
+>> Unexpected: NAs
+>> > > > not appearing
+>> > > > >
+>> > > > > Am I missing something?
+>> > > > >
+>> > > > > Harish
+>> > > > >
+>> > > > >
+>> > > > >
+>> > > > >? ? ???
+>> > > > >
+>> _______________________________________________
+>> > > > > datatable-help mailing list
+>> > > > > datatable-help at lists.r-forge.r-project.org
+>> > > > >
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datat
+>> > > > > able-help
+>> > > >
+>> > > >
+>> > > >
+>> > >
+>> > >
+>> > >
+>> > >? ? ???
+>> >
+>> >
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+>> atatable-help
+>> >
+>>
+>
+>
+>
+>
+>
+
+
+
+From harishv_99 at yahoo.com  Mon Aug  2 18:01:40 2010
+From: harishv_99 at yahoo.com (Harish)
+Date: Mon, 2 Aug 2010 09:01:40 -0700 (PDT)
+Subject: [datatable-help] Unexpectedly getting "Didn't allocate enough
+	rows..."
+Message-ID: <135327.73909.qm@web30803.mail.mud.yahoo.com>
+
+It looks good.? Thanks.
+
+Harish
+
+
+--- On Thu, 7/22/10, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+
+> From: Matthew Dowle <mdowle at mdowle.plus.com>
+> Subject: Re: [datatable-help] Unexpectedly getting "Didn't allocate enough rows..."
+> To: "Harish" <harishv_99 at yahoo.com>, datatable-help at lists.r-forge.r-project.org
+> Date: Thursday, July 22, 2010, 6:43 AM
+> This is now fixed, just committed.
+> Bug #952 raised by Georg closed.
+> Tests 173-175 added which includes Harish's test below.
+> If anyone can test and confirm, much appreciated.
+> Matthew
+> 
+> 
+> On Tue, 2010-07-13 at 00:24 +0100, Matthew Dowle wrote: 
+> > Thanks once again Harish. When I made the changes for
+> fast grouping I
+> > didn't quite finish it off hence the 'to implement' in
+> the message. I
+> > didn't want to hold up 1.4 going to CRAN because of
+> it. Sure enough
+> > pretty quickly after that, and more quickly than I
+> expected, Georg V
+> > added it to the bug tracker (#952) and I've been
+> meaning to get to it.
+> > 
+> > What happens is this. It allocates memory for the
+> largest group and
+> > re-uses that same memory for all groups. No allocation
+> and no garbage
+> > collection. Thats one reason its fast on the input
+> data side of things
+> > for each eval(j).? However on the output side its
+> also fast because it
+> > allocates the data.table result in advance. When it
+> gets the result of
+> > the j expression for each group, it sticks that data
+> directly into the
+> > result data.table at the correct row. It doesn't build
+> a list() of
+> > results which is then collapsed down.
+> > 
+> > It can't possibly know how many rows to allocate in
+> advance though,
+> > until it has run the j for all the groups, right?
+> True, so it tries to
+> > make a very good guess, optimised for most tasks. Most
+> of the time we
+> > either do i) single row aggregates (j is sum, mean, lm
+> etc), or ii) a
+> > subset of the group data (j is cumprod or [ or similar
+> returning
+> > multiple rows per group) or iii) NULL for the side
+> effect of plotting
+> > where no data output is required.
+> > 
+> > First, it runs the j for the first group. Depending on
+> the number of
+> > rows returned by the j on the first group it decides
+> how to allocate the
+> > result. If that is a single row for example, it
+> allocates 1*number of
+> > groups rows for the result. Most of the time thats
+> what we need. Then it
+> > proceeds to the 2nd group etc.
+> > 
+> > If it gets the guess wrong, then it needs to
+> re-allocate memory for the
+> > result using information from the later groups. Thats
+> what isn't done
+> > yet.? Its the right way to do it I think, but the
+> re-allocate just isn't
+> > implemented yet. In the vast majority of cases, it
+> should only need one
+> > re-allocate.
+> > 
+> > 'slow grow' means the method of either building up a
+> growing list()
+> > which is later collapsed, or growing the result slowly
+> for example in
+> > powers of two or by a fixed number of rows somehow.
+> > 
+> > Why the first group? I did try with the largest group
+> which improves the
+> > guess, but that messes up side-effect only plotting.
+> The plot appears
+> > for the largest group first, followed by group 1,
+> group 2, etc. It
+> > wasn't right and even then a re-allocate might still
+> be needed. So its
+> > cleaner to run for the first group, then make the good
+> guess, then
+> > proceed through groups 2 to n.
+> > 
+> > Long answer to a simple question I'm afraid.
+> > 
+> > Btw, you don't need to wrap with list in that example
+> :
+> >? ? DT[ , list(C[ C-min(C) < 5 ]),
+> by=list(A,B) ]
+> > you can just do this :
+> >? ? DT[ , C[ C-min(C) < 5 ], by=list(A,B)
+> ]
+> > 
+> > I'll see if I can implement the re-allocate soon. Or
+> if there any C
+> > programmers listening, then its this line
+> >? ? // TO DO: implement R_realloc(?) here
+> > that needs doing in dogroups.c.
+> > 
+> > Matthew
+> > 
+> > 
+> > On Sun, 2010-07-11 at 02:09 -0700, Harish wrote:
+> > > I am unexpectedly getting an error -- Didn't
+> allocate enough rows. Must grow ans (to implement as we
+> don't want default slow grow)
+> > > 
+> > > 
+> > > DT <- data.table(
+> > >? ? ? ? ?
+> A=c("a","a","b","b","d","c","a","d"),
+> > >? ? ? ? ?
+> B=c("x1","x2","x2","x1","x2","x1","x1","x2"),
+> > >? ? ? ? ?
+> C=c(5,2,3,4,9,5,1,9)
+> > >? ? ? ? ? )
+> > > DT[ , list(C[ C-min(C) < 3 ]), by=list(A,B)
+> ]? ? # Get error
+> > > 
+> > > DT[ , list(C[ C-min(C) < 5 ]), by=list(A,B)
+> ]? ? # No error (as expected)
+> > > 
+> > > 
+> > > Am I doing something that I shouldn't be?
+> > > 
+> > > 
+> > > Harish
+> > > 
+> > > 
+> > > 
+> > >? ? ???
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > 
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+> 
+>
+
+
+
+      
+
+From mdowle at mdowle.plus.com  Tue Aug  3 01:47:18 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 03 Aug 2010 00:47:18 +0100
+Subject: [datatable-help] Unexpectedly getting "Didn't allocate enough
+ rows..."
+In-Reply-To: <135327.73909.qm@web30803.mail.mud.yahoo.com>
+References: <135327.73909.qm@web30803.mail.mud.yahoo.com>
+Message-ID: <1280792838.27694.10.camel@Adam>
+
+Glad to hear that - thanks for confirming.
+Matthew
+
+P.S. This post is also excuse to test if new nabble mirror is
+working ...
+
+On Mon, 2010-08-02 at 09:01 -0700, Harish wrote:
+> It looks good.  Thanks.
+> 
+> Harish
+> 
+> 
+> --- On Thu, 7/22/10, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> 
+> > From: Matthew Dowle <mdowle at mdowle.plus.com>
+> > Subject: Re: [datatable-help] Unexpectedly getting "Didn't allocate enough rows..."
+> > To: "Harish" <harishv_99 at yahoo.com>, datatable-help at lists.r-forge.r-project.org
+> > Date: Thursday, July 22, 2010, 6:43 AM
+> > This is now fixed, just committed.
+> > Bug #952 raised by Georg closed.
+> > Tests 173-175 added which includes Harish's test below.
+> > If anyone can test and confirm, much appreciated.
+> > Matthew
+> > 
+> > 
+> > On Tue, 2010-07-13 at 00:24 +0100, Matthew Dowle wrote: 
+> > > Thanks once again Harish. When I made the changes for
+> > fast grouping I
+> > > didn't quite finish it off hence the 'to implement' in
+> > the message. I
+> > > didn't want to hold up 1.4 going to CRAN because of
+> > it. Sure enough
+> > > pretty quickly after that, and more quickly than I
+> > expected, Georg V
+> > > added it to the bug tracker (#952) and I've been
+> > meaning to get to it.
+> > > 
+> > > What happens is this. It allocates memory for the
+> > largest group and
+> > > re-uses that same memory for all groups. No allocation
+> > and no garbage
+> > > collection. Thats one reason its fast on the input
+> > data side of things
+> > > for each eval(j).  However on the output side its
+> > also fast because it
+> > > allocates the data.table result in advance. When it
+> > gets the result of
+> > > the j expression for each group, it sticks that data
+> > directly into the
+> > > result data.table at the correct row. It doesn't build
+> > a list() of
+> > > results which is then collapsed down.
+> > > 
+> > > It can't possibly know how many rows to allocate in
+> > advance though,
+> > > until it has run the j for all the groups, right?
+> > True, so it tries to
+> > > make a very good guess, optimised for most tasks. Most
+> > of the time we
+> > > either do i) single row aggregates (j is sum, mean, lm
+> > etc), or ii) a
+> > > subset of the group data (j is cumprod or [ or similar
+> > returning
+> > > multiple rows per group) or iii) NULL for the side
+> > effect of plotting
+> > > where no data output is required.
+> > > 
+> > > First, it runs the j for the first group. Depending on
+> > the number of
+> > > rows returned by the j on the first group it decides
+> > how to allocate the
+> > > result. If that is a single row for example, it
+> > allocates 1*number of
+> > > groups rows for the result. Most of the time thats
+> > what we need. Then it
+> > > proceeds to the 2nd group etc.
+> > > 
+> > > If it gets the guess wrong, then it needs to
+> > re-allocate memory for the
+> > > result using information from the later groups. Thats
+> > what isn't done
+> > > yet.  Its the right way to do it I think, but the
+> > re-allocate just isn't
+> > > implemented yet. In the vast majority of cases, it
+> > should only need one
+> > > re-allocate.
+> > > 
+> > > 'slow grow' means the method of either building up a
+> > growing list()
+> > > which is later collapsed, or growing the result slowly
+> > for example in
+> > > powers of two or by a fixed number of rows somehow.
+> > > 
+> > > Why the first group? I did try with the largest group
+> > which improves the
+> > > guess, but that messes up side-effect only plotting.
+> > The plot appears
+> > > for the largest group first, followed by group 1,
+> > group 2, etc. It
+> > > wasn't right and even then a re-allocate might still
+> > be needed. So its
+> > > cleaner to run for the first group, then make the good
+> > guess, then
+> > > proceed through groups 2 to n.
+> > > 
+> > > Long answer to a simple question I'm afraid.
+> > > 
+> > > Btw, you don't need to wrap with list in that example
+> > :
+> > >    DT[ , list(C[ C-min(C) < 5 ]),
+> > by=list(A,B) ]
+> > > you can just do this :
+> > >    DT[ , C[ C-min(C) < 5 ], by=list(A,B)
+> > ]
+> > > 
+> > > I'll see if I can implement the re-allocate soon. Or
+> > if there any C
+> > > programmers listening, then its this line
+> > >    // TO DO: implement R_realloc(?) here
+> > > that needs doing in dogroups.c.
+> > > 
+> > > Matthew
+> > > 
+> > > 
+> > > On Sun, 2010-07-11 at 02:09 -0700, Harish wrote:
+> > > > I am unexpectedly getting an error -- Didn't
+> > allocate enough rows. Must grow ans (to implement as we
+> > don't want default slow grow)
+> > > > 
+> > > > 
+> > > > DT <- data.table(
+> > > >         
+> > A=c("a","a","b","b","d","c","a","d"),
+> > > >         
+> > B=c("x1","x2","x2","x1","x2","x1","x1","x2"),
+> > > >         
+> > C=c(5,2,3,4,9,5,1,9)
+> > > >          )
+> > > > DT[ , list(C[ C-min(C) < 3 ]), by=list(A,B)
+> > ]    # Get error
+> > > > 
+> > > > DT[ , list(C[ C-min(C) < 5 ]), by=list(A,B)
+> > ]    # No error (as expected)
+> > > > 
+> > > > 
+> > > > Am I doing something that I shouldn't be?
+> > > > 
+> > > > 
+> > > > Harish
+> > > > 
+> > > > 
+> > > > 
+> > > >       
+> > > > _______________________________________________
+> > > > datatable-help mailing list
+> > > > datatable-help at lists.r-forge.r-project.org
+> > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > > 
+> > > 
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > 
+> > 
+> > 
+> >
+> 
+> 
+> 
+>       
+
+
+
+From mdowle at mdowle.plus.com  Tue Aug  3 02:22:15 2010
+From: mdowle at mdowle.plus.com (mdowle)
+Date: Mon, 2 Aug 2010 17:22:15 -0700 (PDT)
+Subject: [datatable-help] Nabble mirror
+Message-ID: <1280794935051-1017670.post@n3.nabble.com>
+
+
+
+This mailing list is now mirrored (due to request) at :
+
+http://datatable-help.959596.n3.nabble.com/
+
+History will be uploaded in the next few days hopefully.  It seems better
+for threaded viewing quickly and allows us to turn off mail delivery to our
+inbox if we prefer.  Please keep subscribed to the list as you need to be
+subscribed to post.
+
+Gmane mirror has also been requested:  gmane.comp.lang.r.datatable
+
+Matthew
+
+[ Sent from Nabble as a test ]
+
+-- 
+View this message in context: http://datatable-help.959596.n3.nabble.com/Nabble-mirror-tp1017670p1017670.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From TShort at epri.com  Tue Aug  3 04:28:13 2010
+From: TShort at epri.com (Short, Tom)
+Date: Mon, 2 Aug 2010 19:28:13 -0700
+Subject: [datatable-help] Wonder whether there is an easier way to
+	changepart of data.table values
+References: <AANLkTi=hNtHVsr=gd7y6dk+NbAtNPrpSFSM3nGUSZwPa@mail.gmail.com> 
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E305BA020D@uspalex03.epri.com>
+
+I've just checked in versions of [<-.data.table and $<-.data.table that
+check for the columns adjusted and reset the key if appropriate. This
+brings up some incompatibilities:
+
+(*) KEYS -- Before, you could do:
+
+dt$key_column = anything
+
+And it wouldn't change the status of the key. Now, the key will be
+nullified.
+
+(*) ASSIGNMENT DIFFERENCE
+
+Before: dt["a"] <- "b" meant change column a.
+Now:    dt[,"a"] <- "b" 
+
+Now, you can do 
+dt[J("a"), "somecol"] <- 33 means assign 33 to the column "somecol"
+based on the key being equal to "a".
+
+(*) QUESTIONS
+
+- Do we need a "keep.key" argument for cases where we don't want the key
+nullified (the user knows the order is unaffected). This isn't really
+possible for dt$a[1:4] <- something.
+
+- Is it a good idea to use data.table-style indexing for the i part of
+[<-.data.table? I was skeptical when Branson first asked (prefering
+data.frame compatibility), but it makes more sense now that I think
+about it.
+
+Finally, we should put a warning in the documentation somewhere that
+functions that re-arrange or assign values to a data frame may "corrupt"
+the key of a data.table. Data.table-aware functions should account for
+this, but other functions may not.
+
+- Tom
+ 
+
+> -----Original Message-----
+> From: Short, Tom 
+> Sent: Thursday, July 29, 2010 15:39
+> To: 'Branson Owen'; datatable-help at lists.r-forge.r-project.org
+> Subject: RE: [datatable-help] Wonder whether there is an 
+> easier way to changepart of data.table values
+> 
+> Branson,
+> 
+> [<-.data.table and $<-.data.table both need a bit of work. 
+> 
+> > DT <- data.table(A = c("A", "Z"), Z = 1:10, key = "A")
+> > 
+> 
+> You've found the DT$column[index] = new value approach, but 
+> if you use that on keys, DT may no longer be sorted right:
+> 
+> > DT$A[10] <- "A"
+> > DT
+>       A   Z
+>  [1,] A   1
+>  [2,] A   3
+>  [3,] A   5
+>  [4,] A   7
+>  [5,] A   9
+>  [6,] Z   2
+>  [7,] Z   4
+>  [8,] Z   6
+>  [9,] Z   8
+> [10,] A 100
+> 
+> Since we now inherit from data.frames, we can just use 
+> [<-.data.frame. It still has the problem that it won't remove 
+> the key if the key'd column changes.
+> 
+> > 
+> > `[<-.data.table` <- `[<-.data.frame`
+> > DT[9,"Z"] <- 22
+> > DT
+>       A   Z
+>  [1,] A   1
+>  [2,] A   3
+>  [3,] A   5
+>  [4,] A   7
+>  [5,] A   9
+>  [6,] Z   2
+>  [7,] Z   4
+>  [8,] Z   6
+>  [9,] Z  22
+> [10,] A 100
+> 
+> I'm not sure we want to be able to do DT[select,] <- something.
+> 
+> Something like the following will work for a simple select:
+> 
+> > DT <- data.table(A = c("A", "Z"), Z = 1:10, key = "A") 
+> > `[<-.data.table` <- `[<-.data.frame` DT[DT[J("A"), which=TRUE, 
+> > mult="all"], "Z"] <- 44 DT
+>       A  Z
+>  [1,] A 44
+>  [2,] A 44
+>  [3,] A 44
+>  [4,] A 44
+>  [5,] A 44
+>  [6,] Z  2
+>  [7,] Z  4
+>  [8,] Z  6
+>  [9,] Z  8
+> [10,] Z 10
+> 
+> The following is equivalent:
+> 
+> > DT$Z[DT[J("A"), which=TRUE, mult="all"]] <- 55 DT
+>       A  Z
+>  [1,] A 55
+>  [2,] A 55
+>  [3,] A 55
+>  [4,] A 55
+>  [5,] A 55
+>  [6,] Z  2
+>  [7,] Z  4
+>  [8,] Z  6
+>  [9,] Z  8
+> [10,] Z 10
+> 
+> I'd prefer to use as much of [<-.data.frame and 
+> $<-.data.frame as possible.  $<-.data.frame is pretty easy:
+> 
+> > "$<-.data.table" = function (x, name, value) {
+> +     res <- `$<-.data.frame`(x, name, value)
+> +     if (any(name %in% key(x)))
+> +         key(res) <- NULL
+> +     res
+> + }
+> > DT <- data.table(A = c("A", "Z"), Z = 1:10, key = "A") DT$Z[3] <- 33
+> > key(DT)
+> [1] "A"
+> > DT$A[10] <- "A"
+> > key(DT)
+> NULL
+> > DT
+>       A  Z
+>  [1,] A  1
+>  [2,] A  3
+>  [3,] A 33
+>  [4,] A  7
+>  [5,] A  9
+>  [6,] Z  2
+>  [7,] Z  4
+>  [8,] Z  6
+>  [9,] Z  8
+> [10,] A 10
+> 
+> This doesn't allow x to be a data.table-style select. If we 
+> want that, I could experiment some.
+> 
+> [<-.data.table is more challenging, but I could take a shot 
+> on a plane ride next week.
+> 
+> - Tom 
+> 
+>  
+> 
+> > -----Original Message-----
+> > From: datatable-help-bounces at lists.r-forge.r-project.org
+> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> > On Behalf Of Branson Owen
+> > Sent: Thursday, July 29, 2010 14:39
+> > To: datatable-help at lists.r-forge.r-project.org
+> > Subject: [datatable-help] Wonder whether there is an easier way to 
+> > changepart of data.table values
+> > 
+> > I thought I have no more question, but ... Please take your time to 
+> > respond, I don't want to overwhelm your time.
+> > 
+> > ** I want to only change values for certain rows of 
+> selected columns. 
+> > **
+> > 
+> > In data.frame, I can do something like:
+> > 
+> > > DF[row index, "column"] = new value.
+> > 
+> > In data.table, this has been disabled even using "with = FALSE"
+> > 
+> > >DT[3,"Z", with = FALSE]
+> > 
+> >        Z
+> > [1,] 20
+> > 
+> > > DT[3,"Z", with = FALSE] <- 1
+> > Error in `[<-.data.table`(`*tmp*`, 3, "Z", with = FALSE, 
+> value = 1) :
+> >   unused argument(s) (with = FALSE)
+> > 
+> > 
+> > Actually, I found that there is no way I can edit value 
+> using [,] in 
+> > DT. The only way I found to change value is using 
+> DT$column[index] = 
+> > new value
+> > 
+> > This would make the following task difficult:
+> > 
+> > # DOES NOT WORK #
+> > > DT[join/select, {
+> > columnA <- calculation based on columnB, C, D, ...
+> > }]
+> > # DOES NOT WORK #
+> > 
+> > It didn't complain, but it doesn't change value at all. I 
+> guess this 
+> > is due to the syntax of with in data.frame because it doesn't work 
+> > there, either.
+> > 
+> > At this moment, my solution is:
+> > > DT[join/select, {
+> > DT$columnA[index] <<- calculation based on columnB, C, D, ...
+> > }]
+> > 
+> > with the help of DT$columnA[index] and super assign <<-. We 
+> also need 
+> > to either get index by ourselves like DT[select/join, which = T] or 
+> > store it first. Not sure whether this is the best solution.
+> > 
+> > In DF, it would be
+> > 
+> > > index = using scan
+> > > DF[index, columnA] = with(DF, calculation based on columnB,
+> > C, D, ...)
+> > 
+> > Note that this doesn't work for DT. At this moment, the only way I 
+> > found to edit DT is
+> > > DT$column[index] = new value
+> > 
+> > I don't think my example is uncommon, but I can't find 
+> common solution 
+> > using data.table. Maybe, I missed something.
+> > 
+> > Any comments will be highly appreciated. Thank you very 
+> much again for 
+> > your help.
+> > 
+> > Best regards,
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> atatable-help
+> > 
+
+From branson.owen at gmail.com  Tue Aug  3 15:18:29 2010
+From: branson.owen at gmail.com (Branson Owen)
+Date: Tue, 3 Aug 2010 08:18:29 -0500
+Subject: [datatable-help] Wonder whether there is an easier way to
+	changepart of data.table values
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E305BA020D@uspalex03.epri.com>
+References: <AANLkTi=hNtHVsr=gd7y6dk+NbAtNPrpSFSM3nGUSZwPa@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E305BA020D@uspalex03.epri.com>
+Message-ID: <AANLkTimUtGrh6a=VFFWd+tP2zF1Z6dPvGRDg92W3sS6K@mail.gmail.com>
+
+Wow, thanks a lot Tom!
+
+2010/8/2 Short, Tom <TShort at epri.com>:
+> I've just checked in versions of [<-.data.table and $<-.data.table that
+> check for the columns adjusted and reset the key if appropriate. This
+> brings up some incompatibilities:
+> (*) KEYS -- Before, you could do:
+> dt$key_column = anything
+> And it wouldn't change the status of the key. Now, the key will be nullified.
+
+I think it is an expected behavior. Key is not supposed to be changed
+when it is still key.
+
+> (*) ASSIGNMENT DIFFERENCE
+> Before: dt["a"] <- "b" meant change column a.
+> Now: ? ?dt[,"a"] <- "b"
+> Now, you can do
+> dt[J("a"), "somecol"] <- 33 means assign 33 to the column "somecol" based on the key being equal to "a".
+
+This is cool. dt[,"a"] is clearer than dt["a"] to me.
+
+> (*) QUESTIONS
+> - Do we need a "keep.key" argument for cases where we don't want the key nullified (the user knows the order is unaffected). This isn't really possible for dt$a[1:4] <- something.
+
+I think advanced user would prefer to have this option if it's not too
+hard to provide. So far we trust the speed of re-setting the key but
+when data size reach a certain amount, this might be an issue.
+
+> - Is it a good idea to use data.table-style indexing for the i part of
+> [<-.data.table? I was skeptical when Branson first asked (prefering
+> data.frame compatibility), but it makes more sense now that I think
+> about it.
+
+I think that will be very sweet features, and also more complete for
+replacing data.frame. I think all data.table users feel that they can
+completely replace data.frame using data.table, but this is a case
+where we have to roll back.
+
+> Finally, we should put a warning in the documentation somewhere that
+> functions that re-arrange or assign values to a data frame may "corrupt"
+> the key of a data.table. Data.table-aware functions should account for
+> this, but other functions may not.
+
+A short list of cases (syntaxes) for when key will be automatically
+removed will be great!
+
+From mdowle at mdowle.plus.com  Thu Aug  5 22:37:10 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 05 Aug 2010 21:37:10 +0100
+Subject: [datatable-help] Nabble mirror
+In-Reply-To: <1280794935051-1017670.post@n3.nabble.com>
+References: <1280794935051-1017670.post@n3.nabble.com>
+Message-ID: <1281040630.6726.15.camel@Adam>
+
+The nabble mirror has moved to be a sub-forum of R :
+
+   http://r.789695.n4.nabble.com/datatable-help-f2315188.html
+
+The previous link no longer works.
+
+It's now easier to find: from the www.nabble.com homepage click "R" in
+the list, then click the "Sub-Forums" link near the top.
+
+The history has been uploaded and it tallies with my counts, although
+the threads don't always seem to be grouped. If anyone knows why that
+might be happening please let me know.
+
+Matthew
+
+
+
+On Mon, 2010-08-02 at 17:22 -0700, mdowle wrote:
+> 
+> This mailing list is now mirrored (due to request) at :
+> 
+> http://datatable-help.959596.n3.nabble.com/
+> 
+> History will be uploaded in the next few days hopefully.  It seems better
+> for threaded viewing quickly and allows us to turn off mail delivery to our
+> inbox if we prefer.  Please keep subscribed to the list as you need to be
+> subscribed to post.
+> 
+> Gmane mirror has also been requested:  gmane.comp.lang.r.datatable
+> 
+> Matthew
+> 
+> [ Sent from Nabble as a test ]
+> 
+
+
+
+From harishv_99 at yahoo.com  Fri Aug  6 10:13:25 2010
+From: harishv_99 at yahoo.com (Harish)
+Date: Fri, 6 Aug 2010 01:13:25 -0700 (PDT)
+Subject: [datatable-help] Wonder whether there is an easier way to
+	changepart of data.table values
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E305BA020D@uspalex03.epri.com>
+Message-ID: <44551.53033.qm@web30808.mail.mud.yahoo.com>
+
+Thought #1 -- Consistency
+----------
+
+Quick thought -- would it be more consistent if the interface took in the name of the variable directly rather than a string?
+
+In other words, would
+   dt[,a] <- "b"
+be more consistent with the existing data.table interface than
+   dt[,"a"] <- "b"
+?
+
+Then again, taking in a string of the column name avoids the temptation to having complex expressions (like a+23*c) as the name of the column.  Although I just argued against my own point, I am curious what other people think.
+
+
+Thought #2 -- Alternative interfaces suggested in past
+----------
+
+Also, there were some other messages in the past discussing having an interface similar to:
+   dt[,{a = "b"}]
+   dt[,{T(temp_a) = "b"; a = temp_a}]
+   etc.
+
+What are the merits of having the ability to set values integrated into the "[.data.table" function?
+
+Regards,
+Harish
+
+
+--- On Mon, 8/2/10, Short, Tom <TShort at epri.com> wrote:
+
+> From: Short, Tom <TShort at epri.com>
+> Subject: Re: [datatable-help] Wonder whether there is an easier way to changepart of data.table values
+> To: "Branson Owen" <branson.owen at gmail.com>, datatable-help at lists.r-forge.r-project.org
+> Date: Monday, August 2, 2010, 7:28 PM
+> I've just checked in versions of
+> [<-.data.table and $<-.data.table that
+> check for the columns adjusted and reset the key if
+> appropriate. This
+> brings up some incompatibilities:
+> 
+> (*) KEYS -- Before, you could do:
+> 
+> dt$key_column = anything
+> 
+> And it wouldn't change the status of the key. Now, the key
+> will be
+> nullified.
+> 
+> (*) ASSIGNMENT DIFFERENCE
+> 
+> Before: dt["a"] <- "b" meant change column a.
+> Now:? ? dt[,"a"] <- "b" 
+> 
+> Now, you can do 
+> dt[J("a"), "somecol"] <- 33 means assign 33 to the
+> column "somecol"
+> based on the key being equal to "a".
+> 
+> (*) QUESTIONS
+> 
+> - Do we need a "keep.key" argument for cases where we don't
+> want the key
+> nullified (the user knows the order is unaffected). This
+> isn't really
+> possible for dt$a[1:4] <- something.
+> 
+> - Is it a good idea to use data.table-style indexing for
+> the i part of
+> [<-.data.table? I was skeptical when Branson first asked
+> (prefering
+> data.frame compatibility), but it makes more sense now that
+> I think
+> about it.
+> 
+> Finally, we should put a warning in the documentation
+> somewhere that
+> functions that re-arrange or assign values to a data frame
+> may "corrupt"
+> the key of a data.table. Data.table-aware functions should
+> account for
+> this, but other functions may not.
+> 
+> - Tom
+>  
+
+
+
+      
+
+From dbetebenner at nciea.org  Tue Aug 10 12:49:45 2010
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Tue, 10 Aug 2010 05:49:45 -0500
+Subject: [datatable-help] Behavior of setkey with factors
+In-Reply-To: <6E309EB2B860E64B9C39C13412B314B44A6CC0156C@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB6948E937E0C5@AUSP01VMBX05.collaborationhost.net><2aec1d1873262697af866bea39f85879.squirrel@webmail.plus.net>
+	<8AD9137B75B37049AA711A4B64CEDB6948E937E159@AUSP01VMBX05.collaborationhost.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3058908EA@uspalex03.epri.com>
+	<8AD9137B75B37049AA711A4B64CEDB6948E937E1BD@AUSP01VMBX05.collaborationhost.net>
+	<37f568e9cc99aa55ed1f6ae12e394909.squirrel@webmail.plus.net>
+	<6E309EB2B860E64B9C39C13412B314B44A6CC0156C@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB6948EA1B5D2B@AUSP01VMBX05.collaborationhost.net>
+
+All,
+
+I was wondering how setkey orders a factor and whether it observes whether the factor is ordered or just alphabetically orders the factor 
+
+I would like to have the key observe the order of a factor (e.g., a course taken field may run from 1 to 5 with 1=Basic Math, 2=Calculus, 3=Geometry,
+4=Algebra I and 5=Algebra 2. I would like the sort imposed by data.table to "respect" the canonical ordering of the classes, no an alphabetical ordering.
+
+I can't however, seem to get the key to behave the way I want.
+
+Here's an example:
+
+setkey(123)
+my.course.sample <- sample(1:5, 10, replace=TRUE)
+
+X <- 1:10
+Y <- factor(my.course.sample, levels=1:5, labels=c("Basic Math", "Calculus", "Geometry", "Algebra I", "Algebra II"))
+
+my.dt <- data.table(ID=X, COURSE=Y)
+
+> my.dt
+      ID     COURSE
+ [1,]  1 Algebra II
+ [2,]  2  Algebra I
+ [3,]  3  Algebra I
+ [4,]  4 Algebra II
+ [5,]  5   Geometry
+ [6,]  6  Algebra I
+ [7,]  7   Geometry
+ [8,]  8   Calculus
+ [9,]  9  Algebra I
+[10,] 10   Geometry
+
+
+setkey(my.dt, COURSE)
+
+> my.dt
+      ID     COURSE
+ [1,]  2  Algebra I
+ [2,]  3  Algebra I
+ [3,]  6  Algebra I
+ [4,]  9  Algebra I
+ [5,]  1 Algebra II
+ [6,]  4 Algebra II
+ [7,]  8   Calculus
+ [8,]  5   Geometry
+ [9,]  7   Geometry
+[10,] 10   Geometry
+
+
+###
+### The COURSE key is alphabetizing based upon the labels
+###
+
+###
+### Now try to impose a different ordering
+###
+
+Y <- factor(my.course.sample, levels=c(1,4,3,5,2), labels=c("Basic Math", "Calculus", "Geometry", "Algebra I", "Algebra II"))
+
+my.dt <- data.table(ID=X, COURSE=Y)
+
+> my.dt
+      ID     COURSE
+ [1,]  1  Algebra I
+ [2,]  2   Calculus
+ [3,]  3   Calculus
+ [4,]  4  Algebra I
+ [5,]  5   Geometry
+ [6,]  6   Calculus
+ [7,]  7   Geometry
+ [8,]  8 Algebra II
+ [9,]  9   Calculus
+[10,] 10   Geometry
+
+setkey(my.dt, COURSE)
+
+> my.dt
+      ID     COURSE
+ [1,]  1  Algebra I
+ [2,]  3  Algebra I
+ [3,]  9  Algebra I
+ [4,]  2 Algebra II
+ [5,]  4 Algebra II
+ [6,]  8 Algebra II
+ [7,]  7 Basic Math
+ [8,]  5   Calculus
+ [9,]  6   Calculus
+[10,] 10   Geometry
+
+
+Y <- factor(my.course.sample, levels=c(1,4,3,5,2), labels=c("Basic Math", "Calculus", "Geometry", "Algebra I", "Algebra II"), ordered=TRUE)
+
+my.dt <- data.table(ID=X, COURSE=Y)
+
+my.dt
+
+      ID     COURSE
+ [1,]  1  Algebra I
+ [2,]  2   Calculus
+ [3,]  3   Calculus
+ [4,]  4  Algebra I
+ [5,]  5   Geometry
+ [6,]  6   Calculus
+ [7,]  7   Geometry
+ [8,]  8 Algebra II
+ [9,]  9   Calculus
+[10,] 10   Geometry
+
+setkey(my.dt, COURSE)
+
+my.dt
+
+      ID     COURSE
+ [1,]  1  Algebra I
+ [2,]  4  Algebra I
+ [3,]  8 Algebra II
+ [4,]  2   Calculus
+ [5,]  3   Calculus
+ [6,]  6   Calculus
+ [7,]  9   Calculus
+ [8,]  5   Geometry
+ [9,]  7   Geometry
+[10,] 10   Geometry
+
+
+### Setting COURSE as the key for an ordered factor seems to over-ride the ordering associated with the factor and impose an alphabetical order.
+
+
+I'd like the key to respect the order associated with the factor
+
+
+Any help with this greatly appreciated.
+
+
+Best regards,
+
+
+
+Damian Betebenner
+Center for Assessment
+PO Box 351
+Dover, NH?? 03821-0351
+?
+Phone (office): (603) 516-7900
+Phone (cell): (857) 234-2474
+Fax: (603) 516-7910
+
+dbetebenner at nciea.org
+www.nciea.org
+
+
+
+From TShort at epri.com  Tue Aug 10 13:34:41 2010
+From: TShort at epri.com (Short, Tom)
+Date: Tue, 10 Aug 2010 04:34:41 -0700
+Subject: [datatable-help] Behavior of setkey with factors
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB6948EA1B5D2B@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB6948E937E0C5@AUSP01VMBX05.collaborationhost.net><2aec1d1873262697af866bea39f85879.squirrel@webmail.plus.net><8AD9137B75B37049AA711A4B64CEDB6948E937E159@AUSP01VMBX05.collaborationhost.net><72CF3C50F4AF5B4BB678383F11CEF0E3058908EA@uspalex03.epri.com><8AD9137B75B37049AA711A4B64CEDB6948E937E1BD@AUSP01VMBX05.collaborationhost.net><37f568e9cc99aa55ed1f6ae12e394909.squirrel@webmail.plus.net><6E309EB2B860E64B9C39C13412B314B44A6CC0156C@AUSP01VMBX05.collaborationhost.net>
+	<8AD9137B75B37049AA711A4B64CEDB6948EA1B5D2B@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E305CAF505@uspalex03.epri.com>
+
+Damian, 
+
+The fast lookup of data.table relies on the keys being sorted alphabetically. If you do dt["Algebra II"], data.table uses an alphabetic lookup to find "Algebra II". Speed is the reason (I think). If you had many levels in the factor, the lookup to map the character to the integer would be slow.
+
+One way around this is to set a key based on an integer and use an indexing data.table to look up the course. Here's an example:
+
+> set.seed(100)
+> my.course.sample <- sample(1:5, 10, replace=TRUE)
+> X <- 1:10
+> Y <- factor(my.course.sample, levels=1:5, labels=c("Basic Math", "Calculus", "Geometry", "Algebra I", "Algebra II"))
+> my.dt <- data.table(ID=X, COURSE=Y, k = as.integer(Y), key="k")
+> my.dt
+      ID     COURSE k
+ [1,]  4 Basic Math 1
+ [2,] 10 Basic Math 1
+ [3,]  1   Calculus 2
+ [4,]  2   Calculus 2
+ [5,]  8   Calculus 2
+ [6,]  3   Geometry 3
+ [7,]  5   Geometry 3
+ [8,]  6   Geometry 3
+ [9,]  9   Geometry 3
+[10,]  7 Algebra II 5
+> idx <- data.table(k = 1:5,  course=c("Basic Math", "Calculus", "Geometry", "Algebra I", "Algebra II"), key = "course")
+> my.dt[J(idx["Basic Math", k]), mult="all"]
+     ID     COURSE k
+[1,]  4 Basic Math 1
+[2,] 10 Basic Math 1
+> my.dt[J(idx["Algebra II", k]), mult="all"]
+     ID     COURSE k
+[1,]  7 Algebra II 5
+
+If you use something like that a lot, you could create a little function to improve the notation a bit.
+
+- Tom
+
+
+ 
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Damian Betebenner
+> Sent: Tuesday, August 10, 2010 06:50
+> To: datatable-help at lists.r-forge.r-project.org
+> Subject: [datatable-help] Behavior of setkey with factors
+> 
+> All,
+> 
+> I was wondering how setkey orders a factor and whether it 
+> observes whether the factor is ordered or just alphabetically 
+> orders the factor 
+> 
+> I would like to have the key observe the order of a factor 
+> (e.g., a course taken field may run from 1 to 5 with 1=Basic 
+> Math, 2=Calculus, 3=Geometry, 4=Algebra I and 5=Algebra 2. I 
+> would like the sort imposed by data.table to "respect" the 
+> canonical ordering of the classes, no an alphabetical ordering.
+> 
+> I can't however, seem to get the key to behave the way I want.
+> 
+> Here's an example:
+> 
+> setkey(123)
+> my.course.sample <- sample(1:5, 10, replace=TRUE)
+> 
+> X <- 1:10
+> Y <- factor(my.course.sample, levels=1:5, labels=c("Basic 
+> Math", "Calculus", "Geometry", "Algebra I", "Algebra II"))
+> 
+> my.dt <- data.table(ID=X, COURSE=Y)
+> 
+> > my.dt
+>       ID     COURSE
+>  [1,]  1 Algebra II
+>  [2,]  2  Algebra I
+>  [3,]  3  Algebra I
+>  [4,]  4 Algebra II
+>  [5,]  5   Geometry
+>  [6,]  6  Algebra I
+>  [7,]  7   Geometry
+>  [8,]  8   Calculus
+>  [9,]  9  Algebra I
+> [10,] 10   Geometry
+> 
+> 
+> setkey(my.dt, COURSE)
+> 
+> > my.dt
+>       ID     COURSE
+>  [1,]  2  Algebra I
+>  [2,]  3  Algebra I
+>  [3,]  6  Algebra I
+>  [4,]  9  Algebra I
+>  [5,]  1 Algebra II
+>  [6,]  4 Algebra II
+>  [7,]  8   Calculus
+>  [8,]  5   Geometry
+>  [9,]  7   Geometry
+> [10,] 10   Geometry
+> 
+> 
+> ###
+> ### The COURSE key is alphabetizing based upon the labels ###
+> 
+> ###
+> ### Now try to impose a different ordering ###
+> 
+> Y <- factor(my.course.sample, levels=c(1,4,3,5,2), 
+> labels=c("Basic Math", "Calculus", "Geometry", "Algebra I", 
+> "Algebra II"))
+> 
+> my.dt <- data.table(ID=X, COURSE=Y)
+> 
+> > my.dt
+>       ID     COURSE
+>  [1,]  1  Algebra I
+>  [2,]  2   Calculus
+>  [3,]  3   Calculus
+>  [4,]  4  Algebra I
+>  [5,]  5   Geometry
+>  [6,]  6   Calculus
+>  [7,]  7   Geometry
+>  [8,]  8 Algebra II
+>  [9,]  9   Calculus
+> [10,] 10   Geometry
+> 
+> setkey(my.dt, COURSE)
+> 
+> > my.dt
+>       ID     COURSE
+>  [1,]  1  Algebra I
+>  [2,]  3  Algebra I
+>  [3,]  9  Algebra I
+>  [4,]  2 Algebra II
+>  [5,]  4 Algebra II
+>  [6,]  8 Algebra II
+>  [7,]  7 Basic Math
+>  [8,]  5   Calculus
+>  [9,]  6   Calculus
+> [10,] 10   Geometry
+> 
+> 
+> Y <- factor(my.course.sample, levels=c(1,4,3,5,2), 
+> labels=c("Basic Math", "Calculus", "Geometry", "Algebra I", 
+> "Algebra II"), ordered=TRUE)
+> 
+> my.dt <- data.table(ID=X, COURSE=Y)
+> 
+> my.dt
+> 
+>       ID     COURSE
+>  [1,]  1  Algebra I
+>  [2,]  2   Calculus
+>  [3,]  3   Calculus
+>  [4,]  4  Algebra I
+>  [5,]  5   Geometry
+>  [6,]  6   Calculus
+>  [7,]  7   Geometry
+>  [8,]  8 Algebra II
+>  [9,]  9   Calculus
+> [10,] 10   Geometry
+> 
+> setkey(my.dt, COURSE)
+> 
+> my.dt
+> 
+>       ID     COURSE
+>  [1,]  1  Algebra I
+>  [2,]  4  Algebra I
+>  [3,]  8 Algebra II
+>  [4,]  2   Calculus
+>  [5,]  3   Calculus
+>  [6,]  6   Calculus
+>  [7,]  9   Calculus
+>  [8,]  5   Geometry
+>  [9,]  7   Geometry
+> [10,] 10   Geometry
+> 
+> 
+> ### Setting COURSE as the key for an ordered factor seems to 
+> over-ride the ordering associated with the factor and impose 
+> an alphabetical order.
+> 
+> 
+> I'd like the key to respect the order associated with the factor
+> 
+> 
+> Any help with this greatly appreciated.
+> 
+> 
+> Best regards,
+> 
+> 
+> 
+> Damian Betebenner
+> Center for Assessment
+> PO Box 351
+> Dover, NH?? 03821-0351
+> ?
+> Phone (office): (603) 516-7900
+> Phone (cell): (857) 234-2474
+> Fax: (603) 516-7910
+> 
+> dbetebenner at nciea.org
+> www.nciea.org
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From mdowle at mdowle.plus.com  Tue Aug 10 15:00:50 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 10 Aug 2010 14:00:50 +0100
+Subject: [datatable-help] Behavior of setkey with factors
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E305CAF505@uspalex03.epri.com>
+References: <8AD9137B75B37049AA711A4B64CEDB6948E937E0C5@AUSP01VMBX05.collaborationhost.net><2aec1d1873262697af866bea39f85879.squirrel@webmail.plus.net><8AD9137B75B37049AA711A4B64CEDB6948E937E159@AUSP01VMBX05.collaborationhost.net><72CF3C50F4AF5B4BB678383F11CEF0E3058908EA@uspalex03.epri.com><8AD9137B75B37049AA711A4B64CEDB6948E937E1BD@AUSP01VMBX05.collaborationhost.net><37f568e9cc99aa55ed1f6ae12e394909.squirrel@webmail.plus.net><6E309EB2B860E64B9C39C13412B314B44A6CC0156C@AUSP01VMBX05.collaborationhost.net>
+	<8AD9137B75B37049AA711A4B64CEDB6948EA1B5D2B@AUSP01VMBX05.collaborationhost.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E305CAF505@uspalex03.epri.com>
+Message-ID: <a110fbbd086495e6a1cdf61968e0415a.squirrel@webmail.plus.net>
+
+
+Exactly. We often have 000's of levels, or even 0000's or 00000's.
+Internally sortedmatch() takes advantage that the levels are sorted.
+
+One simple solution, and what I do sometimes, is to put the ordering into
+the level name: "01. Basic math", "02. Calculus", "03. Algebra I".  There
+is very little performance penalty as those strings get hashed by R
+anyway. If you need to remove the prefix for presentation purposes, just
+"substring(course,5)" afterwards.
+
+Matthew
+
+
+> Damian,
+>
+> The fast lookup of data.table relies on the keys being sorted
+> alphabetically. If you do dt["Algebra II"], data.table uses an alphabetic
+> lookup to find "Algebra II". Speed is the reason (I think). If you had
+> many levels in the factor, the lookup to map the character to the integer
+> would be slow.
+>
+> One way around this is to set a key based on an integer and use an
+> indexing data.table to look up the course. Here's an example:
+>
+>> set.seed(100)
+>> my.course.sample <- sample(1:5, 10, replace=TRUE)
+>> X <- 1:10
+>> Y <- factor(my.course.sample, levels=1:5, labels=c("Basic Math",
+>> "Calculus", "Geometry", "Algebra I", "Algebra II"))
+>> my.dt <- data.table(ID=X, COURSE=Y, k = as.integer(Y), key="k")
+>> my.dt
+>       ID     COURSE k
+>  [1,]  4 Basic Math 1
+>  [2,] 10 Basic Math 1
+>  [3,]  1   Calculus 2
+>  [4,]  2   Calculus 2
+>  [5,]  8   Calculus 2
+>  [6,]  3   Geometry 3
+>  [7,]  5   Geometry 3
+>  [8,]  6   Geometry 3
+>  [9,]  9   Geometry 3
+> [10,]  7 Algebra II 5
+>> idx <- data.table(k = 1:5,  course=c("Basic Math", "Calculus",
+>> "Geometry", "Algebra I", "Algebra II"), key = "course")
+>> my.dt[J(idx["Basic Math", k]), mult="all"]
+>      ID     COURSE k
+> [1,]  4 Basic Math 1
+> [2,] 10 Basic Math 1
+>> my.dt[J(idx["Algebra II", k]), mult="all"]
+>      ID     COURSE k
+> [1,]  7 Algebra II 5
+>
+> If you use something like that a lot, you could create a little function
+> to improve the notation a bit.
+>
+> - Tom
+>
+>
+>
+>
+>> -----Original Message-----
+>> From: datatable-help-bounces at lists.r-forge.r-project.org
+>> [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>> On Behalf Of Damian Betebenner
+>> Sent: Tuesday, August 10, 2010 06:50
+>> To: datatable-help at lists.r-forge.r-project.org
+>> Subject: [datatable-help] Behavior of setkey with factors
+>>
+>> All,
+>>
+>> I was wondering how setkey orders a factor and whether it
+>> observes whether the factor is ordered or just alphabetically
+>> orders the factor
+>>
+>> I would like to have the key observe the order of a factor
+>> (e.g., a course taken field may run from 1 to 5 with 1=Basic
+>> Math, 2=Calculus, 3=Geometry, 4=Algebra I and 5=Algebra 2. I
+>> would like the sort imposed by data.table to "respect" the
+>> canonical ordering of the classes, no an alphabetical ordering.
+>>
+>> I can't however, seem to get the key to behave the way I want.
+>>
+>> Here's an example:
+>>
+>> setkey(123)
+>> my.course.sample <- sample(1:5, 10, replace=TRUE)
+>>
+>> X <- 1:10
+>> Y <- factor(my.course.sample, levels=1:5, labels=c("Basic
+>> Math", "Calculus", "Geometry", "Algebra I", "Algebra II"))
+>>
+>> my.dt <- data.table(ID=X, COURSE=Y)
+>>
+>> > my.dt
+>>       ID     COURSE
+>>  [1,]  1 Algebra II
+>>  [2,]  2  Algebra I
+>>  [3,]  3  Algebra I
+>>  [4,]  4 Algebra II
+>>  [5,]  5   Geometry
+>>  [6,]  6  Algebra I
+>>  [7,]  7   Geometry
+>>  [8,]  8   Calculus
+>>  [9,]  9  Algebra I
+>> [10,] 10   Geometry
+>>
+>>
+>> setkey(my.dt, COURSE)
+>>
+>> > my.dt
+>>       ID     COURSE
+>>  [1,]  2  Algebra I
+>>  [2,]  3  Algebra I
+>>  [3,]  6  Algebra I
+>>  [4,]  9  Algebra I
+>>  [5,]  1 Algebra II
+>>  [6,]  4 Algebra II
+>>  [7,]  8   Calculus
+>>  [8,]  5   Geometry
+>>  [9,]  7   Geometry
+>> [10,] 10   Geometry
+>>
+>>
+>> ###
+>> ### The COURSE key is alphabetizing based upon the labels ###
+>>
+>> ###
+>> ### Now try to impose a different ordering ###
+>>
+>> Y <- factor(my.course.sample, levels=c(1,4,3,5,2),
+>> labels=c("Basic Math", "Calculus", "Geometry", "Algebra I",
+>> "Algebra II"))
+>>
+>> my.dt <- data.table(ID=X, COURSE=Y)
+>>
+>> > my.dt
+>>       ID     COURSE
+>>  [1,]  1  Algebra I
+>>  [2,]  2   Calculus
+>>  [3,]  3   Calculus
+>>  [4,]  4  Algebra I
+>>  [5,]  5   Geometry
+>>  [6,]  6   Calculus
+>>  [7,]  7   Geometry
+>>  [8,]  8 Algebra II
+>>  [9,]  9   Calculus
+>> [10,] 10   Geometry
+>>
+>> setkey(my.dt, COURSE)
+>>
+>> > my.dt
+>>       ID     COURSE
+>>  [1,]  1  Algebra I
+>>  [2,]  3  Algebra I
+>>  [3,]  9  Algebra I
+>>  [4,]  2 Algebra II
+>>  [5,]  4 Algebra II
+>>  [6,]  8 Algebra II
+>>  [7,]  7 Basic Math
+>>  [8,]  5   Calculus
+>>  [9,]  6   Calculus
+>> [10,] 10   Geometry
+>>
+>>
+>> Y <- factor(my.course.sample, levels=c(1,4,3,5,2),
+>> labels=c("Basic Math", "Calculus", "Geometry", "Algebra I",
+>> "Algebra II"), ordered=TRUE)
+>>
+>> my.dt <- data.table(ID=X, COURSE=Y)
+>>
+>> my.dt
+>>
+>>       ID     COURSE
+>>  [1,]  1  Algebra I
+>>  [2,]  2   Calculus
+>>  [3,]  3   Calculus
+>>  [4,]  4  Algebra I
+>>  [5,]  5   Geometry
+>>  [6,]  6   Calculus
+>>  [7,]  7   Geometry
+>>  [8,]  8 Algebra II
+>>  [9,]  9   Calculus
+>> [10,] 10   Geometry
+>>
+>> setkey(my.dt, COURSE)
+>>
+>> my.dt
+>>
+>>       ID     COURSE
+>>  [1,]  1  Algebra I
+>>  [2,]  4  Algebra I
+>>  [3,]  8 Algebra II
+>>  [4,]  2   Calculus
+>>  [5,]  3   Calculus
+>>  [6,]  6   Calculus
+>>  [7,]  9   Calculus
+>>  [8,]  5   Geometry
+>>  [9,]  7   Geometry
+>> [10,] 10   Geometry
+>>
+>>
+>> ### Setting COURSE as the key for an ordered factor seems to
+>> over-ride the ordering associated with the factor and impose
+>> an alphabetical order.
+>>
+>>
+>> I'd like the key to respect the order associated with the factor
+>>
+>>
+>> Any help with this greatly appreciated.
+>>
+>>
+>> Best regards,
+>>
+>>
+>>
+>> Damian Betebenner
+>> Center for Assessment
+>> PO Box 351
+>> Dover, NH?? 03821-0351
+>> ?
+>> Phone (office): (603) 516-7900
+>> Phone (cell): (857) 234-2474
+>> Fax: (603) 516-7910
+>>
+>> dbetebenner at nciea.org
+>> www.nciea.org
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> atatable-help
+>>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From mdowle at mdowle.plus.com  Wed Aug 11 02:18:42 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 11 Aug 2010 01:18:42 +0100
+Subject: [datatable-help] Wonder whether there is an easier way to
+ changepart of data.table values
+In-Reply-To: <44551.53033.qm@web30808.mail.mud.yahoo.com>
+References: <44551.53033.qm@web30808.mail.mud.yahoo.com>
+Message-ID: <1281485922.17885.115.camel@Adam>
+
+
+On Fri, 2010-08-06 at 01:13 -0700, Harish wrote:
+> Thought #1 -- Consistency
+> ----------
+> Quick thought -- would it be more consistent if the interface took in the name of the variable directly rather than a string?
+> In other words, would
+>    dt[,a] <- "b"
+> be more consistent with the existing data.table interface than
+>    dt[,"a"] <- "b"
+> ?
+> Then again, taking in a string of the column name avoids the temptation to having complex expressions (like a+23*c) as the name of the column.  Although I just argued against my own point, I am curious what other people think.
+
+My current thought is to agree that dt[,"a"] is easier, the way it is
+currently implemented. This way a variable LOC can be used, holding
+either a character column name or integer location, in the usual
+data.frame way :  dt[,LOC]<-"b".
+If dt[,a] then we might need dt[,eval(LOC)]<-"b" which is getting
+onerous.
+As you say, I can't think why we might want an expression in the j in
+the LHS of [<-.
+
+> 
+> 
+> Thought #2 -- Alternative interfaces suggested in past
+> ----------
+> 
+> Also, there were some other messages in the past discussing having an interface similar to:
+>    dt[,{a = "b"}]
+>    dt[,{T(temp_a) = "b"; a = temp_a}]
+>    etc.
+
+That was here :
+http://r.789695.n4.nabble.com/convenience-function-for-transforming-variables-and-adding-them-to-the-table-tp2315324p2315326.html
+
+> 
+> What are the merits of having the ability to set values integrated into the "[.data.table" function?
+
+Pros :
+1) what you assign to the column can be an expression of columns too, in
+the usual way.  When the RHS is on the RHS of [<-., it doesn't see the
+columns as variables.
+2) you could do several column updates in one query, different
+expressions for each column
+3) that multi-column update could be 'by' group
+4) the assignments appearing later in the j expression could use results
+from the previous assignments, and do that within group.
+5) could update very quickly a small subset of rows or groups, using i
+and mult='all'; => "update by without by"
+6) consistency with SQL 'update'. An update is very similar to a select,
+in syntax. So j seems a natural place to put the update.
+7) potentially much less working memory would be needed, as the
+assignment would be done within by rather than building up a large
+result to be assigned to the entire column(s).
+8) Combination of update and select in one simple short query; e.g.,
+DT[,{z=x*mean(y);sum(z)},by=id]
+
+Cons :
+1) It isn't the norm for "=" within seemingly local scope {} to go and
+change a table by reference, by default. The T() syntax is ugly and
+potentially confusing.
+2) It may be getting quite far from R style programming.
+3) It might be tricky to implement
+4) Might be too easy to change data by accident. To tackle that, tables
+could have a read-only attribute, or you could only update tables in
+this way when they are in local scope, perhaps.
+
+Note that update syntax within j expressions would be additional to [<-
+syntax; the user could choose which one they preferred in different
+situations. It could be an optional feature too, off by default, if some
+users were worried about the cons.
+
+I'm interested in views on this too. Especially any aspects missed above
+and potential pitfalls. Feel free to throw in thoughts.
+
+Matthew
+
+> 
+> Regards,
+> Harish
+> 
+> 
+> --- On Mon, 8/2/10, Short, Tom <TShort at epri.com> wrote:
+> 
+> > From: Short, Tom <TShort at epri.com>
+> > Subject: Re: [datatable-help] Wonder whether there is an easier way to changepart of data.table values
+> > To: "Branson Owen" <branson.owen at gmail.com>, datatable-help at lists.r-forge.r-project.org
+> > Date: Monday, August 2, 2010, 7:28 PM
+> > I've just checked in versions of
+> > [<-.data.table and $<-.data.table that
+> > check for the columns adjusted and reset the key if
+> > appropriate. This
+> > brings up some incompatibilities:
+> > 
+> > (*) KEYS -- Before, you could do:
+> > 
+> > dt$key_column = anything
+> > 
+> > And it wouldn't change the status of the key. Now, the key
+> > will be
+> > nullified.
+> > 
+> > (*) ASSIGNMENT DIFFERENCE
+> > 
+> > Before: dt["a"] <- "b" meant change column a.
+> > Now:    dt[,"a"] <- "b" 
+> > 
+> > Now, you can do 
+> > dt[J("a"), "somecol"] <- 33 means assign 33 to the
+> > column "somecol"
+> > based on the key being equal to "a".
+> > 
+> > (*) QUESTIONS
+> > 
+> > - Do we need a "keep.key" argument for cases where we don't
+> > want the key
+> > nullified (the user knows the order is unaffected). This
+> > isn't really
+> > possible for dt$a[1:4] <- something.
+> > 
+> > - Is it a good idea to use data.table-style indexing for
+> > the i part of
+> > [<-.data.table? I was skeptical when Branson first asked
+> > (prefering
+> > data.frame compatibility), but it makes more sense now that
+> > I think
+> > about it.
+> > 
+> > Finally, we should put a warning in the documentation
+> > somewhere that
+> > functions that re-arrange or assign values to a data frame
+> > may "corrupt"
+> > the key of a data.table. Data.table-aware functions should
+> > account for
+> > this, but other functions may not.
+> > 
+> > - Tom
+> >  
+> 
+> 
+> 
+>       
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From TShort at epri.com  Wed Aug 11 02:45:26 2010
+From: TShort at epri.com (Short, Tom)
+Date: Tue, 10 Aug 2010 17:45:26 -0700
+Subject: [datatable-help] Wonder whether there is an easier way to
+	changepart of data.table values
+In-Reply-To: <1281485922.17885.115.camel@Adam>
+References: <44551.53033.qm@web30808.mail.mud.yahoo.com>
+	<1281485922.17885.115.camel@Adam>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E305CAF80D@uspalex03.epri.com>
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Matthew Dowle
+> Sent: Tuesday, August 10, 2010 20:19
+> To: Harish
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Wonder whether there is an 
+> easier way to changepart of data.table values
+> 
+> 
+> On Fri, 2010-08-06 at 01:13 -0700, Harish wrote:
+> > Thought #1 -- Consistency
+> > ----------
+> > Quick thought -- would it be more consistent if the 
+> interface took in the name of the variable directly rather 
+> than a string?
+> > In other words, would
+> >    dt[,a] <- "b"
+> > be more consistent with the existing data.table interface than
+> >    dt[,"a"] <- "b"
+> > ?
+> > Then again, taking in a string of the column name avoids 
+> the temptation to having complex expressions (like a+23*c) as 
+> the name of the column.  Although I just argued against my 
+> own point, I am curious what other people think.
+> 
+> My current thought is to agree that dt[,"a"] is easier, the 
+> way it is currently implemented. This way a variable LOC can 
+> be used, holding either a character column name or integer 
+> location, in the usual data.frame way :  dt[,LOC]<-"b".
+> If dt[,a] then we might need dt[,eval(LOC)]<-"b" which is 
+> getting onerous.
+> As you say, I can't think why we might want an expression in 
+> the j in the LHS of [<-.
+
+I like the existing notation better: dt[,"a"] <- "b"
+ 
+> > 
+> > 
+> > Thought #2 -- Alternative interfaces suggested in past
+> > ----------
+> > 
+> > Also, there were some other messages in the past discussing 
+> having an interface similar to:
+> >    dt[,{a = "b"}]
+> >    dt[,{T(temp_a) = "b"; a = temp_a}]
+> >    etc.
+> 
+> That was here :
+> http://r.789695.n4.nabble.com/convenience-function-for-transfo
+rming-variables-and-adding-them-to-the-table-> tp2315324p2315326.html
+> 
+> > 
+> > What are the merits of having the ability to set values 
+> integrated into the "[.data.table" function?
+> 
+> Pros :
+> 1) what you assign to the column can be an expression of 
+> columns too, in the usual way.  When the RHS is on the RHS of 
+> [<-., it doesn't see the columns as variables.
+> 2) you could do several column updates in one query, 
+> different expressions for each column
+> 3) that multi-column update could be 'by' group
+> 4) the assignments appearing later in the j expression could 
+> use results from the previous assignments, and do that within group.
+> 5) could update very quickly a small subset of rows or 
+> groups, using i and mult='all'; => "update by without by"
+> 6) consistency with SQL 'update'. An update is very similar 
+> to a select, in syntax. So j seems a natural place to put the update.
+> 7) potentially much less working memory would be needed, as 
+> the assignment would be done within by rather than building 
+> up a large result to be assigned to the entire column(s).
+> 8) Combination of update and select in one simple short 
+> query; e.g., DT[,{z=x*mean(y);sum(z)},by=id]
+> 
+> Cons :
+> 1) It isn't the norm for "=" within seemingly local scope {} 
+> to go and change a table by reference, by default. The T() 
+> syntax is ugly and potentially confusing.
+> 2) It may be getting quite far from R style programming.
+> 3) It might be tricky to implement
+> 4) Might be too easy to change data by accident. To tackle 
+> that, tables could have a read-only attribute, or you could 
+> only update tables in this way when they are in local scope, perhaps.
+> 
+> Note that update syntax within j expressions would be 
+> additional to [<- syntax; the user could choose which one 
+> they preferred in different situations. It could be an 
+> optional feature too, off by default, if some users were 
+> worried about the cons.
+> 
+> I'm interested in views on this too. Especially any aspects 
+> missed above and potential pitfalls. Feel free to throw in thoughts.
+
+For me, data tables are mostly read only except for adding columns. I
+don't like the idea of accidently changing a portion of my data table
+that took an hour to generate. [.data.table is pretty complex already,
+and this will just make it worse. One way to add this type of capability
+may be to create a new class, say "writeable.data.table" that inherits
+from both data.table and data.frame. Another option is to write a
+function that does something like transform that will operate on the
+data table in place. I'd prefer one of these to messing with the
+[.data.table syntax.
+
+- Tom
+
+
+From harishv_99 at yahoo.com  Sat Aug 14 10:08:19 2010
+From: harishv_99 at yahoo.com (Harish)
+Date: Sat, 14 Aug 2010 01:08:19 -0700 (PDT)
+Subject: [datatable-help] Error when using eval() in j
+Message-ID: <770636.21437.qm@web30805.mail.mud.yahoo.com>
+
+I am running into an issue using a quote with eval in 'j'.  I think I had a similar issue with 'by' in the past; maybe it is a similar bug.
+
+Use the following code to reproduce:
+---------------------
+
+foo <- function( data, fcn ) {
+   q <- substitute( fcn )
+   
+   # The following line works
+   #data[ , eval( q ), by=a ]
+
+   # The following line causes an error
+   data[ , eval( substitute( fcn ) ), by=a ]
+}
+
+num <- 10
+DT <- data.table( a=rep(c("A","B"),num), b=1:(num*2) )
+foo( DT, sum(b) )
+
+---------------------
+
+Notice the two lines inside foo().  They should be logically equivalent, but only one works.
+
+Is this a bug?
+
+
+Harish
+
+
+
+      
+
+From mdowle at mdowle.plus.com  Sun Aug 15 02:18:56 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 15 Aug 2010 01:18:56 +0100
+Subject: [datatable-help] Error when using eval() in j
+In-Reply-To: <770636.21437.qm@web30805.mail.mud.yahoo.com>
+References: <770636.21437.qm@web30805.mail.mud.yahoo.com>
+Message-ID: <1281831536.1805.25.camel@Adam>
+
+Harish,
+
+Thats a bug. I added #1026, fixed, +test 182, +NEWS and committed.
+
+Thanks as always for reporting and for the nice reproducible example.
+
+Matthew
+
+
+On Sat, 2010-08-14 at 01:08 -0700, Harish wrote:
+> I am running into an issue using a quote with eval in 'j'.  I think I had a similar issue with 'by' in the past; maybe it is a similar bug.
+> 
+> Use the following code to reproduce:
+> ---------------------
+> 
+> foo <- function( data, fcn ) {
+>    q <- substitute( fcn )
+>    
+>    # The following line works
+>    #data[ , eval( q ), by=a ]
+> 
+>    # The following line causes an error
+>    data[ , eval( substitute( fcn ) ), by=a ]
+> }
+> 
+> num <- 10
+> DT <- data.table( a=rep(c("A","B"),num), b=1:(num*2) )
+> foo( DT, sum(b) )
+> 
+> ---------------------
+> 
+> Notice the two lines inside foo().  They should be logically equivalent, but only one works.
+> 
+> Is this a bug?
+> 
+> 
+> Harish
+> 
+> 
+> 
+>       
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Sun Aug 15 21:48:18 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 15 Aug 2010 12:48:18 -0700 (PDT)
+Subject: [datatable-help] Return Select/Join that does NOT match?
+In-Reply-To: <1fbaca6fd28588483d0f53fd059fe12b.squirrel@webmail.plus.net>
+References: <AANLkTi=yXHYJ2w3PC+ziv05mAaAawWs5YXGsBXw=jZ9z@mail.gmail.com>
+	<502a30c444760298c0ca129c85fd197a.squirrel@webmail.plus.net>
+	<AANLkTim3X1-nvmzsTDVmCCvBK2YeUwGkWyJyJ_zjiL8v@mail.gmail.com>
+	<1fbaca6fd28588483d0f53fd059fe12b.squirrel@webmail.plus.net>
+Message-ID: <1281901698792-2326190.post@n4.nabble.com>
+
+
+
+Branson Owen wrote:
+> 
+>> DT = data.table(A = c("o", "x"), B = 1:10, key = "A")
+>       A  B
+>  [1,] o  1
+>  [2,] o  3
+>  [3,] o  5
+>  [4,] o  7
+>  [5,] o  9
+>  [6,] x  2
+>  [7,] x  4
+>  [8,] x  6
+>  [9,] x  8
+> [10,] x 10
+> 
+>> DT[J(unique(A))]
+> Error hint: the i expression sees the column variables. Column names
+> (variables) will mask variables in the calling frame. Check for any
+> conflicts.
+> Error in `[.data.table`(DT, J(unique(A))) :
+> Error in unique(A) : object 'A' not found
+> 
+>> DT[  {  J(unique(A))  }  ]
+>      A B
+> [1,] o 1
+> [2,] x 2
+> 
+
+Bug #1005 from Branson is now fixed. Added test 183, item to NEWS
+and committed rev 131.
+DT[J(unique(A))] now finds the column A in DT and returns the same
+result as wrapping with {}.
+Thanks Branson for finding it.
+
+Matthew
+
+
+-- 
+View this message in context: http://r.789695.n4.nabble.com/Return-Select-Join-that-does-NOT-match-tp2315211p2326190.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Mon Aug 16 22:43:24 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 16 Aug 2010 21:43:24 +0100
+Subject: [datatable-help] Gmane mirror
+Message-ID: <1281991404.21257.53.camel@Adam>
+
+The history has been uploaded to Gmane now. It has been reflecting new
+posts ok for a week or so.
+
+NNTP host : news.gmane.org
+Group:      gmane.comp.lang.r.datatable
+
+A link is now on the datatable homepage to it.
+
+The web viewer is odd. It orders threads by the time the first post in
+the thread was received *at gmane*. It considers it received each post
+in the history upload when that history was loaded, not the original
+post time. Therefore a few recent threads are at the bottom of page 2,
+followed by the history, followed by this new thread (this is the first
+new thread since the history upload), if I understand correctly.
+
+As a web viewer, Nabble is better than Gmane I think. Nabble imported
+the history correctly, moves active threads to the top and we have the
+ability to move around incorrectly threaded posts there too.
+
+For NNTP though, Gmane is great. The history orders fine in a
+newsreader, in contrast to the web viewer.  You can post to the list
+from a newsreader too, provided your email address is subscribed to the
+list in the usual way.
+
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Thu Aug 19 09:19:37 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 19 Aug 2010 08:19:37 +0100
+Subject: [datatable-help] Windows R-Forge build appears 18 days stale
+In-Reply-To: <a8aa4424239bb4aec583dd76b62fc043.squirrel@webmail.plus.net>
+References: <a8aa4424239bb4aec583dd76b62fc043.squirrel@webmail.plus.net>
+Message-ID: <248fbde75c545cc148546c5ad3146214.squirrel@webmail.plus.net>
+
+All,
+Has anyone noticed this?
+Does it impact you?
+Thanks, Matthew
+
+> Hi Stefan,
+>
+> Just to check if you're aware? ...
+>
+> This says the Win32 was last built 14 Aug at rev 112 :
+>
+> https://r-forge.r-project.org/R/?group_id=240&log=build_win32&pkg=data.table&flavor=patched
+>
+> but rev 112 was on Sunday 1st Aug  (18 days ago).
+>
+> The linux and max build logs both say rev 132, which although hasn't
+> caught
+> up to rev 133 made on Monday, at least they're only 2-3 days stale.
+>
+> Matthew
+>
+>
+
+
+
+From mdowle at mdowle.plus.com  Sun Aug 22 02:12:34 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 22 Aug 2010 01:12:34 +0100
+Subject: [datatable-help] Unexpected behavior with mult="all"
+In-Reply-To: <9cbbc6372f8364cd9a202a3bcf4cbf49.squirrel@webmail.plus.net>
+References: <587667.96608.qm@web30801.mail.mud.yahoo.com>
+	<9cbbc6372f8364cd9a202a3bcf4cbf49.squirrel@webmail.plus.net>
+Message-ID: <1282435954.5482.32.camel@Adam>
+
+Harish,
+
+Just fixed this one, bug #1015 : mult='all' should return NA when
+j=list(d)  i.e. 'by without by' now heeds nomatch=NA.
+
+> x[y,list(d),mult="all"]
+     a b  d
+[1,] a A  1
+[2,] b A  2
+[3,] c A NA
+[4,] d A NA
+> 
+
+The old behaviour is returned via nomatch=0.
+
+> x[y,list(d),mult="all",nomatch=0]
+     a b d
+[1,] a A 1
+[2,] b A 2
+> 
+
+We can observe the j running 4 times now :
+
+> x[y,{cat('running j\n');list(d)},mult='all'] 
+running j
+running j
+running j
+running j
+     a b V1
+[1,] a A  1
+[2,] b A  2
+[3,] c A NA
+[4,] d A NA
+>
+
+Have added 21 new tests related to this change.
+
+Thanks once again for raising it, it really is much appreciated.
+
+Matthew
+
+
+
+On Mon, 2010-08-02 at 10:29 +0100, mdowle at mdowle.plus.com wrote:
+> This change shouldn't impact 'by', if I'm thinking correctly. Think of
+> 'by' as first finding the unique groups present and then splitting up the
+> dataset by group. So there *is* a match for all groups when using 'by';
+> every group does have data by construction therefore the 'nomatch'
+> argument doesn't come into it. In the other thread the discussion was when
+> j returns no rows when run on a group with data, not that there was no
+> matching data for the group.
+> 
+> Using i with mult='all' may be a general form of "key'd by" not just an
+> alternative. [I say 'may' because I'm only 80% sure - you've got me
+> thinking now.] With i and mult='all' you can :
+> 
+>  i) restrict to a subset of groups (likely a small subset)
+>  ii) include groups which may not be present (=> nomatch relevant)
+>  iii) maintain the order of the group results (determined by the order of i)
+> 
+> The special case X[SJ(unique(grpcol)),...] is equivalent to key'd by,  I
+> think.  Also note that X[SJ(grp),...] will be faster than X[J(grp),...]
+> which is why 'by' does the former, but you have more control using the
+> general form i and mult='all'.
+> 
+> Does that all make sense?  Regardless, I'll add this change to the list -
+> thanks.
+> 
+> Best, Matthew
+> 
+> 
+> > Tom, thanks for your vote.  :)
+> >
+> > Matthew, since Tom is on board on the change, I am curious whether this
+> > change will impact the 'by' query behavior as well since both use the same
+> > code (and are conceptually similar).  So, to get the current behavior, one
+> > has to use nomatch=0 with the 'by' query to remove the NAs.  Do I
+> > understand this correctly?
+> >
+> > I also thank you for so patiently listening to my questioning and engaging
+> > me in a conversation.
+> >
+> >
+> > Harish
+> >
+> >
+> > --- On Sun, 8/1/10, Short, Tom <TShort at epri.com> wrote:
+> >
+> >> From: Short, Tom <TShort at epri.com>
+> >> Subject: RE: [datatable-help] Unexpected behavior with mult="all"
+> >> To: mdowle at mdowle.plus.com, "Harish" <harishv_99 at yahoo.com>
+> >> Cc: datatable-help at lists.r-forge.r-project.org
+> >> Date: Sunday, August 1, 2010, 5:00 PM
+> >> I think I agree with Harish (not
+> >> enough to look into it myself right
+> >> now, though :).
+> >>
+> >> - Tom
+> >>
+> >> 
+> >>
+> >> > -----Original Message-----
+> >> > From: datatable-help-bounces at lists.r-forge.r-project.org
+> >>
+> >> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> >>
+> >> > On Behalf Of Matthew Dowle
+> >> > Sent: Sunday, August 01, 2010 17:06
+> >> > To: Harish
+> >> > Cc: datatable-help at lists.r-forge.r-project.org
+> >> > Subject: Re: [datatable-help] Unexpected behavior with
+> >> mult="all"
+> >> >
+> >> > Thanks for sticking with it. The reason that's
+> >> happening is
+> >> > that internally the same code that does grouping via
+> >> 'by'
+> >> > also does grouping via mult='all'. So its the same
+> >> reason as
+> >> > the other thread where we talking about 'by'
+> >> collapsing away
+> >> > NULL groups.
+> >> >
+> >> > But when you present it in that way I see what you
+> >> mean. I'm
+> >> > almost convinced. If Tom agrees that'll tip me and
+> >> I'll add
+> >> > it as a bug to fix. 
+> >> >
+> >> > As an aside to illustrate, the j gets evaluated for
+> >> each
+> >> > group with the mult='all', but just once without :
+> >> >
+> >> > > x[y,{cat('running j\n');list(d)}]
+> >> > running j
+> >> > [[1]]
+> >> > [1]  1  2 NA NA
+> >> >
+> >> > > x[y,{cat('running j\n');list(d)},mult='all']
+> >> > running j
+> >> > running j
+> >> >      a b V1
+> >> > [1,] a A  1
+> >> > [2,] b A  2
+> >> > >
+> >> >
+> >> >
+> >> >
+> >> > On Sat, 2010-07-31 at 19:45 -0700, Harish wrote:
+> >> > > Thanks for the detailed explanation.  My
+> >> question about #1
+> >> > is resolved.  You certainly gave me a lot to
+> >> ponder over.
+> >> > >
+> >> > > I still am doubtful about my question #2 -- not
+> >> getting NAs.
+> >> > >
+> >> > > x <-
+> >> > >
+> >> >
+> >> data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3
+> >> > ,4), key="a,b") y <-
+> >> > data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> >> > > x[y]           
+> >>           # Expected: Getting NAs
+> >> > > x[y,mult="all"]       
+> >>    # Expected: Getting NAs with mult="all"
+> >> > > x[y,list(d)]         
+> >>     # Expected: Getting NAs with i
+> >> > > x[y,list(d),mult="all"]   #
+> >> Unexpected: No NAs with i & mult="all"
+> >> > >
+> >> > > > x[y]
+> >> > >         a 
+> >>   b  d
+> >> > > [1,]    a    A  1
+> >> > > [2,]    b    A  2
+> >> > > [3,] <NA> <NA> NA
+> >> > > [4,] <NA> <NA> NA
+> >> > >
+> >> > > > x[y,mult="all"]
+> >> > >         a 
+> >>   b  d
+> >> > > [1,]    a    A  1
+> >> > > [2,]    b    A  2
+> >> > > [3,] <NA> <NA> NA
+> >> > > [4,] <NA> <NA> NA
+> >> > >
+> >> > > > x[y,list(d)]
+> >> > >       d
+> >> > > [1,]  1
+> >> > > [2,]  2
+> >> > > [3,] NA
+> >> > > [4,] NA
+> >> > >
+> >> > > > x[y,list(d),mult="all"]
+> >> > >      a b d
+> >> > > [1,] a A 1
+> >> > > [2,] b A 2
+> >> > >
+> >> > >
+> >> > > As you can see, the combination of having both i
+> >> and
+> >> > mult="all" is not generating the NAs.  Is there a
+> >> reason for this?
+> >> > >
+> >> > >
+> >> > > Regards,
+> >> > > Harish
+> >> > >
+> >> > >
+> >> > > --- On Sat, 7/31/10, Matthew Dowle <mdowle at mdowle.plus.com>
+> >> wrote:
+> >> > >
+> >> > > > From: Matthew Dowle <mdowle at mdowle.plus.com>
+> >> > > > Subject: Re: [datatable-help] Unexpected
+> >> behavior with mult="all"
+> >> > > > To: "Harish" <harishv_99 at yahoo.com>
+> >> > > > Cc: datatable-help at lists.r-forge.r-project.org
+> >> > > > Date: Saturday, July 31, 2010, 7:25 AM This
+> >> is how I
+> >> > think about it
+> >> > > > currently :
+> >> > > >
+> >> > > > [1] The syntax of "x[y,d]" plus knowing how
+> >> mult's
+> >> > default value is
+> >> > > > set ('first' in this case) means that a
+> >> vector as long as
+> >> > the number
+> >> > > > of rows in y is the result so data.table
+> >> does the least
+> >> > work it can
+> >> > > > and returns just the vector without adding
+> >> in the data
+> >> > already in y.
+> >> > > > Changing mult
+> >> > > > to "all" however means you'll usually get a
+> >> varying
+> >> > number of items
+> >> > > > back for each row in y, so data.table
+> >> includes the y columns as a
+> >> > > > convenience since if it didn't the result
+> >> would be
+> >> > difficult to use
+> >> > > > (you wouldn't know the correspondence).
+> >> data.table tries
+> >> > to do the
+> >> > > > minimum, most efficient thing. If you want
+> >> to be less efficient
+> >> > > > (e.g.
+> >> > > > adding columns
+> >> > > > you already know) then it's for the user to
+> >> add them back.
+> >> > > > This is sort
+> >> > > > of a principle.
+> >> > > >
+> >> > > > [2] nomatch is by default NA so this is the
+> >> same as [1].
+> >> > Is that any
+> >> > > > chance a typo and you meant nomatch=0
+> >> ?  If so then you
+> >> > might have a
+> >> > > > point and perhaps something needs changing
+> >> there.
+> >> > > >
+> >> > > > The other way I think about mult='all' is
+> >> grouping. The
+> >> > > > documentation sometimes mentions 'by without
+> >> by', or I might be
+> >> > > > recalling emails or posts. Remember
+> >> mult='all' gets automatically
+> >> > > > set to 'all'
+> >> > > > when you
+> >> > > > match to not all of the columns of x's key.
+> >> When mult='all'
+> >> > > > I think to
+> >> > > > myself "for each row of y fetch me all the
+> >> rows from x that match
+> >> > > > and eval j for that group, then move on to
+> >> the next row
+> >> > in y".  Its
+> >> > > > kind of like a data specific 'by'. Once you
+> >> realise mult='all' is
+> >> > > > like a 'by'
+> >> > > > remember that 'by' automatically adds in the
+> >> 'by' columns to the
+> >> > > > result.
+> >> > > > Hence mult='all' behaves more like a 'by'
+> >> with respect to
+> >> > returning
+> >> > > > data.table rather than vector.
+> >> > > >
+> >> > > > Example :
+> >> > > >
+> >> > > >   X = data.table(x=1:3,
+> >> y=1:4, z=rnorm(12),
+> >> > > > key="x,y")
+> >> > > >   Y = data.table(x=1:3)
+> >> > > >   X[Y,sum(z)] same as
+> >> X[,sum(z),by=x]
+> >> > > >
+> >> > > > Then going further :
+> >> > > >
+> >> > > >   X[Y[<having>],sum(z)]
+> >> faster than
+> >> > > > X[,sum(z),by=x][<having>]
+> >> > > >
+> >> > > > Lets say <having> are groups where
+> >> x>2 (just one group in this
+> >> > > > example) :
+> >> > > >
+> >> > > >   X[Y[x>2],sum(z)] same
+> >> but faster than X[,sum(z),by=x][x>2]
+> >> > > >
+> >> > > > which is the same as
+> >> > > >
+> >> > > >   X[J(3),sum(z)]
+> >> > > >
+> >> > > > if we knew we wanted group '3' in advance
+> >> for example.
+> >> > > >
+> >> > > > These constructs (e.g. 'by without by')
+> >> generalise to
+> >> > > > list() of
+> >> > > > expressions and function calls of column
+> >> variables in the
+> >> > usual way.
+> >> > > >
+> >> > > > Sometimes you do want mult='all', and run
+> >> the j expression on the
+> >> > > > result as a whole, not by row of Y.  In
+> >> that case, assuming Y has
+> >> > > > less columns than key(X) meaning mult='all'
+> >> (as it is in this
+> >> > > > example)
+> >> > > > :
+> >> > > >
+> >> > > >     X[Y,length(z)] 
+> >>    
+> >> > > > # j eval'd by row of Y, result 3 rows
+> >> > > > 
+> >>    X[Y][,length(z)]  # length 1 vector
+> >> value 12
+> >> > > >
+> >> > > > HTH?
+> >> > > > Matthew
+> >> > > >
+> >> > > >
+> >> > > > On Fri, 2010-07-30 at 19:28 -0700, Harish
+> >> wrote:
+> >> > > > > I am getting some unexpected behavior
+> >> with
+> >> > > > mult="all".
+> >> > > > >
+> >> > > > > 1) Getting a data table when I expect a
+> >> vector
+> >> > > > > 2) Not getting NA's when I expect them
+> >> (because of
+> >> > > > nomatch=NA)
+> >> > > > >
+> >> > > > > ==========
+> >> > > > >
+> >> > > > > Common code for examples below
+> >> > > > >
+> >> > > > > x <-
+> >> > > >
+> >> data.table(a=c("a","b","d","e"),b=c("A","A","B","B"),d=c(1,2,3,4),
+> >> > > > key="a,b")
+> >> > > > > y <-
+> >> > > >
+> >> data.table(g=c("a","b","c","d"),h=c("A","A","A","A"))
+> >> > > > >
+> >> > > > > ==========
+> >> > > > >
+> >> > > > > Issue #1: Getting a data table when I
+> >> expect a vector
+> >> > > > >
+> >> > > > > I am not following the logic of when a
+> >> data.table is
+> >> > > > returned and when a vector is
+> >> returned.  Initially, I
+> >> > thought that
+> >> > > > if j had only one item without a list(), a
+> >> vector is
+> >> > returned, but I
+> >> > > > am seeing some contrary behavior.
+> >> > > > >
+> >> > > > > x[y,d]  # Returns a vector as
+> >> expected x[y,d,mult="all"]  #
+> >> > > > > Returns a data.table.
+> >> > > > Why?
+> >> > > > >
+> >> > > > > Would someone help me understand why I
+> >> should not
+> >> > > > expect a vector in the last query?
+> >> > > > >
+> >> > > > > ==========
+> >> > > > > Issue #2: Not getting NA's when I
+> >> expect them (because
+> >> > > > of nomatch=NA)
+> >> > > > >
+> >> > > > > x[y,d,nomatch=NA]  # Expected:
+> >> returns a vector
+> >> > > > with NAs in them
+> >> > > > > x[y,d,nomatch=NA,mult="all]  #
+> >> Unexpected: NAs
+> >> > > > not appearing
+> >> > > > >
+> >> > > > > Am I missing something?
+> >> > > > >
+> >> > > > > Harish
+> >> > > > >
+> >> > > > >
+> >> > > > >
+> >> > > > >       
+> >> > > > >
+> >> _______________________________________________
+> >> > > > > datatable-help mailing list
+> >> > > > > datatable-help at lists.r-forge.r-project.org
+> >> > > > >
+> >> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datat
+> >> > > > > able-help
+> >> > > >
+> >> > > >
+> >> > > >
+> >> > >
+> >> > >
+> >> > >
+> >> > >       
+> >> >
+> >> >
+> >> > _______________________________________________
+> >> > datatable-help mailing list
+> >> > datatable-help at lists.r-forge.r-project.org
+> >> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> >> atatable-help
+> >> >
+> >>
+> >
+> >
+> >
+> >
+> >
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Mon Aug 23 21:20:57 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 23 Aug 2010 20:20:57 +0100
+Subject: [datatable-help] DT[NA] now returns 1 row of NA
+Message-ID: <1282591257.9868.10.camel@Adam>
+
+Hello everyone,
+
+Before change :
+
+> DT = data.table(a=1:3,v=1:3)
+> DT
+     a v
+[1,] 1 1
+[2,] 2 2
+[3,] 3 3
+> DT[NA]
+      a  v
+[1,] NA NA
+[2,] NA NA
+[3,] NA NA
+
+That was consistent with data.frame :
+
+> DF = data.frame(a=1:3,v=1:3)
+> DF[NA,]
+      a  v
+NA   NA NA
+NA.1 NA NA
+NA.2 NA NA
+
+The reason for that was that NA is logical, followed by standard
+recycling.
+
+Branson mentioned it here and it got me thinking :
+
+http://r.789695.n4.nabble.com/Ran-into-infinite-loop-when-setting-key-sorting-columns-with-NA-tp2315205p2315207.html
+
+It came up on r-help recently here too :
+
+http://r.789695.n4.nabble.com/NA-values-in-indexing-tp1692067p1692067.html
+
+
+Now, after the change :
+
+> DT[NA]
+      a  v
+[1,] NA NA
+>
+
+I think this makes more sense than having to know to need
+DT[NA_integer_].  I can't think of any useful purpose for returning the
+entire table as NA; if DT is large it would create a large copy and that
+shouldn't be so easy to do by accident. A single NA row is almost
+certainly what was intended.
+
+Everything is up for discussion though so if I've missed anything please
+let me know and this can always be rolled back.
+
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Wed Aug 25 10:53:33 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 25 Aug 2010 09:53:33 +0100
+Subject: [datatable-help] Testing 123
+Message-ID: <7cac21b0efc5f45bdc56f1cc61f143d4.squirrel@webmail.plus.net>
+
+
+Please ignore this message if it gets through. Testing if the R-Forge
+mailman is down.
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Sun Aug 29 16:33:32 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 29 Aug 2010 07:33:32 -0700 (PDT)
+Subject: [datatable-help] Environment of eval() execution for "j"
+ appears to vary inexplicably
+In-Reply-To: <ee9c23a6d92d6fb61f5c4005488ca7e1.squirrel@webmail.plus.net>
+References: <478759.42814.qm@web30807.mail.mud.yahoo.com>
+	<1277844206.11836.9.camel@Adam>
+	<243682.40951.qm@web30805.mail.mud.yahoo.com>
+	<ca856d8d3dd22bd416b99fa1bb3bc32a.squirrel@webmail.plus.net>
+	<27145.23453.qm@web30807.mail.mud.yahoo.com>
+	<6fb69f407e8a86b31534eae2ccbf6897.squirrel@webmail.plus.net>
+	<179284.20588.qm@web30808.mail.mud.yahoo.com>
+	<ee9c23a6d92d6fb61f5c4005488ca7e1.squirrel@webmail.plus.net>
+Message-ID: <1283092412693-2399111.post@n4.nabble.com>
+
+
+
+The infinite recursion error when data.table has the wrong class is now
+caught :
+
+> DT = data.table(a=1:3,key="a")
+> class(DT) = "data.table"
+> DT[J(2)]   # previously resulted in 'infinite recursion'
+Error in dimnames.data.table(x) : 
+  data.table inherits from data.frame (from v1.5) but this data.table does
+not. Has it been created manually (e.g. by using 'structure' rather than
+'data.table') or saved to disk using a prior version of data.table? The
+correct class is c('data.table','data.frame').
+> 
+
+Matthew
+
+
+-- 
+View this message in context: http://r.789695.n4.nabble.com/Environment-of-eval-execution-for-j-appears-to-vary-inexplicably-tp2315239p2399111.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Mon Aug 30 00:16:54 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 29 Aug 2010 15:16:54 -0700 (PDT)
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+	<3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com>
+	<AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com>
+Message-ID: <1283120214935-2399401.post@n4.nabble.com>
+
+
+
+setkey now coerces character to factor (as Steve suggested), and double to
+integer (provided they are all.equal).
+
+
+Steve Lianoglou wrote:
+> 
+> Would it make sense to autoconvert characters to factors when setting
+> a character column as a key?
+> df <- data.frame(a=LETTERS[1:10], b=1:10, stringsAsFactors=F)
+> dt <- data.table(df)
+> key(dt) <- 'a'
+>   All keyed columns must be storage mode integer
+> dt <- data.table(df, key='a')
+> Error in setkey(value, a) :
+>   All keyed columns must be storage mode integer
+> 
+
+That became bug #953, now fixed with tests 215-219 added.
+
+> df <- data.frame(a=LETTERS[1:10], b=1:10, stringsAsFactors=F)
+> dt <- data.table(df)
+> key(dt) <- 'a'
+> dt["C"]
+     a b
+[1,] C 3
+
+
+Matthew
+
+
+-- 
+View this message in context: http://r.789695.n4.nabble.com/Auto-convert-characters-to-factors-when-settings-keys-tp2315281p2399401.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mailinglist.honeypot at gmail.com  Mon Aug 30 03:46:49 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Sun, 29 Aug 2010 21:46:49 -0400
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <1283120214935-2399401.post@n4.nabble.com>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+	<3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com>
+	<AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com>
+	<1283120214935-2399401.post@n4.nabble.com>
+Message-ID: <AANLkTimCSVz5pXPK0+f0HahiHWzK2XATcGgB_iNxJ29g@mail.gmail.com>
+
+Hi Matthew,
+
+Thanks for the update and taking care of this!
+
+-steve
+
+On Sun, Aug 29, 2010 at 6:16 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+>
+> setkey now coerces character to factor (as Steve suggested), and double to
+> integer (provided they are all.equal).
+>
+>
+> Steve Lianoglou wrote:
+>>
+>> Would it make sense to autoconvert characters to factors when setting
+>> a character column as a key?
+>> df <- data.frame(a=LETTERS[1:10], b=1:10, stringsAsFactors=F)
+>> dt <- data.table(df)
+>> key(dt) <- 'a'
+>> ? All keyed columns must be storage mode integer
+>> dt <- data.table(df, key='a')
+>> Error in setkey(value, a) :
+>> ? All keyed columns must be storage mode integer
+>>
+>
+> That became bug #953, now fixed with tests 215-219 added.
+>
+>> df <- data.frame(a=LETTERS[1:10], b=1:10, stringsAsFactors=F)
+>> dt <- data.table(df)
+>> key(dt) <- 'a'
+>> dt["C"]
+> ? ? a b
+> [1,] C 3
+>
+>
+> Matthew
+>
+>
+> --
+> View this message in context: http://r.789695.n4.nabble.com/Auto-convert-characters-to-factors-when-settings-keys-tp2315281p2399401.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From jhibschman+r at gmail.com  Mon Aug 30 15:02:41 2010
+From: jhibschman+r at gmail.com (Johann Hibschman)
+Date: Mon, 30 Aug 2010 08:02:41 -0500
+Subject: [datatable-help] Programmatic by clauses
+Message-ID: <u1o7hj8uuby.fsf@lx-chrateresearch01.citadelgroup.com>
+
+I know this was discussed in early July, but I found much of that to be
+impenetrable, unfortunately.  I'm still very bad at understanding R's
+lazy-evaluation mechanism and quoting.  (The sad thing is that I have no
+problem with lisp quotes and quasiquotes in macros, scheme hygenic
+macros, and so on, but it just seems harder in R.)
+
+I'm trying to convert an existing function to R.
+
+That function takes a data set and a named list of factor-generating
+functions, then aggregates the data based on those results using the
+'aggregate' function.
+
+e.g.:
+
+  data <- some.big.data.frame
+
+  aggregation.spec <- list(
+    iquarter=function (d) d$imonth %/% 3,
+    fico.bucket=function (d) as.integer(25*round(d$fico/25)))
+
+  by.factors <- lapply(aggregation.spec, function (f) f(data))
+
+  cols.to.sum <- c("balance", "count", other cols)
+  data.to.sum <- data[,cols.to.sum]
+  agg <- aggregate(data.to.sum, by.factors, sum)
+
+I'm not sure what the equivalent in data.table would be.  I can get
+something that seems to work by something like:
+
+  dt <- as.data.table(data[,cols.to.sum])
+  for (n in names(aggregation.spec)) {
+    dt[[n]] <- aggregation.spec[[n]](data)
+  }
+  agg <- dt[,
+    list(balance=sum(balance), ...(manually construct big list of cols to sum)),
+    by=paste(names(aggregation.spec), ",")]
+
+This just seems, well, hideous.  Problems are:
+
+  1. Constructing the big list of columns to sum is a pain.  Sure, I can
+     do it, but it's a chunk of code that I don't want to maintain.
+
+  2. Passing in the aggregation column names as a comma-separated string
+     feels like a hack.
+
+What's the "expert" way to do this in data.table?
+
+Thanks,
+Johann
+
+
+From TShort at epri.com  Mon Aug 30 15:36:58 2010
+From: TShort at epri.com (Short, Tom)
+Date: Mon, 30 Aug 2010 06:36:58 -0700
+Subject: [datatable-help] Programmatic by clauses
+In-Reply-To: <u1o7hj8uuby.fsf@lx-chrateresearch01.citadelgroup.com>
+References: <u1o7hj8uuby.fsf@lx-chrateresearch01.citadelgroup.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E305DF0547@uspalex03.epri.com>
+
+Johann, how about the following:
+
+>     data <- data.table(fico = rep((1:4)*25L, 5), imonth = rep(1:5,
+each=4),
++                        balance = runif(20), count = runif(20))
+>     aggregation.spec <- list(
++                              iquarter=function (d) d$imonth %/% 3L,
++                              fico.bucket=function (d)
+as.integer(25*round(d$fico/25)))
+> 
+>     by.factors <- lapply(aggregation.spec, function (f) f(data))
+> 
+>     cols.to.sum <- c("balance", "count")
+>     data.to.sum <- data[,cols.to.sum, with=F]
+>     aggregate(data.to.sum, by.factors, sum) 
+  iquarter fico.bucket   balance    count
+1        0          25 0.5506797 1.133675
+2        1          25 1.7311503 1.210178
+3        0          50 1.5175908 0.854553
+4        1          50 2.2930775 1.974759
+5        0          75 0.4627294 1.171430
+6        1          75 1.0477066 1.973119
+7        0         100 0.8354870 1.083211
+8        1         100 1.4351321 1.501291
+>
+
+Here's a data.table version:
+     
+>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
++          by = lapply(aggregation.spec, function (f) f(data))]
+     iquarter fico.bucket   balance    count
+[1,]        0          25 0.5506797 1.133675
+[2,]        0          50 1.5175908 0.854553
+[3,]        0          75 0.4627294 1.171430
+[4,]        0         100 0.8354870 1.083211
+[5,]        1          25 1.7311503 1.210178
+[6,]        1          50 2.2930775 1.974759
+[7,]        1          75 1.0477066 1.973119
+[8,]        1         100 1.4351321 1.501291
+> 
+
+I think the following should also work, but it doesn't. Note that I
+didn't update to the very latest version of data.table, and I know
+Matthew has changed some things that might already fix this.
+     
+
+>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
++          by = by.factors]
+Error in `[.data.table`(data, , lapply(.SD[, cols.to.sum, with = FALSE],
+: 
+  column or expression 1 of 'by' list is not internally type integer. Do
+not quote column names. Example of correct use:
+by=list(colA,month(colB),...).
+
+
+
+- Tom
+
+ 
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Johann Hibschman
+> Sent: Monday, August 30, 2010 09:03
+> To: datatable-help at lists.r-forge.r-project.org
+> Subject: [datatable-help] Programmatic by clauses
+> 
+> I know this was discussed in early July, but I found much of 
+> that to be impenetrable, unfortunately.  I'm still very bad 
+> at understanding R's lazy-evaluation mechanism and quoting.  
+> (The sad thing is that I have no problem with lisp quotes and 
+> quasiquotes in macros, scheme hygenic macros, and so on, but 
+> it just seems harder in R.)
+> 
+> I'm trying to convert an existing function to R.
+> 
+> That function takes a data set and a named list of 
+> factor-generating functions, then aggregates the data based 
+> on those results using the 'aggregate' function.
+> 
+> e.g.:
+> 
+>   data <- some.big.data.frame
+> 
+>   aggregation.spec <- list(
+>     iquarter=function (d) d$imonth %/% 3,
+>     fico.bucket=function (d) as.integer(25*round(d$fico/25)))
+> 
+>   by.factors <- lapply(aggregation.spec, function (f) f(data))
+> 
+>   cols.to.sum <- c("balance", "count", other cols)
+>   data.to.sum <- data[,cols.to.sum]
+>   agg <- aggregate(data.to.sum, by.factors, sum)
+> 
+> I'm not sure what the equivalent in data.table would be.  I 
+> can get something that seems to work by something like:
+> 
+>   dt <- as.data.table(data[,cols.to.sum])
+>   for (n in names(aggregation.spec)) {
+>     dt[[n]] <- aggregation.spec[[n]](data)
+>   }
+>   agg <- dt[,
+>     list(balance=sum(balance), ...(manually construct big 
+> list of cols to sum)),
+>     by=paste(names(aggregation.spec), ",")]
+> 
+> This just seems, well, hideous.  Problems are:
+> 
+>   1. Constructing the big list of columns to sum is a pain.  
+> Sure, I can
+>      do it, but it's a chunk of code that I don't want to maintain.
+> 
+>   2. Passing in the aggregation column names as a 
+> comma-separated string
+>      feels like a hack.
+> 
+> What's the "expert" way to do this in data.table?
+> 
+> Thanks,
+> Johann
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From jhibschman+r at gmail.com  Mon Aug 30 22:03:11 2010
+From: jhibschman+r at gmail.com (Johann Hibschman)
+Date: Mon, 30 Aug 2010 15:03:11 -0500
+Subject: [datatable-help] Programmatic by clauses
+References: <u1o7hj8uuby.fsf@lx-chrateresearch01.citadelgroup.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E305DF0547@uspalex03.epri.com>
+Message-ID: <u1o39tvvpfk.fsf@lx-chrateresearch01.citadelgroup.com>
+
+"Short, Tom" <TShort at epri.com> writes:
+
+> Johann, how about the following:
+> [snip example]
+
+That's a good example; thanks.
+
+> Here's a data.table version:
+>      
+>>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
+> +          by = lapply(aggregation.spec, function (f) f(data))]
+>      iquarter fico.bucket   balance    count
+> [1,]        0          25 0.5506797 1.133675
+> [2,]        0          50 1.5175908 0.854553
+> [3,]        0          75 0.4627294 1.171430
+> [4,]        0         100 0.8354870 1.083211
+> [5,]        1          25 1.7311503 1.210178
+> [6,]        1          50 2.2930775 1.974759
+> [7,]        1          75 1.0477066 1.973119
+> [8,]        1         100 1.4351321 1.501291
+
+I hadn't understood .SD before; that's a very good thing to know.
+
+> I think the following should also work, but it doesn't. Note that I
+> didn't update to the very latest version of data.table, and I know
+> Matthew has changed some things that might already fix this.
+>      
+>
+>>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
+> +          by = by.factors]
+> Error in `[.data.table`(data, , lapply(.SD[, cols.to.sum, with = FALSE],
+> : 
+>   column or expression 1 of 'by' list is not internally type integer. Do
+> not quote column names. Example of correct use:
+> by=list(colA,month(colB),...).
+
+It still doesn't work.  Unfortunately, if I want to have a drop-in
+replacement, I have to operate on the equivalent by.factors.
+
+I tried the following:
+
+  dt.tmp <- cbind(data[, cols.to.sum, with=FALSE],
+    data.table(by.factors))
+  dt.agg <- dt.tmp[, lapply(.SD, sum), by=paste(names(by.factor),
+    collapse=",")]
+
+but I got:
+
+  Error in `[.data.table`(dt.tmp, , lapply(.SD, sum.na), by = paste(names(by),  : 
+    by must evaluate to list
+
+I tried
+
+  by.names <- paste(names(by.factor), collapse=",")
+  dt.agg <- dt.tmp[, lapply(.SD, sum), by=by.names]
+
+but I got the same error.  Randomly wrapping things in eval or evalq
+didn't seem to work either.
+
+Is there any chance that we could get a "less magic" version of the
+data.table extract that doesn't do anything fancy?  Or maybe a
+by.with=FALSE option?
+
+I periodically try data.table, but I always run into this wall where I
+waste a few hours trying to guess how to make extract do what I want it
+to and finally give up.  It's frustrating, it seems as if only
+data.table were trying to be less clever, it would be very useful to me.
+
+
+- Johann
+
+
+From TShort at epri.com  Mon Aug 30 22:45:44 2010
+From: TShort at epri.com (Short, Tom)
+Date: Mon, 30 Aug 2010 13:45:44 -0700
+Subject: [datatable-help] Programmatic by clauses
+In-Reply-To: <u1o39tvvpfk.fsf@lx-chrateresearch01.citadelgroup.com>
+References: <u1o7hj8uuby.fsf@lx-chrateresearch01.citadelgroup.com><72CF3C50F4AF5B4BB678383F11CEF0E305DF0547@uspalex03.epri.com>
+	<u1o39tvvpfk.fsf@lx-chrateresearch01.citadelgroup.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E305DF07BA@uspalex03.epri.com>
+
+This seems to work ("data" is different than before, so the balance and
+count columns are different):
+
+>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
++          by = as.list(by.factors)]
+     iquarter fico.bucket   balance     count
+[1,]        0          25 0.1427648 1.0449715
+[2,]        0          50 0.8598616 0.7946641
+[3,]        0          75 0.7799311 0.6733977
+[4,]        0         100 1.1240393 1.3415721
+[5,]        1          25 1.6179294 1.9870932
+[6,]        1          50 1.4562150 2.0651700
+[7,]        1          75 1.8457541 1.6337161
+[8,]        1         100 2.0330688 0.8113971
+
+ 
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Johann Hibschman
+> Sent: Monday, August 30, 2010 16:03
+> To: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Programmatic by clauses
+> 
+> "Short, Tom" <TShort at epri.com> writes:
+> 
+> > Johann, how about the following:
+> > [snip example]
+> 
+> That's a good example; thanks.
+> 
+> > Here's a data.table version:
+> >      
+> >>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
+> > +          by = lapply(aggregation.spec, function (f) f(data))]
+> >      iquarter fico.bucket   balance    count
+> > [1,]        0          25 0.5506797 1.133675
+> > [2,]        0          50 1.5175908 0.854553
+> > [3,]        0          75 0.4627294 1.171430
+> > [4,]        0         100 0.8354870 1.083211
+> > [5,]        1          25 1.7311503 1.210178
+> > [6,]        1          50 2.2930775 1.974759
+> > [7,]        1          75 1.0477066 1.973119
+> > [8,]        1         100 1.4351321 1.501291
+> 
+> I hadn't understood .SD before; that's a very good thing to know.
+> 
+> > I think the following should also work, but it doesn't. Note that I 
+> > didn't update to the very latest version of data.table, and I know 
+> > Matthew has changed some things that might already fix this.
+> >      
+> >
+> >>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
+> > +          by = by.factors]
+> > Error in `[.data.table`(data, , lapply(.SD[, cols.to.sum, with = 
+> > FALSE],
+> > : 
+> >   column or expression 1 of 'by' list is not internally 
+> type integer. 
+> > Do not quote column names. Example of correct use:
+> > by=list(colA,month(colB),...).
+> 
+> It still doesn't work.  Unfortunately, if I want to have a 
+> drop-in replacement, I have to operate on the equivalent by.factors.
+> 
+> I tried the following:
+> 
+>   dt.tmp <- cbind(data[, cols.to.sum, with=FALSE],
+>     data.table(by.factors))
+>   dt.agg <- dt.tmp[, lapply(.SD, sum), by=paste(names(by.factor),
+>     collapse=",")]
+> 
+> but I got:
+> 
+>   Error in `[.data.table`(dt.tmp, , lapply(.SD, sum.na), by = 
+> paste(names(by),  : 
+>     by must evaluate to list
+> 
+> I tried
+> 
+>   by.names <- paste(names(by.factor), collapse=",")
+>   dt.agg <- dt.tmp[, lapply(.SD, sum), by=by.names]
+> 
+> but I got the same error.  Randomly wrapping things in eval 
+> or evalq didn't seem to work either.
+> 
+> Is there any chance that we could get a "less magic" version 
+> of the data.table extract that doesn't do anything fancy?  Or 
+> maybe a by.with=FALSE option?
+> 
+> I periodically try data.table, but I always run into this 
+> wall where I waste a few hours trying to guess how to make 
+> extract do what I want it to and finally give up.  It's 
+> frustrating, it seems as if only data.table were trying to be 
+> less clever, it would be very useful to me.
+> 
+> 
+> - Johann
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From nicolas.chapados at gmail.com  Tue Aug 31 05:59:55 2010
+From: nicolas.chapados at gmail.com (Nicolas Chapados)
+Date: Mon, 30 Aug 2010 23:59:55 -0400
+Subject: [datatable-help] Efficient conversion of data table column to vector
+Message-ID: <AANLkTi=RMHsnpbiEx5pWXyVVR5OB1SJ4JvQxxmt88GJ=@mail.gmail.com>
+
+Dear data.table friends and maintainers,
+
+First, thanks to the authors for this excellent package: it really fills a
+void in the R world.  However, I have a question: I'm looking to have an
+efficient conversion of a data table object to a vector (of the correct
+type) when querying a single column whose name is stored in a variable.  As
+per the vignette and the FAQ, I use the syntax
+
+    my.data.table[, colname, with=FALSE]
+
+(where colname is a variable containing my desired column name) but this
+returns another data table, not a vector.  Morever, the eval syntax
+suggested in the FAQ simply does not work:
+
+    my.data.table[, eval(colname)]
+
+See example below.  I could use as.matrix on the result, but this carries
+out undesirable type conversion in the case of columns containing dates: see
+below.
+
+Here is an example to reproduce this problem:
+
+> require(data.table)
+Loading required package: data.table
+> a <- data.table(x=seq(1, 2, by=0.1), y=seq(as.POSIXct("2010-01-01"),
+as.POSIXct("2010-01-11"), length.out=11))
+> a
+        x          y
+ [1,] 1.0 2010-01-01
+ [2,] 1.1 2010-01-02
+ [3,] 1.2 2010-01-03
+ [4,] 1.3 2010-01-04
+ [5,] 1.4 2010-01-05
+ [6,] 1.5 2010-01-06
+ [7,] 1.6 2010-01-07
+ [8,] 1.7 2010-01-08
+ [9,] 1.8 2010-01-09
+[10,] 1.9 2010-01-10
+[11,] 2.0 2010-01-11
+> colname <- "y"
+
+## The following returns a data table.  How can I get a vector, and still
+preserve type information?
+> a[, colname, with=FALSE]
+               y
+ [1,] 2010-01-01
+ [2,] 2010-01-02
+ [3,] 2010-01-03
+ [4,] 2010-01-04
+ [5,] 2010-01-05
+ [6,] 2010-01-06
+ [7,] 2010-01-07
+ [8,] 2010-01-08
+ [9,] 2010-01-09
+[10,] 2010-01-10
+[11,] 2010-01-11
+
+## The eval recipe suggested in the FAQ does not work.
+> a[, eval(colname)]
+[1] "y"
+
+## as.vector does not convert away from data.table
+> as.vector(a[, colname, with=FALSE])
+               y
+ [1,] 2010-01-01
+  [2,] 2010-01-02
+ [3,] 2010-01-03
+ [4,] 2010-01-04
+ [5,] 2010-01-05
+ [6,] 2010-01-06
+ [7,] 2010-01-07
+ [8,] 2010-01-08
+ [9,] 2010-01-09
+[10,] 2010-01-10
+[11,] 2010-01-11
+> class(as.vector(a[, colname, with=FALSE]))
+[1] "data.table"
+
+## as.matrix loses type information (NOTE: in my case it is not acceptable
+to
+## convert this character vector back to a POSIXct, due to the loss of
+important
+## timezone information. Furthermore, this would be very inefficient.)
+> as.matrix(a[, colname, with=FALSE])
+       y
+ [1,] "2010-01-01"
+ [2,] "2010-01-02"
+ [3,] "2010-01-03"
+ [4,] "2010-01-04"
+ [5,] "2010-01-05"
+ [6,] "2010-01-06"
+ [7,] "2010-01-07"
+ [8,] "2010-01-08"
+ [9,] "2010-01-09"
+[10,] "2010-01-10"
+[11,] "2010-01-11"
+> mode(as.matrix(a[, colname, with=FALSE]))
+[1] "character"
+
+## Finally, one could go through a data.frame, but this is inefficient
+## and it sorts of defeats the purpose of using data.table...
+> as.data.frame(a[, colname, with=FALSE])[, colname]
+ [1] "2010-01-01 EST" "2010-01-02 EST" "2010-01-03 EST" "2010-01-04 EST"
+ [5] "2010-01-05 EST" "2010-01-06 EST" "2010-01-07 EST" "2010-01-08 EST"
+ [9] "2010-01-09 EST" "2010-01-10 EST" "2010-01-11 EST"
+
+
+So at this point, my imagination is running out and I'm turning to this list
+for suggestions. This should seem to be a fairly frequent use-case, and I'm
+surprised it does not appear to have previously been addressed.
+
+For the record, here is my sessionInfo()
+
+> sessionInfo()
+R version 2.9.2 (2009-08-24)
+x86_64-pc-linux-gnu
+
+locale:
+C
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] data.table_1.4.1
+
+
+Thanks in advance for any help!
++ Nicolas Chapados
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20100830/7e7f2304/attachment-0001.htm>
+
+From mdowle at mdowle.plus.com  Tue Aug 31 09:35:11 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 31 Aug 2010 08:35:11 +0100
+Subject: [datatable-help] Efficient conversion of data table column to
+ vector
+In-Reply-To: <AANLkTi=RMHsnpbiEx5pWXyVVR5OB1SJ4JvQxxmt88GJ=@mail.gmail.com>
+References: <AANLkTi=RMHsnpbiEx5pWXyVVR5OB1SJ4JvQxxmt88GJ=@mail.gmail.com>
+Message-ID: <1283240111.1407.20.camel@Adam>
+
+
+Nicolas,
+
+Welcome to the list.
+
+Where the documentation mentions 'quoted' it means the quote() function
+to create an expression, not as in a character string. Alternatively you
+can use [[ in the usual way since a data.table is a list.
+
+> colexp = quote(y)   # rather than "y"
+> a[,eval(colexp)]
+ [1] "2010-01-01 GMT" "2010-01-02 GMT" "2010-01-03 GMT" "2010-01-04 GMT"
+ [5] "2010-01-05 GMT" "2010-01-06 GMT" "2010-01-07 GMT" "2010-01-08 GMT"
+ [9] "2010-01-09 GMT" "2010-01-10 GMT" "2010-01-11 GMT"
+ 
+or
+
+> colname = "y"
+> a[[colname]]
+ [1] "2010-01-01 GMT" "2010-01-02 GMT" "2010-01-03 GMT" "2010-01-04 GMT"
+ [5] "2010-01-05 GMT" "2010-01-06 GMT" "2010-01-07 GMT" "2010-01-08 GMT"
+ [9] "2010-01-09 GMT" "2010-01-10 GMT" "2010-01-11 GMT"
+> 
+
+A single column name is a special case of expressions so although this
+can create a steeper learner curve, it results in more power and
+flexibility later.
+
+Suggestions on how to improve documentation so that 'quoting' is clearer
+are very welcome. I've added an item to the list so we don't forget.
+
+Matthew
+
+
+On Mon, 2010-08-30 at 23:59 -0400, Nicolas Chapados wrote:
+> Dear data.table friends and maintainers,
+> 
+> 
+> First, thanks to the authors for this excellent package: it really
+> fills a void in the R world.  However, I have a question: I'm looking
+> to have an efficient conversion of a data table object to a vector (of
+> the correct type) when querying a single column whose name is stored
+> in a variable.  As per the vignette and the FAQ, I use the syntax
+> 
+> 
+>     my.data.table[, colname, with=FALSE]
+> 
+> 
+> (where colname is a variable containing my desired column name) but
+> this returns another data table, not a vector.  Morever, the eval
+> syntax suggested in the FAQ simply does not work:
+> 
+> 
+>     my.data.table[, eval(colname)]
+> 
+> 
+> See example below.  I could use as.matrix on the result, but this
+> carries out undesirable type conversion in the case of columns
+> containing dates: see below.
+> 
+> 
+> Here is an example to reproduce this problem:
+> 
+> 
+> > require(data.table)
+> Loading required package: data.table
+> > a <- data.table(x=seq(1, 2, by=0.1), y=seq(as.POSIXct("2010-01-01"),
+> as.POSIXct("2010-01-11"), length.out=11))
+> > a
+>         x          y
+>  [1,] 1.0 2010-01-01
+>  [2,] 1.1 2010-01-02
+>  [3,] 1.2 2010-01-03
+>  [4,] 1.3 2010-01-04
+>  [5,] 1.4 2010-01-05
+>  [6,] 1.5 2010-01-06
+>  [7,] 1.6 2010-01-07
+>  [8,] 1.7 2010-01-08
+>  [9,] 1.8 2010-01-09
+> [10,] 1.9 2010-01-10
+> [11,] 2.0 2010-01-11
+> > colname <- "y"
+> 
+> 
+> ## The following returns a data table.  How can I get a vector, and
+> still preserve type information?
+> > a[, colname, with=FALSE]
+>                y
+>  [1,] 2010-01-01
+>  [2,] 2010-01-02
+>  [3,] 2010-01-03
+>  [4,] 2010-01-04
+>  [5,] 2010-01-05
+>  [6,] 2010-01-06
+>  [7,] 2010-01-07
+>  [8,] 2010-01-08
+>  [9,] 2010-01-09
+> [10,] 2010-01-10
+> [11,] 2010-01-11
+> 
+> 
+> ## The eval recipe suggested in the FAQ does not work.
+> > a[, eval(colname)]
+> [1] "y"
+> 
+> 
+> ## as.vector does not convert away from data.table
+> > as.vector(a[, colname, with=FALSE])
+>                y
+>  [1,] 2010-01-01
+>  [2,] 2010-01-02
+>  [3,] 2010-01-03
+>  [4,] 2010-01-04
+>  [5,] 2010-01-05
+>  [6,] 2010-01-06
+>  [7,] 2010-01-07
+>  [8,] 2010-01-08
+>  [9,] 2010-01-09
+> [10,] 2010-01-10
+> [11,] 2010-01-11
+> > class(as.vector(a[, colname, with=FALSE]))
+> [1] "data.table"
+> 
+> 
+> ## as.matrix loses type information (NOTE: in my case it is not
+> acceptable to
+> ## convert this character vector back to a POSIXct, due to the loss of
+> important
+> ## timezone information. Furthermore, this would be very inefficient.)
+> > as.matrix(a[, colname, with=FALSE])
+>       y           
+>  [1,] "2010-01-01"
+>  [2,] "2010-01-02"
+>  [3,] "2010-01-03"
+>  [4,] "2010-01-04"
+>  [5,] "2010-01-05"
+>  [6,] "2010-01-06"
+>  [7,] "2010-01-07"
+>  [8,] "2010-01-08"
+>  [9,] "2010-01-09"
+> [10,] "2010-01-10"
+> [11,] "2010-01-11"
+> > mode(as.matrix(a[, colname, with=FALSE]))
+> [1] "character"
+> 
+> 
+> ## Finally, one could go through a data.frame, but this is inefficient
+> ## and it sorts of defeats the purpose of using data.table...
+> > as.data.frame(a[, colname, with=FALSE])[, colname]
+>  [1] "2010-01-01 EST" "2010-01-02 EST" "2010-01-03 EST" "2010-01-04
+> EST"
+>  [5] "2010-01-05 EST" "2010-01-06 EST" "2010-01-07 EST" "2010-01-08
+> EST"
+>  [9] "2010-01-09 EST" "2010-01-10 EST" "2010-01-11 EST"
+> 
+> 
+> 
+> 
+> So at this point, my imagination is running out and I'm turning to
+> this list for suggestions. This should seem to be a fairly frequent
+> use-case, and I'm surprised it does not appear to have previously been
+> addressed.
+> 
+> 
+> For the record, here is my sessionInfo()
+> 
+> 
+> > sessionInfo()
+> R version 2.9.2 (2009-08-24) 
+> x86_64-pc-linux-gnu 
+> 
+> 
+> locale:
+> C
+> 
+> 
+> attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods   base
+>     
+> 
+> 
+> other attached packages:
+> [1] data.table_1.4.1
+> 
+> 
+> 
+> 
+> Thanks in advance for any help!
+> + Nicolas Chapados
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From you at ifn-magdeburg.de  Tue Aug 31 11:32:51 2010
+From: you at ifn-magdeburg.de (Wonsang You)
+Date: Tue, 31 Aug 2010 02:32:51 -0700 (PDT)
+Subject: [datatable-help] How to Adaptively Set Up the Coordinate Range of
+ Multiple Graphs in One Figure
+Message-ID: <AANLkTim-B9meiH2BJD7PCqWqXf2+H2DeXrx7+u3gWukz@mail.gmail.com>
+
+
+Hi, R-Helpers,
+
+I would like to ask about multiple graphs in one figure. I tried to execute
+the following codes.
+
+ xlim <- c(1,100)
+
+ylim <- c(1,4)
+
+plot(NA, xlim=xlim, ylim=ylim)
+
+
+> x <- c(1:100)
+
+for(j in seq(1,10,by=1)) {
+
+     y <- j*x^2+log(j)
+
+     lines(x, y)
+
+}
+
+
+In the above codes, I had to  arbitrarily set up the coordinate range of the
+figure in advance before calculating the values y. (seexlim and ylim)
+In results, the figure did not contain all data since most of data were
+outside the predefined range.
+I am wondering about how to control xlim and ylim adaptive to the real range
+of data, in order to include all data in the figure.
+Thank you for your great help and contribution.
+
+Best Regards,
+Stephen You
+
+
+-----
+--
+Wonsang You
+Special Lab Non-Invasive Brain Imaging
+Leibniz Institute for Neurobiology
+http://www.ifn-magdeburg.de
+-- 
+View this message in context: http://r.789695.n4.nabble.com/How-to-Adaptively-Set-Up-the-Coordinate-Range-of-Multiple-Graphs-in-One-Figure-tp2401285p2401285.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20100831/5894624a/attachment.htm>
+
+From mdowle at mdowle.plus.com  Tue Aug 31 13:37:41 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 31 Aug 2010 12:37:41 +0100
+Subject: [datatable-help] How to Adaptively Set Up the Coordinate Range
+ of Multiple Graphs in One Figure
+In-Reply-To: <AANLkTim-B9meiH2BJD7PCqWqXf2+H2DeXrx7+u3gWukz@mail.gmail.com>
+References: <AANLkTim-B9meiH2BJD7PCqWqXf2+H2DeXrx7+u3gWukz@mail.gmail.com>
+Message-ID: <a8eca8260074a4bbd9bb6f3e9967d817.squirrel@webmail.plus.net>
+
+
+Hi Wonsang,
+
+This is datatable-help not r-help. Please post again to the correct list.
+
+People who post to datatable-help by accident normally get rejected
+(nicely) because they are not subscribed. In your case you did subscribe
+to datatable-help and that's why your post got posted. You probably need
+to unsubscribe from datatable-help and subscribe to r-help instead.
+
+Best, Matthew
+
+>
+> Hi, R-Helpers,
+>
+> I would like to ask about multiple graphs in one figure. I tried to
+> execute
+> the following codes.
+>
+>  xlim <- c(1,100)
+>
+> ylim <- c(1,4)
+>
+> plot(NA, xlim=xlim, ylim=ylim)
+>
+>
+>> x <- c(1:100)
+>
+> for(j in seq(1,10,by=1)) {
+>
+>      y <- j*x^2+log(j)
+>
+>      lines(x, y)
+>
+> }
+>
+>
+> In the above codes, I had to  arbitrarily set up the coordinate range of
+> the
+> figure in advance before calculating the values y. (seexlim and ylim)
+> In results, the figure did not contain all data since most of data were
+> outside the predefined range.
+> I am wondering about how to control xlim and ylim adaptive to the real
+> range
+> of data, in order to include all data in the figure.
+> Thank you for your great help and contribution.
+>
+> Best Regards,
+> Stephen You
+>
+>
+> -----
+> --
+> Wonsang You
+> Special Lab Non-Invasive Brain Imaging
+> Leibniz Institute for Neurobiology
+> http://www.ifn-magdeburg.de
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/How-to-Adaptively-Set-Up-the-Coordinate-Range-of-Multiple-Graphs-in-One-Figure-tp2401285p2401285.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From branson.owen at gmail.com  Tue Aug 31 15:40:21 2010
+From: branson.owen at gmail.com (Branson Owen)
+Date: Tue, 31 Aug 2010 08:40:21 -0500
+Subject: [datatable-help] Report an unexpected behavior in data.table 1.5
+Message-ID: <AANLkTikLWYVmWgbWoaSe01JsPosoe-0D-0d73v_TMmeW@mail.gmail.com>
+
+Dear all,
+
+I just updated my data.table package from 1.4 to 1.5 yesterday. Ran
+into a small problem that has been solved. Just want to report it
+since I don't quite understand it.
+
+> DT[eval(parse(text = criteria))]
+
+This command is working in 1.4, but not everywhere in 1.5. It show
+this error message when called within a function.
+
+Error in `[.data.table`(Data, eval(parse(text = criteria))) :
+  i has not evaluated to logical, integer or double
+
+However, it works in global environment? My solution for a function
+call is, again, wrap it with {}. Therefore,
+
+> DT[ { eval(parse(text = criteria)) } ]
+
+solved my new problem.
+
+It didn't behave like this in 1.4. I guess this is because of the
+favor Matthew did for me for the DT[ { CJ } ] bug. If nothing can be
+perfect, I pretty much like the current setup. There wasn't many
+eval(), but there are lots of CJ/J in my codes.
+
+Just thought you will be interested. Thank you very much for your
+efforts and great work.
+
+Best regards,
+
+From nicolas.chapados at gmail.com  Tue Aug 31 16:24:15 2010
+From: nicolas.chapados at gmail.com (Nicolas Chapados)
+Date: Tue, 31 Aug 2010 10:24:15 -0400
+Subject: [datatable-help] Efficient conversion of data table column to
+	vector
+In-Reply-To: <1283240111.1407.20.camel@Adam>
+References: <AANLkTi=RMHsnpbiEx5pWXyVVR5OB1SJ4JvQxxmt88GJ=@mail.gmail.com>
+	<1283240111.1407.20.camel@Adam>
+Message-ID: <AANLkTim2+wUveAODj=YVkU=JMiQeohYEetcQ2qx4v6x2@mail.gmail.com>
+
+Hi Matthew,
+
+Many thanks for your quick reply.
+
+I had indeed not realized that a[[colname]] would work just fine.  I also
+found a[, eval(as.name(colname))] to work, albeit the syntax is messier than
+the double bracket.
+
+Thanks again,
++ Nicolas
+
+
+On Tue, Aug 31, 2010 at 3:35 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+
+>
+> Nicolas,
+>
+> Welcome to the list.
+>
+> Where the documentation mentions 'quoted' it means the quote() function
+> to create an expression, not as in a character string. Alternatively you
+> can use [[ in the usual way since a data.table is a list.
+>
+> > colexp = quote(y)   # rather than "y"
+> > a[,eval(colexp)]
+>  [1] "2010-01-01 GMT" "2010-01-02 GMT" "2010-01-03 GMT" "2010-01-04 GMT"
+>  [5] "2010-01-05 GMT" "2010-01-06 GMT" "2010-01-07 GMT" "2010-01-08 GMT"
+>  [9] "2010-01-09 GMT" "2010-01-10 GMT" "2010-01-11 GMT"
+>
+> or
+>
+> > colname = "y"
+> > a[[colname]]
+>  [1] "2010-01-01 GMT" "2010-01-02 GMT" "2010-01-03 GMT" "2010-01-04 GMT"
+>  [5] "2010-01-05 GMT" "2010-01-06 GMT" "2010-01-07 GMT" "2010-01-08 GMT"
+>  [9] "2010-01-09 GMT" "2010-01-10 GMT" "2010-01-11 GMT"
+> >
+>
+> A single column name is a special case of expressions so although this
+> can create a steeper learner curve, it results in more power and
+> flexibility later.
+>
+> Suggestions on how to improve documentation so that 'quoting' is clearer
+> are very welcome. I've added an item to the list so we don't forget.
+>
+> Matthew
+>
+>
+> On Mon, 2010-08-30 at 23:59 -0400, Nicolas Chapados wrote:
+> > Dear data.table friends and maintainers,
+> >
+> >
+> > First, thanks to the authors for this excellent package: it really
+> > fills a void in the R world.  However, I have a question: I'm looking
+> > to have an efficient conversion of a data table object to a vector (of
+> > the correct type) when querying a single column whose name is stored
+> > in a variable.  As per the vignette and the FAQ, I use the syntax
+> >
+> >
+> >     my.data.table[, colname, with=FALSE]
+> >
+> >
+> > (where colname is a variable containing my desired column name) but
+> > this returns another data table, not a vector.  Morever, the eval
+> > syntax suggested in the FAQ simply does not work:
+> >
+> >
+> >     my.data.table[, eval(colname)]
+> >
+> >
+> > See example below.  I could use as.matrix on the result, but this
+> > carries out undesirable type conversion in the case of columns
+> > containing dates: see below.
+> >
+> >
+> > Here is an example to reproduce this problem:
+> >
+> >
+> > > require(data.table)
+> > Loading required package: data.table
+> > > a <- data.table(x=seq(1, 2, by=0.1), y=seq(as.POSIXct("2010-01-01"),
+> > as.POSIXct("2010-01-11"), length.out=11))
+> > > a
+> >         x          y
+> >  [1,] 1.0 2010-01-01
+> >  [2,] 1.1 2010-01-02
+> >  [3,] 1.2 2010-01-03
+> >  [4,] 1.3 2010-01-04
+> >  [5,] 1.4 2010-01-05
+> >  [6,] 1.5 2010-01-06
+> >  [7,] 1.6 2010-01-07
+> >  [8,] 1.7 2010-01-08
+> >  [9,] 1.8 2010-01-09
+> > [10,] 1.9 2010-01-10
+> > [11,] 2.0 2010-01-11
+> > > colname <- "y"
+> >
+> >
+> > ## The following returns a data table.  How can I get a vector, and
+> > still preserve type information?
+> > > a[, colname, with=FALSE]
+> >                y
+> >  [1,] 2010-01-01
+> >  [2,] 2010-01-02
+> >  [3,] 2010-01-03
+> >  [4,] 2010-01-04
+> >  [5,] 2010-01-05
+> >  [6,] 2010-01-06
+> >  [7,] 2010-01-07
+> >  [8,] 2010-01-08
+> >  [9,] 2010-01-09
+> > [10,] 2010-01-10
+> > [11,] 2010-01-11
+> >
+> >
+> > ## The eval recipe suggested in the FAQ does not work.
+> > > a[, eval(colname)]
+> > [1] "y"
+> >
+> >
+> > ## as.vector does not convert away from data.table
+> > > as.vector(a[, colname, with=FALSE])
+> >                y
+> >  [1,] 2010-01-01
+> >  [2,] 2010-01-02
+> >  [3,] 2010-01-03
+> >  [4,] 2010-01-04
+> >  [5,] 2010-01-05
+> >  [6,] 2010-01-06
+> >  [7,] 2010-01-07
+> >  [8,] 2010-01-08
+> >  [9,] 2010-01-09
+> > [10,] 2010-01-10
+> > [11,] 2010-01-11
+> > > class(as.vector(a[, colname, with=FALSE]))
+> > [1] "data.table"
+> >
+> >
+> > ## as.matrix loses type information (NOTE: in my case it is not
+> > acceptable to
+> > ## convert this character vector back to a POSIXct, due to the loss of
+> > important
+> > ## timezone information. Furthermore, this would be very inefficient.)
+> > > as.matrix(a[, colname, with=FALSE])
+> >       y
+> >  [1,] "2010-01-01"
+> >  [2,] "2010-01-02"
+> >  [3,] "2010-01-03"
+> >  [4,] "2010-01-04"
+> >  [5,] "2010-01-05"
+> >  [6,] "2010-01-06"
+> >  [7,] "2010-01-07"
+> >  [8,] "2010-01-08"
+> >  [9,] "2010-01-09"
+> > [10,] "2010-01-10"
+> > [11,] "2010-01-11"
+> > > mode(as.matrix(a[, colname, with=FALSE]))
+> > [1] "character"
+> >
+> >
+> > ## Finally, one could go through a data.frame, but this is inefficient
+> > ## and it sorts of defeats the purpose of using data.table...
+> > > as.data.frame(a[, colname, with=FALSE])[, colname]
+> >  [1] "2010-01-01 EST" "2010-01-02 EST" "2010-01-03 EST" "2010-01-04
+> > EST"
+> >  [5] "2010-01-05 EST" "2010-01-06 EST" "2010-01-07 EST" "2010-01-08
+> > EST"
+> >  [9] "2010-01-09 EST" "2010-01-10 EST" "2010-01-11 EST"
+> >
+> >
+> >
+> >
+> > So at this point, my imagination is running out and I'm turning to
+> > this list for suggestions. This should seem to be a fairly frequent
+> > use-case, and I'm surprised it does not appear to have previously been
+> > addressed.
+> >
+> >
+> > For the record, here is my sessionInfo()
+> >
+> >
+> > > sessionInfo()
+> > R version 2.9.2 (2009-08-24)
+> > x86_64-pc-linux-gnu
+> >
+> >
+> > locale:
+> > C
+> >
+> >
+> > attached base packages:
+> > [1] stats     graphics  grDevices utils     datasets  methods   base
+> >
+> >
+> >
+> > other attached packages:
+> > [1] data.table_1.4.1
+> >
+> >
+> >
+> >
+> > Thanks in advance for any help!
+> > + Nicolas Chapados
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20100831/4a05a143/attachment.htm>
+
+From jhibschman+r at gmail.com  Tue Aug 31 17:10:12 2010
+From: jhibschman+r at gmail.com (Johann Hibschman)
+Date: Tue, 31 Aug 2010 10:10:12 -0500
+Subject: [datatable-help] Programmatic by clauses
+References: <u1o7hj8uuby.fsf@lx-chrateresearch01.citadelgroup.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E305DF0547@uspalex03.epri.com>
+	<u1o39tvvpfk.fsf@lx-chrateresearch01.citadelgroup.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E305DF07BA@uspalex03.epri.com>
+Message-ID: <u1oy6bmu8bv.fsf@lx-chrateresearch01.citadelgroup.com>
+
+"Short, Tom" <TShort at epri.com> writes:
+
+> This seems to work ("data" is different than before, so the balance and
+> count columns are different):
+>
+>>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
+> +          by = as.list(by.factors)]
+>      iquarter fico.bucket   balance     count
+> [1,]        0          25 0.1427648 1.0449715
+> [2,]        0          50 0.8598616 0.7946641
+> [3,]        0          75 0.7799311 0.6733977
+> [4,]        0         100 1.1240393 1.3415721
+> [5,]        1          25 1.6179294 1.9870932
+> [6,]        1          50 1.4562150 2.0651700
+> [7,]        1          75 1.8457541 1.6337161
+> [8,]        1         100 2.0330688 0.8113971
+
+Using as.list works for me as well, thanks.
+
+I had to change my summary function to return NA_real_ rather than just
+plain NA, but once I did that, everything seems to work.
+
+I'm impressed.  It looks to be about 10 times faster, all
+considered. The actual aggregation step is something like 40 times
+faster, but I have to do some extra work to get it into a format
+suitable for data.table.
+
+I would still prefer there to be a more "plain vanilla" interface to all
+this.  I have no idea why using "as.list" works, and that makes me
+uncomfortable.
+
+Regards,
+Johann
+
+>
+>  
+>
+>> -----Original Message-----
+>> From: datatable-help-bounces at lists.r-forge.r-project.org 
+>> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+>> On Behalf Of Johann Hibschman
+>> Sent: Monday, August 30, 2010 16:03
+>> To: datatable-help at lists.r-forge.r-project.org
+>> Subject: Re: [datatable-help] Programmatic by clauses
+>> 
+>> "Short, Tom" <TShort at epri.com> writes:
+>> 
+>> > Johann, how about the following:
+>> > [snip example]
+>> 
+>> That's a good example; thanks.
+>> 
+>> > Here's a data.table version:
+>> >      
+>> >>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
+>> > +          by = lapply(aggregation.spec, function (f) f(data))]
+>> >      iquarter fico.bucket   balance    count
+>> > [1,]        0          25 0.5506797 1.133675
+>> > [2,]        0          50 1.5175908 0.854553
+>> > [3,]        0          75 0.4627294 1.171430
+>> > [4,]        0         100 0.8354870 1.083211
+>> > [5,]        1          25 1.7311503 1.210178
+>> > [6,]        1          50 2.2930775 1.974759
+>> > [7,]        1          75 1.0477066 1.973119
+>> > [8,]        1         100 1.4351321 1.501291
+>> 
+>> I hadn't understood .SD before; that's a very good thing to know.
+>> 
+>> > I think the following should also work, but it doesn't. Note that I 
+>> > didn't update to the very latest version of data.table, and I know 
+>> > Matthew has changed some things that might already fix this.
+>> >      
+>> >
+>> >>     data[, lapply(.SD[, cols.to.sum, with = FALSE], sum),
+>> > +          by = by.factors]
+>> > Error in `[.data.table`(data, , lapply(.SD[, cols.to.sum, with = 
+>> > FALSE],
+>> > : 
+>> >   column or expression 1 of 'by' list is not internally 
+>> type integer. 
+>> > Do not quote column names. Example of correct use:
+>> > by=list(colA,month(colB),...).
+>> 
+>> It still doesn't work.  Unfortunately, if I want to have a 
+>> drop-in replacement, I have to operate on the equivalent by.factors.
+>> 
+>> I tried the following:
+>> 
+>>   dt.tmp <- cbind(data[, cols.to.sum, with=FALSE],
+>>     data.table(by.factors))
+>>   dt.agg <- dt.tmp[, lapply(.SD, sum), by=paste(names(by.factor),
+>>     collapse=",")]
+>> 
+>> but I got:
+>> 
+>>   Error in `[.data.table`(dt.tmp, , lapply(.SD, sum.na), by = 
+>> paste(names(by),  : 
+>>     by must evaluate to list
+>> 
+>> I tried
+>> 
+>>   by.names <- paste(names(by.factor), collapse=",")
+>>   dt.agg <- dt.tmp[, lapply(.SD, sum), by=by.names]
+>> 
+>> but I got the same error.  Randomly wrapping things in eval 
+>> or evalq didn't seem to work either.
+>> 
+>> Is there any chance that we could get a "less magic" version 
+>> of the data.table extract that doesn't do anything fancy?  Or 
+>> maybe a by.with=FALSE option?
+>> 
+>> I periodically try data.table, but I always run into this 
+>> wall where I waste a few hours trying to guess how to make 
+>> extract do what I want it to and finally give up.  It's 
+>> frustrating, it seems as if only data.table were trying to be 
+>> less clever, it would be very useful to me.
+>> 
+>> 
+>> - Johann
+>> 
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> atatable-help
+>> 
+
+
+From mdowle at mdowle.plus.com  Tue Aug 31 19:41:04 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 31 Aug 2010 18:41:04 +0100
+Subject: [datatable-help] Report an unexpected behavior in data.table 1.5
+In-Reply-To: <AANLkTikLWYVmWgbWoaSe01JsPosoe-0D-0d73v_TMmeW@mail.gmail.com>
+References: <AANLkTikLWYVmWgbWoaSe01JsPosoe-0D-0d73v_TMmeW@mail.gmail.com>
+Message-ID: <1283276464.2084.12.camel@Adam>
+
+I just have 30 seconds for quick reply ... can see I'll need
+reproducible example for this one please; it will probably depend on
+contents of 'criteria', columns of DT and arguments of the function
+within which it fails. With that I can take a look later ...
+Thanks.
+
+On Tue, 2010-08-31 at 08:40 -0500, Branson Owen wrote:
+> Dear all,
+> 
+> I just updated my data.table package from 1.4 to 1.5 yesterday. Ran
+> into a small problem that has been solved. Just want to report it
+> since I don't quite understand it.
+> 
+> > DT[eval(parse(text = criteria))]
+> 
+> This command is working in 1.4, but not everywhere in 1.5. It show
+> this error message when called within a function.
+> 
+> Error in `[.data.table`(Data, eval(parse(text = criteria))) :
+>   i has not evaluated to logical, integer or double
+> 
+> However, it works in global environment? My solution for a function
+> call is, again, wrap it with {}. Therefore,
+> 
+> > DT[ { eval(parse(text = criteria)) } ]
+> 
+> solved my new problem.
+> 
+> It didn't behave like this in 1.4. I guess this is because of the
+> favor Matthew did for me for the DT[ { CJ } ] bug. If nothing can be
+> perfect, I pretty much like the current setup. There wasn't many
+> eval(), but there are lots of CJ/J in my codes.
+> 
+> Just thought you will be interested. Thank you very much for your
+> efforts and great work.
+> 
+> Best regards,
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From nicolas.chapados at gmail.com  Tue Aug 31 21:40:20 2010
+From: nicolas.chapados at gmail.com (Nicolas Chapados)
+Date: Tue, 31 Aug 2010 15:40:20 -0400
+Subject: [datatable-help] Automagic timezone convertion on data.table rbind
+Message-ID: <AANLkTimUToNzw7Me0ys6DU0TyXd-Xjz4qFH-J_w1_F3h@mail.gmail.com>
+
+Dear list,
+
+I'm using a data.table that contains date columns (in POSIXct format).
+ There appears to be an issue with automatic timezone conversion when
+rbinding from NULL (or an empty data.table), as would occur when one is
+progressively building up the table in a loop.
+
+For example:
+
+> require(data.table)
+Loading required package: data.table
+
+## Currently located in the North-America Eastern Standard Time zone.
+> Sys.timezone()
+[1] "America/Montreal"
+> a <- NULL
+
+## Create a table with a single date column (GMT timezone)
+> b <- data.table(x = seq(as.POSIXct("2010-01-01", "GMT"),
+as.POSIXct("2010-01-10", "GMT"), length.out=10))
+> b
+               x
+ [1,] 2010-01-01
+ [2,] 2010-01-02
+ [3,] 2010-01-03
+ [4,] 2010-01-04
+ [5,] 2010-01-05
+ [6,] 2010-01-06
+ [7,] 2010-01-07
+ [8,] 2010-01-08
+ [9,] 2010-01-09
+[10,] 2010-01-10
+
+## Bind it from NULL: Oops!  The timezone changes to EST!
+> rbind(a,b)
+                        x
+ [1,] 2009-12-31 19:00:00
+ [2,] 2010-01-01 19:00:00
+ [3,] 2010-01-02 19:00:00
+ [4,] 2010-01-03 19:00:00
+ [5,] 2010-01-04 19:00:00
+ [6,] 2010-01-05 19:00:00
+ [7,] 2010-01-06 19:00:00
+ [8,] 2010-01-07 19:00:00
+ [9,] 2010-01-08 19:00:00
+[10,] 2010-01-09 19:00:00
+
+## Same behavior from an empty data table.
+> rbind(data.table(), b)
+                        x
+ [1,] 2009-12-31 19:00:00
+ [2,] 2010-01-01 19:00:00
+ [3,] 2010-01-02 19:00:00
+ [4,] 2010-01-03 19:00:00
+ [5,] 2010-01-04 19:00:00
+ [6,] 2010-01-05 19:00:00
+ [7,] 2010-01-06 19:00:00
+ [8,] 2010-01-07 19:00:00
+ [9,] 2010-01-08 19:00:00
+[10,] 2010-01-09 19:00:00
+
+This behavior is somewhat puzzling.  Any pointers as to how to preserve
+timezone information would be greatly appreciated!  For the record, I'm
+with R version 2.9.2 and time.date version 1.4.1 (the latest on CRAN).
+
+Best regards,
++ Nicolas Chapados
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20100831/dbca043d/attachment.htm>
+
+From mdowle at mdowle.plus.com  Tue Aug 31 22:10:47 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 31 Aug 2010 21:10:47 +0100
+Subject: [datatable-help] Windows R-Forge build appears 18 days stale
+In-Reply-To: <248fbde75c545cc148546c5ad3146214.squirrel@webmail.plus.net>
+References: <a8aa4424239bb4aec583dd76b62fc043.squirrel@webmail.plus.net>
+	<248fbde75c545cc148546c5ad3146214.squirrel@webmail.plus.net>
+Message-ID: <1283285447.2373.6.camel@Adam>
+
+
+The Windows binary on R-Forge seems to be up to date now, or at least
+only one or two days behind the latest commit.
+Matthew
+
+
+On Thu, 2010-08-19 at 08:19 +0100, Matthew Dowle wrote:
+> All,
+> Has anyone noticed this?
+> Does it impact you?
+> Thanks, Matthew
+> 
+> > Hi Stefan,
+> >
+> > Just to check if you're aware? ...
+> >
+> > This says the Win32 was last built 14 Aug at rev 112 :
+> >
+> > https://r-forge.r-project.org/R/?group_id=240&log=build_win32&pkg=data.table&flavor=patched
+> >
+> > but rev 112 was on Sunday 1st Aug  (18 days ago).
+> >
+> > The linux and max build logs both say rev 132, which although hasn't
+> > caught
+> > up to rev 133 made on Monday, at least they're only 2-3 days stale.
+> >
+> > Matthew
+> >
+> >
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From dwinsemius at comcast.net  Tue Aug 31 22:17:04 2010
+From: dwinsemius at comcast.net (David Winsemius)
+Date: Tue, 31 Aug 2010 16:17:04 -0400
+Subject: [datatable-help] Efficient conversion of data table column to
+	vector
+In-Reply-To: <0BD59054-6A3F-4DD2-9D6F-F6BFE51C6629@comcast.net>
+References: <AANLkTi=RMHsnpbiEx5pWXyVVR5OB1SJ4JvQxxmt88GJ=@mail.gmail.com>
+	<1283240111.1407.20.camel@Adam>
+	<0BD59054-6A3F-4DD2-9D6F-F6BFE51C6629@comcast.net>
+Message-ID: <BAE80FA9-2D24-4027-98A2-1687E2904807@comcast.net>
+
+I sent this to Matthew offlist but he wants it "on the record", so  
+here is what I sent:
+On Aug 31, 2010, at 11:56 AM, David Winsemius wrote:
+
+>
+> On Aug 31, 2010, at 3:35 AM, Matthew Dowle wrote:
+>
+>>
+>> Nicolas,
+>>
+>> Welcome to the list.
+>>
+>> Where the documentation mentions 'quoted' it means the quote()  
+>> function
+>> to create an expression, not as in a character string.
+>
+
+Matthew;
+
+I think you really should look at FAQ 1.5. It says nothing about  
+"quoted". It does appear to imply that if someone had executed:
+
+colname="x"
+
+... that both DT[, colname, with=FALSE]  and DT[, eval(colname)]  
+should "work". Now you are saying that isn't so, that only the first  
+will return anything like the expected result.
+
+-- 
+David
+>
+>> Alternatively you
+>> can use [[ in the usual way since a data.table is a list.
+>>
+>>> colexp = quote(y)   # rather than "y"
+>>> a[,eval(colexp)]
+>> [1] "2010-01-01 GMT" "2010-01-02 GMT" "2010-01-03 GMT" "2010-01-04  
+>> GMT"
+>> [5] "2010-01-05 GMT" "2010-01-06 GMT" "2010-01-07 GMT" "2010-01-08  
+>> GMT"
+>> [9] "2010-01-09 GMT" "2010-01-10 GMT" "2010-01-11 GMT"
+>>
+>> or
+>>
+>>> colname = "y"
+>>> a[[colname]]
+>> [1] "2010-01-01 GMT" "2010-01-02 GMT" "2010-01-03 GMT" "2010-01-04  
+>> GMT"
+>> [5] "2010-01-05 GMT" "2010-01-06 GMT" "2010-01-07 GMT" "2010-01-08  
+>> GMT"
+>> [9] "2010-01-09 GMT" "2010-01-10 GMT" "2010-01-11 GMT"
+>>>
+>>
+>> A single column name is a special case of expressions so although  
+>> this
+>> can create a steeper learner curve, it results in more power and
+>> flexibility later.
+>>
+>> Suggestions on how to improve documentation so that 'quoting' is  
+>> clearer
+>> are very welcome. I've added an item to the list so we don't forget.
+>>
+>> Matthew
+>>
+>>
+>> On Mon, 2010-08-30 at 23:59 -0400, Nicolas Chapados wrote:
+>>> Dear data.table friends and maintainers,
+>>>
+>>>
+>>> First, thanks to the authors for this excellent package: it really
+>>> fills a void in the R world.  However, I have a question: I'm  
+>>> looking
+>>> to have an efficient conversion of a data table object to a vector  
+>>> (of
+>>> the correct type) when querying a single column whose name is stored
+>>> in a variable.  As per the vignette and the FAQ, I use the syntax
+>>>
+>>>
+>>>   my.data.table[, colname, with=FALSE]
+>>>
+>>>
+>>> (where colname is a variable containing my desired column name) but
+>>> this returns another data table, not a vector.  Morever, the eval
+>>> syntax suggested in the FAQ simply does not work:
+>>>
+>>>
+>>>   my.data.table[, eval(colname)]
+>>>
+>>>
+>>> See example below.  I could use as.matrix on the result, but this
+>>> carries out undesirable type conversion in the case of columns
+>>> containing dates: see below.
+>>>
+>>>
+>>> Here is an example to reproduce this problem:
+>>>
+>>>
+>>>> require(data.table)
+>>> Loading required package: data.table
+>>>> a <- data.table(x=seq(1, 2, by=0.1),  
+>>>> y=seq(as.POSIXct("2010-01-01"),
+>>> as.POSIXct("2010-01-11"), length.out=11))
+>>>> a
+>>>       x          y
+>>> [1,] 1.0 2010-01-01
+>>> [2,] 1.1 2010-01-02
+>>> [3,] 1.2 2010-01-03
+>>> [4,] 1.3 2010-01-04
+>>> [5,] 1.4 2010-01-05
+>>> [6,] 1.5 2010-01-06
+>>> [7,] 1.6 2010-01-07
+>>> [8,] 1.7 2010-01-08
+>>> [9,] 1.8 2010-01-09
+>>> [10,] 1.9 2010-01-10
+>>> [11,] 2.0 2010-01-11
+>>>> colname <- "y"
+>>>
+>>>
+>>> ## The following returns a data table.  How can I get a vector, and
+>>> still preserve type information?
+>>>> a[, colname, with=FALSE]
+>>>              y
+>>> [1,] 2010-01-01
+>>> [2,] 2010-01-02
+>>> [3,] 2010-01-03
+>>> [4,] 2010-01-04
+>>> [5,] 2010-01-05
+>>> [6,] 2010-01-06
+>>> [7,] 2010-01-07
+>>> [8,] 2010-01-08
+>>> [9,] 2010-01-09
+>>> [10,] 2010-01-10
+>>> [11,] 2010-01-11
+>>>
+>>>
+>>> ## The eval recipe suggested in the FAQ does not work.
+>>>> a[, eval(colname)]
+>>> [1] "y"
+>>>
+>>>
+>>> ## as.vector does not convert away from data.table
+>>>> as.vector(a[, colname, with=FALSE])
+>>>              y
+>>> [1,] 2010-01-01
+>>> [2,] 2010-01-02
+>>> [3,] 2010-01-03
+>>> [4,] 2010-01-04
+>>> [5,] 2010-01-05
+>>> [6,] 2010-01-06
+>>> [7,] 2010-01-07
+>>> [8,] 2010-01-08
+>>> [9,] 2010-01-09
+>>> [10,] 2010-01-10
+>>> [11,] 2010-01-11
+>>>> class(as.vector(a[, colname, with=FALSE]))
+>>> [1] "data.table"
+>>>
+>>>
+>>> ## as.matrix loses type information (NOTE: in my case it is not
+>>> acceptable to
+>>> ## convert this character vector back to a POSIXct, due to the  
+>>> loss of
+>>> important
+>>> ## timezone information. Furthermore, this would be very  
+>>> inefficient.)
+>>>> as.matrix(a[, colname, with=FALSE])
+>>>     y
+>>> [1,] "2010-01-01"
+>>> [2,] "2010-01-02"
+>>> [3,] "2010-01-03"
+>>> [4,] "2010-01-04"
+>>> [5,] "2010-01-05"
+>>> [6,] "2010-01-06"
+>>> [7,] "2010-01-07"
+>>> [8,] "2010-01-08"
+>>> [9,] "2010-01-09"
+>>> [10,] "2010-01-10"
+>>> [11,] "2010-01-11"
+>>>> mode(as.matrix(a[, colname, with=FALSE]))
+>>> [1] "character"
+>>>
+>>>
+>>> ## Finally, one could go through a data.frame, but this is  
+>>> inefficient
+>>> ## and it sorts of defeats the purpose of using data.table...
+>>>> as.data.frame(a[, colname, with=FALSE])[, colname]
+>>> [1] "2010-01-01 EST" "2010-01-02 EST" "2010-01-03 EST" "2010-01-04
+>>> EST"
+>>> [5] "2010-01-05 EST" "2010-01-06 EST" "2010-01-07 EST" "2010-01-08
+>>> EST"
+>>> [9] "2010-01-09 EST" "2010-01-10 EST" "2010-01-11 EST"
+>>>
+>>>
+>>>
+>>>
+>>> So at this point, my imagination is running out and I'm turning to
+>>> this list for suggestions. This should seem to be a fairly frequent
+>>> use-case, and I'm surprised it does not appear to have previously  
+>>> been
+>>> addressed.
+>>>
+>>>
+>>> For the record, here is my sessionInfo()
+>>>
+>>>
+>>>> sessionInfo()
+>>> R version 2.9.2 (2009-08-24)
+>>> x86_64-pc-linux-gnu
+>>>
+>>>
+>>> locale:
+>>> C
+>>>
+>>>
+>>> attached base packages:
+>>> [1] stats     graphics  grDevices utils     datasets  methods   base
+>>>
+>>>
+>>>
+>>> other attached packages:
+>>> [1] data.table_1.4.1
+>>>
+>>>
+>>>
+>>>
+>>> Thanks in advance for any help!
+>>> + Nicolas Chapados
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+> David Winsemius, MD
+> West Hartford, CT
+>
+
+David Winsemius, MD
+West Hartford, CT
+
+
+From bogus@does.not.exist.com  Thu Aug 26 12:23:38 2010
+From: bogus@does.not.exist.com ()
+Date: Thu, 26 Aug 2010 10:23:38 -0000
+Subject: No subject
+Message-ID: <mailman.2.1284392751.1378.datatable-help@lists.r-forge.r-project.org>
+
+has to be pretty slow to benefit. If you have lots of groupings,
+the serial method will generally win because it doesn't have the
+overhead. You can use "parallel" and "collect" from multicore
+with a data.table with something like:
+
+dt[, parallel(mean(b)), by = "a"]
+ans <- collect()
+
+See below for examples and some timings. It doesn't work for
+me on windows XP, but it does on Linux.
+
+> library(multicore)
+> n <- 1e8
+> dt <- data.table(a = sample(1:10, n, replace = TRUE),
++                  b = sample(1:100, n, replace = TRUE),
++                  c = LETTERS[rep(1:500, n/500)], key = "a")
+>
+> (res <- dt[, list(pid = parallel(mean(b))$pid), by = "a"])
+       a   pid
+ [1,]  1 19547
+ [2,]  2 19548
+ [3,]  3 19549
+ [4,]  4 19550
+ [5,]  5 19551
+ [6,]  6 19552
+ [7,]  7 19553
+ [8,]  8 19554
+ [9,]  9 19555
+[10,] 10 19556
+> (ans <- collect())
+$`19556`
+[1] 50.50949
+
+$`19555`
+[1] 50.49289
+
+$`19554`
+[1] 50.48453
+
+$`19553`
+[1] 50.48849
+
+$`19552`
+[1] 50.51581
+
+$`19551`
+[1] 50.49477
+
+$`19550`
+[1] 50.50468
+
+$`19549`
+[1] 50.50396
+
+$`19548`
+[1] 50.495
+
+$`19547`
+[1] 50.51994
+
+$`19545`
+[1] 50.51657
+
+
+We're not done yet, because the "ans" is a list, and we
+need to merge res and ans to get the results right. I
+won't bother with that.
+
+Here are some timings:
+
+> system.time({
++     res <- dt[, list(pid = parallel(mean(b))$pid), by = "a"]
++     ans <- collect()
++ })
+   user  system elapsed
+  2.880   3.996   5.561
+>
+> system.time({
++     dt[, mean(b), by = "a"]
++ })
+   user  system elapsed
+  3.051   2.605   5.660
+
+No gain there, so let's make R work harder on each grouping:
+
+> system.time({
++     res <- dt[, list(pid = parallel(mean(sort(b)))$pid), by = "a"]
++     ans <- collect()
++ })
+   user  system elapsed
+ 17.416   5.138   8.114
+>
+> system.time({
++     dt[, mean(sort(b)), by = "a"]
++ })
+   user  system elapsed
+ 11.429   2.682  14.120
+
+- Tom
+
+On Mon, Sep 13, 2010 at 10:36 AM, Branson Owen <branson.owen at gmail.com> wrote:
+> I just read an article about new plyr package using parallelization to
+> speed up its performance. Just throw out an idea for data.table to
+> parallelize some operations and make use of multiple processors
+> simultaneously. I don't think this is a must-have feature at this
+> moment though.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+

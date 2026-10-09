@@ -1,0 +1,1946 @@
+From mailinglist.honeypot at gmail.com  Tue Mar  1 20:41:52 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 1 Mar 2011 14:41:52 -0500
+Subject: [datatable-help] Idea/feature request
+Message-ID: <AANLkTikcB6Eik=M-e0gxvuqiVCDB78iNsTT_cJKHQ5yj@mail.gmail.com>
+
+Hi,
+
+Now that data.table has dropped the "by" columns in .SD (since 1.5.3),
+I find myself wanting a way to figure out what subset I'm working on
+when I'm processing data in groups.
+
+The reason is that I want to (at times) fetch/retrieve relevant info
+from another data.table that relates to the current subest I'm
+operating on. I know I can join the two tables together first before
+processing the groups, but sometimes I work with large data.tables and
+don't want to merge them at once and then iterate over the new
+agglomerated/huge one.
+
+Would anyone else find it helpful to have data.table inject something
+like a ".by" (or .BY) variable into the scope of the current
+processing group so we can reference it as we see fit.
+
+For example:
+
+result <- some.big.data.table[, by=list(colA, colB), {
+  ## Sometimes I want to know what the current values of
+  ## colA and colB are in here to get some more info. Mabye
+  ## we can have .BY:
+
+  xref <- more.data[J(.BY[1], .BY[2]), mult='all'] ## or something
+  ## ...
+}]
+
+You know? Does anyone else find themselves in this boat too, or is
+there a better way to do what I'm after already?
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Wed Mar  2 10:22:50 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 02 Mar 2011 09:22:50 +0000
+Subject: [datatable-help] Idea/feature request
+In-Reply-To: <AANLkTikcB6Eik=M-e0gxvuqiVCDB78iNsTT_cJKHQ5yj@mail.gmail.com>
+References: <AANLkTikcB6Eik=M-e0gxvuqiVCDB78iNsTT_cJKHQ5yj@mail.gmail.com>
+Message-ID: <1299057770.6601.193.camel@netbook>
+
+Yes, good idea. I thought the grouping columns would already be in scope
+actually, that was an oversight. Intention was just to change .SD. The
+first item of each group needs to be installed in scope then. If you
+feel like looking: internally .SD points to itself so you can use
+variables alongside .SD. It's the upper level that needs a small loop to
+set them. I didn't like the .BY on first glance, but thinking about it
+maybe that could be useful too in cases when you write generic code that
+works when the by column names vary. You could have .BY pointing to
+itself, too. .BY would contain a set of 1-length vectors.  There's a FAQ
+that answers why j needs grp[1] rather than grp, so that would be better
+and no longer needed as grp would be length 1 anyway. Sorry I realise
+that's all English and no R examples, will add later if needed.
+Matthew
+
+On Tue, 2011-03-01 at 14:41 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> Now that data.table has dropped the "by" columns in .SD (since 1.5.3),
+> I find myself wanting a way to figure out what subset I'm working on
+> when I'm processing data in groups.
+> 
+> The reason is that I want to (at times) fetch/retrieve relevant info
+> from another data.table that relates to the current subest I'm
+> operating on. I know I can join the two tables together first before
+> processing the groups, but sometimes I work with large data.tables and
+> don't want to merge them at once and then iterate over the new
+> agglomerated/huge one.
+> 
+> Would anyone else find it helpful to have data.table inject something
+> like a ".by" (or .BY) variable into the scope of the current
+> processing group so we can reference it as we see fit.
+> 
+> For example:
+> 
+> result <- some.big.data.table[, by=list(colA, colB), {
+>   ## Sometimes I want to know what the current values of
+>   ## colA and colB are in here to get some more info. Mabye
+>   ## we can have .BY:
+> 
+>   xref <- more.data[J(.BY[1], .BY[2]), mult='all'] ## or something
+>   ## ...
+> }]
+> 
+> You know? Does anyone else find themselves in this boat too, or is
+> there a better way to do what I'm after already?
+> 
+> Thanks,
+> -steve
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Wed Mar  2 22:19:17 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 2 Mar 2011 16:19:17 -0500
+Subject: [datatable-help] Idea/feature request
+In-Reply-To: <1299057770.6601.193.camel@netbook>
+References: <AANLkTikcB6Eik=M-e0gxvuqiVCDB78iNsTT_cJKHQ5yj@mail.gmail.com>
+	<1299057770.6601.193.camel@netbook>
+Message-ID: <AANLkTi==ALrr0REkGF=+rcp79rp_gag1me9dXgQNNKi8@mail.gmail.com>
+
+Hi,
+
+On Wed, Mar 2, 2011 at 4:22 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Yes, good idea. I thought the grouping columns would already be in scope
+> actually, that was an oversight. Intention was just to change .SD. The
+> first item of each group needs to be installed in scope then. If you
+> feel like looking: internally .SD points to itself so you can use
+> variables alongside .SD. It's the upper level that needs a small loop to
+> set them. I didn't like the .BY on first glance, but thinking about it
+> maybe that could be useful too in cases when you write generic code that
+> works when the by column names vary. You could have .BY pointing to
+> itself, too. .BY would contain a set of 1-length vectors. ?There's a FAQ
+> that answers why j needs grp[1] rather than grp, so that would be better
+> and no longer needed as grp would be length 1 anyway. Sorry I realise
+> that's all English and no R examples, will add later if needed.
+
+I actually got the gist of it.
+
+I agree that .BY is a bit ugly, but I was also thinking of the
+"generic code" scenario you mentioned.
+
+I didn't think of just installing the by variables in scope as well so
+we can reference them like we do the column names of the current .SD
+(ie. no qualifiers/whatever needed), but that'd be quite nice, too.
+
+I'll take some time to look at the implementation details later,
+though I reckon I'll be chasing my tail for a while there.
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Fri Mar  4 23:46:17 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Fri, 4 Mar 2011 17:46:17 -0500
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+Message-ID: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+
+I'll have to apologize in advance because I can't create a
+reproducible example for this behavior, but I'll keep trying .. please
+bear with me.
+
+Somehow I've ended up with a data.table `m2` that looks like this:
+
+R> m2
+      entrez.id total.tags.liver cds.liver intron.liver utr.liver
+ [1,]         9               27         0            0         0
+ [2,]        10              347         0            0         0
+ [3,]        12             5076         0           17         0
+ [4,]        13             2445         0            0         0
+ [5,]        18             2076         0            0         0
+ [6,]        20               15         0            0         0
+ [7,]        25               62         0            0         0
+ [8,]        32              320         0            0         0
+ [9,]        34             1377         0            0         0
+[10,]        35              757         0            0         0
+First 10 rows of 5236 printed.
+
+R> key(m2)
+[1] "entrez.id"
+
+R> any(duplicated(m2$entrez.id))
+[1] FALSE
+
+So far so good -- I stumbled on the following problem when `merge`-ing
+two large data tables which was giving me a stranger error. In the
+process of trying to smoke out the problem, I notice this unexpected
+behavior:
+
+## This is expected
+R> subset(m2, entrez.id == '9')
+     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+[1,]         9               27         0            0         0
+
+## This isn't
+R> m2['9']
+     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+[1,]         9               NA        NA           NA        NA
+
+Woops! Isn't that supposed to return the same as above?
+
+I can fix `m2` by manipulating the key column:
+
+R> key(m2) <- NULL ## probably not necessary
+R> m2$entrez.id <- as.character(m2$entrez.id)
+R> key(m2) <- 'entrez.id'
+R> m2['9']
+     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+[1,]         9               27         0            0         0
+
+(side note: the bug I mentioned when I try to `merge` this w/ another
+data.table is gone after I did the above fix).
+
+So -- I guess my point is that I'm not exactly sure how I got `m2` to
+have a funky key, but the fact that it got messed up like this somehow
+I think is undesired behavior, no?
+
+Does this point to something (maybe obvious) that happened on the way
+to building up `m2`?
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mel at mbacou.com  Sat Mar  5 02:15:12 2011
+From: mel at mbacou.com (Bacou, Melanie)
+Date: Fri, 4 Mar 2011 20:15:12 -0500
+Subject: [datatable-help] Something seems funky. I think with
+	character-to-factor conversion for keys (?)
+In-Reply-To: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+Message-ID: <000301cbdad2$c82ef8e0$588ceaa0$@com>
+
+Steve,
+
+Try instead:
+
+R> m2[J(9)]
+
+It seems your original entrez.id key is integer not character -- but to be
+honest I'm not sure why:
+
+R> m2[9]
+
+doesn't work either...
+
+--Mel.
+
+-----Original Message-----
+From: datatable-help-bounces at r-forge.wu-wien.ac.at
+[mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Steve
+Lianoglou
+Sent: Friday, March 04, 2011 5:46 PM
+To: datatable-help at r-forge.wu-wien.ac.at
+Subject: [datatable-help] Something seems funky. I think with
+character-to-factor conversion for keys (?)
+
+I'll have to apologize in advance because I can't create a
+reproducible example for this behavior, but I'll keep trying .. please
+bear with me.
+
+Somehow I've ended up with a data.table `m2` that looks like this:
+
+R> m2
+      entrez.id total.tags.liver cds.liver intron.liver utr.liver
+ [1,]         9               27         0            0         0
+ [2,]        10              347         0            0         0
+ [3,]        12             5076         0           17         0
+ [4,]        13             2445         0            0         0
+ [5,]        18             2076         0            0         0
+ [6,]        20               15         0            0         0
+ [7,]        25               62         0            0         0
+ [8,]        32              320         0            0         0
+ [9,]        34             1377         0            0         0
+[10,]        35              757         0            0         0
+First 10 rows of 5236 printed.
+
+R> key(m2)
+[1] "entrez.id"
+
+R> any(duplicated(m2$entrez.id))
+[1] FALSE
+
+So far so good -- I stumbled on the following problem when `merge`-ing
+two large data tables which was giving me a stranger error. In the
+process of trying to smoke out the problem, I notice this unexpected
+behavior:
+
+## This is expected
+R> subset(m2, entrez.id == '9')
+     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+[1,]         9               27         0            0         0
+
+## This isn't
+R> m2['9']
+     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+[1,]         9               NA        NA           NA        NA
+
+Woops! Isn't that supposed to return the same as above?
+
+I can fix `m2` by manipulating the key column:
+
+R> key(m2) <- NULL ## probably not necessary
+R> m2$entrez.id <- as.character(m2$entrez.id)
+R> key(m2) <- 'entrez.id'
+R> m2['9']
+     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+[1,]         9               27         0            0         0
+
+(side note: the bug I mentioned when I try to `merge` this w/ another
+data.table is gone after I did the above fix).
+
+So -- I guess my point is that I'm not exactly sure how I got `m2` to
+have a funky key, but the fact that it got messed up like this somehow
+I think is undesired behavior, no?
+
+Does this point to something (maybe obvious) that happened on the way
+to building up `m2`?
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+_______________________________________________
+datatable-help mailing list
+datatable-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+From mailinglist.honeypot at gmail.com  Sat Mar  5 03:43:49 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Fri, 4 Mar 2011 21:43:49 -0500
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <000301cbdad2$c82ef8e0$588ceaa0$@com>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+Message-ID: <AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+
+Hi Mel,
+
+On Fri, Mar 4, 2011 at 8:15 PM, Bacou, Melanie <mel at mbacou.com> wrote:
+> Steve,
+>
+> Try instead:
+>
+> R> m2[J(9)]
+>
+> It seems your original entrez.id key is integer not character
+
+It's actually a factor:
+
+R> is(m2$entrez.id)
+[1] "factor"   "integer"  "oldClass" "numeric"  "vector"
+
+and moreover:
+
+R> '9' %in% levels(m2$entrez.id)
+[1] TRUE
+
+and the integer J() maneuver is a no go:
+
+R> Error in `[.data.table`(m2, J(9)) :
+  x.entrez.id is a factor but joining to i.V1 which is not a factor.
+Factors must join to factors.
+
+> -- but to be honest I'm not sure why:
+>
+> R> m2[9]
+>
+> doesn't work either...
+
+That works, in that it does something, but it just gets the 9th row of
+m2, not the row whose key is '9'
+
+Seems like something's strange is afoot here ...
+
+-steve
+
+> --Mel.
+>
+> -----Original Message-----
+> From: datatable-help-bounces at r-forge.wu-wien.ac.at
+> [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Steve
+> Lianoglou
+> Sent: Friday, March 04, 2011 5:46 PM
+> To: datatable-help at r-forge.wu-wien.ac.at
+> Subject: [datatable-help] Something seems funky. I think with
+> character-to-factor conversion for keys (?)
+>
+> I'll have to apologize in advance because I can't create a
+> reproducible example for this behavior, but I'll keep trying .. please
+> bear with me.
+>
+> Somehow I've ended up with a data.table `m2` that looks like this:
+>
+> R> m2
+> ? ? ?entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> ?[1,] ? ? ? ? 9 ? ? ? ? ? ? ? 27 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> ?[2,] ? ? ? ?10 ? ? ? ? ? ? ?347 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> ?[3,] ? ? ? ?12 ? ? ? ? ? ? 5076 ? ? ? ? 0 ? ? ? ? ? 17 ? ? ? ? 0
+> ?[4,] ? ? ? ?13 ? ? ? ? ? ? 2445 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> ?[5,] ? ? ? ?18 ? ? ? ? ? ? 2076 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> ?[6,] ? ? ? ?20 ? ? ? ? ? ? ? 15 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> ?[7,] ? ? ? ?25 ? ? ? ? ? ? ? 62 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> ?[8,] ? ? ? ?32 ? ? ? ? ? ? ?320 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> ?[9,] ? ? ? ?34 ? ? ? ? ? ? 1377 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> [10,] ? ? ? ?35 ? ? ? ? ? ? ?757 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+> First 10 rows of 5236 printed.
+>
+> R> key(m2)
+> [1] "entrez.id"
+>
+> R> any(duplicated(m2$entrez.id))
+> [1] FALSE
+>
+> So far so good -- I stumbled on the following problem when `merge`-ing
+> two large data tables which was giving me a stranger error. In the
+> process of trying to smoke out the problem, I notice this unexpected
+> behavior:
+>
+> ## This is expected
+> R> subset(m2, entrez.id == '9')
+> ? ? entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> [1,] ? ? ? ? 9 ? ? ? ? ? ? ? 27 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>
+> ## This isn't
+> R> m2['9']
+> ? ? entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> [1,] ? ? ? ? 9 ? ? ? ? ? ? ? NA ? ? ? ?NA ? ? ? ? ? NA ? ? ? ?NA
+>
+> Woops! Isn't that supposed to return the same as above?
+>
+> I can fix `m2` by manipulating the key column:
+>
+> R> key(m2) <- NULL ## probably not necessary
+> R> m2$entrez.id <- as.character(m2$entrez.id)
+> R> key(m2) <- 'entrez.id'
+> R> m2['9']
+> ? ? entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> [1,] ? ? ? ? 9 ? ? ? ? ? ? ? 27 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>
+> (side note: the bug I mentioned when I try to `merge` this w/ another
+> data.table is gone after I did the above fix).
+>
+> So -- I guess my point is that I'm not exactly sure how I got `m2` to
+> have a funky key, but the fact that it got messed up like this somehow
+> I think is undesired behavior, no?
+>
+> Does this point to something (maybe obvious) that happened on the way
+> to building up `m2`?
+>
+> Thanks,
+> -steve
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> ?| Memorial Sloan-Kettering Cancer Center
+> ?| Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Sat Mar  5 22:06:52 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 05 Mar 2011 21:06:52 +0000
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+	<AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+Message-ID: <1299359212.4785.33.camel@netbook>
+
+Hi,
+Seems consistent with out of order factor levels. The binary search
+relies on levels being sorted. If that's it then please track down the
+earlier point where the out-of-order factor levels were introduced and
+maybe a fix is needed there. Everything else here is correct behaviour.
+Matthew
+
+On Fri, 2011-03-04 at 21:43 -0500, Steve Lianoglou wrote:
+> Hi Mel,
+> 
+> On Fri, Mar 4, 2011 at 8:15 PM, Bacou, Melanie <mel at mbacou.com> wrote:
+> > Steve,
+> >
+> > Try instead:
+> >
+> > R> m2[J(9)]
+> >
+> > It seems your original entrez.id key is integer not character
+> 
+> It's actually a factor:
+> 
+> R> is(m2$entrez.id)
+> [1] "factor"   "integer"  "oldClass" "numeric"  "vector"
+> 
+> and moreover:
+> 
+> R> '9' %in% levels(m2$entrez.id)
+> [1] TRUE
+> 
+> and the integer J() maneuver is a no go:
+> 
+> R> Error in `[.data.table`(m2, J(9)) :
+>   x.entrez.id is a factor but joining to i.V1 which is not a factor.
+> Factors must join to factors.
+> 
+> > -- but to be honest I'm not sure why:
+> >
+> > R> m2[9]
+> >
+> > doesn't work either...
+> 
+> That works, in that it does something, but it just gets the 9th row of
+> m2, not the row whose key is '9'
+> 
+> Seems like something's strange is afoot here ...
+> 
+> -steve
+> 
+> > --Mel.
+> >
+> > -----Original Message-----
+> > From: datatable-help-bounces at r-forge.wu-wien.ac.at
+> > [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Steve
+> > Lianoglou
+> > Sent: Friday, March 04, 2011 5:46 PM
+> > To: datatable-help at r-forge.wu-wien.ac.at
+> > Subject: [datatable-help] Something seems funky. I think with
+> > character-to-factor conversion for keys (?)
+> >
+> > I'll have to apologize in advance because I can't create a
+> > reproducible example for this behavior, but I'll keep trying .. please
+> > bear with me.
+> >
+> > Somehow I've ended up with a data.table `m2` that looks like this:
+> >
+> > R> m2
+> >      entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> >  [1,]         9               27         0            0         0
+> >  [2,]        10              347         0            0         0
+> >  [3,]        12             5076         0           17         0
+> >  [4,]        13             2445         0            0         0
+> >  [5,]        18             2076         0            0         0
+> >  [6,]        20               15         0            0         0
+> >  [7,]        25               62         0            0         0
+> >  [8,]        32              320         0            0         0
+> >  [9,]        34             1377         0            0         0
+> > [10,]        35              757         0            0         0
+> > First 10 rows of 5236 printed.
+> >
+> > R> key(m2)
+> > [1] "entrez.id"
+> >
+> > R> any(duplicated(m2$entrez.id))
+> > [1] FALSE
+> >
+> > So far so good -- I stumbled on the following problem when `merge`-ing
+> > two large data tables which was giving me a stranger error. In the
+> > process of trying to smoke out the problem, I notice this unexpected
+> > behavior:
+> >
+> > ## This is expected
+> > R> subset(m2, entrez.id == '9')
+> >     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> > [1,]         9               27         0            0         0
+> >
+> > ## This isn't
+> > R> m2['9']
+> >     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> > [1,]         9               NA        NA           NA        NA
+> >
+> > Woops! Isn't that supposed to return the same as above?
+> >
+> > I can fix `m2` by manipulating the key column:
+> >
+> > R> key(m2) <- NULL ## probably not necessary
+> > R> m2$entrez.id <- as.character(m2$entrez.id)
+> > R> key(m2) <- 'entrez.id'
+> > R> m2['9']
+> >     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> > [1,]         9               27         0            0         0
+> >
+> > (side note: the bug I mentioned when I try to `merge` this w/ another
+> > data.table is gone after I did the above fix).
+> >
+> > So -- I guess my point is that I'm not exactly sure how I got `m2` to
+> > have a funky key, but the fact that it got messed up like this somehow
+> > I think is undesired behavior, no?
+> >
+> > Does this point to something (maybe obvious) that happened on the way
+> > to building up `m2`?
+> >
+> > Thanks,
+> > -steve
+> >
+> > --
+> > Steve Lianoglou
+> > Graduate Student: Computational Systems Biology
+> >  | Memorial Sloan-Kettering Cancer Center
+> >  | Weill Medical College of Cornell University
+> > Contact Info: http://cbio.mskcc.org/~lianos/contact
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> 
+> 
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Mon Mar  7 17:30:30 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 7 Mar 2011 11:30:30 -0500
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <1299359212.4785.33.camel@netbook>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+	<AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+	<1299359212.4785.33.camel@netbook>
+Message-ID: <AANLkTimRQ8i3Y70P2F2tW0ZRKrzsWjRAnK1hw8Wxf-a=@mail.gmail.com>
+
+Hi,
+
+On Sat, Mar 5, 2011 at 4:06 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Hi,
+> Seems consistent with out of order factor levels. The binary search
+> relies on levels being sorted. If that's it then please track down the
+> earlier point where the out-of-order factor levels were introduced and
+> maybe a fix is needed there. Everything else here is correct behaviour.
+
+I know it sounds lame, but I'm having problems tracking down how my
+key/factor column arrived at having out of order levels.
+
+While I try to smoke that out, do you think it would be a good idea to
+write a small utility at the C level to scan through the levels() of
+factor-keys to test for them being in order and
+breaking/short-circuiting as soon as it finds one level that's out of
+order? This way we can fire off a warning when this problem is
+detected so the user would be warned to expect "weird" behavior (and
+also know how to fix(?))
+
+I'm not sure exactly where/when we would invoke that test -- maybe
+after calls to setkey ... and optionally under merge-like operations.
+
+I can take a crack at doing that if it seems like a good idea.
+
+-steve
+
+> Matthew
+>
+> On Fri, 2011-03-04 at 21:43 -0500, Steve Lianoglou wrote:
+>> Hi Mel,
+>>
+>> On Fri, Mar 4, 2011 at 8:15 PM, Bacou, Melanie <mel at mbacou.com> wrote:
+>> > Steve,
+>> >
+>> > Try instead:
+>> >
+>> > R> m2[J(9)]
+>> >
+>> > It seems your original entrez.id key is integer not character
+>>
+>> It's actually a factor:
+>>
+>> R> is(m2$entrez.id)
+>> [1] "factor" ? "integer" ?"oldClass" "numeric" ?"vector"
+>>
+>> and moreover:
+>>
+>> R> '9' %in% levels(m2$entrez.id)
+>> [1] TRUE
+>>
+>> and the integer J() maneuver is a no go:
+>>
+>> R> Error in `[.data.table`(m2, J(9)) :
+>> ? x.entrez.id is a factor but joining to i.V1 which is not a factor.
+>> Factors must join to factors.
+>>
+>> > -- but to be honest I'm not sure why:
+>> >
+>> > R> m2[9]
+>> >
+>> > doesn't work either...
+>>
+>> That works, in that it does something, but it just gets the 9th row of
+>> m2, not the row whose key is '9'
+>>
+>> Seems like something's strange is afoot here ...
+>>
+>> -steve
+>>
+>> > --Mel.
+>> >
+>> > -----Original Message-----
+>> > From: datatable-help-bounces at r-forge.wu-wien.ac.at
+>> > [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Steve
+>> > Lianoglou
+>> > Sent: Friday, March 04, 2011 5:46 PM
+>> > To: datatable-help at r-forge.wu-wien.ac.at
+>> > Subject: [datatable-help] Something seems funky. I think with
+>> > character-to-factor conversion for keys (?)
+>> >
+>> > I'll have to apologize in advance because I can't create a
+>> > reproducible example for this behavior, but I'll keep trying .. please
+>> > bear with me.
+>> >
+>> > Somehow I've ended up with a data.table `m2` that looks like this:
+>> >
+>> > R> m2
+>> > ? ? ?entrez.id total.tags.liver cds.liver intron.liver utr.liver
+>> > ?[1,] ? ? ? ? 9 ? ? ? ? ? ? ? 27 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > ?[2,] ? ? ? ?10 ? ? ? ? ? ? ?347 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > ?[3,] ? ? ? ?12 ? ? ? ? ? ? 5076 ? ? ? ? 0 ? ? ? ? ? 17 ? ? ? ? 0
+>> > ?[4,] ? ? ? ?13 ? ? ? ? ? ? 2445 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > ?[5,] ? ? ? ?18 ? ? ? ? ? ? 2076 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > ?[6,] ? ? ? ?20 ? ? ? ? ? ? ? 15 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > ?[7,] ? ? ? ?25 ? ? ? ? ? ? ? 62 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > ?[8,] ? ? ? ?32 ? ? ? ? ? ? ?320 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > ?[9,] ? ? ? ?34 ? ? ? ? ? ? 1377 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > [10,] ? ? ? ?35 ? ? ? ? ? ? ?757 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> > First 10 rows of 5236 printed.
+>> >
+>> > R> key(m2)
+>> > [1] "entrez.id"
+>> >
+>> > R> any(duplicated(m2$entrez.id))
+>> > [1] FALSE
+>> >
+>> > So far so good -- I stumbled on the following problem when `merge`-ing
+>> > two large data tables which was giving me a stranger error. In the
+>> > process of trying to smoke out the problem, I notice this unexpected
+>> > behavior:
+>> >
+>> > ## This is expected
+>> > R> subset(m2, entrez.id == '9')
+>> > ? ? entrez.id total.tags.liver cds.liver intron.liver utr.liver
+>> > [1,] ? ? ? ? 9 ? ? ? ? ? ? ? 27 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> >
+>> > ## This isn't
+>> > R> m2['9']
+>> > ? ? entrez.id total.tags.liver cds.liver intron.liver utr.liver
+>> > [1,] ? ? ? ? 9 ? ? ? ? ? ? ? NA ? ? ? ?NA ? ? ? ? ? NA ? ? ? ?NA
+>> >
+>> > Woops! Isn't that supposed to return the same as above?
+>> >
+>> > I can fix `m2` by manipulating the key column:
+>> >
+>> > R> key(m2) <- NULL ## probably not necessary
+>> > R> m2$entrez.id <- as.character(m2$entrez.id)
+>> > R> key(m2) <- 'entrez.id'
+>> > R> m2['9']
+>> > ? ? entrez.id total.tags.liver cds.liver intron.liver utr.liver
+>> > [1,] ? ? ? ? 9 ? ? ? ? ? ? ? 27 ? ? ? ? 0 ? ? ? ? ? ?0 ? ? ? ? 0
+>> >
+>> > (side note: the bug I mentioned when I try to `merge` this w/ another
+>> > data.table is gone after I did the above fix).
+>> >
+>> > So -- I guess my point is that I'm not exactly sure how I got `m2` to
+>> > have a funky key, but the fact that it got messed up like this somehow
+>> > I think is undesired behavior, no?
+>> >
+>> > Does this point to something (maybe obvious) that happened on the way
+>> > to building up `m2`?
+>> >
+>> > Thanks,
+>> > -steve
+>> >
+>> > --
+>> > Steve Lianoglou
+>> > Graduate Student: Computational Systems Biology
+>> > ?| Memorial Sloan-Kettering Cancer Center
+>> > ?| Weill Medical College of Cornell University
+>> > Contact Info: http://cbio.mskcc.org/~lianos/contact
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>> >
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>> >
+>>
+>>
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Mon Mar  7 20:31:15 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 07 Mar 2011 19:31:15 +0000
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <AANLkTimRQ8i3Y70P2F2tW0ZRKrzsWjRAnK1hw8Wxf-a=@mail.gmail.com>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+	<AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+	<1299359212.4785.33.camel@netbook>
+	<AANLkTimRQ8i3Y70P2F2tW0ZRKrzsWjRAnK1hw8Wxf-a=@mail.gmail.com>
+Message-ID: <1299526275.1786.24.camel@netbook>
+
+An option to turn on a check like that might be good. Probably at the
+start of [.data.table.
+
+When I've seen this issue before it's been when I have been constructing
+data.table's 'manually'. Similar to other places in R, nothing stops you
+creating invalid objects, directly.
+
+For example (in base R) :
+
+> DF = list(1:10,1:5)
+> DF
+[[1]]
+ [1]  1  2  3  4  5  6  7  8  9 10
+
+[[2]]
+[1] 1 2 3 4 5
+
+> class(DF)="data.frame"
+> sapply(DF,length)
+[1] 10  5
+> DF
+NULL
+<0 rows> (or 0-length row.names)
+>
+> attr(DF,"row.names")=letters[1:3]
+> DF[6,]
+   NA NA
+NA  6 NA
+> 
+
+
+On Mon, 2011-03-07 at 11:30 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> On Sat, Mar 5, 2011 at 4:06 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > Hi,
+> > Seems consistent with out of order factor levels. The binary search
+> > relies on levels being sorted. If that's it then please track down the
+> > earlier point where the out-of-order factor levels were introduced and
+> > maybe a fix is needed there. Everything else here is correct behaviour.
+> 
+> I know it sounds lame, but I'm having problems tracking down how my
+> key/factor column arrived at having out of order levels.
+> 
+> While I try to smoke that out, do you think it would be a good idea to
+> write a small utility at the C level to scan through the levels() of
+> factor-keys to test for them being in order and
+> breaking/short-circuiting as soon as it finds one level that's out of
+> order? This way we can fire off a warning when this problem is
+> detected so the user would be warned to expect "weird" behavior (and
+> also know how to fix(?))
+> 
+> I'm not sure exactly where/when we would invoke that test -- maybe
+> after calls to setkey ... and optionally under merge-like operations.
+> 
+> I can take a crack at doing that if it seems like a good idea.
+> 
+> -steve
+> 
+> > Matthew
+> >
+> > On Fri, 2011-03-04 at 21:43 -0500, Steve Lianoglou wrote:
+> >> Hi Mel,
+> >>
+> >> On Fri, Mar 4, 2011 at 8:15 PM, Bacou, Melanie <mel at mbacou.com> wrote:
+> >> > Steve,
+> >> >
+> >> > Try instead:
+> >> >
+> >> > R> m2[J(9)]
+> >> >
+> >> > It seems your original entrez.id key is integer not character
+> >>
+> >> It's actually a factor:
+> >>
+> >> R> is(m2$entrez.id)
+> >> [1] "factor"   "integer"  "oldClass" "numeric"  "vector"
+> >>
+> >> and moreover:
+> >>
+> >> R> '9' %in% levels(m2$entrez.id)
+> >> [1] TRUE
+> >>
+> >> and the integer J() maneuver is a no go:
+> >>
+> >> R> Error in `[.data.table`(m2, J(9)) :
+> >>   x.entrez.id is a factor but joining to i.V1 which is not a factor.
+> >> Factors must join to factors.
+> >>
+> >> > -- but to be honest I'm not sure why:
+> >> >
+> >> > R> m2[9]
+> >> >
+> >> > doesn't work either...
+> >>
+> >> That works, in that it does something, but it just gets the 9th row of
+> >> m2, not the row whose key is '9'
+> >>
+> >> Seems like something's strange is afoot here ...
+> >>
+> >> -steve
+> >>
+> >> > --Mel.
+> >> >
+> >> > -----Original Message-----
+> >> > From: datatable-help-bounces at r-forge.wu-wien.ac.at
+> >> > [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Steve
+> >> > Lianoglou
+> >> > Sent: Friday, March 04, 2011 5:46 PM
+> >> > To: datatable-help at r-forge.wu-wien.ac.at
+> >> > Subject: [datatable-help] Something seems funky. I think with
+> >> > character-to-factor conversion for keys (?)
+> >> >
+> >> > I'll have to apologize in advance because I can't create a
+> >> > reproducible example for this behavior, but I'll keep trying .. please
+> >> > bear with me.
+> >> >
+> >> > Somehow I've ended up with a data.table `m2` that looks like this:
+> >> >
+> >> > R> m2
+> >> >      entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> >> >  [1,]         9               27         0            0         0
+> >> >  [2,]        10              347         0            0         0
+> >> >  [3,]        12             5076         0           17         0
+> >> >  [4,]        13             2445         0            0         0
+> >> >  [5,]        18             2076         0            0         0
+> >> >  [6,]        20               15         0            0         0
+> >> >  [7,]        25               62         0            0         0
+> >> >  [8,]        32              320         0            0         0
+> >> >  [9,]        34             1377         0            0         0
+> >> > [10,]        35              757         0            0         0
+> >> > First 10 rows of 5236 printed.
+> >> >
+> >> > R> key(m2)
+> >> > [1] "entrez.id"
+> >> >
+> >> > R> any(duplicated(m2$entrez.id))
+> >> > [1] FALSE
+> >> >
+> >> > So far so good -- I stumbled on the following problem when `merge`-ing
+> >> > two large data tables which was giving me a stranger error. In the
+> >> > process of trying to smoke out the problem, I notice this unexpected
+> >> > behavior:
+> >> >
+> >> > ## This is expected
+> >> > R> subset(m2, entrez.id == '9')
+> >> >     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> >> > [1,]         9               27         0            0         0
+> >> >
+> >> > ## This isn't
+> >> > R> m2['9']
+> >> >     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> >> > [1,]         9               NA        NA           NA        NA
+> >> >
+> >> > Woops! Isn't that supposed to return the same as above?
+> >> >
+> >> > I can fix `m2` by manipulating the key column:
+> >> >
+> >> > R> key(m2) <- NULL ## probably not necessary
+> >> > R> m2$entrez.id <- as.character(m2$entrez.id)
+> >> > R> key(m2) <- 'entrez.id'
+> >> > R> m2['9']
+> >> >     entrez.id total.tags.liver cds.liver intron.liver utr.liver
+> >> > [1,]         9               27         0            0         0
+> >> >
+> >> > (side note: the bug I mentioned when I try to `merge` this w/ another
+> >> > data.table is gone after I did the above fix).
+> >> >
+> >> > So -- I guess my point is that I'm not exactly sure how I got `m2` to
+> >> > have a funky key, but the fact that it got messed up like this somehow
+> >> > I think is undesired behavior, no?
+> >> >
+> >> > Does this point to something (maybe obvious) that happened on the way
+> >> > to building up `m2`?
+> >> >
+> >> > Thanks,
+> >> > -steve
+> >> >
+> >> > --
+> >> > Steve Lianoglou
+> >> > Graduate Student: Computational Systems Biology
+> >> >  | Memorial Sloan-Kettering Cancer Center
+> >> >  | Weill Medical College of Cornell University
+> >> > Contact Info: http://cbio.mskcc.org/~lianos/contact
+> >> > _______________________________________________
+> >> > datatable-help mailing list
+> >> > datatable-help at lists.r-forge.r-project.org
+> >> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >> >
+> >> > _______________________________________________
+> >> > datatable-help mailing list
+> >> > datatable-help at lists.r-forge.r-project.org
+> >> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >> >
+> >>
+> >>
+> >>
+> >
+> >
+> >
+> 
+> 
+> 
+
+
+
+From mdowle at mdowle.plus.com  Tue Mar  8 02:08:27 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 08 Mar 2011 01:08:27 +0000
+Subject: [datatable-help] Fast first row of each group
+Message-ID: <1299546507.12946.10.camel@netbook>
+
+
+Hi Steve,
+
+Have posted a follow up to your answer here :
+
+http://stats.stackexchange.com/questions/7884/fast-ways-in-r-to-get-the-first-row-of-a-data-frame-grouped-by-an-identifier/7985#7985
+
+Thought it might be of interest on list as it's such a large difference.
+
+I realise this probably isn't clear in the documentation or FAQs, so
+have added todo to make that clearer.
+
+Btw, could somebody vote me up please - I have 1 point and can't make
+comments!
+
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Tue Mar  8 02:50:46 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 08 Mar 2011 01:50:46 +0000
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <1299526275.1786.24.camel@netbook>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+	<AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+	<1299359212.4785.33.camel@netbook>
+	<AANLkTimRQ8i3Y70P2F2tW0ZRKrzsWjRAnK1hw8Wxf-a=@mail.gmail.com>
+	<1299526275.1786.24.camel@netbook>
+Message-ID: <1299549046.12946.14.camel@netbook>
+
+Btw :
+
+> a small utility at the C level to scan through the levels() of
+> factor-keys to test for them being in order and
+> breaking/short-circuiting as soon as it finds one level that's out of
+> order?
+
+That's base::is.unsorted(), which is done in C.
+
+
+
+
+From mailinglist.honeypot at gmail.com  Tue Mar  8 03:39:59 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 7 Mar 2011 21:39:59 -0500
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <1299549046.12946.14.camel@netbook>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+	<AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+	<1299359212.4785.33.camel@netbook>
+	<AANLkTimRQ8i3Y70P2F2tW0ZRKrzsWjRAnK1hw8Wxf-a=@mail.gmail.com>
+	<1299526275.1786.24.camel@netbook>
+	<1299549046.12946.14.camel@netbook>
+Message-ID: <AANLkTik=hBmq0Sox1ksKSQdTH7SUP3DxhgxB6j2bLyp2@mail.gmail.com>
+
+On Mon, Mar 7, 2011 at 8:50 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Btw :
+>
+>> a small utility at the C level to scan through the levels() of
+>> factor-keys to test for them being in order and
+>> breaking/short-circuiting as soon as it finds one level that's out of
+>> order?
+>
+> That's base::is.unsorted(), which is done in C.
+
+Aww -- was looking forward to writing some C code ...
+
+It looks like you were right, though -- the problematic data.table has
+a (factor) key where `is.unsorted(levels(the_key_column))` is TRUE.
+
+So I guess we're talking about having something like
+options(datatable.check.factor.levels=TRUE) check at the top of the
+[.data.table function that fires a warning() when the levels are
+unsorted, yeah?
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Tue Mar  8 04:18:06 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 08 Mar 2011 03:18:06 +0000
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <AANLkTik=hBmq0Sox1ksKSQdTH7SUP3DxhgxB6j2bLyp2@mail.gmail.com>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+	<AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+	<1299359212.4785.33.camel@netbook>
+	<AANLkTimRQ8i3Y70P2F2tW0ZRKrzsWjRAnK1hw8Wxf-a=@mail.gmail.com>
+	<1299526275.1786.24.camel@netbook> <1299549046.12946.14.camel@netbook>
+	<AANLkTik=hBmq0Sox1ksKSQdTH7SUP3DxhgxB6j2bLyp2@mail.gmail.com>
+Message-ID: <1299554286.12946.24.camel@netbook>
+
+Maybe. The slowdown would be fairly significant, perhaps. Although the
+levels vector is contiguous in memory, the global character hash (the
+memory where the character pointers point to) isn't. It's not the string
+cmp as such, it's the page fetches. Also, it might potentially do this
+check over and over again for the same levels vectors (very wasteful).
+Remember that [.data.table is recursive in places, although once only I
+think.
+
+Did you find out what created the out-of-order levels? This check won't
+help you find out where that occurred, or will it?
+ 
+
+On Mon, 2011-03-07 at 21:39 -0500, Steve Lianoglou wrote:
+> On Mon, Mar 7, 2011 at 8:50 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > Btw :
+> >
+> >> a small utility at the C level to scan through the levels() of
+> >> factor-keys to test for them being in order and
+> >> breaking/short-circuiting as soon as it finds one level that's out of
+> >> order?
+> >
+> > That's base::is.unsorted(), which is done in C.
+> 
+> Aww -- was looking forward to writing some C code ...
+> 
+> It looks like you were right, though -- the problematic data.table has
+> a (factor) key where `is.unsorted(levels(the_key_column))` is TRUE.
+> 
+> So I guess we're talking about having something like
+> options(datatable.check.factor.levels=TRUE) check at the top of the
+> [.data.table function that fires a warning() when the levels are
+> unsorted, yeah?
+> 
+> -steve
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Tue Mar  8 05:05:51 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 7 Mar 2011 23:05:51 -0500
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <1299554286.12946.24.camel@netbook>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+	<AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+	<1299359212.4785.33.camel@netbook>
+	<AANLkTimRQ8i3Y70P2F2tW0ZRKrzsWjRAnK1hw8Wxf-a=@mail.gmail.com>
+	<1299526275.1786.24.camel@netbook>
+	<1299549046.12946.14.camel@netbook>
+	<AANLkTik=hBmq0Sox1ksKSQdTH7SUP3DxhgxB6j2bLyp2@mail.gmail.com>
+	<1299554286.12946.24.camel@netbook>
+Message-ID: <AANLkTi=qSGFQ5Gj9y_6qe55QMXB0GQcVSzwnAxfoa9R8@mail.gmail.com>
+
+On Mon, Mar 7, 2011 at 10:18 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Maybe. The slowdown would be fairly significant, perhaps. Although the
+> levels vector is contiguous in memory, the global character hash (the
+> memory where the character pointers point to) isn't. It's not the string
+> cmp as such, it's the page fetches. Also, it might potentially do this
+> check over and over again for the same levels vectors (very wasteful).
+> Remember that [.data.table is recursive in places, although once only I
+> think.
+
+Good point.
+
+Well -- there is a place I've identified in merge.data.table that
+throws some esoteric error due to this problem. Perhaps I'll just
+catch the error there and wrap it with a test to see if the levels of
+the factor are sorted -- it'll only hit that once, and if it does
+happen, maybe I (or whoever) will be able to remember how it got
+messed up to begin with.
+
+> Did you find out what created the out-of-order levels? This check won't
+> help you find out where that occurred, or will it?
+
+Unfortunately, I haven't investigated much further. I have a sneaking
+suspicion that it has to do with the type of values that are in the
+key'd column (enterz.id). It is originally of type character when the
+data.table is constructed -- then after it is key'd, it turns into a
+factor.
+
+When I was making this particular data.table, I saved the table to a
+text file, and reloaded it into another R session via read.table. The
+thing with that entrez.id column is that it can successfully be parsed
+as an integer, so it was likely read in as such. Somehow after it was
+keyed it was turned into a factor -- not sure how.
+
+The ordering of the "broken" levels is consistent with ordering an integer:
+
+R> head(levels(m2$entrez.id))
+[1] "9"  "10" "12" "13" "18" "20"
+
+And after fixing the data.table, the levels are reorderd as a
+character should be:
+
+R> m2$entrez.id <- factor(as.character(m2$entrez.id))
+[1] "10"        "10009"     "100093630" "10010"     "100113384" "100113407"
+
+I'm thinking all signs are pointing to me having done something bone
+headed ... I haven't had time to really try too many different things,
+but the few (one) obvious thing I tried to reconstruct my m2 table
+from my raw (text) data file isn't turning my entrez.id column into a
+screwed factor column.
+
+Anyway -- I guess there isn't much to do just yet.
+
+As I said, I'll just add a check for an error in the appropriate place
+in merge.data.table and keep my eye out to see if it happens again.
+
+-steve
+
+>
+>
+> On Mon, 2011-03-07 at 21:39 -0500, Steve Lianoglou wrote:
+>> On Mon, Mar 7, 2011 at 8:50 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> > Btw :
+>> >
+>> >> a small utility at the C level to scan through the levels() of
+>> >> factor-keys to test for them being in order and
+>> >> breaking/short-circuiting as soon as it finds one level that's out of
+>> >> order?
+>> >
+>> > That's base::is.unsorted(), which is done in C.
+>>
+>> Aww -- was looking forward to writing some C code ...
+>>
+>> It looks like you were right, though -- the problematic data.table has
+>> a (factor) key where `is.unsorted(levels(the_key_column))` is TRUE.
+>>
+>> So I guess we're talking about having something like
+>> options(datatable.check.factor.levels=TRUE) check at the top of the
+>> [.data.table function that fires a warning() when the levels are
+>> unsorted, yeah?
+>>
+>> -steve
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Tue Mar  8 05:08:19 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 7 Mar 2011 23:08:19 -0500
+Subject: [datatable-help] Something seems funky. I think with
+ character-to-factor conversion for keys (?)
+In-Reply-To: <AANLkTi=qSGFQ5Gj9y_6qe55QMXB0GQcVSzwnAxfoa9R8@mail.gmail.com>
+References: <AANLkTimTNJk7B_xyt+nD-xk6C7FdKEsvJDZiFp+Ey+Zy@mail.gmail.com>
+	<000301cbdad2$c82ef8e0$588ceaa0$@com>
+	<AANLkTikxs55ntKOzmDNvW7Y479E7Kwg8+-Thi-Y6TmRz@mail.gmail.com>
+	<1299359212.4785.33.camel@netbook>
+	<AANLkTimRQ8i3Y70P2F2tW0ZRKrzsWjRAnK1hw8Wxf-a=@mail.gmail.com>
+	<1299526275.1786.24.camel@netbook>
+	<1299549046.12946.14.camel@netbook>
+	<AANLkTik=hBmq0Sox1ksKSQdTH7SUP3DxhgxB6j2bLyp2@mail.gmail.com>
+	<1299554286.12946.24.camel@netbook>
+	<AANLkTi=qSGFQ5Gj9y_6qe55QMXB0GQcVSzwnAxfoa9R8@mail.gmail.com>
+Message-ID: <AANLkTikG-KD0aLcrM8092C+3LxEnR1u3MWHOyeik1DWs@mail.gmail.com>
+
+Sorry -- copy/pasting from my R session got screwy:
+
+This:
+
+> The ordering of the "broken" levels is consistent with ordering an integer:
+>
+> R> head(levels(m2$entrez.id))
+> [1] "9" ?"10" "12" "13" "18" "20"
+>
+> And after fixing the data.table, the levels are reorderd as a
+> character should be:
+>
+> R> m2$entrez.id <- factor(as.character(m2$entrez.id))
+> [1] "10" ? ? ? ?"10009" ? ? "100093630" "10010" ? ? "100113384" "100113407"
+
+The result I pasted above obviously isn't correct, I accidentally
+missed a step. It should be:
+
+R> m2$entrez.id <- factor(as.character(m2$entrez.id))
+R> head(levels(m2$entrez.id))
+[1] "10" ? ? ? ?"10009" ? ? "100093630" "10010" ? ? "100113384" "100113407"
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Fri Mar 11 06:21:38 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Fri, 11 Mar 2011 00:21:38 -0500
+Subject: [datatable-help] Fast first row of each group
+In-Reply-To: <1299546507.12946.10.camel@netbook>
+References: <1299546507.12946.10.camel@netbook>
+Message-ID: <AANLkTik5eWuEM28WwHYG1tL3afbys-699U0_g5LpyjpV@mail.gmail.com>
+
+Hey Matthew,
+
+On Mon, Mar 7, 2011 at 8:08 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> Hi Steve,
+>
+> Have posted a follow up to your answer here :
+>
+> http://stats.stackexchange.com/questions/7884/fast-ways-in-r-to-get-the-first-row-of-a-data-frame-grouped-by-an-identifier/7985#7985
+>
+> Thought it might be of interest on list as it's such a large difference.
+>
+> I realise this probably isn't clear in the documentation or FAQs, so
+> have added todo to make that clearer.
+>
+> Btw, could somebody vote me up please - I have 1 point and can't make
+> comments!
+
+As I commented on stats.stackeschange: Nicely done! (I also upvoted then, too).
+
+I was just curious about what determines when the `.SD` object is built.
+
+I often do things like:
+
+my.data.table[, {
+  ## some block of code
+  list(a=whatever, b=something)
+}, by='some.key']
+
+If I never reference `.SD` and only reference some subset of the
+columns of `my.data.table` in my "block of code", can data.table still
+avoid building `.SD` and only copy the columns I reference in my
+"block of code," or does this magic only restrict my group summaries
+to something I can evaluate within a list(...), like:
+
+my.data.table[, list(a=whatever, b=something), by='some.key']
+
+Hopefully my example isn't too confusing w/o a real code sample --
+which I can provide if so.
+
+Thanks,
+-steve
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Fri Mar 11 10:23:43 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 11 Mar 2011 09:23:43 -0000
+Subject: [datatable-help] Fast first row of each group
+References: <1299546507.12946.10.camel@netbook>
+	<AANLkTik5eWuEM28WwHYG1tL3afbys-699U0_g5LpyjpV@mail.gmail.com>
+Message-ID: <ilcpn1$mb7$1@dough.gmane.org>
+
+
+I thought there was a FAQ on that, but appears not. Will add.
+
+Yes, you're right, only when .SD is used by j, .SD is built i.e. if (".SD" 
+%in% all.vars(j)).
+
+To illustrate :
+
+> DT = data.table(a=1:2,b=1:10)
+
+> DT[,sapply(.SD,sum),a]     # j uses .SD
+     a V1
+[1,] 1 25
+[2,] 2 30
+
+> DT[,{sapply(.SD,sum)},a]    # j uses .SD
+     a V1
+[1,] 1 25
+[2,] 2 30
+
+> f = function()sapply(.SD,sum)
+> DT[,f(),a]                             # j doesn't use .SD (f does)
+Error in is.vector(X) : object '.SD' not found
+
+> DT[,{.SD;f()},a]                  # attempt : yes, I really want to use 
+> .SD !
+Error in is.vector(X) : object '.SD' not found
+# remember that lexical scoping works from where the function f was 
+*defined* not from where it is used
+# so you have to pass .SD in, in this case :
+
+> f = function(.SD)sapply(.SD,sum)
+> DT[,f(.SD),a]     # works, but *not* recommended, see below
+     a V1
+[1,] 1 25
+[2,] 2 30
+
+BUT we don't like functions in data.table (because of the overhead, and the 
+copying),  we prefer lamdas and "macros" i.e. eval(q),
+so we don't want to encourage functions really. Also, we avoid .SD if at all 
+possible, too. So that last form is *not* recommended, just illustrating.
+
+> Hopefully my example isn't too confusing w/o a real code sample --
+> which I can provide if so.
+
+Good approach.  If we need a reproducible example, we can always ask, but I 
+understood without.
+
+Matthew
+
+"Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote in message 
+news:AANLkTik5eWuEM28WwHYG1tL3afbys-699U0_g5LpyjpV at mail.gmail.com...
+Hey Matthew,
+
+On Mon, Mar 7, 2011 at 8:08 PM, Matthew Dowle <mdowle at mdowle.plus.com> 
+wrote:
+>
+> Hi Steve,
+>
+> Have posted a follow up to your answer here :
+>
+> http://stats.stackexchange.com/questions/7884/fast-ways-in-r-to-get-the-first-row-of-a-data-frame-grouped-by-an-identifier/7985#7985
+>
+> Thought it might be of interest on list as it's such a large difference.
+>
+> I realise this probably isn't clear in the documentation or FAQs, so
+> have added todo to make that clearer.
+>
+> Btw, could somebody vote me up please - I have 1 point and can't make
+> comments!
+
+As I commented on stats.stackeschange: Nicely done! (I also upvoted then, 
+too).
+
+I was just curious about what determines when the `.SD` object is built.
+
+I often do things like:
+
+my.data.table[, {
+  ## some block of code
+  list(a=whatever, b=something)
+}, by='some.key']
+
+If I never reference `.SD` and only reference some subset of the
+columns of `my.data.table` in my "block of code", can data.table still
+avoid building `.SD` and only copy the columns I reference in my
+"block of code," or does this magic only restrict my group summaries
+to something I can evaluate within a list(...), like:
+
+my.data.table[, list(a=whatever, b=something), by='some.key']
+
+Hopefully my example isn't too confusing w/o a real code sample --
+which I can provide if so.
+
+Thanks,
+-steve
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+| Memorial Sloan-Kettering Cancer Center
+| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact 
+
+
+
+
+From mdowle at mdowle.plus.com  Fri Mar 18 23:22:25 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 18 Mar 2011 22:22:25 +0000
+Subject: [datatable-help] data.table wiki has grown (a bit)
+Message-ID: <1300486945.21660.52.camel@netbook>
+
+
+The data.table wiki now has 3 do's and don'ts ! :
+
+http://rwiki.sciviews.org/doku.php?id=packages:cran:data.table
+
+Would be interested to know if these things are revelations, or old
+news, to people who watch this list?
+
+Thanks,
+Matthew
+
+
+
+
+From santosh.srinivas at gmail.com  Sat Mar 19 03:25:33 2011
+From: santosh.srinivas at gmail.com (Santosh Srinivas)
+Date: Sat, 19 Mar 2011 07:55:33 +0530
+Subject: [datatable-help] data.table wiki has grown (a bit)
+In-Reply-To: <1300486945.21660.52.camel@netbook>
+References: <1300486945.21660.52.camel@netbook>
+Message-ID: <AANLkTimZ-qzF-nk9f6fY3SsyHOCQ4nqCDdyTXtnSO2oQ@mail.gmail.com>
+
+
+From andreas.borg at unimedizin-mainz.de  Wed Mar 30 13:55:49 2011
+From: andreas.borg at unimedizin-mainz.de (Andreas Borg)
+Date: Wed, 30 Mar 2011 13:55:49 +0200
+Subject: [datatable-help] Column names after self join
+Message-ID: <4D931A45.7070802@unimedizin-mainz.de>
+
+Dear list members,
+
+I started incorporating data.tabe into the RecordLinkage package for
+speed improvement. Right now I am trying to use a self join on a
+data.table to find from a dataset all record pairs that have equal
+values for a specified column. An example table:
+
+> dt <- data.table(id=1:4, x1=c("a","a","b","c"), x2=c(1,2,3,3), key="x1")
+> dt
+     id x1 x2
+[1,]  1  a  1
+[2,]  2  a  2
+[3,]  3  b  3
+[4,]  4  c  3
+
+I do a self join to find all pairs of rows with same value for x1:
+
+> dt[dt]
+     x1 id x2 id.1 x2.1
+[1,]  a  1  1    1    1
+[2,]  a  2  2    1    1
+[3,]  a  1  1    2    2
+[4,]  a  2  2    2    2
+[5,]  b  3  3    3    3
+[6,]  c  4  3    4    3
+
+
+The problem comes now: I want to select the columns "id" and "id.1" and
+let only rows with id < id.1 pass (which means that each pair appears
+only once and a row is not matched to itself). Naturally, this would be:
+
+dt[dt][id < id.1]
+
+but I get an error, because "id.1" is really "id" internally:
+
+> summary.default(dt[dt])
+   Length Class  Mode
+x1 6      factor numeric
+id 6      -none- numeric
+x2 6      -none- numeric
+id 6      -none- numeric
+x2 6      -none- numeric
+
+and also the other components are ambigiuos, so there seems to be no way
+to discern between the two "id" columns. I would propose to change this
+behaviour to the one of merge, where one gets unambigous column names:
+
+> summary.default(merge(dt, dt, by="x1"))
+     Length Class  Mode
+id   6      -none- numeric
+x1   6      factor numeric
+x2   6      -none- numeric
+id.1 6      -none- numeric
+x2.1 6      -none- numeric
+
+Or is there any other possibility to deal with this?
+
+Anyway, thanks to the developers for creating this useful package!
+
+Best regards,
+
+Andreas
+
+
+
+-- 
+Andreas Borg
+Medizinische Informatik
+
+UNIVERSIT?TSMEDIZIN
+der Johannes Gutenberg-Universit?t
+Institut f?r Medizinische Biometrie, Epidemiologie und Informatik
+Obere Zahlbacher Stra?e 69, 55131 Mainz
+www.imbei.uni-mainz.de
+
+Telefon +49 (0) 6131 175062
+E-Mail: borg at imbei.uni-mainz.de
+
+Diese E-Mail enth?lt vertrauliche und/oder rechtlich gesch?tzte 
+Informationen. Wenn Sie nicht der
+richtige Adressat sind oder diese E-Mail irrt?mlich erhalten haben, 
+informieren Sie bitte sofort den
+Absender und l?schen Sie diese Mail. Das unerlaubte Kopieren sowie die 
+unbefugte Weitergabe
+dieser Mail und der darin enthaltenen Informationen ist nicht gestattet.
+
+
+
+From mdowle at mdowle.plus.com  Thu Mar 31 09:26:12 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 31 Mar 2011 08:26:12 +0100
+Subject: [datatable-help] Column names after self join
+In-Reply-To: <4D931A45.7070802@unimedizin-mainz.de>
+References: <4D931A45.7070802@unimedizin-mainz.de>
+Message-ID: <1301556372.18343.21.camel@netbook>
+
+Hi Andreas,
+
+Agreed, thanks - added bug #1340 re the column names.
+
+The example data seems a little too cut down but if I understand
+correctly then this idiom might be better :
+
+> setkey(dt,x1,id)
+> dt[J(x1,id-1,id,x2),roll=TRUE,nomatch=0]
+     x1 id x2 id.1 x2.1
+[1,]  a  1  1    2    2
+> 
+
+That has the same column name issue but in the result this time and may
+be easier to work around in the meantime. I've assumed you've already
+tried grouping by x1 and using .SD.
+
+Matthew
+
+
+On Wed, 2011-03-30 at 13:55 +0200, Andreas Borg wrote:
+> Dear list members,
+> 
+> I started incorporating data.tabe into the RecordLinkage package for
+> speed improvement. Right now I am trying to use a self join on a
+> data.table to find from a dataset all record pairs that have equal
+> values for a specified column. An example table:
+> 
+> > dt <- data.table(id=1:4, x1=c("a","a","b","c"), x2=c(1,2,3,3), key="x1")
+> > dt
+>      id x1 x2
+> [1,]  1  a  1
+> [2,]  2  a  2
+> [3,]  3  b  3
+> [4,]  4  c  3
+> 
+> I do a self join to find all pairs of rows with same value for x1:
+> 
+> > dt[dt]
+>      x1 id x2 id.1 x2.1
+> [1,]  a  1  1    1    1
+> [2,]  a  2  2    1    1
+> [3,]  a  1  1    2    2
+> [4,]  a  2  2    2    2
+> [5,]  b  3  3    3    3
+> [6,]  c  4  3    4    3
+> 
+> 
+> The problem comes now: I want to select the columns "id" and "id.1" and
+> let only rows with id < id.1 pass (which means that each pair appears
+> only once and a row is not matched to itself). Naturally, this would be:
+> 
+> dt[dt][id < id.1]
+> 
+> but I get an error, because "id.1" is really "id" internally:
+> 
+> > summary.default(dt[dt])
+>    Length Class  Mode
+> x1 6      factor numeric
+> id 6      -none- numeric
+> x2 6      -none- numeric
+> id 6      -none- numeric
+> x2 6      -none- numeric
+> 
+> and also the other components are ambigiuos, so there seems to be no way
+> to discern between the two "id" columns. I would propose to change this
+> behaviour to the one of merge, where one gets unambigous column names:
+> 
+> > summary.default(merge(dt, dt, by="x1"))
+>      Length Class  Mode
+> id   6      -none- numeric
+> x1   6      factor numeric
+> x2   6      -none- numeric
+> id.1 6      -none- numeric
+> x2.1 6      -none- numeric
+> 
+> Or is there any other possibility to deal with this?
+> 
+> Anyway, thanks to the developers for creating this useful package!
+> 
+> Best regards,
+> 
+> Andreas
+> 
+> 
+> 
+
+
+
+From andreas.borg at unimedizin-mainz.de  Thu Mar 31 10:07:43 2011
+From: andreas.borg at unimedizin-mainz.de (Andreas Borg)
+Date: Thu, 31 Mar 2011 10:07:43 +0200
+Subject: [datatable-help] Column names after self join
+In-Reply-To: <1301556372.18343.21.camel@netbook>
+References: <4D931A45.7070802@unimedizin-mainz.de>
+	<1301556372.18343.21.camel@netbook>
+Message-ID: <4D94364F.1040407@unimedizin-mainz.de>
+
+Hi Matthew,
+
+thanks for the reply.
+
+> The example data seems a little too cut down but if I understand
+> correctly then this idiom might be better :
+>
+>   
+>> setkey(dt,x1,id)
+>> dt[J(x1,id-1,id,x2),roll=TRUE,nomatch=0]
+>>     
+>      x1 id x2 id.1 x2.1
+> [1,]  a  1  1    2    2
+>   
+
+That would not be sufficient because in a larger world example the ids 
+of a pair can differ by more than one. Anyway, what is the use of 
+roll=TRUE in this case (there are no missing values with nomatch=0)?
+
+> That has the same column name issue but in the result this time and may
+> be easier to work around in the meantime. I've assumed you've already
+> tried grouping by x1 and using .SD.
+>
+>   
+Grouping might work in combination with calling a function on each group 
+that constructs all valid combinations of ids in the group. Not 
+straightforward to ensure compatible values over all groups, but I'll 
+dig into it. Thanks for the suggestion!
+
+Andreas
+
+-- 
+Andreas Borg
+Medizinische Informatik
+
+UNIVERSIT?TSMEDIZIN
+der Johannes Gutenberg-Universit?t
+Institut f?r Medizinische Biometrie, Epidemiologie und Informatik
+Obere Zahlbacher Stra?e 69, 55131 Mainz
+www.imbei.uni-mainz.de
+
+Telefon +49 (0) 6131 175062
+E-Mail: borg at imbei.uni-mainz.de
+
+Diese E-Mail enth?lt vertrauliche und/oder rechtlich gesch?tzte Informationen. Wenn Sie nicht der
+richtige Adressat sind oder diese E-Mail irrt?mlich erhalten haben, informieren Sie bitte sofort den
+Absender und l?schen Sie diese Mail. Das unerlaubte Kopieren sowie die unbefugte Weitergabe
+dieser Mail und der darin enthaltenen Informationen ist nicht gestattet.
+
+
+From mdowle at mdowle.plus.com  Thu Mar 31 10:23:35 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 31 Mar 2011 09:23:35 +0100
+Subject: [datatable-help] Column names after self join
+References: <4D931A45.7070802@unimedizin-mainz.de><1301556372.18343.21.camel@netbook>
+	<4D94364F.1040407@unimedizin-mainz.de>
+Message-ID: <in1dn4$rkk$1@dough.gmane.org>
+
+
+"Andreas Borg" <andreas.borg at unimedizin-mainz.de> wrote in message 
+news:4D94364F.1040407 at unimedizin-mainz.de...
+> Hi Matthew,
+>
+> thanks for the reply.
+>
+>> The example data seems a little too cut down but if I understand
+>> correctly then this idiom might be better :
+>>
+>>
+>>> setkey(dt,x1,id)
+>>> dt[J(x1,id-1,id,x2),roll=TRUE,nomatch=0]
+>>>
+>>      x1 id x2 id.1 x2.1
+>> [1,]  a  1  1    2    2
+>>
+>
+> That would not be sufficient because in a larger world example
+> the ids of a pair can differ by more than one.
+
+Sounds like you haven't fully understood rolling join. You
+described an equi-join (if you *don't* specify roll=TRUE).
+
+> Anyway, what is the use of roll=TRUE in this case (there are no missing 
+> values with nomatch=0)?
+
+nomatch applies after the rolling join has been done.  The rolling join 
+itself
+may return NA (in this example for the rows which don't have a prior id)
+
+
+
+
+
+From mailinglist.honeypot at gmail.com  Thu Mar 31 18:29:37 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Thu, 31 Mar 2011 12:29:37 -0400
+Subject: [datatable-help] Mainting key columns after `transform`
+Message-ID: <AANLkTikOtRWuoCpeQA+EkPV+HCTs1-cXYXTNP8tSp0aL@mail.gmail.com>
+
+Howdy,
+
+Would it make sense to change `transform.data.table` to ensure that
+the key columns are maintained after the `transform`-ation?
+
+My initial thoughts is that this is "fine" (ie. won't break anything)
+as long as none of the columns transformed are elements in the key --
+if they are, I guess it's not clear what to do. One option is to drop
+the keys at this point, another is to add a `.force.keys=TRUE/FALSE`
+argument after the dots, eg:
+
+transform.data.table <- function(`_data`, ..., .force.keys=TRUE)
+
+which would reset the key columns to what they were, even if it
+resorts the data.table.
+
+Thoughts?
+
+-steve
+
+btw - and I guess whatever makes sense to do here would also make
+sense to do in the `within.data.table` function as well.
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Thu Mar 31 20:21:08 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 31 Mar 2011 19:21:08 +0100
+Subject: [datatable-help] Mainting key columns after `transform`
+In-Reply-To: <AANLkTikOtRWuoCpeQA+EkPV+HCTs1-cXYXTNP8tSp0aL@mail.gmail.com>
+References: <AANLkTikOtRWuoCpeQA+EkPV+HCTs1-cXYXTNP8tSp0aL@mail.gmail.com>
+Message-ID: <1301595668.18343.30.camel@netbook>
+
+Hi,
+I don't mind as I don't use transform() or within().
+At least, I don't use them directly. Packages I pass
+a data.table to might I suppose.
+Sounds like a good idea to me though.
+Matthew
+
+On Thu, 2011-03-31 at 12:29 -0400, Steve Lianoglou wrote:
+> Howdy,
+> 
+> Would it make sense to change `transform.data.table` to ensure that
+> the key columns are maintained after the `transform`-ation?
+> 
+> My initial thoughts is that this is "fine" (ie. won't break anything)
+> as long as none of the columns transformed are elements in the key --
+> if they are, I guess it's not clear what to do. One option is to drop
+> the keys at this point, another is to add a `.force.keys=TRUE/FALSE`
+> argument after the dots, eg:
+> 
+> transform.data.table <- function(`_data`, ..., .force.keys=TRUE)
+> 
+> which would reset the key columns to what they were, even if it
+> resorts the data.table.
+> 
+> Thoughts?
+> 
+> -steve
+> 
+> btw - and I guess whatever makes sense to do here would also make
+> sense to do in the `within.data.table` function as well.
+> 
+> 
+
+
+

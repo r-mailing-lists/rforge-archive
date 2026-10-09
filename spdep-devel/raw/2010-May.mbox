@@ -1,0 +1,174 @@
+From Roger.Bivand at nhh.no  Mon May  3 15:23:02 2010
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Mon, 3 May 2010 15:23:02 +0200 (CEST)
+Subject: [Spdep-devel] poly2nb commits
+Message-ID: <alpine.LRH.2.00.1005031331380.8217@reclus.nhh.no>
+
+Micah:
+
+Some further work on poly2nb() By taking findInBox() out of the big loop, 
+I can now parallelise it. In addition, I re-wrote the big loop in C, which 
+makes less absolute difference for the LA blocks (20 secs -> 1 sec), but a 
+lot of difference for the US zip ZCTA (about 30K Polygons, 170 secs -> 40 
+secs). For the LA blocks and two machines:
+
+Machine 1:
+
+without and with C in the big loop:
+
+> load("la_blks.RData")
+> set.VerboseOption(TRUE)
+[1] TRUE
+> system.time(la_nb <- poly2nb(la_blks, useC=FALSE))
+convert to polylist: 30.883
+handle IDs: 0
+generate BBs: 1.646
+massage polygons: 5.763
+findInBox: 1574.904 list size 388001
+work loop: 20.857
+done: 0.108
+     user   system  elapsed
+1628.555    0.210 1634.248
+> system.time(la_nbC <- poly2nb(la_blks))
+convert to polylist: 26.381
+handle IDs: 0
+generate BBs: 1.743
+massage polygons: 5.874
+findInBox: 1615.051 list size 388001
+work loop: 0.542
+done: 0.133
+     user   system  elapsed
+1644.159    0.203 1649.809
+> all.equal(la_nb, la_nbC, check.attributes=FALSE)
+[1] TRUE
+
+with a 2x snow socket cluster with and without C:
+
+> library(snow)
+> cl <- makeCluster(2, type="SOCK")
+Detaching after fork from child process 27021.
+Detaching after fork from child process 27025.
+> set.ClusterOption(cl)
+> system.time(la_nb_CL <- poly2nb(la_blks, useC=FALSE))
+convert to polylist: 26.555
+handle IDs: 0
+generate BBs: 1.69
+massage polygons: 5.849
+cluster findInBox setup: 9.907
+cluster findInBox: 868.271 list size 388001
+work loop: 21.656
+done: 0.134
+    user  system elapsed
+  57.447   0.186 934.153
+> all.equal(la_nb, la_nb_CL, check.attributes=FALSE)
+[1] TRUE
+> system.time(la_nbCCL <- poly2nb(la_blks))
+convert to polylist: 26.042
+handle IDs: 0
+generate BBs: 1.8
+massage polygons: 5.857
+cluster findInBox setup: 2.773
+cluster findInBox: 850.392 list size 388001
+work loop: 1.219
+done: 0.106
+    user  system elapsed
+  36.585   0.216 888.283
+> all.equal(la_nb, la_nbCCL, check.attributes=FALSE)
+[1] TRUE
+> stopCluster(cl)
+> set.ClusterOption(NULL)
+
+so now at under 15 minutes for a core 2 (RHEL 5 x86_64, R 2.11.0, 3.16GHz, 
+6MB L2 cache), down from 27 minutes.
+
+Machine 2:
+
+On a quad (RHEL 5 x86_64, R 2.11.0, 2.66GHz, 3MB L2 cache, so 1.22 times 
+slower than the core 2 per core), I see:
+
+> load("la_blks.RData")
+> set.VerboseOption(TRUE)
+[1] FALSE
+> system.time(la_nb <- poly2nb(la_blks, useC=FALSE))
+convert to polylist: 36.061
+handle IDs: 0
+generate BBs: 1.632
+massage polygons: 6.97
+findInBox: 1918.232 list size 388001
+work loop: 23.363
+done: 0.15
+     user   system  elapsed
+1970.291   15.827 1986.502
+> system.time(la_nbC <- poly2nb(la_blks))
+convert to polylist: 29.241
+handle IDs: 0
+generate BBs: 1.834
+massage polygons: 6.334
+findInBox: 1898.911 list size 388001
+work loop: 0.618
+done: 0.137
+     user   system  elapsed
+1930.429    6.360 1937.169
+> all.equal(la_nb, la_nbC, check.attributes=FALSE)
+[1] TRUE
+> library(snow)
+> cl <- makeCluster(4, type="SOCK")
+> set.ClusterOption(cl)
+> system.time(la_nb_CL <- poly2nb(la_blks, useC=FALSE))
+convert to polylist: 29.131
+handle IDs: 0
+generate BBs: 1.787
+massage polygons: 7.181
+cluster findInBox setup: 21.622
+cluster findInBox: 579.886 list size 388001
+work loop: 24.731
+done: 0.118
+    user  system elapsed
+  67.187   1.222 664.548
+> all.equal(la_nb, la_nb_CL, check.attributes=FALSE)
+[1] TRUE
+> system.time(la_nbCCL <- poly2nb(la_blks))
+convert to polylist: 29.083
+handle IDs: 0
+generate BBs: 1.861
+massage polygons: 6.483
+cluster findInBox setup: 7.465
+cluster findInBox: 566.255 list size 388001
+work loop: 1.134
+done: 0.113
+    user  system elapsed
+  43.451   1.275 612.486
+> all.equal(la_nb, la_nbCCL, check.attributes=FALSE)
+[1] TRUE
+> stopCluster(cl)
+> set.ClusterOption(NULL)
+
+so just over 10 minutes, down from 33 minutes on the same machine.
+
+Of course, using a snow cluster imposes a memory footprint for each worker 
+over and above the administrating process - the core 2 went from about 
+1.6G to about 2G (with an interactive graphical user and typical 
+applications taking space), and on the quad from about 1.0G to 1.7G. I 
+think that this could be reduced, but the concurrent R images do take 
+space.
+
+I'm CC'ing to the new spdep devel list as a record. We're now probably 
+well below your ~1100 seconds, although it is findInBox that is the burden 
+here, I think because of the off-shore polygons. Other data sets, such as 
+the ZCTA boundaries, split 50% findInBox, 50% work loop with no C and no 
+cluster; the findInBox speeds up with clusters at about 80% of the number 
+of clusters plus setup. The C work loop seems to speed up 4-8 times, I 
+think depending on the numbers of coordinates in polygon boundaries. The 
+blocks are often regular, so go fast anyway, once we have the candidate 
+sets from findInBox.
+
+Roger
+
+-- 
+Roger Bivand
+Economic Geography Section, Department of Economics, Norwegian School of
+Economics and Business Administration, Helleveien 30, N-5045 Bergen,
+Norway. voice: +47 55 95 93 55; fax +47 55 95 95 43
+e-mail: Roger.Bivand at nhh.no
+
+

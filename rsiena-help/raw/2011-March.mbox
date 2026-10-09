@@ -1,0 +1,471 @@
+From brubineau at cornell.edu  Tue Mar  8 20:46:29 2011
+From: brubineau at cornell.edu (Brian Rubineau)
+Date: Tue, 08 Mar 2011 14:46:29 -0500
+Subject: [Rsiena-help] Accessing the simulated networks
+Message-ID: <4D768795.6070200@cornell.edu>
+
+Dear RSiena experts,
+I'm trying to use the simulation engine in RSiena for fixed network models.
+That is, the output I'm interested in is the networks in the $sims 
+portion of an
+RSiena estimation object, not the estimation results itself. My problem is
+that I'm only getting "NULL" in the $sims list.
+I'm using R 2.12.0 and RSiena 1.0.11.119.
+
+Here's a simple example of what I'm trying to do, and the problem:
+
+library(statnet)  ## to get the random graph function rgraph
+two <- rgraph(20,m=2,tprob=0.2)
+two[1,,] <- 0  ## set the 1st graph to empty
+two[1,sample(1:20,1),sample(1:20,1)]<-1  ## make the 1st graph have only 
+1 random tie
+two.siena <- sienaNet(array(c(two[1,,],two[2,,]),dim=c(20,20,2)))
+two.siena.data <- sienaDataCreate(two.siena)
+two.siena.model <- sienaModelCreate(useStdInits = FALSE, projname = 
+'two',n3=10)
+two.effects <- getEffects(two.siena.data)
+two.effects$fix <- two.effects$include ## to fix all the parameters
+two.1 <- siena07(two.siena.model,data=two.siena.data,effects=two.effects)
+two.1$sims
+[[1]]
+NULL
+
+[[2]]
+NULL
+
+[[3]]
+NULL
+
+[[4]]
+NULL
+
+[[5]]
+NULL
+
+The errors from the siena07 process are:
+> Error in solve.default(z$msfc) :
+>   Lapack routine dgesv: system is exactly singular
+> In addition: Warning message:
+> In max(abs(tstat)[!z$fixed & !z$BasicRateFunction & z$resist > 0.9]) :
+>   no non-missing arguments to max; returning -Inf
+
+I'm attaching the out file from this process.
+
+Any ideas as to what I'm doing wrong?
+Thanks so much!
+Best,
+Brian
+
+
+
+-- 
+Brian Rubineau
+Assistant Professor, Organizational Behavior        394 Ives Hall
+School of Industrial and Labor Relations         ph. 607.255.3048
+Cornell University                              fax. 607.255.2261
+Ithaca, NY 14853                            brubineau at cornell.edu
+
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: two.out
+URL: <http://lists.r-forge.r-project.org/pipermail/rsiena-help/attachments/20110308/f9028ee7/attachment.asc>
+
+From doogan.1 at osu.edu  Tue Mar  8 21:22:40 2011
+From: doogan.1 at osu.edu (Nate Doogan)
+Date: Tue, 8 Mar 2011 15:22:40 -0500
+Subject: [Rsiena-help] New Memory Issue
+Message-ID: <AANLkTikCpy7FngPh9Kk9Ws-proPbkk+a51Bu-vvoxFJz@mail.gmail.com>
+
+Hi group.
+
+I have a very large time series. I am analyzing it by dividing it into small
+sections. I estimate parameters for many small sections of time and combine
+them using siena08(). I have done this using 54 individual estimations in
+the past with little trouble on a machine with 4 gigabytes of RAM.
+
+Recently, I have tried this again with no success. R spits out a memory
+error, even if I use a machine with 8 gigabytes of memory and the 64bit
+version of R and the OS. The problem is that all of the sienaFit objects
+need to be loaded and there has to be enough memory left for siena08() to do
+its job. I have tried breaking the estimations down into theoretically
+interesting subsets, but that still results in a set of sienaFit objects of
+size 40--still too big. Also, if I monitor the computer's RAM usage, it
+clearly sky rockets when I load() the saved sienaFit objects. In fact, the
+sienaFit objects appear to consume more memory than they have in the past.
+
+I am currently using RSiena version 141. First, I want to confirm that
+RSiena is actually storing more information in the sienaFit objects in
+recent updates of the software. Second, if this is true, and short of
+finding a machine with more RAM, does anyone have a suggestion for working
+around the resulting problem? Thank you.
+
+Nathan Doogan
+Doctoral Student
+The Ohio State University
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rsiena-help/attachments/20110308/3bbdae0a/attachment-0001.htm>
+
+From ruth at stats.ox.ac.uk  Tue Mar  8 23:24:32 2011
+From: ruth at stats.ox.ac.uk (Ruth M. Ripley)
+Date: Tue, 8 Mar 2011 22:24:32 +0000 (GMT Standard Time)
+Subject: [Rsiena-help] New Memory Issue
+In-Reply-To: <AANLkTikCpy7FngPh9Kk9Ws-proPbkk+a51Bu-vvoxFJz@mail.gmail.com>
+References: <AANLkTikCpy7FngPh9Kk9Ws-proPbkk+a51Bu-vvoxFJz@mail.gmail.com>
+Message-ID: <Pine.WNT.4.64.1103082202410.3076@reeve>
+
+Dear Nate,
+
+I have just done a quick comparison on a simple fit in 32 bit windows, and 
+my version 141 fit is smaller than 129, which actually stored the data. So 
+it is nothing obvious... Things have been added to the model, but nothing 
+large that I can think of, and we no longer store the data. But it could 
+be something specific to the options you have used: eg if you use maximum 
+likelihood fitting... If you would like to send me direct one of your 
+sienaFit's I will try to work out what is going on. If you also send me a 
+data object, effect object and model, I can run some comparisons with 
+each version.
+
+Regards,
+
+Ruth
+--
+Ruth M. Ripley,                         Email:ruth at stats.ox.ac.uk
+Dept. of Statistics,                    http://www.stats.ox.ac.uk/~ruth/
+University of Oxford,                   Tel:   01865 282851
+1 South Parks Road, Oxford OX1 3TG, UK  Fax:   01865 272595
+
+
+On Tue, 8 Mar 2011, Nate Doogan wrote:
+
+> Hi group.
+>
+> I have a very large time series. I am analyzing it by dividing it into small
+> sections. I estimate parameters for many small sections of time and combine
+> them using siena08(). I have done this using 54 individual estimations in
+> the past with little trouble on a machine with 4 gigabytes of RAM.
+>
+> Recently, I have tried this again with no success. R spits out a memory
+> error, even if I use a machine with 8 gigabytes of memory and the 64bit
+> version of R and the OS. The problem is that all of the sienaFit objects
+> need to be loaded and there has to be enough memory left for siena08() to do
+> its job. I have tried breaking the estimations down into theoretically
+> interesting subsets, but that still results in a set of sienaFit objects of
+> size 40--still too big. Also, if I monitor the computer's RAM usage, it
+> clearly sky rockets when I load() the saved sienaFit objects. In fact, the
+> sienaFit objects appear to consume more memory than they have in the past.
+>
+> I am currently using RSiena version 141. First, I want to confirm that
+> RSiena is actually storing more information in the sienaFit objects in
+> recent updates of the software. Second, if this is true, and short of
+> finding a machine with more RAM, does anyone have a suggestion for working
+> around the resulting problem? Thank you.
+>
+> Nathan Doogan
+> Doctoral Student
+> The Ohio State University
+>
+
+From ruth at stats.ox.ac.uk  Tue Mar  8 23:35:55 2011
+From: ruth at stats.ox.ac.uk (Ruth M. Ripley)
+Date: Tue, 8 Mar 2011 22:35:55 +0000 (GMT Standard Time)
+Subject: [Rsiena-help] Accessing the simulated networks
+In-Reply-To: <4D768795.6070200@cornell.edu>
+References: <4D768795.6070200@cornell.edu>
+Message-ID: <Pine.WNT.4.64.1103082231530.3076@reeve>
+
+Dear Brian,
+
+You need to ask for the simulations to be returned. Use returnDeps=TRUE in 
+the call to siena07.
+
+By the way, you can turn off estimation by using nsub=0 in the call to 
+sienaModelCreate. If you do this, you do not need to fix the parameters.
+
+Regards,
+
+Ruth
+
+
+On Tue, 8 Mar 2011, Brian Rubineau wrote:
+
+> Dear RSiena experts,
+> I'm trying to use the simulation engine in RSiena for fixed network models.
+> That is, the output I'm interested in is the networks in the $sims portion of 
+> an
+> RSiena estimation object, not the estimation results itself. My problem is
+> that I'm only getting "NULL" in the $sims list.
+> I'm using R 2.12.0 and RSiena 1.0.11.119.
+>
+> Here's a simple example of what I'm trying to do, and the problem:
+>
+> library(statnet)  ## to get the random graph function rgraph
+> two <- rgraph(20,m=2,tprob=0.2)
+> two[1,,] <- 0  ## set the 1st graph to empty
+> two[1,sample(1:20,1),sample(1:20,1)]<-1  ## make the 1st graph have only 1 
+> random tie
+> two.siena <- sienaNet(array(c(two[1,,],two[2,,]),dim=c(20,20,2)))
+> two.siena.data <- sienaDataCreate(two.siena)
+> two.siena.model <- sienaModelCreate(useStdInits = FALSE, projname = 
+> 'two',n3=10)
+> two.effects <- getEffects(two.siena.data)
+> two.effects$fix <- two.effects$include ## to fix all the parameters
+> two.1 <- siena07(two.siena.model,data=two.siena.data,effects=two.effects)
+> two.1$sims
+> [[1]]
+> NULL
+>
+> [[2]]
+> NULL
+>
+> [[3]]
+> NULL
+>
+> [[4]]
+> NULL
+>
+> [[5]]
+> NULL
+>
+> The errors from the siena07 process are:
+>> Error in solve.default(z$msfc) :
+>>   Lapack routine dgesv: system is exactly singular
+>> In addition: Warning message:
+>> In max(abs(tstat)[!z$fixed & !z$BasicRateFunction & z$resist > 0.9]) :
+>>   no non-missing arguments to max; returning -Inf
+>
+> I'm attaching the out file from this process.
+>
+> Any ideas as to what I'm doing wrong?
+> Thanks so much!
+> Best,
+> Brian
+>
+>
+>
+> -- 
+> Brian Rubineau
+> Assistant Professor, Organizational Behavior        394 Ives Hall
+> School of Industrial and Labor Relations         ph. 607.255.3048
+> Cornell University                              fax. 607.255.2261
+> Ithaca, NY 14853                            brubineau at cornell.edu
+>
+>
+
+From brubineau at cornell.edu  Wed Mar  9 01:06:46 2011
+From: brubineau at cornell.edu (Brian Rubineau)
+Date: Tue, 08 Mar 2011 19:06:46 -0500
+Subject: [Rsiena-help] Accessing the simulated networks
+In-Reply-To: <Pine.WNT.4.64.1103082231530.3076@reeve>
+References: <4D768795.6070200@cornell.edu>
+	<Pine.WNT.4.64.1103082231530.3076@reeve>
+Message-ID: <4D76C496.3010008@cornell.edu>
+
+Perfect! I'm off and running, thanks!
+Brian
+
+On 3/8/2011 5:35 PM, Ruth M. Ripley wrote:
+> Dear Brian,
+>
+> You need to ask for the simulations to be returned. Use returnDeps=TRUE in
+> the call to siena07.
+>
+> By the way, you can turn off estimation by using nsub=0 in the call to
+> sienaModelCreate. If you do this, you do not need to fix the parameters.
+>
+> Regards,
+>
+> Ruth
+>
+>
+> On Tue, 8 Mar 2011, Brian Rubineau wrote:
+>
+>> Dear RSiena experts,
+>> I'm trying to use the simulation engine in RSiena for fixed network models.
+>> That is, the output I'm interested in is the networks in the $sims portion of
+>> an
+>> RSiena estimation object, not the estimation results itself. My problem is
+>> that I'm only getting "NULL" in the $sims list.
+>> I'm using R 2.12.0 and RSiena 1.0.11.119.
+>>
+>> Here's a simple example of what I'm trying to do, and the problem:
+>>
+>> library(statnet)  ## to get the random graph function rgraph
+>> two<- rgraph(20,m=2,tprob=0.2)
+>> two[1,,]<- 0  ## set the 1st graph to empty
+>> two[1,sample(1:20,1),sample(1:20,1)]<-1  ## make the 1st graph have only 1
+>> random tie
+>> two.siena<- sienaNet(array(c(two[1,,],two[2,,]),dim=c(20,20,2)))
+>> two.siena.data<- sienaDataCreate(two.siena)
+>> two.siena.model<- sienaModelCreate(useStdInits = FALSE, projname =
+>> 'two',n3=10)
+>> two.effects<- getEffects(two.siena.data)
+>> two.effects$fix<- two.effects$include ## to fix all the parameters
+>> two.1<- siena07(two.siena.model,data=two.siena.data,effects=two.effects)
+>> two.1$sims
+>> [[1]]
+>> NULL
+>>
+>> [[2]]
+>> NULL
+>>
+>> [[3]]
+>> NULL
+>>
+>> [[4]]
+>> NULL
+>>
+>> [[5]]
+>> NULL
+>>
+>> The errors from the siena07 process are:
+>>> Error in solve.default(z$msfc) :
+>>>    Lapack routine dgesv: system is exactly singular
+>>> In addition: Warning message:
+>>> In max(abs(tstat)[!z$fixed&  !z$BasicRateFunction&  z$resist>  0.9]) :
+>>>    no non-missing arguments to max; returning -Inf
+>> I'm attaching the out file from this process.
+>>
+>> Any ideas as to what I'm doing wrong?
+>> Thanks so much!
+>> Best,
+>> Brian
+>>
+>>
+>>
+>> -- 
+>> Brian Rubineau
+>> Assistant Professor, Organizational Behavior        394 Ives Hall
+>> School of Industrial and Labor Relations         ph. 607.255.3048
+>> Cornell University                              fax. 607.255.2261
+>> Ithaca, NY 14853                            brubineau at cornell.edu
+>>
+>>
+
+
+-- 
+Brian Rubineau
+Assistant Professor, Organizational Behavior        394 Ives Hall
+School of Industrial and Labor Relations         ph. 607.255.3048
+Cornell University                              fax. 607.255.2261
+Ithaca, NY 14853                            brubineau at cornell.edu
+
+
+From kmlewis at fas.harvard.edu  Wed Mar 16 20:37:30 2011
+From: kmlewis at fas.harvard.edu (Kevin Lewis)
+Date: Wed, 16 Mar 2011 15:37:30 -0400
+Subject: [Rsiena-help] undirected networks in RSiena
+Message-ID: <4D81117A.1050909@fas.harvard.edu>
+
+greetings,
+
+i wonder if anyone can provide an update on current functionality for 
+undirected networks in RSiena? it appears that RSiena indeed recognizes 
+my network as undirected, but this case is not as thoroughly documented 
+in the most recent manual. in particular i am wondering about the following:
+
+1) if i recall correctly, version 3 did not allow estimation by the 
+score function method, and instead forced the "finite differences" 
+method for all undirected models. however, when i run an undirected 
+model in RSiena, it seems i am able to select the score function method 
+without problem (and the output reports that standard errors are 
+estimated with the likelihood ratio method, which i assume is the same 
+thing). am i correct in interpreting this to mean that the score 
+function method is now available for undirected networks in RSiena?
+
+2) while RSiena will successfully run an undirected model, the "model 
+options" screen still looks identical to the options screen for directed 
+networks- and therefore i am unable to select which of the 6 undirected 
+model types i would like to use (a possibility that was available in 
+version 3). the output reports, however, that "Model Type 2: Forcing 
+model" appears to be the default. is there a way to change this to 
+another type, in particular the initiative-confirmation model? if not, 
+is there reason to believe this will influence results anyway? (i recall 
+reading somewhere that results did not vary much across different 
+undirected model types.)
+
+i am obviously also using the GUI, so perhaps this is something i can 
+accomplish without the GUI.
+
+thanks for any help with this!
+
+-kevin
+
+-- 
+Kevin Lewis
+Ph.D. Candidate in Sociology
+Harvard University
+33 Kirkland Street
+Cambridge, MA 02138
+
+
+From ruth at stats.ox.ac.uk  Mon Mar 21 23:46:43 2011
+From: ruth at stats.ox.ac.uk (Ruth M. Ripley)
+Date: Mon, 21 Mar 2011 22:46:43 +0000 (GMT Standard Time)
+Subject: [Rsiena-help] undirected networks in RSiena
+In-Reply-To: <4D81117A.1050909@fas.harvard.edu>
+References: <4D81117A.1050909@fas.harvard.edu>
+Message-ID: <Pine.WNT.4.64.1103212241240.8992@sony-PC>
+
+Kevin,
+
+1) There is an option called modelType which is not available via the GUI.
+The documentation is rudimentary at the moment, I am afraid. 
+?sienaModelCreate will tell you the possible values. I think 3 is what you 
+need.
+
+2) It is no longer necessary to use the finite difference method for 
+undirected networks.
+
+Hope this helps,
+
+Ruth
+
+On Wed, 16 Mar 2011, Kevin Lewis wrote:
+
+> greetings,
+>
+> i wonder if anyone can provide an update on current functionality for 
+> undirected networks in RSiena? it appears that RSiena indeed recognizes my 
+> network as undirected, but this case is not as thoroughly documented in the 
+> most recent manual. in particular i am wondering about the following:
+>
+> 1) if i recall correctly, version 3 did not allow estimation by the score 
+> function method, and instead forced the "finite differences" method for all 
+> undirected models. however, when i run an undirected model in RSiena, it 
+> seems i am able to select the score function method without problem (and the 
+> output reports that standard errors are estimated with the likelihood ratio 
+> method, which i assume is the same thing). am i correct in interpreting this 
+> to mean that the score function method is now available for undirected 
+> networks in RSiena?
+>
+> 2) while RSiena will successfully run an undirected model, the "model 
+> options" screen still looks identical to the options screen for directed 
+> networks- and therefore i am unable to select which of the 6 undirected 
+> model types i would like to use (a possibility that was available in version 
+> 3). the output reports, however, that "Model Type 2: Forcing model" appears 
+> to be the default. is there a way to change this to another type, in 
+> particular the initiative-confirmation model? if not, is there reason to 
+> believe this will influence results anyway? (i recall reading somewhere that 
+> results did not vary much across different undirected model types.)
+>
+> i am obviously also using the GUI, so perhaps this is something i can 
+> accomplish without the GUI.
+>
+> thanks for any help with this!
+>
+> -kevin
+>
+> -- 
+> Kevin Lewis
+> Ph.D. Candidate in Sociology
+> Harvard University
+> 33 Kirkland Street
+> Cambridge, MA 02138
+>
+> _______________________________________________
+> Rsiena-help mailing list
+> Rsiena-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rsiena-help
+>
+

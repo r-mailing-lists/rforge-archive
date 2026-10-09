@@ -1,0 +1,205 @@
+From k.zhong at erasmusmc.nl  Wed Sep 23 15:46:14 2015
+From: k.zhong at erasmusmc.nl (K. Zhong)
+Date: Wed, 23 Sep 2015 13:46:14 +0000
+Subject: [GenABEL-dev] truncate end of file with Rcpp
+Message-ID: <D22879C6.1FD0%k.zhong@erasmusmc.nl>
+
+Dear list,
+
+Since the `truncate` function is not working properly on Windows (see ?truncate), and CollapsABEL depends on such a function, I tried to implement it with c++ (to be integrated into R with Rcpp):
+
+
+
+#include <SDKDDKVer.h>
+
+#include <windows.h>
+
+#include <tlhelp32.h>
+
+#include <tchar.h>
+
+#include <stdio.h>
+
+#include <iostream>
+
+#include <string>
+
+#include <sstream>
+
+#include <Rcpp.h>
+
+
+using namespace Rcpp;
+
+
+typedef const char* LPCTSTR;
+
+typedef const void* LPCVOID;
+
+typedef unsigned long DWORD;
+
+
+// [[Rcpp::export]]
+
+void append(LPCTSTR filename, LPCVOID buf, DWORD writeSize) {
+
+LARGE_INTEGER size;
+
+size.QuadPart = 0;
+
+HANDLE fh = CreateFile(filename, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+if (fh == INVALID_HANDLE_VALUE) {
+
+std::ostringstream error;
+
+error << "Failed to created file: " << filename << "\nError: " << GetLastError();
+
+throw error.str();
+
+}
+
+GetFileSizeEx(fh, &size);
+
+SetFilePointerEx(fh, size, NULL, FILE_BEGIN);
+
+if (WriteFile(fh, buf, writeSize, NULL, NULL) == 0) {
+
+std::ostringstream error;
+
+error << "Failed to write file: " << filename << "\nError: " << GetLastError();
+
+throw error.str();
+
+}
+
+CloseHandle(fh);
+
+}
+
+
+// [[Rcpp::export]]
+
+std::string readTail(LPCTSTR filename,  DWORD readSize) {
+
+char *buf = "";
+
+LARGE_INTEGER size;
+
+size.QuadPart = 0;
+
+HANDLE fh = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+if (fh == INVALID_HANDLE_VALUE) {
+
+std::ostringstream error;
+
+error << "Failed to created file: " << filename << "\nError: " << GetLastError();
+
+throw error.str();
+
+}
+
+GetFileSizeEx(fh, &size);
+
+size.QuadPart -= readSize;
+
+SetFilePointerEx(fh, size, NULL, FILE_BEGIN);
+
+if (ReadFile(fh, buf, readSize, NULL, NULL) == 0) {
+
+std::ostringstream error;
+
+error << "Failed to read file: " << filename << "\nError: " << GetLastError();
+
+throw error.str();
+
+}
+
+CloseHandle(fh);
+
+std::string s(buf);
+
+}
+
+
+// [[Rcpp::export]]
+
+std::string hello(std::string name) {
+
+std::ostringstream s;
+
+s << "Hello, " << name << "\n";
+
+return s.str();
+
+}
+
+
+// [[Rcpp::export]]
+
+void truncateTail(LPCTSTR filename, long truncateSize) {
+
+LARGE_INTEGER size;
+
+size.QuadPart = 0;
+
+HANDLE fh = CreateFile(filename, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+if (fh == INVALID_HANDLE_VALUE) {
+
+std::ostringstream error;
+
+error << "Failed to created file: " << filename << "\nError: " << GetLastError();
+
+throw error.str();
+
+}
+
+GetFileSizeEx(fh, &size);
+
+size.QuadPart -= truncateSize;
+
+SetFilePointerEx(fh, size, NULL, FILE_BEGIN);
+
+if (SetEndOfFile(fh) == 0) {
+
+std::ostringstream error;
+
+error << "Failed to set end of file: " << filename << "\nError: " << GetLastError();
+
+throw error.str();
+
+}
+
+CloseHandle(fh);
+
+}
+
+
+A quick import with `sourceCpp` seems to compile this just fine, but when I call `truncateTail("C:/kaiyin/kybig.out", 3L)`, I get this:
+
+
+
+Error in truncateTail("C:/kaiyin/kybig.out", 3L) :
+
+  c++ exception (unknown reason)
+
+
+Any suggestions?
+
+
+Best regards,
+
+Kaiyin ZHONG
+------------------
+FMB, Erasmus MC
+http://kspace.co.vu
+k.zhong at erasmusmc.nl<mailto:k.zhong at erasmusmc.nl>
+kindlychung at gmail.com<mailto:kindlychung at gmail.com>
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20150923/81a01b72/attachment.html>
+

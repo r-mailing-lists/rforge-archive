@@ -1,0 +1,995 @@
+From Roger.Bivand at nhh.no  Sun Jan 22 21:17:48 2012
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Sun, 22 Jan 2012 21:17:48 +0100 (CET)
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+Message-ID: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+
+Hi,
+
+Working with Rainer Krug on making readRAST6() in spgrass6 faster, we've 
+identified an issue with time wasting in creating SGDF. For 2.14.1, sp 
+0.9-93, rgdal 0.7-8:
+
+> Rprof("readGDAL.out")
+> system.time(for (i in 1:50) SP27GTIF <- 
+readGDAL(system.file("pictures/SP27GTIF.TIF", package = "rgdal")[1]))
+    user  system elapsed
+122.961   4.678 131.383
+> Rprof("")
+> summaryRprof("readGDAL.out")
+$by.self
+                         self.time self.pct total.time total.pct
+"getGridIndex"              32.32    25.31      45.44     35.59
+"asMethod"                  10.60     8.30     119.04     93.23
+"slot<-"                     8.50     6.66       8.64      6.77
+"apply"                      7.52     5.89      15.12     11.84
+"validityMethod"             7.24     5.67     120.30     94.22
+".local"                     6.40     5.01      22.92     17.95
+"structure"                  5.56     4.35       5.58      4.37
+"expand.grid"                5.14     4.03      12.72      9.96
+"FUN"                        4.86     3.81       4.86      3.81
+"initialize"                 4.34     3.40     123.08     96.40
+"SpatialPixels"              3.06     2.40      96.18     75.33
+"aperm.default"              2.70     2.11       2.70      2.11
+"SpatialPoints"              2.54     1.99      49.16     38.50
+"gc"                         2.52     1.97       2.52      1.97
+....
+$by.total
+                         total.time total.pct self.time self.pct
+"system.time"               127.68    100.00      0.00     0.00
+"readGDAL"                  127.64     99.97      0.00     0.00
+"new"                       123.10     96.41      0.02     0.02
+"initialize"                123.08     96.40      4.34     3.40
+"SpatialGridDataFrame"      123.04     96.37      0.00     0.00
+"validObject"               120.42     94.31      0.00     0.00
+"validityMethod"            120.30     94.22      7.24     5.67
+"anyStrings"                120.30     94.22      0.00     0.00
+"as"                        119.08     93.26      0.00     0.00
+"asMethod"                  119.04     93.23     10.60     8.30
+"SpatialPixels"              96.18     75.33      3.06     2.40
+"nrow"                       96.18     75.33      0.00     0.00
+"SpatialGrid"                59.22     46.38      0.00     0.00
+"SpatialPoints"              49.16     38.50      2.54     1.99
+"getGridIndex"               45.44     35.59     32.32    25.31
+"standardGeneric"            27.94     21.88      0.00     0.00
+"is"                         26.28     20.58      0.02     0.02
+".local"                     22.92     17.95      6.40     5.01
+"coordinates"                22.92     17.95      0.00     0.00
+"do.call"                    16.48     12.91      0.00     0.00
+".bboxCoords"                15.16     11.87      0.02     0.02
+"t"                          15.14     11.86      0.02     0.02
+"apply"                      15.12     11.84      7.52     5.89
+"expand.grid"                12.72      9.96      5.14     4.03
+"slot<-"                      8.64      6.77      8.50     6.66
+"structure"                   5.58      4.37      5.56     4.35
+
+
+The getGridIndex() call is particularly odd, taking 25% of execution time. 
+I've put the Rprof file on rspatial/misc. This looks like an S4 oddity to 
+me. I can't see where the validity checks might recurse to trip calls to 
+other classes. The validity check ought to be a no-brainer, really. I 
+don't know when this happened, it may be caused by recent methods.
+
+Any ideas?
+
+Roger
+
+-- 
+Roger Bivand
+Department of Economics, NHH Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 95 43
+e-mail: Roger.Bivand at nhh.no
+
+
+From Roger.Bivand at nhh.no  Sun Jan 22 23:32:38 2012
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Sun, 22 Jan 2012 23:32:38 +0100 (CET)
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+In-Reply-To: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+References: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+Message-ID: <alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+
+With revision 1200, the same test is:
+
+    user  system elapsed
+   7.763   0.346   8.119
+
+but no validity checks are done. As may be sensible, something may be done 
+about validity checking, but an order of magnitude speedup is worth 
+having, I think.
+
+Roger
+
+On Sun, 22 Jan 2012, Roger Bivand wrote:
+
+> Hi,
+>
+> Working with Rainer Krug on making readRAST6() in spgrass6 faster, we've 
+> identified an issue with time wasting in creating SGDF. For 2.14.1, sp 
+> 0.9-93, rgdal 0.7-8:
+>
+>> Rprof("readGDAL.out")
+>> system.time(for (i in 1:50) SP27GTIF <- 
+> readGDAL(system.file("pictures/SP27GTIF.TIF", package = "rgdal")[1]))
+>   user  system elapsed
+> 122.961   4.678 131.383
+>> Rprof("")
+>> summaryRprof("readGDAL.out")
+> $by.self
+>                        self.time self.pct total.time total.pct
+> "getGridIndex"              32.32    25.31      45.44     35.59
+> "asMethod"                  10.60     8.30     119.04     93.23
+> "slot<-"                     8.50     6.66       8.64      6.77
+> "apply"                      7.52     5.89      15.12     11.84
+> "validityMethod"             7.24     5.67     120.30     94.22
+> ".local"                     6.40     5.01      22.92     17.95
+> "structure"                  5.56     4.35       5.58      4.37
+> "expand.grid"                5.14     4.03      12.72      9.96
+> "FUN"                        4.86     3.81       4.86      3.81
+> "initialize"                 4.34     3.40     123.08     96.40
+> "SpatialPixels"              3.06     2.40      96.18     75.33
+> "aperm.default"              2.70     2.11       2.70      2.11
+> "SpatialPoints"              2.54     1.99      49.16     38.50
+> "gc"                         2.52     1.97       2.52      1.97
+> ....
+> $by.total
+>                        total.time total.pct self.time self.pct
+> "system.time"               127.68    100.00      0.00     0.00
+> "readGDAL"                  127.64     99.97      0.00     0.00
+> "new"                       123.10     96.41      0.02     0.02
+> "initialize"                123.08     96.40      4.34     3.40
+> "SpatialGridDataFrame"      123.04     96.37      0.00     0.00
+> "validObject"               120.42     94.31      0.00     0.00
+> "validityMethod"            120.30     94.22      7.24     5.67
+> "anyStrings"                120.30     94.22      0.00     0.00
+> "as"                        119.08     93.26      0.00     0.00
+> "asMethod"                  119.04     93.23     10.60     8.30
+> "SpatialPixels"              96.18     75.33      3.06     2.40
+> "nrow"                       96.18     75.33      0.00     0.00
+> "SpatialGrid"                59.22     46.38      0.00     0.00
+> "SpatialPoints"              49.16     38.50      2.54     1.99
+> "getGridIndex"               45.44     35.59     32.32    25.31
+> "standardGeneric"            27.94     21.88      0.00     0.00
+> "is"                         26.28     20.58      0.02     0.02
+> ".local"                     22.92     17.95      6.40     5.01
+> "coordinates"                22.92     17.95      0.00     0.00
+> "do.call"                    16.48     12.91      0.00     0.00
+> ".bboxCoords"                15.16     11.87      0.02     0.02
+> "t"                          15.14     11.86      0.02     0.02
+> "apply"                      15.12     11.84      7.52     5.89
+> "expand.grid"                12.72      9.96      5.14     4.03
+> "slot<-"                      8.64      6.77      8.50     6.66
+> "structure"                   5.58      4.37      5.56     4.35
+>
+>
+> The getGridIndex() call is particularly odd, taking 25% of execution time. 
+> I've put the Rprof file on rspatial/misc. This looks like an S4 oddity to me. 
+> I can't see where the validity checks might recurse to trip calls to other 
+> classes. The validity check ought to be a no-brainer, really. I don't know 
+> when this happened, it may be caused by recent methods.
+>
+> Any ideas?
+>
+> Roger
+>
+>
+
+-- 
+Roger Bivand
+Department of Economics, NHH Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 95 43
+e-mail: Roger.Bivand at nhh.no
+
+
+From r.m.krug at gmail.com  Mon Jan 23 10:58:22 2012
+From: r.m.krug at gmail.com (Rainer M Krug)
+Date: Mon, 23 Jan 2012 10:58:22 +0100
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+In-Reply-To: <alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+References: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+	<alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+Message-ID: <4F1D2F3E.1020106@gmail.com>
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+OK - I have done the following:
+
+  library(profr)
+  plot(rg <- parse_rprof("readGDAL.out"))
+  x11()
+  plot(rg[(rg$start>0 & rg$end <20), ])
+  x11()
+  plot(rg[(rg$start>0 & rg$end <2), ])
+  x11()
+  plot(rg1 <- parse_rprof("readGDAL1.out"))
+  x11()
+  plot(rg1[(rg1$start>0 & rg1$end <2), ])
+
+I do not know the inner workings of readGDAL(), but it strikes me,
+that SpatialGridDataFrame is called so often (or is this the reason
+why you have chosen readGDAL() for this profiling?).
+
+This looks similar to the aspect you are looking at in readRAST6 - if
+a more basic format could be used internally, this problem would
+probably go away for readGDAL().
+
+But there is still the issue, why SpatialGridDataFrame is relatively
+slow. I profiled the function readRAST6() whose running time is almost
+comletely caused by SpatialGridDataFrame. I profiled reading the
+"aspect" from the spearfish dataset, started R inside GRASS 6.4.1:
+
+
+  Rprof("withGDAL.out");x <- readRAST6("aspect", useGDAL=TRUE,
+plugin=FALSE);Rprof(NULL)
+
+  Rprof("noGDAL.out");x <- readRAST6("aspect", useGDAL=FALSE,
+plugin=FALSE);Rprof(NULL)
+  xnoGDAL <- parse_rprof("noGDAL.out")
+  xwithGDAL <- parse_rprof("withGDAL.out")
+
+  plot(xwithGDAL, main="With GDAL")
+  plot(xnoGDAL, main="No GDAL")
+
+attached the profile data and graphs generated by profr as above.
+
+For SpatialGridDataFrame, the function getGridDataFrame uses most of
+the time, particularly the "-" minus fiunction, and for "noGDAL" the
+"<=" comparison (not visible on the plot, but through plotting only
+that region).
+
+
+Profiling was done with: R 2.14.0, Linux 32 bit, spgrass6_0.7-4,
+rgdal_0.7-5, sp_0.9-91
+
+Hope this helps,
+
+Rainer
+
+
+On 22/01/12 23:32, Roger Bivand wrote:
+> With revision 1200, the same test is:
+> 
+> user  system elapsed 7.763   0.346   8.119
+> 
+> but no validity checks are done. As may be sensible, something may
+> be done about validity checking, but an order of magnitude speedup
+> is worth having, I think.
+> 
+> Roger
+> 
+> On Sun, 22 Jan 2012, Roger Bivand wrote:
+> 
+>> Hi,
+>> 
+>> Working with Rainer Krug on making readRAST6() in spgrass6
+>> faster, we've identified an issue with time wasting in creating
+>> SGDF. For 2.14.1, sp 0.9-93, rgdal 0.7-8:
+>> 
+>>> Rprof("readGDAL.out") system.time(for (i in 1:50) SP27GTIF <-
+>> readGDAL(system.file("pictures/SP27GTIF.TIF", package =
+>> "rgdal")[1])) user  system elapsed 122.961   4.678 131.383
+>>> Rprof("") summaryRprof("readGDAL.out")
+>> $by.self self.time self.pct total.time total.pct "getGridIndex"
+>> 32.32    25.31      45.44     35.59 "asMethod"
+>> 10.60     8.30     119.04     93.23 "slot<-"
+>> 8.50     6.66       8.64      6.77 "apply"
+>> 7.52     5.89      15.12     11.84 "validityMethod"
+>> 7.24     5.67     120.30     94.22 ".local"
+>> 6.40     5.01      22.92     17.95 "structure"
+>> 5.56     4.35       5.58      4.37 "expand.grid"
+>> 5.14     4.03      12.72      9.96 "FUN"
+>> 4.86     3.81       4.86      3.81 "initialize"
+>> 4.34     3.40     123.08     96.40 "SpatialPixels"
+>> 3.06     2.40      96.18     75.33 "aperm.default"
+>> 2.70     2.11       2.70      2.11 "SpatialPoints"
+>> 2.54     1.99      49.16     38.50 "gc"
+>> 2.52     1.97       2.52      1.97 .... $by.total total.time
+>> total.pct self.time self.pct "system.time"               127.68
+>> 100.00      0.00     0.00 "readGDAL"                  127.64
+>> 99.97      0.00     0.00 "new"                       123.10
+>> 96.41      0.02     0.02 "initialize"                123.08
+>> 96.40      4.34     3.40 "SpatialGridDataFrame"      123.04
+>> 96.37      0.00     0.00 "validObject"               120.42
+>> 94.31      0.00     0.00 "validityMethod"            120.30
+>> 94.22      7.24     5.67 "anyStrings"                120.30
+>> 94.22      0.00     0.00 "as"                        119.08
+>> 93.26      0.00     0.00 "asMethod"                  119.04
+>> 93.23     10.60     8.30 "SpatialPixels"              96.18
+>> 75.33      3.06     2.40 "nrow"                       96.18
+>> 75.33      0.00     0.00 "SpatialGrid"                59.22
+>> 46.38      0.00     0.00 "SpatialPoints"              49.16
+>> 38.50      2.54     1.99 "getGridIndex"               45.44
+>> 35.59     32.32    25.31 "standardGeneric"            27.94
+>> 21.88      0.00     0.00 "is"                         26.28
+>> 20.58      0.02     0.02 ".local"                     22.92
+>> 17.95      6.40     5.01 "coordinates"                22.92
+>> 17.95      0.00     0.00 "do.call"                    16.48
+>> 12.91      0.00     0.00 ".bboxCoords"                15.16
+>> 11.87      0.02     0.02 "t"                          15.14
+>> 11.86      0.02     0.02 "apply"                      15.12
+>> 11.84      7.52     5.89 "expand.grid"                12.72
+>> 9.96      5.14     4.03 "slot<-"                      8.64
+>> 6.77      8.50     6.66 "structure"                   5.58
+>> 4.37      5.56     4.35
+>> 
+>> 
+>> The getGridIndex() call is particularly odd, taking 25% of
+>> execution time. I've put the Rprof file on rspatial/misc. This
+>> looks like an S4 oddity to me. I can't see where the validity
+>> checks might recurse to trip calls to other classes. The validity
+>> check ought to be a no-brainer, really. I don't know when this
+>> happened, it may be caused by recent methods.
+>> 
+>> Any ideas?
+>> 
+>> Roger
+>> 
+>> 
+> 
+
+
+- -- 
+Rainer M. Krug, PhD (Conservation Ecology, SUN), MSc (Conservation
+Biology, UCT), Dipl. Phys. (Germany)
+
+Centre of Excellence for Invasion Biology
+Stellenbosch University
+South Africa
+
+Tel :       +33 - (0)9 53 10 27 44
+Cell:       +33 - (0)6 85 62 59 98
+Fax :       +33 - (0)9 58 10 27 44
+
+Fax (D):    +49 - (0)3 21 21 25 22 44
+
+email:      Rainer at krugs.de
+
+Skype:      RMkrug
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iEUEARECAAYFAk8dLz4ACgkQoYgNqgF2egq4zQCYvSIqm3rtOeJz/9Y4exywlnne
++QCfaTwnirthAp1zfHx7AqtInXrDKZI=
+=dMcm
+-----END PGP SIGNATURE-----
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: noGDAL.out
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20120123/92d534a4/attachment.txt>
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: withGDAL.out
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20120123/92d534a4/attachment.asc>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Rplots.pdf
+Type: application/pdf
+Size: 6915 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20120123/92d534a4/attachment.pdf>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: noGDAL.out.sig
+Type: application/octet-stream
+Size: 72 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20120123/92d534a4/attachment.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: withGDAL.out.sig
+Type: application/octet-stream
+Size: 72 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20120123/92d534a4/attachment-0001.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Rplots.pdf.sig
+Type: application/octet-stream
+Size: 72 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/rspatial-devel/attachments/20120123/92d534a4/attachment-0002.obj>
+
+From edzer.pebesma at uni-muenster.de  Mon Jan 23 11:03:50 2012
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Mon, 23 Jan 2012 11:03:50 +0100
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+In-Reply-To: <alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+References: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+	<alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+Message-ID: <4F1D3086.30306@uni-muenster.de>
+
+Thanks for the fix, although you probably dislike it as much as I do.
+
+The problem seems to be in the only setIs() remaining in sp; if I modify
+it to spitting debug prints by:
+
+setIs("SpatialGrid", "SpatialPixels",
+    coerce = function(from) {
+        print("coercing by setIs() on SpatialGrid")
+        SpatialPixels(SpatialPoints(coordinates(from), from at proj4string),
+        grid = from at grid)
+        },
+    replace = function(from, value) stop("replace-coercion not allowed")
+)
+
+then testing on test.ag in inst/external gives:
+
+> x = readGDAL("test.ag")
+test.ag has GDAL driver AAIGrid
+and has 115 rows and 80 columns
+[1] "coercing by setIs() on SpatialGrid"
+[1] "coercing by setIs() on SpatialGrid"
+
+So, apparently, setIs() causes the validity checking of SpatialGrid or
+SpatialGridDataFrame to ALSO coerce to SpatialPixels[DataFrame], not
+only once but twice, to check validity there. Indeed, a pretty stupid
+thing to do.
+
+maybe it should be setIs("SpatialPixels", "SpatialGrid", ...) ?
+
+will look into this; would be good to have this settled before 1.0, it
+has given me a few headaches before, see
+
+http://lists.r-forge.r-project.org/pipermail/rspatial-devel/2011-September/000023.html
+
+On 01/22/2012 11:32 PM, Roger Bivand wrote:
+> With revision 1200, the same test is:
+> 
+>    user  system elapsed
+>   7.763   0.346   8.119
+> 
+> but no validity checks are done. As may be sensible, something may be
+> done about validity checking, but an order of magnitude speedup is worth
+> having, I think.
+> 
+> Roger
+> 
+> On Sun, 22 Jan 2012, Roger Bivand wrote:
+> 
+>> Hi,
+>>
+>> Working with Rainer Krug on making readRAST6() in spgrass6 faster,
+>> we've identified an issue with time wasting in creating SGDF. For
+>> 2.14.1, sp 0.9-93, rgdal 0.7-8:
+>>
+>>> Rprof("readGDAL.out")
+>>> system.time(for (i in 1:50) SP27GTIF <- 
+>> readGDAL(system.file("pictures/SP27GTIF.TIF", package = "rgdal")[1]))
+>>   user  system elapsed
+>> 122.961   4.678 131.383
+>>> Rprof("")
+>>> summaryRprof("readGDAL.out")
+>> $by.self
+>>                        self.time self.pct total.time total.pct
+>> "getGridIndex"              32.32    25.31      45.44     35.59
+>> "asMethod"                  10.60     8.30     119.04     93.23
+>> "slot<-"                     8.50     6.66       8.64      6.77
+>> "apply"                      7.52     5.89      15.12     11.84
+>> "validityMethod"             7.24     5.67     120.30     94.22
+>> ".local"                     6.40     5.01      22.92     17.95
+>> "structure"                  5.56     4.35       5.58      4.37
+>> "expand.grid"                5.14     4.03      12.72      9.96
+>> "FUN"                        4.86     3.81       4.86      3.81
+>> "initialize"                 4.34     3.40     123.08     96.40
+>> "SpatialPixels"              3.06     2.40      96.18     75.33
+>> "aperm.default"              2.70     2.11       2.70      2.11
+>> "SpatialPoints"              2.54     1.99      49.16     38.50
+>> "gc"                         2.52     1.97       2.52      1.97
+>> ....
+>> $by.total
+>>                        total.time total.pct self.time self.pct
+>> "system.time"               127.68    100.00      0.00     0.00
+>> "readGDAL"                  127.64     99.97      0.00     0.00
+>> "new"                       123.10     96.41      0.02     0.02
+>> "initialize"                123.08     96.40      4.34     3.40
+>> "SpatialGridDataFrame"      123.04     96.37      0.00     0.00
+>> "validObject"               120.42     94.31      0.00     0.00
+>> "validityMethod"            120.30     94.22      7.24     5.67
+>> "anyStrings"                120.30     94.22      0.00     0.00
+>> "as"                        119.08     93.26      0.00     0.00
+>> "asMethod"                  119.04     93.23     10.60     8.30
+>> "SpatialPixels"              96.18     75.33      3.06     2.40
+>> "nrow"                       96.18     75.33      0.00     0.00
+>> "SpatialGrid"                59.22     46.38      0.00     0.00
+>> "SpatialPoints"              49.16     38.50      2.54     1.99
+>> "getGridIndex"               45.44     35.59     32.32    25.31
+>> "standardGeneric"            27.94     21.88      0.00     0.00
+>> "is"                         26.28     20.58      0.02     0.02
+>> ".local"                     22.92     17.95      6.40     5.01
+>> "coordinates"                22.92     17.95      0.00     0.00
+>> "do.call"                    16.48     12.91      0.00     0.00
+>> ".bboxCoords"                15.16     11.87      0.02     0.02
+>> "t"                          15.14     11.86      0.02     0.02
+>> "apply"                      15.12     11.84      7.52     5.89
+>> "expand.grid"                12.72      9.96      5.14     4.03
+>> "slot<-"                      8.64      6.77      8.50     6.66
+>> "structure"                   5.58      4.37      5.56     4.35
+>>
+>>
+>> The getGridIndex() call is particularly odd, taking 25% of execution
+>> time. I've put the Rprof file on rspatial/misc. This looks like an S4
+>> oddity to me. I can't see where the validity checks might recurse to
+>> trip calls to other classes. The validity check ought to be a
+>> no-brainer, really. I don't know when this happened, it may be caused
+>> by recent methods.
+>>
+>> Any ideas?
+>>
+>> Roger
+>>
+>>
+> 
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From edzer.pebesma at uni-muenster.de  Mon Jan 23 16:57:49 2012
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Mon, 23 Jan 2012 16:57:49 +0100
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+In-Reply-To: <alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+References: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+	<alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+Message-ID: <4F1D837D.3020906@uni-muenster.de>
+
+Agreed.
+
+I'm working on a fix where SpatialGrid no longer subclasses
+SpatialPixels (no longer "is" a SpatialPixels or SpatialPoints).
+
+I believe this is the only way, as the issue keeps coming back at
+inconvenient moments.
+
+Will try to check against all packages depending on sp. I committed to
+svn, can you run a check against ASDAR?
+
+On 01/22/2012 11:32 PM, Roger Bivand wrote:
+> With revision 1200, the same test is:
+> 
+>    user  system elapsed
+>   7.763   0.346   8.119
+> 
+> but no validity checks are done. As may be sensible, something may be
+> done about validity checking, but an order of magnitude speedup is worth
+> having, I think.
+> 
+> Roger
+> 
+> On Sun, 22 Jan 2012, Roger Bivand wrote:
+> 
+>> Hi,
+>>
+>> Working with Rainer Krug on making readRAST6() in spgrass6 faster,
+>> we've identified an issue with time wasting in creating SGDF. For
+>> 2.14.1, sp 0.9-93, rgdal 0.7-8:
+>>
+>>> Rprof("readGDAL.out")
+>>> system.time(for (i in 1:50) SP27GTIF <- 
+>> readGDAL(system.file("pictures/SP27GTIF.TIF", package = "rgdal")[1]))
+>>   user  system elapsed
+>> 122.961   4.678 131.383
+>>> Rprof("")
+>>> summaryRprof("readGDAL.out")
+>> $by.self
+>>                        self.time self.pct total.time total.pct
+>> "getGridIndex"              32.32    25.31      45.44     35.59
+>> "asMethod"                  10.60     8.30     119.04     93.23
+>> "slot<-"                     8.50     6.66       8.64      6.77
+>> "apply"                      7.52     5.89      15.12     11.84
+>> "validityMethod"             7.24     5.67     120.30     94.22
+>> ".local"                     6.40     5.01      22.92     17.95
+>> "structure"                  5.56     4.35       5.58      4.37
+>> "expand.grid"                5.14     4.03      12.72      9.96
+>> "FUN"                        4.86     3.81       4.86      3.81
+>> "initialize"                 4.34     3.40     123.08     96.40
+>> "SpatialPixels"              3.06     2.40      96.18     75.33
+>> "aperm.default"              2.70     2.11       2.70      2.11
+>> "SpatialPoints"              2.54     1.99      49.16     38.50
+>> "gc"                         2.52     1.97       2.52      1.97
+>> ....
+>> $by.total
+>>                        total.time total.pct self.time self.pct
+>> "system.time"               127.68    100.00      0.00     0.00
+>> "readGDAL"                  127.64     99.97      0.00     0.00
+>> "new"                       123.10     96.41      0.02     0.02
+>> "initialize"                123.08     96.40      4.34     3.40
+>> "SpatialGridDataFrame"      123.04     96.37      0.00     0.00
+>> "validObject"               120.42     94.31      0.00     0.00
+>> "validityMethod"            120.30     94.22      7.24     5.67
+>> "anyStrings"                120.30     94.22      0.00     0.00
+>> "as"                        119.08     93.26      0.00     0.00
+>> "asMethod"                  119.04     93.23     10.60     8.30
+>> "SpatialPixels"              96.18     75.33      3.06     2.40
+>> "nrow"                       96.18     75.33      0.00     0.00
+>> "SpatialGrid"                59.22     46.38      0.00     0.00
+>> "SpatialPoints"              49.16     38.50      2.54     1.99
+>> "getGridIndex"               45.44     35.59     32.32    25.31
+>> "standardGeneric"            27.94     21.88      0.00     0.00
+>> "is"                         26.28     20.58      0.02     0.02
+>> ".local"                     22.92     17.95      6.40     5.01
+>> "coordinates"                22.92     17.95      0.00     0.00
+>> "do.call"                    16.48     12.91      0.00     0.00
+>> ".bboxCoords"                15.16     11.87      0.02     0.02
+>> "t"                          15.14     11.86      0.02     0.02
+>> "apply"                      15.12     11.84      7.52     5.89
+>> "expand.grid"                12.72      9.96      5.14     4.03
+>> "slot<-"                      8.64      6.77      8.50     6.66
+>> "structure"                   5.58      4.37      5.56     4.35
+>>
+>>
+>> The getGridIndex() call is particularly odd, taking 25% of execution
+>> time. I've put the Rprof file on rspatial/misc. This looks like an S4
+>> oddity to me. I can't see where the validity checks might recurse to
+>> trip calls to other classes. The validity check ought to be a
+>> no-brainer, really. I don't know when this happened, it may be caused
+>> by recent methods.
+>>
+>> Any ideas?
+>>
+>> Roger
+>>
+>>
+> 
+
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From Roger.Bivand at nhh.no  Mon Jan 23 17:22:42 2012
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Mon, 23 Jan 2012 17:22:42 +0100 (CET)
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+In-Reply-To: <4F1D837D.3020906@uni-muenster.de>
+References: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+	<alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+	<4F1D837D.3020906@uni-muenster.de>
+Message-ID: <alpine.LRH.2.02.1201231703040.27306@reclus.nhh.no>
+
+On Mon, 23 Jan 2012, Edzer Pebesma wrote:
+
+> Agreed.
+>
+> I'm working on a fix where SpatialGrid no longer subclasses
+> SpatialPixels (no longer "is" a SpatialPixels or SpatialPoints).
+>
+> I believe this is the only way, as the issue keeps coming back at
+> inconvenient moments.
+>
+> Will try to check against all packages depending on sp. I committed to
+> svn, can you run a check against ASDAR?
+
+Run - three failures:
+
+cm failed at:
+
+
+> fname <- unzip(zipfile = "70042108.zip", files = "70042108.tif")
+
+> library(rgdal)
+
+> auck_el1 <- readGDAL(fname)
+./70042108.tif has GDAL driver GTiff
+and has 1200 rows and 1320 columns
+
+> load("auck_gshhs.RData")
+
+> source("legend_image.R")
+
+> class(auck_el1)
+[1] "SpatialGridDataFrame"
+attr(,"package")
+[1] "sp"
+
+> slot(auck_el1, "grid")
+                              x             y
+cellcentre.offset 1.742004e+02 -3.749958e+01
+cellsize          8.333333e-04  8.333333e-04
+cells.dim         1.320000e+03  1.200000e+03
+
+> slot(auck_el1, "grid.index")
+
+
+next, die at:
+
+
+> library(maptools)
+
+> grd <- as(meuse.grid, "SpatialPolygons")
+
+> proj4string(grd) <- CRS(proj4string(meuse))
+
+> gpclibPermit()
+[1] TRUE
+
+> require(gpclib)
+
+> IDs <- rep("x", length(slot(grd, "polygons")))
+
+> grd.union <- unionSpatialPolygons(grd, IDs)
+
+> ll <- CRS("+proj=longlat +datum=WGS84")
+
+> grd.union.ll <- spTransform(grd.union, ll)
+
+> llGRD <- GE_SpatialGrid(grd.union.ll)
+
+> llGRD_in <- overlay(llGRD$SG, grd.union.ll)
+
+(well, overlay() is still in the book ...)
+
+and sppa at:
+
+
+> splancs_ge_24 <- packageDescription("splancs")$Version >
++     "2.01-23"
+
+> if (!splancs_ge_24) idxna <- complete.cases(df0)
+
+> spkratio0 <- SpatialGridDataFrame(gt, data = df0)
+
+> spkratio <- as(spkratio0, "SpatialPixelsDataFrame")
+
+> spkratio$kratio <- spkratio$kcases/spkratio$kcontrols
+
+> is.na(spkratio$kratio) <- !is.finite(spkratio$kratio)
+
+> spkratio$logratio <- log(spkratio$kratio) - log(ncases/ncontrols)
+
+> set.seed(1234)
+
+> if (splancs_ge_24) {
++     idxinbdry <- overlay(sG, spbdry)
++     idxna <- !is.na(idxinbdry)
++ }
+
+(probably also overlay?)
+
+Roger
+
+>
+> On 01/22/2012 11:32 PM, Roger Bivand wrote:
+>> With revision 1200, the same test is:
+>>
+>>    user  system elapsed
+>>   7.763   0.346   8.119
+>>
+>> but no validity checks are done. As may be sensible, something may be
+>> done about validity checking, but an order of magnitude speedup is worth
+>> having, I think.
+>>
+>> Roger
+>>
+>> On Sun, 22 Jan 2012, Roger Bivand wrote:
+>>
+>>> Hi,
+>>>
+>>> Working with Rainer Krug on making readRAST6() in spgrass6 faster,
+>>> we've identified an issue with time wasting in creating SGDF. For
+>>> 2.14.1, sp 0.9-93, rgdal 0.7-8:
+>>>
+>>>> Rprof("readGDAL.out")
+>>>> system.time(for (i in 1:50) SP27GTIF <-
+>>> readGDAL(system.file("pictures/SP27GTIF.TIF", package = "rgdal")[1]))
+>>>   user  system elapsed
+>>> 122.961   4.678 131.383
+>>>> Rprof("")
+>>>> summaryRprof("readGDAL.out")
+>>> $by.self
+>>>                        self.time self.pct total.time total.pct
+>>> "getGridIndex"              32.32    25.31      45.44     35.59
+>>> "asMethod"                  10.60     8.30     119.04     93.23
+>>> "slot<-"                     8.50     6.66       8.64      6.77
+>>> "apply"                      7.52     5.89      15.12     11.84
+>>> "validityMethod"             7.24     5.67     120.30     94.22
+>>> ".local"                     6.40     5.01      22.92     17.95
+>>> "structure"                  5.56     4.35       5.58      4.37
+>>> "expand.grid"                5.14     4.03      12.72      9.96
+>>> "FUN"                        4.86     3.81       4.86      3.81
+>>> "initialize"                 4.34     3.40     123.08     96.40
+>>> "SpatialPixels"              3.06     2.40      96.18     75.33
+>>> "aperm.default"              2.70     2.11       2.70      2.11
+>>> "SpatialPoints"              2.54     1.99      49.16     38.50
+>>> "gc"                         2.52     1.97       2.52      1.97
+>>> ....
+>>> $by.total
+>>>                        total.time total.pct self.time self.pct
+>>> "system.time"               127.68    100.00      0.00     0.00
+>>> "readGDAL"                  127.64     99.97      0.00     0.00
+>>> "new"                       123.10     96.41      0.02     0.02
+>>> "initialize"                123.08     96.40      4.34     3.40
+>>> "SpatialGridDataFrame"      123.04     96.37      0.00     0.00
+>>> "validObject"               120.42     94.31      0.00     0.00
+>>> "validityMethod"            120.30     94.22      7.24     5.67
+>>> "anyStrings"                120.30     94.22      0.00     0.00
+>>> "as"                        119.08     93.26      0.00     0.00
+>>> "asMethod"                  119.04     93.23     10.60     8.30
+>>> "SpatialPixels"              96.18     75.33      3.06     2.40
+>>> "nrow"                       96.18     75.33      0.00     0.00
+>>> "SpatialGrid"                59.22     46.38      0.00     0.00
+>>> "SpatialPoints"              49.16     38.50      2.54     1.99
+>>> "getGridIndex"               45.44     35.59     32.32    25.31
+>>> "standardGeneric"            27.94     21.88      0.00     0.00
+>>> "is"                         26.28     20.58      0.02     0.02
+>>> ".local"                     22.92     17.95      6.40     5.01
+>>> "coordinates"                22.92     17.95      0.00     0.00
+>>> "do.call"                    16.48     12.91      0.00     0.00
+>>> ".bboxCoords"                15.16     11.87      0.02     0.02
+>>> "t"                          15.14     11.86      0.02     0.02
+>>> "apply"                      15.12     11.84      7.52     5.89
+>>> "expand.grid"                12.72      9.96      5.14     4.03
+>>> "slot<-"                      8.64      6.77      8.50     6.66
+>>> "structure"                   5.58      4.37      5.56     4.35
+>>>
+>>>
+>>> The getGridIndex() call is particularly odd, taking 25% of execution
+>>> time. I've put the Rprof file on rspatial/misc. This looks like an S4
+>>> oddity to me. I can't see where the validity checks might recurse to
+>>> trip calls to other classes. The validity check ought to be a
+>>> no-brainer, really. I don't know when this happened, it may be caused
+>>> by recent methods.
+>>>
+>>> Any ideas?
+>>>
+>>> Roger
+>>>
+>>>
+>>
+>
+>
+
+-- 
+Roger Bivand
+Department of Economics, NHH Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 95 43
+e-mail: Roger.Bivand at nhh.no
+
+
+From edzer.pebesma at uni-muenster.de  Mon Jan 23 19:30:25 2012
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Mon, 23 Jan 2012 19:30:25 +0100
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+In-Reply-To: <alpine.LRH.2.02.1201231703040.27306@reclus.nhh.no>
+References: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+	<alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+	<4F1D837D.3020906@uni-muenster.de>
+	<alpine.LRH.2.02.1201231703040.27306@reclus.nhh.no>
+Message-ID: <4F1DA741.3020902@uni-muenster.de>
+
+
+
+On 01/23/2012 05:22 PM, Roger Bivand wrote:
+> 
+>> slot(auck_el1, "grid.index") 
+
+This one will remain, as I removed slot grid.index from SpatialGrid.
+
+The other two should be gone now, I committed overlay() methods for
+SpatialGrid*.
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From Roger.Bivand at nhh.no  Mon Jan 23 22:49:26 2012
+From: Roger.Bivand at nhh.no (Roger Bivand)
+Date: Mon, 23 Jan 2012 22:49:26 +0100 (CET)
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+In-Reply-To: <4F1DA741.3020902@uni-muenster.de>
+References: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+	<alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+	<4F1D837D.3020906@uni-muenster.de>
+	<alpine.LRH.2.02.1201231703040.27306@reclus.nhh.no>
+	<4F1DA741.3020902@uni-muenster.de>
+Message-ID: <alpine.LRH.2.02.1201232246510.29658@reclus.nhh.no>
+
+On Mon, 23 Jan 2012, Edzer Pebesma wrote:
+
+>
+>
+> On 01/23/2012 05:22 PM, Roger Bivand wrote:
+>>
+>>> slot(auck_el1, "grid.index")
+>
+> This one will remain, as I removed slot grid.index from SpatialGrid.
+
+Yes cm:
+
+
+> slot(auck_el1, "grid")
+                              x             y
+cellcentre.offset 1.742004e+02 -3.749958e+01
+cellsize          8.333333e-04  8.333333e-04
+cells.dim         1.320000e+03  1.200000e+03
+
+> slot(auck_el1, "grid.index")
+
+still there. Otherwise OK in sppa and die.
+
+I'll fix the book code and post an erratum when we go for release. Will 
+removing the grid.index break code? For example the GDAL R driver??
+
+Roger
+
+
+
+>
+> The other two should be gone now, I committed overlay() methods for
+> SpatialGrid*.
+>
+
+-- 
+Roger Bivand
+Department of Economics, NHH Norwegian School of Economics,
+Helleveien 30, N-5045 Bergen, Norway.
+voice: +47 55 95 93 55; fax +47 55 95 95 43
+e-mail: Roger.Bivand at nhh.no
+
+
+From edzer.pebesma at uni-muenster.de  Mon Jan 23 22:56:35 2012
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Mon, 23 Jan 2012 22:56:35 +0100
+Subject: [Rspatial-devel] new("SpatialGridDataFrame") time issue
+In-Reply-To: <alpine.LRH.2.02.1201232246510.29658@reclus.nhh.no>
+References: <alpine.LRH.2.02.1201222107130.22563@reclus.nhh.no>
+	<alpine.LRH.2.02.1201222330120.22927@reclus.nhh.no>
+	<4F1D837D.3020906@uni-muenster.de>
+	<alpine.LRH.2.02.1201231703040.27306@reclus.nhh.no>
+	<4F1DA741.3020902@uni-muenster.de>
+	<alpine.LRH.2.02.1201232246510.29658@reclus.nhh.no>
+Message-ID: <4F1DD793.5010803@uni-muenster.de>
+
+
+
+On 01/23/2012 10:49 PM, Roger Bivand wrote:
+> Will removing the grid.index break code?
+
+I'm trying to find out.
+
+Reading saved .RData files with old-style objects seems not to be a
+problem with the new code (only coords and grid.index slots were removed).
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+
+From edzer.pebesma at uni-muenster.de  Tue Jan 31 20:57:15 2012
+From: edzer.pebesma at uni-muenster.de (Edzer Pebesma)
+Date: Tue, 31 Jan 2012 20:57:15 +0100
+Subject: [Rspatial-devel] sp_0.9-94.tar.gz
+Message-ID: <4F28479B.3000005@uni-muenster.de>
+
+CRAN masters,
+
+I uploaded sp_0.9-94.tar.gz to /incoming on CRAN.
+
+I checked it succesfully against 78 out of the 86 packages that depend
+on sp (thanks to Uwe's help with the script); the others 6 I couldn't
+check because of other complex dependencies, too complex for me.
+
+The major change is that to class SpatialGrid, which no longer is() a
+SpatialPixels, but needs explicit coercion to become so.
+
+Best regards,
+-- 
+Edzer Pebesma
+Institute for Geoinformatics (ifgi), University of M?nster
+Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251
+8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de
+http://www.52north.org/geostatistics      e.pebesma at wwu.de
+

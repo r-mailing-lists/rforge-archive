@@ -1,0 +1,159 @@
+From michael.fontaine at u-psud.fr  Mon Dec  1 14:20:01 2008
+From: michael.fontaine at u-psud.fr (Michael C Fontaine)
+Date: Mon, 1 Dec 2008 14:20:01 +0100
+Subject: [adegenet-forum] importing annex information within the Genind
+	object (@other)
+Message-ID: <95CB9577-0575-44E1-9031-8D3847D91F6C@u-psud.fr>
+
+Dear Thibaut,
+
+I am Micha?l, I have a problem with Adegenet when I want to import my  
+dataset from a data.frame. The problematic point is to import annex  
+information within the Genind object. I am not very use to that kind  
+of object. Specifically my data are imported in R as a data.frame  
+( read.table() ), and I would like to add information within the  
+Genind object, such as the population, the geographic coordinates, and  
+other factors, such as the year.
+
+Here is an example of the kind of script I am using:
+
+> #My data
+> ampelo_gp<- cbind(AQmalus3, AQmalus4, AQmalus8, AQmalus10, AQmalus11)
+> head(ampelo_gp)
+> ampelo_ID <- cbind(ID, DNAsamples,Populations,X,Y, Country, Year)
+> head(ampelo_ID)
+>
+> #the Genind object
+> amp_ade <- df2genind(X=ampelo_gp, ind.names=ID, pop=Populations,  
+> ploidy=1)
+> amp_ade at pop=Populations    #it works, but is this the best way to  
+> proceed?
+>
+> #here I am trying to add annex information in the  class @other est  
+> d?finie comme NULL.
+> amp_ade at other@xy=cbind(X,Y)
+> amp_ade at other@coutry=Country
+Here this doesn't work, R return that "amp_ade at other" is defined as  
+NULL.
+How can I  import these information within the @other?
+
+Thank you in advance for your answer,
+All the best,
+Micha?l
+--
+Michael C. Fontaine
+
+PostDoc
+UMR CNRS/Universite Paris Sud/AgroParisTech 8079
+Universite Paris-Sud, Batiment 360
+F-91405 Orsay cedex
+FRANCE
+Phone +33169155662
+Fax +33169154697
+E-Mail: michael.fontaine at u-psud.fr
+Personal webpage: http://users.skynet.be/fb683753/michaelcfontaine/Home.html
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20081201/2b6678a8/attachment.htm 
+
+From jombart at biomserv.univ-lyon1.fr  Mon Dec  1 14:57:44 2008
+From: jombart at biomserv.univ-lyon1.fr (Thibaut Jombart)
+Date: Mon, 01 Dec 2008 14:57:44 +0100
+Subject: [adegenet-forum] importing annex information within the Genind
+ object (@other)
+In-Reply-To: <95CB9577-0575-44E1-9031-8D3847D91F6C@u-psud.fr>
+References: <95CB9577-0575-44E1-9031-8D3847D91F6C@u-psud.fr>
+Message-ID: <4933ED58.2090703@biomserv.univ-lyon1.fr>
+
+Hi Micha?l,
+
+This question is quite common, so thanks for your post. Miscellanous 
+information can be stored inside the @other slot of genind/genpop 
+objects. If there is a single population factor, it is better to have it 
+stored in @pop, since this will be used automatically by several 
+functions. The same is true for spatial coordinates, expected to be in 
+@other$xy.
+> Dear Thibaut,
+>
+> I am Micha?l, I have a problem with Adegenet when I want to import my 
+> dataset from a data.frame. The problematic point is to import annex 
+> information within the Genind object. I am not very use to that kind 
+> of object. Specifically my data are imported in R as a data.frame ( 
+> read.table() ), and I would like to add information within the Genind 
+> object, such as the population, the geographic coordinates, and other 
+> factors, such as the year.
+>
+> Here is an example of the kind of script I am using:
+>
+>> #My data
+>> ampelo_gp<- cbind(AQmalus3, AQmalus4, AQmalus8, AQmalus10, AQmalus11)
+>> head(ampelo_gp)
+>> ampelo_ID <- cbind(ID, DNAsamples,Populations,X,Y, Country, Year)
+>> head(ampelo_ID)
+>>
+>> #the Genind object
+>> amp_ade <- df2genind(X=ampelo_gp, ind.names=ID, pop=Populations, 
+>> ploidy=1)
+>> amp_ade at pop=Populations    #it works, but is this the best way to 
+>> proceed?
+>>
+>> #here I am trying to add annex information in the  class @other est 
+>> d?finie comme NULL.
+>> amp_ade at other@xy=cbind(X,Y)
+>> amp_ade at other@coutry=Country
+> Here this doesn't work, R return that "amp_ade at other" is defined as NULL.
+> How can I  import these information within the @other?
+>
+What is tricky here is that there is a mix between S4 object, whose 
+slots are accessed by '@', and a S3 object (a list), accessed using '$'. 
+For instance:
+##
+ > example(df2genind)
+ > obj at other
+NULL
+##
+to add smthg to obj, the right use is:
+##
+ > obj at other$foo <- "Here is a component of the list 'other'"
+ > obj at other
+$foo
+[1] "Here is a component of the list 'other'"
+class(obj at other)
+##
+
+- obj at other refers to a slot called 'other' of an S4 object
+- obj at other$foo is a component of the list 'obj at other'.
+
+Note that in adegenet, there is an emulation of @ into $, so you can 
+just use $ everywhere:
+##
+ > obj$other$toto <- "yop yop yop"
+ > obj$other
+$foo
+[1] "Here is a component of the list 'other'"
+
+$toto
+[1] "yop yop yop"
+
+ > identical(obj$other, obj at other)
+[1] TRUE
+##
+
+Best regards,
+
+Thibaut.
+
+-- 
+######################################
+Dr Thibaut JOMBART
+CNRS UMR 5558 - Laboratoire de Biom?trie et Biologie Evolutive
+Universite Lyon 1
+43 bd du 11 novembre 1918
+69622 Villeurbanne Cedex
+T?l. : 04.72.43.29.35
+Fax : 04.72.43.13.88
+jombart at biomserv.univ-lyon1.fr
+http://biomserv.univ-lyon1.fr/%7Ejombart/
+http://adegenet.r-forge.r-project.org/
+

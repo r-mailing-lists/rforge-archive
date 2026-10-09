@@ -1,0 +1,1097 @@
+From peter.rooney at blueyonder.co.uk  Mon Feb  3 02:50:13 2014
+From: peter.rooney at blueyonder.co.uk (Peter)
+Date: Mon, 3 Feb 2014 01:50:13 -0000
+Subject: [adegenet-forum] Distance patches in data
+Message-ID: <000001cf2082$479afa50$d6d0eef0$@blueyonder.co.uk>
+
+Hi,
+
+ 
+
+I'm very new to adegenet, and trying to determine if it is sensible to
+create a distance matrix from a neighbour joining tree (njt) for
+correspondence analysis with a genetic matrix.  I couldn't find any
+information on this from a search of the archives.  
+
+ 
+
+I have created a neighbour joining tree and then used it in an sPCA as
+follows:
+
+ 
+
+njt <- chooseCN(myind at other$xy,ask=FALSE,type=4) #create njt from xy
+
+njt_ed<-edit.nb(njt,myind at other$xy,polys=rb_polys) #edit njt to insert
+"barriers", creates a "forest"
+
+myspca<-spca(myind, cn=njt_ed, scale=TRUE, type=1, plot.nb=TRUE, nfposi=40,
+nfnega=40, ask=FALSE, scannf=FALSE)
+
+ 
+
+I can now create a genetic distance matrix from the microsatellite data:
+
+dg<-dist(myind$tab)
+
+ 
+
+However, I don't know how to create a distance matrix for the individuals
+based on the edited neighbour joining tree, rather than the xy coordinates
+(as in the tutorial) or the results of the sPCA which also represent genetic
+variation.  I want to compare distances for individuals based on the njt
+"forest", so that I can compare them, e.g.:
+
+ 
+
+plot(dg,?? geographic distance matrix using njt ??)
+
+ 
+
+Perhaps it would be more sensible to use a different type of connection
+network?
+
+ 
+
+If anyone can help I'd be very grateful, thanks.
+
+ 
+
+Peter
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20140203/31756b70/attachment.html>
+
+From t.jombart at imperial.ac.uk  Wed Feb  5 13:09:11 2014
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Wed, 5 Feb 2014 12:09:11 +0000
+Subject: [adegenet-forum] Cluster specific alleles
+In-Reply-To: <OFA86502F3.408C5EDD-ONC1257C71.0036FD80-C1257C71.0036FD88@wsl.ch>
+References: <OFA86502F3.408C5EDD-ONC1257C71.0036FD80-C1257C71.0036FD88@wsl.ch>
+Message-ID: <2CB2DA8E426F3541AB1907F98ABA657075F4F032@icexch-m1.ic.ac.uk>
+
+Dear Mich?le, 
+
+sorry about the late reply - just coming back from a workshop. 
+You can find the most contributing alleles using the loadingplot (see vignette on DAPC, p.17 and further). However, this will only tell you which alleles allow to discriminate the groups, without telling you which allele precisely belongs to which group. Further analysis is needed, but here is an example. 
+
+### R code ###
+## generate DAPC example
+library(adegenet)
+example(dapc)
+scatter(dapc1) # this example uses 'microbov' - cattle microsat dataset
+
+## visualize variable contributions
+loadingplot(dapc1$var.contr)
+x <- loadingplot(dapc1$var.contr, thres=.02) # thresold defined based on previous plot
+
+## list most contributing variables
+x
+
+## get table of allele frequencies for the selected alleles
+tab <- apply(truenames(microbov)$tab[, x$var.names],2, function(e) tapply(e, pop(microbov), mean,na.rm=TRUE)) # replace 'microbov' by your dataset
+
+## visualize this table
+table.value(tab, col.lab=colnames(tab))
+
+### end R code ###
+
+Here you can see that some of the alleles discriminate two large taxonomic groups (Bos taurus vs Bos indicus) but some are also more specific, e.g. CSRM60.093
+
+Best
+Thibaut
+
+--
+######################################
+Dr Thibaut JOMBART
+MRC Centre for Outbreak Analysis and Modelling
+Department of Infectious Disease Epidemiology
+Imperial College - School of Public Health
+St Mary?s Campus
+Norfolk Place
+London W2 1PG
+United Kingdom
+Tel. : 0044 (0)20 7594 3658
+t.jombart at imperial.ac.uk
+http://sites.google.com/site/thibautjombart/
+http://adegenet.r-forge.r-project.org/
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of michele.lerch at wsl.ch [michele.lerch at wsl.ch]
+Sent: 31 January 2014 10:00
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] Cluster specific alleles
+
+Hello,
+
+I have a question concerning DAPC. I would like to know which alleles are characheristic to which cluster. How can I get this information?
+Thanks for your answer,
+Mich?le
+
+From t.jombart at imperial.ac.uk  Wed Feb  5 13:27:53 2014
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Wed, 5 Feb 2014 12:27:53 +0000
+Subject: [adegenet-forum] Distance patches in data
+In-Reply-To: <000001cf2082$479afa50$d6d0eef0$@blueyonder.co.uk>
+References: <000001cf2082$479afa50$d6d0eef0$@blueyonder.co.uk>
+Message-ID: <2CB2DA8E426F3541AB1907F98ABA657075F4F04E@icexch-m1.ic.ac.uk>
+
+Hello, 
+
+again, sorry about the late reply. 
+What you describe makes sense - it is a Mantel test using an unorthodox measure of geographic distance. Because this distance is binary (neighbour/not neighbour), it is also the AMOVA of your distance matrix using neighbourhood definition as a grouping factor for each pairwise distance comparison. 
+
+The only trick is that you want to convert your standardized list of spatial weights (decimal numbers between 0 and 1 reflecting geographic proximities)  into a binary matrix of distances.
+Here's an example of how to do it:
+### 
+
+## get the spatial distance
+data(sim2pop)
+cn <- chooseCN(sim2pop$other$xy, type=2)
+matgeo <- as.dist(1*(!nb2mat(cn)>1e-14))
+
+## compare these distances with genetic distances
+library(ggplot2)
+x <- data.frame(geo=as.vector(matgeo), genet=as.vector(dist(sim2pop$tab))) # 
+head(x) # both distance measures
+boxplot(x$genet~x$geo) # distances are marginally greater in non-neighbours
+
+
+## using ggplot2 for fancier plots
+p <- ggplot(x, aes(x=factor(geo),y=genet)) 
+p + geom_boxplot() # boxplot
+p + geom_violin(alpha=.4) # better: violinplot
+
+###
+
+However, the weakness of the result here with sim2pop shows that this approach is not the best for testing structures.
+Cheers
+Thibaut
+
+--
+######################################
+Dr Thibaut JOMBART
+MRC Centre for Outbreak Analysis and Modelling
+Department of Infectious Disease Epidemiology
+Imperial College - School of Public Health
+St Mary?s Campus
+Norfolk Place
+London W2 1PG
+United Kingdom
+Tel. : 0044 (0)20 7594 3658
+t.jombart at imperial.ac.uk
+http://sites.google.com/site/thibautjombart/
+http://adegenet.r-forge.r-project.org/
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Peter [peter.rooney at blueyonder.co.uk]
+Sent: 03 February 2014 01:50
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] Distance patches in data
+
+Hi,
+
+I?m very new to adegenet, and trying to determine if it is sensible to create a distance matrix from a neighbour joining tree (njt) for correspondence analysis with a genetic matrix.  I couldn?t find any information on this from a search of the archives.
+
+I have created a neighbour joining tree and then used it in an sPCA as follows:
+
+njt <- chooseCN(myind at other$xy,ask=FALSE,type=4) #create njt from xy
+njt_ed<-edit.nb(njt,myind at other$xy,polys=rb_polys) #edit njt to insert ?barriers?, creates a ?forest?
+myspca<-spca(myind, cn=njt_ed, scale=TRUE, type=1, plot.nb=TRUE, nfposi=40, nfnega=40, ask=FALSE, scannf=FALSE)
+
+I can now create a genetic distance matrix from the microsatellite data:
+dg<-dist(myind$tab)
+
+However, I don?t know how to create a distance matrix for the individuals based on the edited neighbour joining tree, rather than the xy coordinates (as in the tutorial) or the results of the sPCA which also represent genetic variation.  I want to compare distances for individuals based on the njt ?forest?, so that I can compare them, e.g.:
+
+plot(dg,?? geographic distance matrix using njt ??)
+
+Perhaps it would be more sensible to use a different type of connection network?
+
+If anyone can help I?d be very grateful, thanks.
+
+Peter
+
+From peter.bulli at wsu.edu  Thu Feb  6 04:18:57 2014
+From: peter.bulli at wsu.edu (Bulli, Peter)
+Date: Thu, 6 Feb 2014 03:18:57 +0000
+Subject: [adegenet-forum] Trouble reading data
+Message-ID: <98752BB75D014940BFDCB379F959823F189463@EXMB-05.ad.wsu.edu>
+
+Hello everybody,
+
+
+
+This is my first post to the mailing list although I've spent some time scanning through posts on specific subjects/topics. However, I still found myself having a problem, and it has to do with reading my data into the R for "structure" DAPC analysis using "adegenet". I would greatly appreciate if anyone can help me out My data has 983 individuals labeled individuals in the first column, followed by population groups in the 2nd column, and columns of 548 SNP markers. I have attached a sample file of 10 individuals (1st column), the population groupings (2nd column)  and 10 SNP markers so you can have an idea of the data format I used.
+
+
+
+For the 983 individuals and the 548 SNP markers, I used the following codes and got the following error messages when trying to read my data into R:
+
+> setwd("c:\\myDAPC")
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", header=TRUE)
+Error in scan(file, what, nmax, sep, dec, quote, skip, nlines, na.strings,  :
+  line 680 did not have 550 elements
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", na.strings="NA", sep="|", header=TRUE)
+Error in read.table("c:\\myDAPC\\data02052014.txt", na.strings = "NA",  :
+  more columns than column names
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", na.strings="NA", sep="|", rows=1, col.lab=1, col.pop=2, header=TRUE)
+Error in read.table("c:\\myDAPC\\data02052014.txt", na.strings = "NA",  :
+  unused arguments (rows = 1, col.lab = 1, col.pop = 2)
+>
+
+
+
+For the test sample data of 10 individuals and 10 SNP markers below is an error message and a code that seems to have worked:
+
+
+
+> datadata <- read.table("c:\\myDAPC\\testdata.txt", na.strings="NA", sep="|", header=TRUE)
+Error in read.table("c:\\myDAPC\\testdata.txt", na.strings = "NA", sep = "|",  :
+  more columns than column names
+
+
+
+> data <- read.table("c:\\myDAPC\\testdata.txt", header=TRUE)
+> data
+    geno  pop    M1    M2    M3    M4    M5    M6    M7    M8    M9   M10
+1   Ind1 pop1 44|44 44|44 22|22 33|33 33|33 22|22 22|22 11|11 11|11  <NA>
+2   Ind2 pop1 44|44 44|44 44|44 33|33 33|33 22|22 22|22 11|11 22|22 11|11
+3   Ind3 pop2 44|44 44|44 44|44 33|33 11|11 44|44 44|44 33|33 11|11 33|33
+4   Ind4 pop2 44|44 22|22 22|22 33|33 33|33 22|22 22|22 33|33 22|22 11|11
+5   Ind5 pop2 44|44 44|44 22|22 44|44 33|33 22|22 44|44 11|11 22|22 11|11
+6   Ind6 pop3 44|44 22|22 22|22  <NA> 33|33 22|22 22|22 11|11 11|11 11|11
+7   Ind7 pop3 44|44 22|22 22|22 33|33 11|11 22|22 44|44 11|11 22|22 11|11
+8   Ind8 pop3 44|44 44|44 44|44 44|44 33|33 22|22 22|22 11|11 11|11 33|33
+9   Ind9 pop4 44|44 22|22 22|22 44|44 11|11 44|44 22|22 33|33 11|11 11|11
+10 Ind10 pop4 44|44 44|44 44|44 44|44 33|33 22|22 22|22 11|11 11|11 33|33
+
+
+
+The last part for the sample data seems to be working. But the same code doesn't work for when the data of the 983 individuals grouped into 6 populations, and genotyped with 548 SNP markers is used.
+
+
+
+Any help that will enable me get started with the "DAPC" analyses for the input data of 983 individuals that are grouped into 6 populations, and genotyped with 548 SNP markers would be highly appreciated.
+
+
+
+Thank you for your time and help.
+
+
+
+
+
+Peter
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20140206/4f3e9c3a/attachment.html>
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: testdata.txt
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20140206/4f3e9c3a/attachment.txt>
+
+From t.jombart at imperial.ac.uk  Thu Feb  6 15:43:40 2014
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Thu, 6 Feb 2014 14:43:40 +0000
+Subject: [adegenet-forum] Trouble reading data
+In-Reply-To: <98752BB75D014940BFDCB379F959823F189463@EXMB-05.ad.wsu.edu>
+References: <98752BB75D014940BFDCB379F959823F189463@EXMB-05.ad.wsu.edu>
+Message-ID: <2CB2DA8E426F3541AB1907F98ABA657075F50890@icexch-m1.ic.ac.uk>
+
+
+Hi there, 
+
+you're close, but there's a non-trivial glitch with using "|" as a separator. As it is a special character, regular expressions used to process the file need it to be within "[]":
+
+#### start R code
+> library(adegenet)
+
+## read the data table
+> tab <- read.table("testdata.txt", header=TRUE)
+> head(tab)
+  geno  pop    M1    M2    M3    M4    M5    M6    M7    M8    M9   M10
+1 Ind1 pop1 44|44 44|44 22|22 33|33 33|33 22|22 22|22 11|11 11|11  <NA>
+2 Ind2 pop1 44|44 44|44 44|44 33|33 33|33 22|22 22|22 11|11 22|22 11|11
+3 Ind3 pop2 44|44 44|44 44|44 33|33 11|11 44|44 44|44 33|33 11|11 33|33
+4 Ind4 pop2 44|44 22|22 22|22 33|33 33|33 22|22 22|22 33|33 22|22 11|11
+5 Ind5 pop2 44|44 44|44 22|22 44|44 33|33 22|22 44|44 11|11 22|22 11|11
+6 Ind6 pop3 44|44 22|22 22|22  <NA> 33|33 22|22 22|22 11|11 11|11 11|11
+
+## convert to genind
+> x <- df2genind(tab[,-(1:2)], ind.names=tab$geno, pop=tab$pop, sep="[|]")
+
+## check conversion by reverting back to table
+> genind2df(x,sep="/")
+       pop    M1    M2    M3    M4    M5    M6    M7    M8    M9   M10
+Ind1  pop1 44/44 44/44 22/22 33/33 33/33 22/22 22/22 11/11 11/11  <NA>
+Ind2  pop1 44/44 44/44 44/44 33/33 33/33 22/22 22/22 11/11 22/22 11/11
+Ind3  pop2 44/44 44/44 44/44 33/33 11/11 44/44 44/44 33/33 11/11 33/33
+Ind4  pop2 44/44 22/22 22/22 33/33 33/33 22/22 22/22 33/33 22/22 11/11
+Ind5  pop2 44/44 44/44 22/22 44/44 33/33 22/22 44/44 11/11 22/22 11/11
+Ind6  pop3 44/44 22/22 22/22  <NA> 33/33 22/22 22/22 11/11 11/11 11/11
+Ind7  pop3 44/44 22/22 22/22 33/33 11/11 22/22 44/44 11/11 22/22 11/11
+Ind8  pop3 44/44 44/44 44/44 44/44 33/33 22/22 22/22 11/11 11/11 33/33
+Ind9  pop4 44/44 22/22 22/22 44/44 11/11 44/44 22/22 33/33 11/11 11/11
+Ind10 pop4 44/44 44/44 44/44 44/44 33/33 22/22 22/22 11/11 11/11 33/33
+
+#### end R code
+
+And you can now run DAPC on your dataset "x", alongside any other analysis using genind objects as inputs.
+
+Best
+Thibaut
+
+--
+######################################
+Dr Thibaut JOMBART
+MRC Centre for Outbreak Analysis and Modelling
+Department of Infectious Disease Epidemiology
+Imperial College - School of Public Health
+St Mary?s Campus
+Norfolk Place
+London W2 1PG
+United Kingdom
+Tel. : 0044 (0)20 7594 3658
+t.jombart at imperial.ac.uk
+http://sites.google.com/site/thibautjombart/
+http://adegenet.r-forge.r-project.org/
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Bulli, Peter [peter.bulli at wsu.edu]
+Sent: 06 February 2014 03:18
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: Re: [adegenet-forum] Trouble reading data
+
+Hello everybody,
+
+
+
+This is my first post to the mailing list although I've spent some time scanning through posts on specific subjects/topics. However, I still found myself having a problem, and it has to do with reading my data into the R for "structure" DAPC analysis using "adegenet". I would greatly appreciate if anyone can help me out My data has 983 individuals labeled individuals in the first column, followed by population groups in the 2nd column, and columns of 548 SNP markers. I have attached a sample file of 10 individuals (1st column), the population groupings (2nd column)  and 10 SNP markers so you can have an idea of the data format I used.
+
+
+
+For the 983 individuals and the 548 SNP markers, I used the following codes and got the following error messages when trying to read my data into R:
+
+> setwd("c:\\myDAPC")
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", header=TRUE)
+Error in scan(file, what, nmax, sep, dec, quote, skip, nlines, na.strings,  :
+  line 680 did not have 550 elements
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", na.strings="NA", sep="|", header=TRUE)
+Error in read.table("c:\\myDAPC\\data02052014.txt", na.strings = "NA",  :
+  more columns than column names
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", na.strings="NA", sep="|", rows=1, col.lab=1, col.pop=2, header=TRUE)
+Error in read.table("c:\\myDAPC\\data02052014.txt", na.strings = "NA",  :
+  unused arguments (rows = 1, col.lab = 1, col.pop = 2)
+>
+
+
+
+For the test sample data of 10 individuals and 10 SNP markers below is an error message and a code that seems to have worked:
+
+
+
+> datadata <- read.table("c:\\myDAPC\\testdata.txt", na.strings="NA", sep="|", header=TRUE)
+Error in read.table("c:\\myDAPC\\testdata.txt", na.strings = "NA", sep = "|",  :
+  more columns than column names
+
+
+
+> data <- read.table("c:\\myDAPC\\testdata.txt", header=TRUE)
+> data
+    geno  pop    M1    M2    M3    M4    M5    M6    M7    M8    M9   M10
+1   Ind1 pop1 44|44 44|44 22|22 33|33 33|33 22|22 22|22 11|11 11|11  <NA>
+2   Ind2 pop1 44|44 44|44 44|44 33|33 33|33 22|22 22|22 11|11 22|22 11|11
+3   Ind3 pop2 44|44 44|44 44|44 33|33 11|11 44|44 44|44 33|33 11|11 33|33
+4   Ind4 pop2 44|44 22|22 22|22 33|33 33|33 22|22 22|22 33|33 22|22 11|11
+5   Ind5 pop2 44|44 44|44 22|22 44|44 33|33 22|22 44|44 11|11 22|22 11|11
+6   Ind6 pop3 44|44 22|22 22|22  <NA> 33|33 22|22 22|22 11|11 11|11 11|11
+7   Ind7 pop3 44|44 22|22 22|22 33|33 11|11 22|22 44|44 11|11 22|22 11|11
+8   Ind8 pop3 44|44 44|44 44|44 44|44 33|33 22|22 22|22 11|11 11|11 33|33
+9   Ind9 pop4 44|44 22|22 22|22 44|44 11|11 44|44 22|22 33|33 11|11 11|11
+10 Ind10 pop4 44|44 44|44 44|44 44|44 33|33 22|22 22|22 11|11 11|11 33|33
+
+
+
+The last part for the sample data seems to be working. But the same code doesn't work for when the data of the 983 individuals grouped into 6 populations, and genotyped with 548 SNP markers is used.
+
+
+
+Any help that will enable me get started with the "DAPC" analyses for the input data of 983 individuals that are grouped into 6 populations, and genotyped with 548 SNP markers would be highly appreciated.
+
+
+
+Thank you for your time and help.
+
+
+
+
+
+Peter
+
+
+
+
+
+From peter.bulli at wsu.edu  Thu Feb  6 20:09:59 2014
+From: peter.bulli at wsu.edu (Bulli, Peter)
+Date: Thu, 6 Feb 2014 19:09:59 +0000
+Subject: [adegenet-forum] Trouble reading data
+In-Reply-To: <2CB2DA8E426F3541AB1907F98ABA657075F50890@icexch-m1.ic.ac.uk>
+References: <98752BB75D014940BFDCB379F959823F189463@EXMB-05.ad.wsu.edu>,
+ <2CB2DA8E426F3541AB1907F98ABA657075F50890@icexch-m1.ic.ac.uk>
+Message-ID: <98752BB75D014940BFDCB379F959823F189503@EXMB-05.ad.wsu.edu>
+
+Thanks Thibaut for the help. I am finally able to get it running with my data of 983 individuals and 548 SNPs after making changes based on your suggestions. I will get back to you with specific questions in case I ran into some trouble. 
+
+Again - thanks a lot for the help.
+
+Peter
+
+________________________________________
+From: Jombart, Thibaut [t.jombart at imperial.ac.uk]
+Sent: Thursday, February 06, 2014 6:43 AM
+To: Bulli, Peter; adegenet-forum at lists.r-forge.r-project.org
+Subject: RE: Trouble reading data
+
+Hi there,
+
+you're close, but there's a non-trivial glitch with using "|" as a separator. As it is a special character, regular expressions used to process the file need it to be within "[]":
+
+#### start R code
+> library(adegenet)
+
+## read the data table
+> tab <- read.table("testdata.txt", header=TRUE)
+> head(tab)
+  geno  pop    M1    M2    M3    M4    M5    M6    M7    M8    M9   M10
+1 Ind1 pop1 44|44 44|44 22|22 33|33 33|33 22|22 22|22 11|11 11|11  <NA>
+2 Ind2 pop1 44|44 44|44 44|44 33|33 33|33 22|22 22|22 11|11 22|22 11|11
+3 Ind3 pop2 44|44 44|44 44|44 33|33 11|11 44|44 44|44 33|33 11|11 33|33
+4 Ind4 pop2 44|44 22|22 22|22 33|33 33|33 22|22 22|22 33|33 22|22 11|11
+5 Ind5 pop2 44|44 44|44 22|22 44|44 33|33 22|22 44|44 11|11 22|22 11|11
+6 Ind6 pop3 44|44 22|22 22|22  <NA> 33|33 22|22 22|22 11|11 11|11 11|11
+
+## convert to genind
+> x <- df2genind(tab[,-(1:2)], ind.names=tab$geno, pop=tab$pop, sep="[|]")
+
+## check conversion by reverting back to table
+> genind2df(x,sep="/")
+       pop    M1    M2    M3    M4    M5    M6    M7    M8    M9   M10
+Ind1  pop1 44/44 44/44 22/22 33/33 33/33 22/22 22/22 11/11 11/11  <NA>
+Ind2  pop1 44/44 44/44 44/44 33/33 33/33 22/22 22/22 11/11 22/22 11/11
+Ind3  pop2 44/44 44/44 44/44 33/33 11/11 44/44 44/44 33/33 11/11 33/33
+Ind4  pop2 44/44 22/22 22/22 33/33 33/33 22/22 22/22 33/33 22/22 11/11
+Ind5  pop2 44/44 44/44 22/22 44/44 33/33 22/22 44/44 11/11 22/22 11/11
+Ind6  pop3 44/44 22/22 22/22  <NA> 33/33 22/22 22/22 11/11 11/11 11/11
+Ind7  pop3 44/44 22/22 22/22 33/33 11/11 22/22 44/44 11/11 22/22 11/11
+Ind8  pop3 44/44 44/44 44/44 44/44 33/33 22/22 22/22 11/11 11/11 33/33
+Ind9  pop4 44/44 22/22 22/22 44/44 11/11 44/44 22/22 33/33 11/11 11/11
+Ind10 pop4 44/44 44/44 44/44 44/44 33/33 22/22 22/22 11/11 11/11 33/33
+
+#### end R code
+
+And you can now run DAPC on your dataset "x", alongside any other analysis using genind objects as inputs.
+
+Best
+Thibaut
+
+--
+######################################
+Dr Thibaut JOMBART
+MRC Centre for Outbreak Analysis and Modelling
+Department of Infectious Disease Epidemiology
+Imperial College - School of Public Health
+St Mary?s Campus
+Norfolk Place
+London W2 1PG
+United Kingdom
+Tel. : 0044 (0)20 7594 3658
+t.jombart at imperial.ac.uk
+http://sites.google.com/site/thibautjombart/
+http://adegenet.r-forge.r-project.org/
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Bulli, Peter [peter.bulli at wsu.edu]
+Sent: 06 February 2014 03:18
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: Re: [adegenet-forum] Trouble reading data
+
+Hello everybody,
+
+
+
+This is my first post to the mailing list although I've spent some time scanning through posts on specific subjects/topics. However, I still found myself having a problem, and it has to do with reading my data into the R for "structure" DAPC analysis using "adegenet". I would greatly appreciate if anyone can help me out My data has 983 individuals labeled individuals in the first column, followed by population groups in the 2nd column, and columns of 548 SNP markers. I have attached a sample file of 10 individuals (1st column), the population groupings (2nd column)  and 10 SNP markers so you can have an idea of the data format I used.
+
+
+
+For the 983 individuals and the 548 SNP markers, I used the following codes and got the following error messages when trying to read my data into R:
+
+> setwd("c:\\myDAPC")
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", header=TRUE)
+Error in scan(file, what, nmax, sep, dec, quote, skip, nlines, na.strings,  :
+  line 680 did not have 550 elements
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", na.strings="NA", sep="|", header=TRUE)
+Error in read.table("c:\\myDAPC\\data02052014.txt", na.strings = "NA",  :
+  more columns than column names
+
+> data <- read.table("c:\\myDAPC\\data02052014.txt", na.strings="NA", sep="|", rows=1, col.lab=1, col.pop=2, header=TRUE)
+Error in read.table("c:\\myDAPC\\data02052014.txt", na.strings = "NA",  :
+  unused arguments (rows = 1, col.lab = 1, col.pop = 2)
+>
+
+
+
+For the test sample data of 10 individuals and 10 SNP markers below is an error message and a code that seems to have worked:
+
+
+
+> datadata <- read.table("c:\\myDAPC\\testdata.txt", na.strings="NA", sep="|", header=TRUE)
+Error in read.table("c:\\myDAPC\\testdata.txt", na.strings = "NA", sep = "|",  :
+  more columns than column names
+
+
+
+> data <- read.table("c:\\myDAPC\\testdata.txt", header=TRUE)
+> data
+    geno  pop    M1    M2    M3    M4    M5    M6    M7    M8    M9   M10
+1   Ind1 pop1 44|44 44|44 22|22 33|33 33|33 22|22 22|22 11|11 11|11  <NA>
+2   Ind2 pop1 44|44 44|44 44|44 33|33 33|33 22|22 22|22 11|11 22|22 11|11
+3   Ind3 pop2 44|44 44|44 44|44 33|33 11|11 44|44 44|44 33|33 11|11 33|33
+4   Ind4 pop2 44|44 22|22 22|22 33|33 33|33 22|22 22|22 33|33 22|22 11|11
+5   Ind5 pop2 44|44 44|44 22|22 44|44 33|33 22|22 44|44 11|11 22|22 11|11
+6   Ind6 pop3 44|44 22|22 22|22  <NA> 33|33 22|22 22|22 11|11 11|11 11|11
+7   Ind7 pop3 44|44 22|22 22|22 33|33 11|11 22|22 44|44 11|11 22|22 11|11
+8   Ind8 pop3 44|44 44|44 44|44 44|44 33|33 22|22 22|22 11|11 11|11 33|33
+9   Ind9 pop4 44|44 22|22 22|22 44|44 11|11 44|44 22|22 33|33 11|11 11|11
+10 Ind10 pop4 44|44 44|44 44|44 44|44 33|33 22|22 22|22 11|11 11|11 33|33
+
+
+
+The last part for the sample data seems to be working. But the same code doesn't work for when the data of the 983 individuals grouped into 6 populations, and genotyped with 548 SNP markers is used.
+
+
+
+Any help that will enable me get started with the "DAPC" analyses for the input data of 983 individuals that are grouped into 6 populations, and genotyped with 548 SNP markers would be highly appreciated.
+
+
+
+Thank you for your time and help.
+
+
+
+
+
+Peter
+
+From Lisa.Lumley at RNCan-NRCan.gc.ca  Sat Feb  8 08:20:10 2014
+From: Lisa.Lumley at RNCan-NRCan.gc.ca (Lumley, Lisa)
+Date: Sat, 8 Feb 2014 07:20:10 +0000
+Subject: [adegenet-forum] xy coordinate data
+Message-ID: <9595B20D741A2641829BAA52CD570B882B232498@S-BSC-MBX4.nrn.nrcan.gc.ca>
+
+Hi there,
+
+I've searched the adegenet forum and web, but have not been able to find anything, so hopefully these questions aren't redundant. I just want to confirm the way I am inputting the xy coordinate data.
+
+1. I am importing Structure files, where the data is on two lines for each individual. However, I am importing an xy coordinate file corresponding to the data that gives the coordinates only on one line per individual (i.e. a file for 100 individuals will have 200 rows of data in Structure, corresponding to 100 rows of data in the xy coordinate file). 
+
+2. After converting a genind file to a genpop file (e.g. for IBD), I am importing an xy coordinate file with only one line of coordinate data per population (i.e. 15 populations = 15 rows of coordinate data).
+
+Are these the correct way of doing this? Just want to make sure, as matching these two matrices will be crucial to any spatial analyses...
+
+Thanks for your help!
+Lisa
+
+From t.jombart at imperial.ac.uk  Mon Feb 10 17:08:46 2014
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Mon, 10 Feb 2014 16:08:46 +0000
+Subject: [adegenet-forum] xy coordinate data
+In-Reply-To: <9595B20D741A2641829BAA52CD570B882B232498@S-BSC-MBX4.nrn.nrcan.gc.ca>
+References: <9595B20D741A2641829BAA52CD570B882B232498@S-BSC-MBX4.nrn.nrcan.gc.ca>
+Message-ID: <2CB2DA8E426F3541AB1907F98ABA657075F517D5@icexch-m1.ic.ac.uk>
+
+Hi Lisa, 
+
+yes, it is fine. For a genind object, your xy matrix should have one row per individual, and match the order of the individuals. To check the ordering of individuals in the genind, use the function 'indNames'.
+
+For a genpop object, xy must have one row per population. To check the populations, assuming 'x' is your genpop, use 'x at pop.names'.
+
+Best
+Thibaut
+
+
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Lumley, Lisa [Lisa.Lumley at RNCan-NRCan.gc.ca]
+Sent: 08 February 2014 07:20
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] xy coordinate data
+
+Hi there,
+
+I've searched the adegenet forum and web, but have not been able to find anything, so hopefully these questions aren't redundant. I just want to confirm the way I am inputting the xy coordinate data.
+
+1. I am importing Structure files, where the data is on two lines for each individual. However, I am importing an xy coordinate file corresponding to the data that gives the coordinates only on one line per individual (i.e. a file for 100 individuals will have 200 rows of data in Structure, corresponding to 100 rows of data in the xy coordinate file).
+
+2. After converting a genind file to a genpop file (e.g. for IBD), I am importing an xy coordinate file with only one line of coordinate data per population (i.e. 15 populations = 15 rows of coordinate data).
+
+Are these the correct way of doing this? Just want to make sure, as matching these two matrices will be crucial to any spatial analyses...
+
+Thanks for your help!
+Lisa
+_______________________________________________
+adegenet-forum mailing list
+adegenet-forum at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/adegenet-forum
+
+From nlv209 at hotmail.com  Mon Feb 17 16:04:48 2014
+From: nlv209 at hotmail.com (Nikki Vollmer)
+Date: Mon, 17 Feb 2014 09:04:48 -0600
+Subject: [adegenet-forum] xvalDapc confusion
+Message-ID: <COL401-EAS413503128CBCFCCD39075C880990@phx.gbl>
+
+Hi all,
+
+
+
+I have used DAPC for my studies a bunch in the past, and am now curious to see how applying xvalDapc to the procedure affects things. I apologize in advance if my confusion is just a result of a brain fart due to the crappy cold weather the northeast US has been having. 
+
+
+
+First, is xvalDapc running your DAPC or just validating the parameters (PCAs) to use for running a separate DAPC?
+
+
+
+And related to that, what can you do with the results from xvalDapc?  For example do you run xvalDapc, see what number of PCAs give you the highest success, then run a 'regular' DAPC choosing the PCA number from xvalDapc results?  Or do you do the opposite...run DAPC first using what you think is the best number of PCAs, then run xvalDapc to validate the number of PCAs you originally chose?  Or both? (or neither?)
+
+
+
+Ultimately I am still wanting to make a scatter plot of my groups for publication. So I supposed I still need to run a single DAPC to do that and can't use the xvalDapc results somehow...right?
+
+
+
+Second, in the output for the xvalDapc function what are the numbers under the success column?  I was thinking they were assignment success, but if you do not specify either result="groupMean" or result="overall", which result are you getting?  I have tried it all three ways (not specifying a result, using groupMean, and using overall) and have gotten very different numbers for each (all are close to or above 0.90, but results become more variable when I specify a result argument).  
+
+
+
+Thank you in advance for any help you can offer, I really appreciate it!
+
+
+
+Nikki
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20140217/b8cb389c/attachment.html>
+
+From t.jombart at imperial.ac.uk  Mon Feb 17 16:31:28 2014
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Mon, 17 Feb 2014 15:31:28 +0000
+Subject: [adegenet-forum] xvalDapc confusion
+In-Reply-To: <COL401-EAS413503128CBCFCCD39075C880990@phx.gbl>
+References: <COL401-EAS413503128CBCFCCD39075C880990@phx.gbl>
+Message-ID: <2CB2DA8E426F3541AB1907F98ABA657075F5A365@icexch-m1.ic.ac.uk>
+
+
+Hello there, 
+To reply to the various points:
+
+> First, is xvalDapc running your DAPC or just validating the parameters (PCAs) to use for running a separate DAPC?
+
+It runs a bunch of DAPCs with varying numbers of PCA axes retained, each time with a bootstrapped sample of the data.
+
+> And related to that, what can you do with the results from xvalDapc?  For example do you run xvalDapc, see what number of PCAs give you the highest success, then run a 'regular' DAPC choosing the PCA number from xvalDapc results?  
+
+Yes.
+
+> Or do you do the opposite...run DAPC first using what you think is the best number of PCAs, then run xvalDapc to validate the number of PCAs you originally chose?  Or both? (or neither?)
+
+The main use is the previous statement - get the right number of PCA axes. This said, once you settle for a number of PCA axes and thus for a DAPC, xvalDapc still gives you some interesting information about how reliable your group membership prediction is. 
+
+> Ultimately I am still wanting to make a scatter plot of my groups for publication. So I supposed I still need to run a single DAPC to do that and can't use the xvalDapc results somehow...right?
+
+I'd recommend doing the above. Get an idea of the optimal number of PCA axes, then use one DAPC to make the scatterplot. Reliability of the results in terms of group prediction can be assessed by running xvalDapc.
+
+
+> Second, in the output for the xvalDapc function what are the numbers under the success column?  I was thinking they were assignment success, but if you do not specify either result="groupMean" or result="overall", which result are you getting?  I have tried it all three ways (not specifying a result, using groupMean, and using overall) and have gotten very different numbers for each (all are close to or above 0.90, but results become more variable when I specify a result argument).
+
+"groupMean" is the default. As for the difference, from the 'details' section of the doc:
+"DAPC is performed on a training set, typically
+ made of 90% of the observations, and then used to predict the
+ groups of the 10% remaining observation. Current method uses the
+ average prediction success per group (result="groupMean"), or the
+ overall prediction success (result="overall").
+"
+
+Thus groupMean will even out differences due to group sizes, while "overall" will reflect more the larger groups. Makes sense?
+
+> I apologize in advance if my confusion is just a result of a brain fart due to the crappy cold weather the northeast US has been having.
+
+I hope nothing that bad happens to your brain. As for the weather, I'm currently working on it; improvements will hopefully be part of the next release of adegenet.
+
+Best
+Thibaut
+
+
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Nikki Vollmer [nlv209 at hotmail.com]
+Sent: 17 February 2014 15:04
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] xvalDapc confusion
+
+Hi all,
+
+
+I have used DAPC for my studies a bunch in the past, and am now curious to see how applying xvalDapc to the procedure affects things. 
+
+
+
+
+Second, in the output for the xvalDapc function what are the numbers under the success column?  I was thinking they were assignment success, but if you do not specify either result="groupMean" or result="overall", which result are you getting?  I have tried it all three ways (not specifying a result, using groupMean, and using overall) and have gotten very different numbers for each (all are close to or above 0.90, but results become more variable when I specify a result argument).
+
+
+Thank you in advance for any help you can offer, I really appreciate it!
+
+
+Nikki
+
+From x.giroux.bougard at gmail.com  Wed Feb 19 02:28:25 2014
+From: x.giroux.bougard at gmail.com (Xavier Giroux-Bougard)
+Date: Tue, 18 Feb 2014 20:28:25 -0500
+Subject: [adegenet-forum] rda/dbMEM vs sPCA
+Message-ID: <CAMOcQZL49p5pYOaKr7b5WPJqPRCYrWvG=4=MhxuS=81HYG9ysA@mail.gmail.com>
+
+Hello,
+
+
+over the past year I have been experimenting with various types of spatial
+analysis in R to interpret genetic data. While I haven't gone into the
+repositories of PCNM and adegenet to check the code (and frankly I suspect
+this could take a long long time for me to figure out on my own), I am
+wondering if rda/dbMEM and sPCA are similar in the way they use Moran's I
+to detect spatial structures. From my understanding, sPCA combines matrices
+of variance and Moran's I, then decomposes them into eigenvalues to look
+for structures. While we can test for significance of these eigenvalues
+using global/local.randtest(), is the observation value in the output
+(which I am assuming is R2) analogous to the R2 you would obtain if you
+plugged a dbMEM into a canonical redundancy analysis (rda) on a table of
+allele frequencies?
+
+Can anyone point out the similarities and differences between these two
+techniques?
+
+Thank you,
+
+Xavier
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20140218/c7a62796/attachment.html>
+
+From t.jombart at imperial.ac.uk  Wed Feb 19 12:40:15 2014
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Wed, 19 Feb 2014 11:40:15 +0000
+Subject: [adegenet-forum] rda/dbMEM vs sPCA
+In-Reply-To: <CAMOcQZL49p5pYOaKr7b5WPJqPRCYrWvG=4=MhxuS=81HYG9ysA@mail.gmail.com>
+References: <CAMOcQZL49p5pYOaKr7b5WPJqPRCYrWvG=4=MhxuS=81HYG9ysA@mail.gmail.com>
+Message-ID: <2CB2DA8E426F3541AB1907F98ABA657075F5DBF0@icexch-m1.ic.ac.uk>
+
+Hi Xavier, 
+
+the approaches are close but not identical. 
+
+You description of sPCA is accurate, and shows that it is very different from a RDA on MEMs. The first decomposes a product of variance and autocorrelation, the second maximises the variance explained by the MEMs. 
+
+The similarity is in the global/local tests, which indeed rely on the (full) decomposition of the data onto the MEMs basis. By definition, the R2 of this decomposition is 1. The test statistic we use there is the highest R2 with a single MEM. This is what explains that the test itself lacks power: we only capture spatial structures which resemble at least one of the MEMs. 
+
+Best
+Thibaut
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Xavier Giroux-Bougard [x.giroux.bougard at gmail.com]
+Sent: 19 February 2014 01:28
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] rda/dbMEM vs sPCA
+
+Hello,
+
+
+over the past year I have been experimenting with various types of spatial analysis in R to interpret genetic data. While I haven't gone into the repositories of PCNM and adegenet to check the code (and frankly I suspect this could take a long long time for me to figure out on my own), I am wondering if rda/dbMEM and sPCA are similar in the way they use Moran's I to detect spatial structures. From my understanding, sPCA combines matrices of variance and Moran's I, then decomposes them into eigenvalues to look for structures. While we can test for significance of these eigenvalues using global/local.randtest(), is the observation value in the output (which I am assuming is R2) analogous to the R2 you would obtain if you plugged a dbMEM into a canonical redundancy analysis (rda) on a table of allele frequencies?
+
+Can anyone point out the similarities and differences between these two techniques?
+
+Thank you,
+
+Xavier
+
+From nlv209 at hotmail.com  Tue Feb 25 20:25:57 2014
+From: nlv209 at hotmail.com (Nikki Vollmer)
+Date: Tue, 25 Feb 2014 14:25:57 -0500
+Subject: [adegenet-forum] more xval confusion: getting variable results
+Message-ID: <COL126-W492131545FEDF5A7943C6580810@phx.gbl>
+
+Hello again,
+I have been running xvalDapc and have been getting variable results and am not sure how to interpret this.  
+I have a dataset of combined microsatellite (19 loci) and SNP (39 loci) data for 560 individuals. From initially running find.clusters I have 6 groups/clusters (which makes sense with my data) that I am testing with xval to eventually run a DAPC.
+For xvalDapc I have been using the following settings:n.pca.max=100, n.da=NULL, training.set=0.9, n.pca=NULL 
+First off, if I try anything over 4 replicates I often get the following message:
+Warning message:In xvalDapc.matrix(objNoNa at tab, grp$grp, n.pca.max = 100, n.da = NULL,  :  At least one group was absent from the training / validating sets.Try using smaller training sets.
+So, I have run the command many many times with both 3 and 4 reps (occasionally, but not as often, getting the above warning message) and keep getting very variable results. For instance if I run xval 6 times with 4 reps no one run gives me the same "best" number of PCAs.  Some times I get 20 PCAs as best, others I get 80.  Overall, I never get the same thing twice, but all classifications are greater than 0.80, and most over 0.90, success. I feel based on the xval results there is no way to unambiguously pick a best number of PCAs to use to run a subsequent DAPC. 
+My first thought with this inconsistency would be to run more reps, but then I get the warning message very often, and when the runs with the higher reps do proceed, I get many groups that aren't assigned to a training set.  So if I am stuck with using fewer reps, and am stuck with the inconsistent results, can that be interpreted as my dataset not being very informative...and/or, I hate to say it, but that I need more loci to increase assignment consistency with DAPC?
+Thanks for any help you can offer, it is much appreciated!
+Nikki 		 	   		  
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20140225/8c70aa2e/attachment.html>
+
+From t.jombart at imperial.ac.uk  Wed Feb 26 12:52:00 2014
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Wed, 26 Feb 2014 11:52:00 +0000
+Subject: [adegenet-forum] more xval confusion: getting variable results
+In-Reply-To: <COL126-W492131545FEDF5A7943C6580810@phx.gbl>
+References: <COL126-W492131545FEDF5A7943C6580810@phx.gbl>
+Message-ID: <2CB2DA8E426F3541AB1907F98ABA657075F61F6F@icexch-m1.ic.ac.uk>
+
+Hello, 
+
+the results come from the fact that some groups probably have very small sample sizes in your data. Therefore, the re-sampling used for the cross validation may have i) no individuals to train the method on, and/or ii) no individuals to cross-validate with.
+
+Caitlin Collins has modified the cross-validation procedure for this kind of situation, but it is still in (one of ) the devel version of adegenet. You can either contact her directly, or just discard the smallest groups from your analysis.
+
+Cheers
+Thibaut
+
+
+
+
+________________________________________
+From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Nikki Vollmer [nlv209 at hotmail.com]
+Sent: 25 February 2014 19:25
+To: adegenet-forum at lists.r-forge.r-project.org
+Subject: [adegenet-forum] more xval confusion: getting variable results
+
+Hello again,
+
+I have been running xvalDapc and have been getting variable results and am not sure how to interpret this.
+
+I have a dataset of combined microsatellite (19 loci) and SNP (39 loci) data for 560 individuals. From initially running find.clusters I have 6 groups/clusters (which makes sense with my data) that I am testing with xval to eventually run a DAPC.
+
+For xvalDapc I have been using the following settings:
+n.pca.max=100, n.da=NULL, training.set=0.9, n.pca=NULL
+
+First off, if I try anything over 4 replicates I often get the following message:
+
+Warning message:
+In xvalDapc.matrix(objNoNa at tab, grp$grp, n.pca.max = 100, n.da = NULL,  :
+  At least one group was absent from the training / validating sets.
+Try using smaller training sets.
+
+So, I have run the command many many times with both 3 and 4 reps (occasionally, but not as often, getting the above warning message) and keep getting very variable results. For instance if I run xval 6 times with 4 reps no one run gives me the same "best" number of PCAs.  Some times I get 20 PCAs as best, others I get 80.  Overall, I never get the same thing twice, but all classifications are greater than 0.80, and most over 0.90, success. I feel based on the xval results there is no way to unambiguously pick a best number of PCAs to use to run a subsequent DAPC.
+
+My first thought with this inconsistency would be to run more reps, but then I get the warning message very often, and when the runs with the higher reps do proceed, I get many groups that aren't assigned to a training set.  So if I am stuck with using fewer reps, and am stuck with the inconsistent results, can that be interpreted as my dataset not being very informative...and/or, I hate to say it, but that I need more loci to increase assignment consistency with DAPC?
+
+Thanks for any help you can offer, it is much appreciated!
+
+Nikki
+
+From nlv209 at hotmail.com  Wed Feb 26 14:59:25 2014
+From: nlv209 at hotmail.com (Nikki Vollmer)
+Date: Wed, 26 Feb 2014 08:59:25 -0500
+Subject: [adegenet-forum] more xval confusion: getting variable results
+In-Reply-To: <2CB2DA8E426F3541AB1907F98ABA657075F61F6F@icexch-m1.ic.ac.uk>
+References: <COL126-W492131545FEDF5A7943C6580810@phx.gbl>,
+ <2CB2DA8E426F3541AB1907F98ABA657075F61F6F@icexch-m1.ic.ac.uk>
+Message-ID: <COL126-W30A6219A159473D83FFDC180800@phx.gbl>
+
+Really group size?  Here are mine: 95,  43,  61,  72, 164, 125.  Is 43 really that small?
+
+
+
+
+
+> From: t.jombart at imperial.ac.uk
+> To: nlv209 at hotmail.com; adegenet-forum at lists.r-forge.r-project.org
+> Subject: RE: [adegenet-forum] more xval confusion: getting variable results
+> Date: Wed, 26 Feb 2014 11:52:00 +0000
+> 
+> Hello, 
+> 
+> the results come from the fact that some groups probably have very small sample sizes in your data. Therefore, the re-sampling used for the cross validation may have i) no individuals to train the method on, and/or ii) no individuals to cross-validate with.
+> 
+> Caitlin Collins has modified the cross-validation procedure for this kind of situation, but it is still in (one of ) the devel version of adegenet. You can either contact her directly, or just discard the smallest groups from your analysis.
+> 
+> Cheers
+> Thibaut
+> 
+> 
+> 
+> 
+> ________________________________________
+> From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Nikki Vollmer [nlv209 at hotmail.com]
+> Sent: 25 February 2014 19:25
+> To: adegenet-forum at lists.r-forge.r-project.org
+> Subject: [adegenet-forum] more xval confusion: getting variable results
+> 
+> Hello again,
+> 
+> I have been running xvalDapc and have been getting variable results and am not sure how to interpret this.
+> 
+> I have a dataset of combined microsatellite (19 loci) and SNP (39 loci) data for 560 individuals. From initially running find.clusters I have 6 groups/clusters (which makes sense with my data) that I am testing with xval to eventually run a DAPC.
+> 
+> For xvalDapc I have been using the following settings:
+> n.pca.max=100, n.da=NULL, training.set=0.9, n.pca=NULL
+> 
+> First off, if I try anything over 4 replicates I often get the following message:
+> 
+> Warning message:
+> In xvalDapc.matrix(objNoNa at tab, grp$grp, n.pca.max = 100, n.da = NULL,  :
+>   At least one group was absent from the training / validating sets.
+> Try using smaller training sets.
+> 
+> So, I have run the command many many times with both 3 and 4 reps (occasionally, but not as often, getting the above warning message) and keep getting very variable results. For instance if I run xval 6 times with 4 reps no one run gives me the same "best" number of PCAs.  Some times I get 20 PCAs as best, others I get 80.  Overall, I never get the same thing twice, but all classifications are greater than 0.80, and most over 0.90, success. I feel based on the xval results there is no way to unambiguously pick a best number of PCAs to use to run a subsequent DAPC.
+> 
+> My first thought with this inconsistency would be to run more reps, but then I get the warning message very often, and when the runs with the higher reps do proceed, I get many groups that aren't assigned to a training set.  So if I am stuck with using fewer reps, and am stuck with the inconsistent results, can that be interpreted as my dataset not being very informative...and/or, I hate to say it, but that I need more loci to increase assignment consistency with DAPC?
+> 
+> Thanks for any help you can offer, it is much appreciated!
+> 
+> Nikki
+ 		 	   		  
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20140226/0786c251/attachment.html>
+
+From t.jombart at imperial.ac.uk  Wed Feb 26 17:48:48 2014
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Wed, 26 Feb 2014 16:48:48 +0000
+Subject: [adegenet-forum] more xval confusion: getting variable results
+In-Reply-To: <COL126-W30A6219A159473D83FFDC180800@phx.gbl>
+References: <COL126-W492131545FEDF5A7943C6580810@phx.gbl>,
+ <2CB2DA8E426F3541AB1907F98ABA657075F61F6F@icexch-m1.ic.ac.uk>,
+ <COL126-W30A6219A159473D83FFDC180800@phx.gbl>
+Message-ID: <2CB2DA8E426F3541AB1907F98ABA657075F62180@icexch-m1.ic.ac.uk>
+
+
+Judge for yourself; using exactly your distribution:
+###
+> fac <- rep(letters[1:6], c(95,  43,  61,  72, 164, 125))
+> table(fac) - table(sample(fac, size=504, replace=FALSE))
+fac
+ a  b  c  d  e  f 
+10  6  5  8 14 13 
+
+## in the above case, all is fine. Let's try 1000 times:
+> set.seed(1)
+> for(i in 1:1000) {if(any(table(fac) - table(sample(fac, size=504, replace=FALSE)) < 1)) counter=counter+1}  
+> counter
+[1] 12
+
+So in 1000 resampling, 12 of them could not get data cross-validated. 43 is not a small sample size for e.g. estimating allele frequencies, but for cross-validation purposes with 90% of data used as training set, it may not always be enough. Selection a smaller training set should help.
+
+In any case, the fact that cross-validation leads to selecting anywhere from 20 to 80 PCs may also mean that this number does not matter that much. This would be the case if e.g. PCs 20:80 had a very small variance. 
+
+Cheers
+Thibaut
+
+
+--
+######################################
+Dr Thibaut JOMBART
+MRC Centre for Outbreak Analysis and Modelling
+Department of Infectious Disease Epidemiology
+Imperial College - School of Public Health
+St Mary?s Campus
+Norfolk Place
+London W2 1PG
+United Kingdom
+Tel. : 0044 (0)20 7594 3658
+t.jombart at imperial.ac.uk
+http://sites.google.com/site/thibautjombart/
+http://adegenet.r-forge.r-project.org/
+________________________________________
+From: Nikki Vollmer [nlv209 at hotmail.com]
+Sent: 26 February 2014 13:59
+To: Jombart, Thibaut; adegenet-forum at lists.r-forge.r-project.org
+Subject: RE: [adegenet-forum] more xval confusion: getting variable results
+
+Really group size?  Here are mine: 95,  43,  61,  72, 164, 125.  Is 43 really that small?
+
+
+
+
+
+> From: t.jombart at imperial.ac.uk
+> To: nlv209 at hotmail.com; adegenet-forum at lists.r-forge.r-project.org
+> Subject: RE: [adegenet-forum] more xval confusion: getting variable results
+> Date: Wed, 26 Feb 2014 11:52:00 +0000
+>
+> Hello,
+>
+> the results come from the fact that some groups probably have very small sample sizes in your data. Therefore, the re-sampling used for the cross validation may have i) no individuals to train the method on, and/or ii) no individuals to cross-validate with.
+>
+> Caitlin Collins has modified the cross-validation procedure for this kind of situation, but it is still in (one of ) the devel version of adegenet. You can either contact her directly, or just discard the smallest groups from your analysis.
+>
+> Cheers
+> Thibaut
+>
+>
+>
+>
+> ________________________________________
+> From: adegenet-forum-bounces at lists.r-forge.r-project.org [adegenet-forum-bounces at lists.r-forge.r-project.org] on behalf of Nikki Vollmer [nlv209 at hotmail.com]
+> Sent: 25 February 2014 19:25
+> To: adegenet-forum at lists.r-forge.r-project.org
+> Subject: [adegenet-forum] more xval confusion: getting variable results
+>
+> Hello again,
+>
+> I have been running xvalDapc and have been getting variable results and am not sure how to interpret this.
+>
+> I have a dataset of combined microsatellite (19 loci) and SNP (39 loci) data for 560 individuals. From initially running find.clusters I have 6 groups/clusters (which makes sense with my data) that I am testing with xval to eventually run a DAPC.
+>
+> For xvalDapc I have been using the following settings:
+> n.pca.max=100, n.da=NULL, training.set=0.9, n.pca=NULL
+>
+> First off, if I try anything over 4 replicates I often get the following message:
+>
+> Warning message:
+> In xvalDapc.matrix(objNoNa at tab, grp$grp, n.pca.max = 100, n.da = NULL, :
+> At least one group was absent from the training / validating sets.
+> Try using smaller training sets.
+>
+> So, I have run the command many many times with both 3 and 4 reps (occasionally, but not as often, getting the above warning message) and keep getting very variable results. For instance if I run xval 6 times with 4 reps no one run gives me the same "best" number of PCAs. Some times I get 20 PCAs as best, others I get 80. Overall, I never get the same thing twice, but all classifications are greater than 0.80, and most over 0.90, success. I feel based on the xval results there is no way to unambiguously pick a best number of PCAs to use to run a subsequent DAPC.
+>
+> My first thought with this inconsistency would be to run more reps, but then I get the warning message very often, and when the runs with the higher reps do proceed, I get many groups that aren't assigned to a training set. So if I am stuck with using fewer reps, and am stuck with the inconsistent results, can that be interpreted as my dataset not being very informative...and/or, I hate to say it, but that I need more loci to increase assignment consistency with DAPC?
+>
+> Thanks for any help you can offer, it is much appreciated!
+>
+> Nikki
+
+From mayalopez at gmail.com  Fri Feb 28 03:11:57 2014
+From: mayalopez at gmail.com (Margarita Lopez Uribe)
+Date: Thu, 27 Feb 2014 21:11:57 -0500
+Subject: [adegenet-forum] sPCA - choosing connection netwroks
+Message-ID: <CAJskHBEEvmU6_mZb7Q5VXhtFFk-hR5TdAwNp+CmdZFLCiiAhZw@mail.gmail.com>
+
+Dear Thibaut and adegenet user,
+
+I would like to open up a discussion in this forum about the differences
+between the 7 kinds of connection networks in sPCA. I would like to hear
+from user what their experience has been on this topic. Specifically, I
+would like to know in what cases one type of network is better that the
+other.
+
+I hope this discussion will be useful to current and future sPCA user as
+well!
+
+Thanks in advance,
+Margarita
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20140227/8551f38b/attachment.html>
+

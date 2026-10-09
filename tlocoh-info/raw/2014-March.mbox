@@ -1,0 +1,94 @@
+From ajlyons at berkeley.edu  Mon Mar  3 17:26:07 2014
+From: ajlyons at berkeley.edu (Andy Lyons)
+Date: Mon, 3 Mar 2014 08:26:07 -0800
+Subject: [tlocoh-info] tspan
+In-Reply-To: <53104A8D.2040305@gwdg.de>
+References: <53104A8D.2040305@gwdg.de>
+Message-ID: <53140B8A.2030103@berkeley.edu>
+
+Hi Horst,
+
+Thanks for your question about the hull metric 'tspan'. You are correct 
+that it isn't obvious (or well-documented) what this hull metric is all 
+about or the units. Basically, it is the time-span of the nearest 
+neighbors of a hull, expressed as a multiple of the median sampling 
+interval. So for example if the median sampling interval for a given 
+trajectory is 3600 seconds (1 hour), and a particular hull selected from 
+that dataset was constructed from the parent point and 10 nearest 
+neighbors, then the tspan value for that hull would be duration of time 
+in seconds between the earliest and last location used to construct the 
+hull (including the parent point), divided by 3600. If there are no time 
+stamps associated with the locations, tspan will be NULL.
+
+When / whether this is a useful hull metric depends on the data and the 
+question. It could be a measure of the duration of time an individual 
+was present in a given hull. This could be useful, for example, to see 
+which areas of the habitat were used for a short period vs. which were 
+used over a longer period of time. This will of course be sensitive to 
+the length of data collection as well. A related hull metric that 
+measures duration of time in an area, but which takes into account the 
+notion of a visit, is the mean number of locations per visit (mnlv), 
+where a 'visit' is defined by an additional parameter, the 
+inter-visit-gap (ivg) period.
+
+tspan can be used to see the effect of incorporating time into nearest 
+neighbor selection. When time is included (e.g., s>0), you would expect 
+the distribution of tspan values to shift to the left (i.e., get 
+smaller), because points further away in time get bypassed as nearest 
+neighbors. That is essentially what the function lxy.plot.tspan shows.
+
+You can check the hull metric value of tspan for an arbitrary hull using 
+the code below. This code illustrates how to extract information from a 
+locoh-hullset object (the most recent version of the tlocoh package, 
+version 1.15, updated about two weeks ago, has a vignette about the data 
+structure of a locoh hullset object). Given a hullset object named lhs, 
+you could compute tspan of the ith hull in the first set of hulls by:
+
+i <- 5
+
+## Get the indices of the enclosed points of the ith hull
+ep.idx <- lhs[[1]]$enc.pts$idx[[i]]
+
+## Get those enclosed points that are also nearest neighbors
+nn.idx <- ep.idx[lhs[[1]]$enc.pts$nn[[i]]]
+
+## Get the time in seconds of the date stamps of the nearest neighbors 
+of the ith hull
+dt_secs <- as.numeric(lhs[[1]]$pts$dt[nn.idx])
+
+## Compute max - min
+dt_secs_range <- diff(range(dt_secs))
+
+## Get the median sampling interval(also saved in seconds)
+tau <- lhs[[1]]$rw.params$time.step.median
+
+## Express the time span as a multiple of the median
+dt_secs_range / tau
+
+## See if this is the same as the saved value for tspan
+lhs[[1]]$hulls at data$tspan[i]
+
+In general, the function hm.expr() will display a list of the hull 
+metrics that are supported in the package, and a short description of 
+each. Please keep sending questions like this which highlight where the 
+documentation needs some more work. I am also hoping to write a vignette 
+on how to use hull metrics and code up new metrics, because its the 
+hulls and their metrics which gives tlocoh the ability to generate 
+analytical insights beyond traditional utilization distributions.
+
+Best,
+
+Andy
+
+
+
+On 2/28/2014 12:36 AM, Horst Reinecke wrote:
+> Hello list,
+>
+> I'm working with tlocoh  and data of red deer. I'm uncertain how to 
+> interpret the tspan data because I don't know neither the unit nor how 
+> tspan is caluclated.
+> Any suggests?
+>
+> Horst
+

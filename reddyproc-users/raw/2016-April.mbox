@@ -1,0 +1,181 @@
+From sigut.l at czechglobe.cz  Mon Apr 18 09:26:54 2016
+From: sigut.l at czechglobe.cz (Ladislav =?utf-8?Q?=C5=A0igut?=)
+Date: Mon, 18 Apr 2016 09:26:54 +0200 (CEST)
+Subject: [Reddyproc-users] REddyProc 0.8.2
+In-Reply-To: <1991953600.208226.1460655699816.JavaMail.root@czechglobe.cz>
+Message-ID: <2038172571.8992.1460964414988.JavaMail.root@czechglobe.cz>
+
+Dear REddyProc developers, 
+thank you very much for your great work on porting this code to R and for adding further functionalities! I am running Win 10, R-3.2.4revised, REddyProc 0.8.2 and made the code run succesfully on my data. I would have some questions and comments about the R package and its comparison to online tool (OT; also 0.8.2). I hope this channel is appropriate because other users could find it interesting too. 
+1) I noticed the ustar filtering is not removing halfhours when ustar is missing. I would say the conservative approach would be to remove the halfhours because they are compromised. I will solve it by removing the NEE halfhours in input file. Would you implement this as part of ustar filtering in future version of REddyProc? 
+2) The original OT implemented ustar filter only for the nighttime data. Of course, oppinions might differ about this but do you also plan to include this option in future versions? This would allow better consistency with the older processing method. 
+3) I find it confusing that sPlotHHFluxes() and sPlotFingerprint() show axis label in the middle of the month. I think it is more informative when it marks the start of month. 
+4) EddyProc.C$sPlotDailySums() seems like it is plotting daily averages instead. OT example ( ver. 0.6.0 ) seems to have some kind of summing, although the units were not clear as I saw previous conversation on the mail list. What kind of solution do you plan here? 
+5) Only a minor issue is with the custom seasonFactor specification in vignette("DEGebExample") . Centering of timestamp by 15 min shift is implemented only within EddyProc.C object, therefore DEGebExample$DateTime should be manually corrected by user. Also the seasonFactor marks the season starting from midnight, not noon. Therefore seasonStartsDate should be created by fConvertTimeToPosix(..., Hour = 0.25 ). 
+6) What is the difference between isUsingCPT and isUsingCPTSeveralT in usControlUstarEst()? SeveralT takes the same (default 7) temperature classes as Moving point test? But then I would expect there would be only one ustar threshold estimate for all temperature classes when using isUsingCPT which is not the case when I check the plots from sPlotNEEVersusUStarForSeason(). Which CPT implementation is prefered? 
+- It also seems it is possible to set both isUsingCPT and isUsingCPTSeveralT = TRUE 
+7) Is the reference temperature really changed to 15 ?C in sMRFluxPartition()? The original Tref was 10 ?C in the old OT. Is there an option to change this? Could you please comment why you decided to change this? 
+8) What is the significance of OT using 200 bootstraps instead of default 100? 
+9) Why is the OT definition of seasons using startMonth = c(2, 5, 8, 11) instead of default startMonth = c(3, 6, 9, 12)? 
+10) Could you please comment why you give preference to 'uStar' estimate (without bootstrapping) instead of 50% (median) ustar threshold (resulting from bootstrapping)? I would assume 50% (median) ustar threshold should be more robust. 
+11) There is some inconsistency in annual estimate of ustar threshold using sEstUstarThresholdDistribution(). The annual estimate is usually a bit higher than any of the seasonal estimates although it should be their maximum. 
+12) Plotting functions that have output to the console miss some features, e.g. colour scale for fingerprint plot and labels defining the plotted variable. Do you plan to change this in future versions? 
+13) There is a mistake in function name usGetSeaonalSeasonUStarMappingFromDistributionResult() (...Seaonal...) 
+Sorry for the long list but I hope it also helps you. 
+Best wishes 
+
+Ladislav ?igut, M.Sc. 
+Department of Matter and Energy Fluxes 
+Global Change Research Institute CAS 
+B?lidla 986/4a, CZ-60300 Brno, Czech Republic 
++420 511 192 286 / +420 606 641 694 
+www.czechglobe.cz 
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/reddyproc-users/attachments/20160418/ac8e9265/attachment.html>
+
+From twutz at bgc-jena.mpg.de  Fri Apr 29 08:21:43 2016
+From: twutz at bgc-jena.mpg.de (Thomas Wutzler)
+Date: Fri, 29 Apr 2016 08:21:43 +0200
+Subject: [Reddyproc-users] REddyProc 0.8.2
+In-Reply-To: <2038172571.8992.1460964414988.JavaMail.root@czechglobe.cz>
+References: <2038172571.8992.1460964414988.JavaMail.root@czechglobe.cz>
+Message-ID: <5722FD77.8030608@bgc-jena.mpg.de>
+
+Dear Ladislav, Antje and Mirco,
+
+Thanks for your thorough look at our package.
+I start to answer your questions.
+
+> 1) I noticed the ustar filtering is not removing halfhours when ustar is
+> missing. I would say the conservative approach would be to remove the
+> halfhours because they are compromised. I will solve it by removing the
+> NEE halfhours in input file. Would you implement this as part of ustar
+> filtering in future version of REddyProc?
+The current procedure corresponds to the directive to the user: "Low
+quality or invalid values, that should not be used during the
+processing, should be set to -9999 beforehand."
+
+I will discuss with the EddyProc team:
+"Should we do a quality check before and automatically set NEE to
+missing for awkward rows?"
+
+Questions 2, 3, 4, 7
+are best answered by developer Antje Moffat.
+
+> 5) Only a minor issue is with the custom seasonFactor specification in
+> vignette("DEGebExample"). Centering of timestamp by 15 min shift is
+> implemented only within EddyProc.C object, therefore
+> DEGebExample$DateTime should be manually corrected by user. 
+You are correct. I will update the Example and the documentation of
+usCreateSeasonFactor methods.
+Also the
+> seasonFactor marks the season starting from midnight, not noon.
+> Therefore seasonStartsDate should be created by fConvertTimeToPosix(...,
+> Hour = 0.25).
+Thanks, fixed the Example.
+
+> 6) What is the difference between isUsingCPT and isUsingCPTSeveralT in
+> usControlUstarEst()? SeveralT takes the same (default 7) temperature
+> classes as Moving point test? But then I would expect there would be
+> only one ustar threshold estimate for all temperature classes when using
+> isUsingCPT which is not the case when I check the plots from
+> sPlotNEEVersusUStarForSeason(). Which CPT implementation is prefered?
+>     - It also seems it is possible to set both isUsingCPT and
+> isUsingCPTSeveralT = TRUE
+Because we experimented quite a lot with adding the CPT afterwards, the
+code is not clean here, and parameterization and output are still
+adjusted to the original Moving point method instead.
+
+isUsingCPT:
+only change is that for each temperature subset, change point detection
+is used instead of the Moving point detection.
+This is only provided for comparing methods. I will note this in the help.
+
+isUsingCPTSeveralT:
+Since there are more records per subsets of data, if binning due to
+uStar is omitted, more and narrower temperature classes can be used
+(specifically 3L*ctrlUstarSub.l$taClasses - 3L), by default 18 instead
+of 7. Furthermore, the subsetting into different temperature classes is
+repeated for different classification (3 to 18 subsets) to diversify the
+threshold estimates. You get 18+17+16+... estimates to average.
+If it is set to TRUE, the isUsingCPT option has no effect.
+If you want to use ChangePointDetection, this is the recommend option.
+
+> 8) What is the significance of OT using 200 bootstraps instead of
+> default 100?
+This is not intended.  I will fix it.
+When developing the package we reduced the default when we decided to
+use the 90% percentiles instead of the 95% by default. We forgot to
+adapt the online tool.
+
+> 9) Why is the OT definition of seasons using startMonth = c(2, 5, 8, 11)
+> instead of default startMonth = c(3, 6, 9, 12)?
+This is a bug. I will fix it.
+When developing we changed the numbering of the month starting from 0 to
+starting from 1. But we forgot to change it in the online tool.
+
+> 10) Could you please comment why you give preference to 'uStar' estimate
+> (without bootstrapping) instead of 50% (median) ustar threshold
+> (resulting from bootstrapping)? I would assume 50% (median) ustar
+> threshold should be more robust.
+uStar is based on the original dataset. This helps comparison to runs
+that did not bootstrapping. We think this will be more relevant to the
+user. I agree that the median is more robust. Since, you get both from
+the default of sEstUstarThresholdDistribution and in the online tool,
+its up to your preference.
+
+> 11) There is some inconsistency in annual estimate of ustar threshold
+> using sEstUstarThresholdDistribution(). The annual estimate is usually a
+> bit higher than any of the seasonal estimates although it should be
+> their maximum.
+Considering a single value its really the maximum.
+Considering the bootstrap, the annual aggregate is computed on each
+bootstrap sample and then the quantiles are obtained. Hence, it may
+differ from the percentiles of the seasonal estimates.
+
+> 12) Plotting functions that have output to the console miss some
+> features, e.g. colour scale for fingerprint plot and labels defining the
+> plotted variable. Do you plan to change this in future versions?
+I have implemented that, but need to discuss with original develop Antje
+Moffat before putting it to r-forge.
+
+> 13) There is a mistake in function name
+> usGetSeaonalSeasonUStarMappingFromDistributionResult() (...Seaonal...)
+Thanks, I will correct this.
+
+> Sorry for the long list but I hope it also helps you.
+Thank you again. It really helps.
+
+Yours
+Thomas
+
+@Antje: Could you take care of the following questions?
+
+2) The original OT implemented ustar filter only for the nighttime data.
+Of course, oppinions might differ about this but do you also plan to
+include this option in future versions? This would allow better
+consistency with the older processing method.
+3) I find it confusing that sPlotHHFluxes() and sPlotFingerprint() show
+axis label in the middle of the month. I think it is more informative
+when it marks the start of month.
+4) EddyProc.C$sPlotDailySums() seems like it is plotting daily averages
+instead. OT example (ver. 0.6.0) seems to have some kind of summing,
+although the units were not clear as I saw previous conversation on the
+mail list. What kind of solution do you plan here?
+7) Is the reference temperature really changed to 15 ?C in
+sMRFluxPartition()? The original Tref was 10 ?C in the old OT. Is there
+an option to change this? Could you please comment why you decided to
+change this?
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 4895 bytes
+Desc: S/MIME Cryptographic Signature
+URL: <http://lists.r-forge.r-project.org/pipermail/reddyproc-users/attachments/20160429/0ac8b676/attachment.bin>
+

@@ -1,0 +1,1478 @@
+From bolker at ufl.edu  Thu Dec 10 14:37:55 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Thu, 10 Dec 2009 08:37:55 -0500
+Subject: [Phylobase-devl] [Fwd: phylobase]
+Message-ID: <4B20F9B3.5060104@ufl.edu>
+
+
+  The C++ interfacing is a fairly regular irritation for us, it would be
+great to improve it/clean it up -- I'm cc'ing/forwarding this question
+to the rest of the dev team, some of whom may have more informed
+opinions (Brian?)
+
+  cheers
+    Ben
+
+
+-------- Original Message --------
+Subject: phylobase
+Date: Wed, 9 Dec 2009 23:07:13 -0500
+From: Dirk Eddelbuettel <edd at debian.org>
+To: Bolker,Benjamin Michael <bolker at ufl.edu>
+
+
+Hi Ben,
+
+I am writing to you in regards to phylobase for which you are listed as the
+maintainer.
+
+As you may know, I have been working with a very sharp British (now
+grad-)student on automtic builds of .deb packages for all of CRAN. This
+works
+already really well for Debian testing -- see
+http://debian.cran.r-project.org
+We hope to extend that to Ubuntu one day.  Being able to 'apt-get install
+r-cran-ANYTHING' for essentially 2000 values of ANYTHING is pretty neat, esp
+as apt et al really do solve dependencies in a reliable way.
+
+A few packages fail to build, and phylobase is among them.  We build these
+packages (just like normal Debian or Ubuntu packages) in restricted chroot
+and that sometimes triggers erros we do not get in interactive shells. For
+phylobase it is
+
+[...]
+cendants.o phyloXX.o reorderBinary.o reorderRobust.o -LRcppSrc -lRcpp
+-Lncl/ncl/.libs -lncl -L/usr/lib/R/lib -lR
+/usr/bin/ld: cannot find -lncl
+
+and I think has to do with ncl using libtool, and the build running
+configure
+&& make but not make install.  So src/ncl/ncl/.libs -- a temporary location
+-- is the only one and that proves too unreliable here.
+
+On the other hand, if one also calls, say, in src/ncl/ncl
+
+    make install prefix=`pwd`/../..
+
+then src/lib/libncl.a is created with about 753kb on an amd64.  We could
+then
+link against this static library which would be easier, and we don;t need
+ld.so or LD_LIBRARY_PATH or libtool magic.
+
+Another thing I noticed is that the packages uses the older RcppSrc.  After
+Dominick stopped working on Rcpp (which he neglected from Nov 2006 to Nov
+2009), I took over maintenance about a year ago.  If you look at the current
+Rcpp package and say its examples/ directory you may get an idea.  In
+essence, I maintained the API but made Rcpp a full-fledged CRAN package.  So
+update.packages() gets you new versions including a new library that is
+ready
+to get linked against -- no more sources of RcppSrc/ in your project, no
+more
+build from configure etc pp.  I'd be happy to walk you through usage and
+builds, and there are other example users.
+
+But fixing the build of phylobase w.r.t. nlc is more important.  If you
+want,
+I can work on a patch, or a tentative 0.5.0.1 that changes the build.
+
+Cheers, Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091210/7afaff23/attachment.pgp 
+
+From omeara.brian at gmail.com  Thu Dec 10 17:06:24 2009
+From: omeara.brian at gmail.com (Brian O'Meara)
+Date: Thu, 10 Dec 2009 11:06:24 -0500
+Subject: [Phylobase-devl] [Fwd: phylobase]
+In-Reply-To: <4B20F9B3.5060104@ufl.edu>
+References: <4B20F9B3.5060104@ufl.edu>
+Message-ID: <0121CC53-32D3-4173-A2C5-E7B2E271724B@gmail.com>
+
+Thanks for the info, Dirk. I was one of the two people responsible for  
+the C++ code in phylobase, and I've consistently had trouble mastering  
+build issues (this has come up in other code I've written, too). For  
+my part, any patches you could provide to make this more robust would  
+be great.
+
+We included Rcpp sources in phylobase because, as you note, during the  
+week we were first making phylobase Rcpp wasn't being maintained and,  
+more importantly, it was only present on a subset of CRAN mirrors (I  
+think we ended up getting it from Italy). Taking out the Rcpp source  
+from phylobase and just requiring the Rcpp package makes a lot of  
+sense to me, and I will look into doing this after the holidays.
+
+Best,
+Brian
+
+On Dec 10, 2009, at 8:37 AM, Ben Bolker wrote:
+
+>
+>  The C++ interfacing is a fairly regular irritation for us, it would  
+> be
+> great to improve it/clean it up -- I'm cc'ing/forwarding this question
+> to the rest of the dev team, some of whom may have more informed
+> opinions (Brian?)
+>
+>  cheers
+>    Ben
+>
+>
+> -------- Original Message --------
+> Subject: phylobase
+> Date: Wed, 9 Dec 2009 23:07:13 -0500
+> From: Dirk Eddelbuettel <edd at debian.org>
+> To: Bolker,Benjamin Michael <bolker at ufl.edu>
+>
+>
+> Hi Ben,
+>
+> I am writing to you in regards to phylobase for which you are listed  
+> as the
+> maintainer.
+>
+> As you may know, I have been working with a very sharp British (now
+> grad-)student on automtic builds of .deb packages for all of CRAN.  
+> This
+> works
+> already really well for Debian testing -- see
+> http://debian.cran.r-project.org
+> We hope to extend that to Ubuntu one day.  Being able to 'apt-get  
+> install
+> r-cran-ANYTHING' for essentially 2000 values of ANYTHING is pretty  
+> neat, esp
+> as apt et al really do solve dependencies in a reliable way.
+>
+> A few packages fail to build, and phylobase is among them.  We build  
+> these
+> packages (just like normal Debian or Ubuntu packages) in restricted  
+> chroot
+> and that sometimes triggers erros we do not get in interactive  
+> shells. For
+> phylobase it is
+>
+> [...]
+> cendants.o phyloXX.o reorderBinary.o reorderRobust.o -LRcppSrc -lRcpp
+> -Lncl/ncl/.libs -lncl -L/usr/lib/R/lib -lR
+> /usr/bin/ld: cannot find -lncl
+>
+> and I think has to do with ncl using libtool, and the build running
+> configure
+> && make but not make install.  So src/ncl/ncl/.libs -- a temporary  
+> location
+> -- is the only one and that proves too unreliable here.
+>
+> On the other hand, if one also calls, say, in src/ncl/ncl
+>
+>    make install prefix=`pwd`/../..
+>
+> then src/lib/libncl.a is created with about 753kb on an amd64.  We  
+> could
+> then
+> link against this static library which would be easier, and we don;t  
+> need
+> ld.so or LD_LIBRARY_PATH or libtool magic.
+>
+> Another thing I noticed is that the packages uses the older  
+> RcppSrc.  After
+> Dominick stopped working on Rcpp (which he neglected from Nov 2006  
+> to Nov
+> 2009), I took over maintenance about a year ago.  If you look at the  
+> current
+> Rcpp package and say its examples/ directory you may get an idea.  In
+> essence, I maintained the API but made Rcpp a full-fledged CRAN  
+> package.  So
+> update.packages() gets you new versions including a new library that  
+> is
+> ready
+> to get linked against -- no more sources of RcppSrc/ in your  
+> project, no
+> more
+> build from configure etc pp.  I'd be happy to walk you through usage  
+> and
+> builds, and there are other example users.
+>
+> But fixing the build of phylobase w.r.t. nlc is more important.  If  
+> you
+> want,
+> I can work on a patch, or a tentative 0.5.0.1 that changes the build.
+>
+> Cheers, Dirk
+>
+> -- 
+> Three out of two people have difficulties with fractions.
+>
+> -- 
+> Ben Bolker
+> Associate professor, Biology Dep't, Univ. of Florida
+> bolker at ufl.edu / www.zoology.ufl.edu/bolker
+> GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+------------------------------------------------------
+Brian O'Meara
+http://www.brianomeara.info
+Assistant Prof.
+Dept. Ecology & Evolutionary Biology
+U. of Tennessee, Knoxville
+
+
+From francois.michonneau at gmail.com  Thu Dec 10 17:55:14 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Thu, 10 Dec 2009 11:55:14 -0500
+Subject: [Phylobase-devl] [Fwd: phylobase]
+In-Reply-To: <0121CC53-32D3-4173-A2C5-E7B2E271724B@gmail.com>
+References: <4B20F9B3.5060104@ufl.edu>
+	<0121CC53-32D3-4173-A2C5-E7B2E271724B@gmail.com>
+Message-ID: <1260464115.19297.641.camel@francois-laptop>
+
+
+  I'm planning to do a little bit of hacking on phylobase over the
+holidays.
+
+  For various reasons I had to play with libncl a couple of months ago,
+and I would be inclined to spend a little bit of time trying to improve
+the integration of libncl with phylobase. However, there are a few
+things I need to learn to this properly, so I can't guarantee I'll make
+much progress. I'll try though...
+
+  Cheers,
+  -- Fran?ois 
+
+On Thu, 2009-12-10 at 11:06 -0500, Brian O'Meara wrote:
+> Thanks for the info, Dirk. I was one of the two people responsible for  
+> the C++ code in phylobase, and I've consistently had trouble mastering  
+> build issues (this has come up in other code I've written, too). For  
+> my part, any patches you could provide to make this more robust would  
+> be great.
+> 
+> We included Rcpp sources in phylobase because, as you note, during the  
+> week we were first making phylobase Rcpp wasn't being maintained and,  
+> more importantly, it was only present on a subset of CRAN mirrors (I  
+> think we ended up getting it from Italy). Taking out the Rcpp source  
+> from phylobase and just requiring the Rcpp package makes a lot of  
+> sense to me, and I will look into doing this after the holidays.
+> 
+> Best,
+> Brian
+> 
+> On Dec 10, 2009, at 8:37 AM, Ben Bolker wrote:
+> 
+> >
+> >  The C++ interfacing is a fairly regular irritation for us, it would  
+> > be
+> > great to improve it/clean it up -- I'm cc'ing/forwarding this question
+> > to the rest of the dev team, some of whom may have more informed
+> > opinions (Brian?)
+> >
+> >  cheers
+> >    Ben
+> >
+> >
+> > -------- Original Message --------
+> > Subject: phylobase
+> > Date: Wed, 9 Dec 2009 23:07:13 -0500
+> > From: Dirk Eddelbuettel <edd at debian.org>
+> > To: Bolker,Benjamin Michael <bolker at ufl.edu>
+> >
+> >
+> > Hi Ben,
+> >
+> > I am writing to you in regards to phylobase for which you are listed  
+> > as the
+> > maintainer.
+> >
+> > As you may know, I have been working with a very sharp British (now
+> > grad-)student on automtic builds of .deb packages for all of CRAN.  
+> > This
+> > works
+> > already really well for Debian testing -- see
+> > http://debian.cran.r-project.org
+> > We hope to extend that to Ubuntu one day.  Being able to 'apt-get  
+> > install
+> > r-cran-ANYTHING' for essentially 2000 values of ANYTHING is pretty  
+> > neat, esp
+> > as apt et al really do solve dependencies in a reliable way.
+> >
+> > A few packages fail to build, and phylobase is among them.  We build  
+> > these
+> > packages (just like normal Debian or Ubuntu packages) in restricted  
+> > chroot
+> > and that sometimes triggers erros we do not get in interactive  
+> > shells. For
+> > phylobase it is
+> >
+> > [...]
+> > cendants.o phyloXX.o reorderBinary.o reorderRobust.o -LRcppSrc -lRcpp
+> > -Lncl/ncl/.libs -lncl -L/usr/lib/R/lib -lR
+> > /usr/bin/ld: cannot find -lncl
+> >
+> > and I think has to do with ncl using libtool, and the build running
+> > configure
+> > && make but not make install.  So src/ncl/ncl/.libs -- a temporary  
+> > location
+> > -- is the only one and that proves too unreliable here.
+> >
+> > On the other hand, if one also calls, say, in src/ncl/ncl
+> >
+> >    make install prefix=`pwd`/../..
+> >
+> > then src/lib/libncl.a is created with about 753kb on an amd64.  We  
+> > could
+> > then
+> > link against this static library which would be easier, and we don;t  
+> > need
+> > ld.so or LD_LIBRARY_PATH or libtool magic.
+> >
+> > Another thing I noticed is that the packages uses the older  
+> > RcppSrc.  After
+> > Dominick stopped working on Rcpp (which he neglected from Nov 2006  
+> > to Nov
+> > 2009), I took over maintenance about a year ago.  If you look at the  
+> > current
+> > Rcpp package and say its examples/ directory you may get an idea.  In
+> > essence, I maintained the API but made Rcpp a full-fledged CRAN  
+> > package.  So
+> > update.packages() gets you new versions including a new library that  
+> > is
+> > ready
+> > to get linked against -- no more sources of RcppSrc/ in your  
+> > project, no
+> > more
+> > build from configure etc pp.  I'd be happy to walk you through usage  
+> > and
+> > builds, and there are other example users.
+> >
+> > But fixing the build of phylobase w.r.t. nlc is more important.  If  
+> > you
+> > want,
+> > I can work on a patch, or a tentative 0.5.0.1 that changes the build.
+> >
+> > Cheers, Dirk
+> >
+> > -- 
+> > Three out of two people have difficulties with fractions.
+> >
+> > -- 
+> > Ben Bolker
+> > Associate professor, Biology Dep't, Univ. of Florida
+> > bolker at ufl.edu / www.zoology.ufl.edu/bolker
+> > GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+> >
+> > _______________________________________________
+> > Phylobase-devl mailing list
+> > Phylobase-devl at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+> ------------------------------------------------------
+> Brian O'Meara
+> http://www.brianomeara.info
+> Assistant Prof.
+> Dept. Ecology & Evolutionary Biology
+> U. of Tennessee, Knoxville
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091210/bb66139e/attachment.pgp 
+
+From omeara.brian at gmail.com  Thu Dec 10 18:24:10 2009
+From: omeara.brian at gmail.com (Brian O'Meara)
+Date: Thu, 10 Dec 2009 12:24:10 -0500
+Subject: [Phylobase-devl] [Fwd: phylobase]
+In-Reply-To: <19233.11159.584626.107750@ron.nulle.part>
+References: <4B20F9B3.5060104@ufl.edu>
+	<0121CC53-32D3-4173-A2C5-E7B2E271724B@gmail.com>
+	<19233.11159.584626.107750@ron.nulle.part>
+Message-ID: <14661239-B8D5-4B78-BFB0-0B99E76013BB@gmail.com>
+
+That sounds good to me. I don't think I have privileges to add you,  
+but you could request to join once you're logged into r-forge.
+
+Best,
+Brian
+
+On Dec 10, 2009, at 12:10 PM, Dirk Eddelbuettel wrote:
+
+>
+> On 10 December 2009 at 11:06, Brian O'Meara wrote:
+> | Thanks for the info, Dirk. I was one of the two people responsible  
+> for
+> | the C++ code in phylobase, and I've consistently had trouble  
+> mastering
+> | build issues (this has come up in other code I've written, too). For
+> | my part, any patches you could provide to make this more robust  
+> would
+> | be great.
+> |
+> | We included Rcpp sources in phylobase because, as you note, during  
+> the
+> | week we were first making phylobase Rcpp wasn't being maintained  
+> and,
+> | more importantly, it was only present on a subset of CRAN mirrors (I
+> | think we ended up getting it from Italy). Taking out the Rcpp source
+> | from phylobase and just requiring the Rcpp package makes a lot of
+> | sense to me, and I will look into doing this after the holidays.
+>
+> As this is on r-forge -- you could add me to the project I could  
+> simply commit
+> a patch that cleanly upgrades to Rcpp with proper 'R CMD check'  
+> behaviour etc.
+>
+> That's of course just a thought. I could also email you a diff.
+>
+> Dirk
+>
+> -- 
+> Three out of two people have difficulties with fractions.
+
+------------------------------------------------------
+Brian O'Meara
+http://www.brianomeara.info
+Assistant Prof.
+Dept. Ecology & Evolutionary Biology
+U. of Tennessee, Knoxville
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091210/9b36dd2c/attachment.htm 
+
+From edd at debian.org  Thu Dec 10 16:10:30 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 10 Dec 2009 09:10:30 -0600
+Subject: [Phylobase-devl] [Fwd: phylobase]
+In-Reply-To: <4B20F9B3.5060104@ufl.edu>
+References: <4B20F9B3.5060104@ufl.edu>
+Message-ID: <19233.3942.595276.23763@ron.nulle.part>
+
+
+On 10 December 2009 at 08:37, Ben Bolker wrote:
+|   The C++ interfacing is a fairly regular irritation for us, it would be
+| great to improve it/clean it up -- I'm cc'ing/forwarding this question
+| to the rest of the dev team, some of whom may have more informed
+| opinions (Brian?)
+
+I'd be glad to help -- Rcpp itself is r-forge and CRAN too.  
+
+I hope you find the package easier to use.  If your DESCRIPTION: has a
+Depends: Rcpp then all you need may be (and this is more verbose / longer than
+it needs to be -- and this is fron configure.in of the RProtoBuf package also
+on R-Forge)
+
+
+
+AC_DEFUN([AC_PROG_R], [AC_CHECK_PROG(R,R,yes)])
+AC_PROG_R
+
+## With thanks to Kurt
+: ${R_HOME=`R RHOME`}
+if test -z "${R_HOME}"; then
+    AC_MSG_ERROR([Could not determine R_HOME.])   
+fi
+CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
+
+## look for Rscript, but use the one found via R_HOME to allow for multiple installations
+AC_DEFUN([AC_PROG_RSCRIPT], [AC_CHECK_PROG(RSCRIPT,Rscript,yes)])
+AC_PROG_RSCRIPT
+if test x"${RSCRIPT}" == x"yes" ; then
+    ## Rcpp compile flag providing header directory containing Rcpp.h
+    rcpp_cxxflags=`${R_HOME}/bin/Rscript -e 'Rcpp:::CxxFlags()'`
+    ## link flag providing libary as well as path to library, and optionally rpath
+    rcpp_ldflags=`${R_HOME}/bin/Rscript -e 'Rcpp:::LdFlags()'`
+else
+    echo "
+  Your installation does not appear to have Rscript installed.
+
+  Please make sure that you have a working and complete R installation.
+"
+    exit 1
+fi
+
+
+
+Ie I ask Rcpp itself about values of -I and -L I need to use (thanks to a
+suggestion by Simon).  You then to paste the variab;e rcpp_cxxflags and
+rcpp_ldflags into the PKG_CPPFLAGS and PKG_LIBS as I do here (after having
+found values for the ProtoBuf lib):
+
+
+## now use all these
+AC_SUBST([PKG_CPPFLAGS],["${PKG_CPPFLAGS} $rcpp_cxxflags $protobuf_cxxflags"])
+AC_SUBST([PKG_LIBS],["${PKG_LIBS} $rcpp_ldflags $protobuf_libs"])
+AC_OUTPUT(src/Makevars)
+
+
+That should be it. Other than that, Rcpp.h receives updates required by more
+recent g++ versions and some more sanity w.r.t. to namespaces etc.  You may now
+need to call Rf_error() instead of error() but that should be it.
+
+Oh, one last thing: I like and prefer dynamic linking, but you can also link
+Rcpp statically as you currently do.  There is a 'static=FALSE)' argument to
+RcppLdFlags you could tickle.
+
+Dirk
+
+(PS Please forward to to the phylobase-dev list in case I can't post there as
+a non-subscriber)
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Thu Dec 10 18:10:47 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 10 Dec 2009 11:10:47 -0600
+Subject: [Phylobase-devl] [Fwd: phylobase]
+In-Reply-To: <0121CC53-32D3-4173-A2C5-E7B2E271724B@gmail.com>
+References: <4B20F9B3.5060104@ufl.edu>
+	<0121CC53-32D3-4173-A2C5-E7B2E271724B@gmail.com>
+Message-ID: <19233.11159.584626.107750@ron.nulle.part>
+
+
+On 10 December 2009 at 11:06, Brian O'Meara wrote:
+| Thanks for the info, Dirk. I was one of the two people responsible for  
+| the C++ code in phylobase, and I've consistently had trouble mastering  
+| build issues (this has come up in other code I've written, too). For  
+| my part, any patches you could provide to make this more robust would  
+| be great.
+| 
+| We included Rcpp sources in phylobase because, as you note, during the  
+| week we were first making phylobase Rcpp wasn't being maintained and,  
+| more importantly, it was only present on a subset of CRAN mirrors (I  
+| think we ended up getting it from Italy). Taking out the Rcpp source  
+| from phylobase and just requiring the Rcpp package makes a lot of  
+| sense to me, and I will look into doing this after the holidays.
+
+As this is on r-forge -- you could add me to the project I could simply commit
+a patch that cleanly upgrades to Rcpp with proper 'R CMD check' behaviour etc.
+
+That's of course just a thought. I could also email you a diff.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From omeara.brian at gmail.com  Tue Dec 15 21:26:13 2009
+From: omeara.brian at gmail.com (Brian O'Meara)
+Date: Tue, 15 Dec 2009 15:26:13 -0500
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+Message-ID: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+
+Hi, all. Dirk Eddelbuettel [1] has been working to pull Rcpp [2]  
+source code out from phylobase and make it a dependency instead. Rcpp  
+is used to interact with C++ code -- we included its source in  
+phylobase because we used it to interact with NCL but at the time Rcpp  
+was abandoned and not available in many CPAN mirrors, but it has since  
+been taken over by Dirk. His phylobase changes are committed to R- 
+forge trunk, but there are errors on the Mac build (see command check  
+[3]). Dirk's been debugging it (with me trying to help by typing what  
+I'm told to on my mac) but we're still running into problems. Anyone  
+else want to take a crack at it?
+
+Things to know:
+Rcpp Template will throw an error if you install from source. This is  
+known, and apparently not relevant to our problem.
+I'm getting errors like "i686-apple-darwin9-g++-4.2.1: PKG_LIBS=/ 
+Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/ 
+libRcpp.a: No such file or directory" when doing
+
+R CMD SHLIB PKG_CXXFLAGS="-I/Library/Frameworks/R.framework/Resources/ 
+library/Rcpp/lib/i386 -Incl/ncl" PKG_LIBS="/Library/Frameworks/ 
+R.framework/Resources/library/Rcpp/lib/i386/libRcpp.a -Lncl/ncl/.libs - 
+lncl" -o phylobase.dylib *cpp *c
+
+even though /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/ 
+i386/libRcpp.a clearly exists on my system:
+
+ls -ulth /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/ 
+i386/libRcpp.a
+-rw-r--r--  1 bomeara  admin   1.1M Dec 15 14:13 /Library/Frameworks/ 
+R.framework/Resources/library/Rcpp/lib/i386/libRcpp.a
+
+I'd suspect something off with just my system, other than the fact  
+that R-forge is also having issues.
+
+Thanks,
+Brian
+
+[1]: http://dirk.eddelbuettel.com/
+[2]: http://dirk.eddelbuettel.com/code/rcpp.html
+[3]: http://r-forge.r-project.org/R/?group_id=111&log=check_x86_64_mac&pkg=phylobase&flavor=patched
+
+------------------------------------------------------
+Brian O'Meara
+http://www.brianomeara.info
+Assistant Prof.
+Dept. Ecology & Evolutionary Biology
+U. of Tennessee, Knoxville
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20091215/dee8e431/attachment.htm 
+
+From hlapp at duke.edu  Tue Dec 15 21:54:06 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Tue, 15 Dec 2009 15:54:06 -0500
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+Message-ID: <323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+
+
+On Dec 15, 2009, at 3:26 PM, Brian O'Meara wrote:
+
+> PKG_LIBS=/Library/Frameworks/R.framework/Resources/library/Rcpp/lib/ 
+> i386/libRcpp.a: No such file or directory"
+> [...]
+> even though /Library/Frameworks/R.framework/Resources/library/Rcpp/ 
+> lib/i386/libRcpp.a clearly exists on my system:
+
+
+Is it a given that libRcpp.a is of the right architecture, and has  
+been compiled with a compatible compiler version?
+
+I've sometimes got these things when it turned out after some digging  
+that that was not the case (even though the library itself was there).
+
+	-hilmar
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+
+From hlapp at duke.edu  Tue Dec 15 23:02:59 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Tue, 15 Dec 2009 17:02:59 -0500
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <19240.429.241392.54333@ron.nulle.part>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+Message-ID: <91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+
+So what does file or otool say when you run it on the archive? Does it  
+confirm that it is the expected and desired architecture?
+
+	-hilmar
+
+On Dec 15, 2009, at 4:37 PM, Dirk Eddelbuettel wrote:
+
+>
+> On 15 December 2009 at 15:54, Hilmar Lapp wrote:
+> | On Dec 15, 2009, at 3:26 PM, Brian O'Meara wrote:
+> |
+> | > PKG_LIBS=/Library/Frameworks/R.framework/Resources/library/Rcpp/ 
+> lib/
+> | > i386/libRcpp.a: No such file or directory"
+> | > [...]
+> | > even though /Library/Frameworks/R.framework/Resources/library/ 
+> Rcpp/
+> | > lib/i386/libRcpp.a clearly exists on my system:
+> |
+> |
+> | Is it a given that libRcpp.a is of the right architecture, and has
+> | been compiled with a compatible compiler version?
+> |
+> | I've sometimes got these things when it turned out after some  
+> digging
+> | that that was not the case (even though the library itself was  
+> there).
+>
+> Good hunch.  As Brian and I check by looking at his 'R CMD INSTALL  
+> pkg' logs
+> for Rcpp, it does build three times (i386, ppc, x86_64) but each  
+> time we do
+>
+> userLibrary: 	$(USERLIB) $(USERLIBST)
+> 		- at if test ! -e $(USERDIR)$(R_ARCH); then mkdir -p $(USERDIR)$ 
+> (R_ARCH); fi
+> 		cp $(USERLIB) $(USERDIR)$(R_ARCH)
+> 		cp Rcpp*.h $(USERDIR)$(R_ARCH)
+> 		cp $(USERLIBST) $(USERDIR)$(R_ARCH)
+> 		rm $(USERLIB) $(USERLIBST)
+>
+> USERLIB is the dynamic library, USERLIBST is the static library.  
+> This should
+> rotate over the R_ARCH vales and copy appropriately.
+>
+> If someone has good OS X and wants to help Brian and myself...  I am  
+> at wit's
+> end (but I no close to nada about OS X).
+>
+> Dirk
+>
+>
+> -- 
+> Three out of two people have difficulties with fractions.
+
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+
+From omeara.brian at gmail.com  Tue Dec 15 23:12:44 2009
+From: omeara.brian at gmail.com (Brian O'Meara)
+Date: Tue, 15 Dec 2009 17:12:44 -0500
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+	<91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+Message-ID: <175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+
+
+On Dec 15, 2009, at 5:02 PM, Hilmar Lapp wrote:
+
+> So what does file or otool say when you run it on the archive? Does  
+> it confirm that it is the expected and desired architecture?
+>
+> 	-hilmar
+
+
+omearalab5:Sites bomeara$ otool -hv /Library/Frameworks/R.framework/ 
+Resources/library/Rcpp/lib/i386/libRcpp.a
+Archive : /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/ 
+i386/libRcpp.a
+/Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/ 
+libRcpp.a(Rcpp.o):
+Mach header
+       magic cputype cpusubtype  caps    filetype ncmds  
+sizeofcmds      flags
+    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1792  
+SUBSECTIONS_VIA_SYMBOLS
+/Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/ 
+libRcpp.a(RcppDate.o):
+Mach header
+       magic cputype cpusubtype  caps    filetype ncmds  
+sizeofcmds      flags
+    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1860  
+SUBSECTIONS_VIA_SYMBOLS
+/Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/ 
+libRcpp.a(RcppDatetime.o):
+Mach header
+       magic cputype cpusubtype  caps    filetype ncmds  
+sizeofcmds      flags
+    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1588  
+SUBSECTIONS_VIA_SYMBOLS
+/Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/ 
+libRcpp.a(RcppList.o):
+Mach header
+       magic cputype cpusubtype  caps    filetype ncmds  
+sizeofcmds      flags
+    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1792  
+SUBSECTIONS_VIA_SYMBOLS
+/Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/ 
+libRcpp.a(RcppParams.o):
+Mach header
+       magic cputype cpusubtype  caps    filetype ncmds  
+sizeofcmds      flags
+    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1792  
+SUBSECTIONS_VIA_SYMBOLS
+
+omearalab5:src bomeara$ file /Library/Frameworks/R.framework/Resources/ 
+library/Rcpp/lib/i386/libRcpp.a
+/Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/ 
+libRcpp.a: current ar archive
+
+I've also put a zipped version at <http://omearalab5.dyndns.org/~bomeara/libRcpp.a.zip 
+ > if you want to look at it.
+
+Thanks,
+Brian
+
+
+>
+> On Dec 15, 2009, at 4:37 PM, Dirk Eddelbuettel wrote:
+>
+>>
+>> On 15 December 2009 at 15:54, Hilmar Lapp wrote:
+>> | On Dec 15, 2009, at 3:26 PM, Brian O'Meara wrote:
+>> |
+>> | > PKG_LIBS=/Library/Frameworks/R.framework/Resources/library/Rcpp/ 
+>> lib/
+>> | > i386/libRcpp.a: No such file or directory"
+>> | > [...]
+>> | > even though /Library/Frameworks/R.framework/Resources/library/ 
+>> Rcpp/
+>> | > lib/i386/libRcpp.a clearly exists on my system:
+>> |
+>> |
+>> | Is it a given that libRcpp.a is of the right architecture, and has
+>> | been compiled with a compatible compiler version?
+>> |
+>> | I've sometimes got these things when it turned out after some  
+>> digging
+>> | that that was not the case (even though the library itself was  
+>> there).
+>>
+>> Good hunch.  As Brian and I check by looking at his 'R CMD INSTALL  
+>> pkg' logs
+>> for Rcpp, it does build three times (i386, ppc, x86_64) but each  
+>> time we do
+>>
+>> userLibrary: 	$(USERLIB) $(USERLIBST)
+>> 		- at if test ! -e $(USERDIR)$(R_ARCH); then mkdir -p $(USERDIR)$ 
+>> (R_ARCH); fi
+>> 		cp $(USERLIB) $(USERDIR)$(R_ARCH)
+>> 		cp Rcpp*.h $(USERDIR)$(R_ARCH)
+>> 		cp $(USERLIBST) $(USERDIR)$(R_ARCH)
+>> 		rm $(USERLIB) $(USERLIBST)
+>>
+>> USERLIB is the dynamic library, USERLIBST is the static library.  
+>> This should
+>> rotate over the R_ARCH vales and copy appropriately.
+>>
+>> If someone has good OS X and wants to help Brian and myself...  I  
+>> am at wit's
+>> end (but I no close to nada about OS X).
+>>
+>> Dirk
+>>
+>>
+>> -- 
+>> Three out of two people have difficulties with fractions.
+>
+> -- 
+> ===========================================================
+> : Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+> ===========================================================
+>
+>
+>
+>
+
+------------------------------------------------------
+Brian O'Meara
+http://www.brianomeara.info
+Assistant Prof.
+Dept. Ecology & Evolutionary Biology
+U. of Tennessee, Knoxville
+
+
+From hlapp at duke.edu  Tue Dec 15 23:20:12 2009
+From: hlapp at duke.edu (Hilmar Lapp)
+Date: Tue, 15 Dec 2009 17:20:12 -0500
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+	<91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+	<175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+Message-ID: <D9B64061-6106-4314-9B20-E2668A8ABFB7@duke.edu>
+
+Well, doesn't look suspicious at all, does it. Brian - that's of  
+course assuming that you *are* running on an Intel Mac, not a PPC.  
+Also, presumably it's all 32-bit compiled and R is 32-bit, or  
+alternatively everything is 64bit compiled, including R?
+
+I'm afraid I've run out of suggestions too...
+
+	-hilmar
+
+On Dec 15, 2009, at 5:12 PM, Brian O'Meara wrote:
+
+>
+> On Dec 15, 2009, at 5:02 PM, Hilmar Lapp wrote:
+>
+>> So what does file or otool say when you run it on the archive? Does
+>> it confirm that it is the expected and desired architecture?
+>>
+>> 	-hilmar
+>
+>
+> omearalab5:Sites bomeara$ otool -hv /Library/Frameworks/R.framework/
+> Resources/library/Rcpp/lib/i386/libRcpp.a
+> Archive : /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/
+> i386/libRcpp.a
+> /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/
+> libRcpp.a(Rcpp.o):
+> Mach header
+>       magic cputype cpusubtype  caps    filetype ncmds
+> sizeofcmds      flags
+>    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1792
+> SUBSECTIONS_VIA_SYMBOLS
+> /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/
+> libRcpp.a(RcppDate.o):
+> Mach header
+>       magic cputype cpusubtype  caps    filetype ncmds
+> sizeofcmds      flags
+>    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1860
+> SUBSECTIONS_VIA_SYMBOLS
+> /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/
+> libRcpp.a(RcppDatetime.o):
+> Mach header
+>       magic cputype cpusubtype  caps    filetype ncmds
+> sizeofcmds      flags
+>    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1588
+> SUBSECTIONS_VIA_SYMBOLS
+> /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/
+> libRcpp.a(RcppList.o):
+> Mach header
+>       magic cputype cpusubtype  caps    filetype ncmds
+> sizeofcmds      flags
+>    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1792
+> SUBSECTIONS_VIA_SYMBOLS
+> /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/
+> libRcpp.a(RcppParams.o):
+> Mach header
+>       magic cputype cpusubtype  caps    filetype ncmds
+> sizeofcmds      flags
+>    MH_MAGIC    I386        ALL  0x00      OBJECT     3       1792
+> SUBSECTIONS_VIA_SYMBOLS
+>
+> omearalab5:src bomeara$ file /Library/Frameworks/R.framework/ 
+> Resources/
+> library/Rcpp/lib/i386/libRcpp.a
+> /Library/Frameworks/R.framework/Resources/library/Rcpp/lib/i386/
+> libRcpp.a: current ar archive
+>
+> I've also put a zipped version at <http://omearalab5.dyndns.org/~bomeara/libRcpp.a.zip
+>> if you want to look at it.
+>
+> Thanks,
+> Brian
+>
+>
+>>
+>> On Dec 15, 2009, at 4:37 PM, Dirk Eddelbuettel wrote:
+>>
+>>>
+>>> On 15 December 2009 at 15:54, Hilmar Lapp wrote:
+>>> | On Dec 15, 2009, at 3:26 PM, Brian O'Meara wrote:
+>>> |
+>>> | > PKG_LIBS=/Library/Frameworks/R.framework/Resources/library/Rcpp/
+>>> lib/
+>>> | > i386/libRcpp.a: No such file or directory"
+>>> | > [...]
+>>> | > even though /Library/Frameworks/R.framework/Resources/library/
+>>> Rcpp/
+>>> | > lib/i386/libRcpp.a clearly exists on my system:
+>>> |
+>>> |
+>>> | Is it a given that libRcpp.a is of the right architecture, and has
+>>> | been compiled with a compatible compiler version?
+>>> |
+>>> | I've sometimes got these things when it turned out after some
+>>> digging
+>>> | that that was not the case (even though the library itself was
+>>> there).
+>>>
+>>> Good hunch.  As Brian and I check by looking at his 'R CMD INSTALL
+>>> pkg' logs
+>>> for Rcpp, it does build three times (i386, ppc, x86_64) but each
+>>> time we do
+>>>
+>>> userLibrary: 	$(USERLIB) $(USERLIBST)
+>>> 		- at if test ! -e $(USERDIR)$(R_ARCH); then mkdir -p $(USERDIR)$
+>>> (R_ARCH); fi
+>>> 		cp $(USERLIB) $(USERDIR)$(R_ARCH)
+>>> 		cp Rcpp*.h $(USERDIR)$(R_ARCH)
+>>> 		cp $(USERLIBST) $(USERDIR)$(R_ARCH)
+>>> 		rm $(USERLIB) $(USERLIBST)
+>>>
+>>> USERLIB is the dynamic library, USERLIBST is the static library.
+>>> This should
+>>> rotate over the R_ARCH vales and copy appropriately.
+>>>
+>>> If someone has good OS X and wants to help Brian and myself...  I
+>>> am at wit's
+>>> end (but I no close to nada about OS X).
+>>>
+>>> Dirk
+>>>
+>>>
+>>> -- 
+>>> Three out of two people have difficulties with fractions.
+>>
+>> -- 
+>> ===========================================================
+>> : Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+>> ===========================================================
+>>
+>>
+>>
+>>
+>
+> ------------------------------------------------------
+> Brian O'Meara
+> http://www.brianomeara.info
+> Assistant Prof.
+> Dept. Ecology & Evolutionary Biology
+> U. of Tennessee, Knoxville
+>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+-- 
+===========================================================
+: Hilmar Lapp  -:-  Durham, NC  -:- hlapp at duke dot edu :
+===========================================================
+
+
+
+
+
+From edd at debian.org  Wed Dec 16 13:36:17 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 16 Dec 2009 06:36:17 -0600
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <D9B64061-6106-4314-9B20-E2668A8ABFB7@duke.edu>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+	<91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+	<175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+	<D9B64061-6106-4314-9B20-E2668A8ABFB7@duke.edu>
+Message-ID: <19240.54337.548558.866458@ron.nulle.part>
+
+
+If we look at the build log for OS X at R-Forge:
+https://r-forge.r-project.org/R/?group_id=155&log=build_mac&pkg=Rcpp&flavor=patched
+then Rcpp clearly has its .dylib and .a built for i386, ppc and x86_64 in the
+respective Rcpp/lib/$arch/ directory:
+
+[...]
+Rcpp/lib/i386/libRcpp.a
+Rcpp/lib/i386/libRcpp.dylib
+Rcpp/lib/ppc/
+Rcpp/lib/ppc/Rcpp.h
+[...]
+Rcpp/lib/ppc/libRcpp.a
+Rcpp/lib/ppc/libRcpp.dylib
+Rcpp/lib/x86_64/
+Rcpp/lib/x86_64/Rcpp.h
+[...]
+Rcpp/lib/x86_64/libRcpp.a
+Rcpp/lib/x86_64/libRcpp.dylib
+Rcpp/libs/
+Rcpp/libs/i386/
+Rcpp/libs/i386/Rcpp.so
+Rcpp/libs/ppc/
+Rcpp/libs/ppc/Rcpp.so
+Rcpp/libs/x86_64/
+Rcpp/libs/x86_64/Rcpp.so
+Run time: 67.21 seconds.
+
+What I don't understand is why the lib that R loads itself (in the Rcpp/libs/
+directory) is a .so.  Is that how it is supposed to be OS X?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From hlapp at nescent.org  Wed Dec 16 15:19:32 2009
+From: hlapp at nescent.org (Hilmar Lapp)
+Date: Wed, 16 Dec 2009 09:19:32 -0500
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <19240.54337.548558.866458@ron.nulle.part>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+	<91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+	<175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+	<D9B64061-6106-4314-9B20-E2668A8ABFB7@duke.edu>
+	<19240.54337.548558.866458@ron.nulle.part>
+Message-ID: <D35749F3-D44C-466F-A323-BA766C4EC30A@nescent.org>
+
+
+On Dec 16, 2009, at 7:36 AM, Dirk Eddelbuettel wrote:
+
+> What I don't understand is why the lib that R loads itself (in the  
+> Rcpp/libs/
+> directory) is a .so.  Is that how it is supposed to be OS X?
+
+
+No, it's the .dylib that it's supposed to be loading.
+
+	-hilmar
+-- 
+===========================================================
+: Hilmar Lapp  -:- Durham, NC -:- informatics.nescent.org :
+===========================================================
+
+
+
+
+From edd at debian.org  Wed Dec 16 16:06:09 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 16 Dec 2009 09:06:09 -0600
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <D35749F3-D44C-466F-A323-BA766C4EC30A@nescent.org>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+	<91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+	<175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+	<D9B64061-6106-4314-9B20-E2668A8ABFB7@duke.edu>
+	<19240.54337.548558.866458@ron.nulle.part>
+	<D35749F3-D44C-466F-A323-BA766C4EC30A@nescent.org>
+Message-ID: <19240.63329.773495.454118@ron.nulle.part>
+
+
+On 16 December 2009 at 09:19, Hilmar Lapp wrote:
+| On Dec 16, 2009, at 7:36 AM, Dirk Eddelbuettel wrote:
+| 
+| > What I don't understand is why the lib that R loads itself (in the  
+| > Rcpp/libs/
+| > directory) is a .so.  Is that how it is supposed to be OS X?
+| 
+| 
+| No, it's the .dylib that it's supposed to be loading.
+
+Ok, maybe Hilmar, Brian and I should take this off-list then.  My best idea
+(being the OS X ignoramus that I am) were to look at two other (and small !!)
+package that also link against Rcpp:
+
+ -- Earth Mover Distance
+    https://r-forge.r-project.org/projects/earthmovdist/
+    No log at R-Forge because no recent changes
+
+ -- RInside
+    https://r-forge.r-project.org/projects/rinside/
+    No log at R-Forge because I had a stupid mistake in a change
+    on Sunday that I fixed yesterday -- will work now but hasn't been
+    rebuilt on R-Forge yet
+
+We simply need a smaller working example, see the exact gcc invocation on OS
+X and then compare what the more complicated (as ncl enters etc) phylobase
+does.  This ain't brain surgery and we will get this fixed.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From pdc at berkeley.edu  Wed Dec 16 19:16:13 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Wed, 16 Dec 2009 10:16:13 -0800
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <19240.63329.773495.454118@ron.nulle.part>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+	<91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+	<175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+	<D9B64061-6106-4314-9B20-E2668A8ABFB7@duke.edu>
+	<19240.54337.548558.866458@ron.nulle.part>
+	<D35749F3-D44C-466F-A323-BA766C4EC30A@nescent.org>
+	<19240.63329.773495.454118@ron.nulle.part>
+Message-ID: <9D875E18-54B0-4F6F-A443-989B8F568CF6@berkeley.edu>
+
+
+On Dec 16, 2009, at 7:06 AM, Dirk Eddelbuettel wrote:
+
+> 
+> On 16 December 2009 at 09:19, Hilmar Lapp wrote:
+> | On Dec 16, 2009, at 7:36 AM, Dirk Eddelbuettel wrote:
+> | 
+> | > What I don't understand is why the lib that R loads itself (in the  
+> | > Rcpp/libs/
+> | > directory) is a .so.  Is that how it is supposed to be OS X?
+> | 
+> | 
+> | No, it's the .dylib that it's supposed to be loading.
+> 
+> Ok, maybe Hilmar, Brian and I should take this off-list then.  My best idea
+> (being the OS X ignoramus that I am) were to look at two other (and small !!)
+> package that also link against Rcpp:
+> 
+> -- Earth Mover Distance
+>    https://r-forge.r-project.org/projects/earthmovdist/
+>    No log at R-Forge because no recent changes
+> 
+> -- RInside
+>    https://r-forge.r-project.org/projects/rinside/
+>    No log at R-Forge because I had a stupid mistake in a change
+>    on Sunday that I fixed yesterday -- will work now but hasn't been
+>    rebuilt on R-Forge yet
+> 
+> We simply need a smaller working example, see the exact gcc invocation on OS
+> X and then compare what the more complicated (as ncl enters etc) phylobase
+> does.  This ain't brain surgery and we will get this fixed.
+
+I don't mind if this stays on list.  Many of us are OS X users, but don't understand the build process very well.
+
+I've had similar problems in the past, and attributed it to NCL not being build using the R make variables.  This is what I *thought* was going on, it might be completely off base.  From 10.5 to 10.6 Apple changed the default build architecture from i386 to x86_64.  R has typically been distributed as a 32 bit (i386) build.  So all was fine when NCL was building as the default in 10.5, but when moving to 10.6 32 bit R and the default build doesn't work.  So I use the 64bit build of R to install and run phylobase and it works fine.  But, doesn't constitute a general solution.
+
+I'm sure the make files for NCL could be greatly simplified which could help. But, it is currently beyond my abilities, and I don't currently have the time to learn the make.
+
+Peter
+
+
+> Dirk
+> 
+> -- 
+> Three out of two people have difficulties with fractions.
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From edd at debian.org  Wed Dec 16 20:15:18 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 16 Dec 2009 13:15:18 -0600
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <9D875E18-54B0-4F6F-A443-989B8F568CF6@berkeley.edu>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+	<91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+	<175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+	<D9B64061-6106-4314-9B20-E2668A8ABFB7@duke.edu>
+	<19240.54337.548558.866458@ron.nulle.part>
+	<D35749F3-D44C-466F-A323-BA766C4EC30A@nescent.org>
+	<19240.63329.773495.454118@ron.nulle.part>
+	<9D875E18-54B0-4F6F-A443-989B8F568CF6@berkeley.edu>
+Message-ID: <19241.12742.508431.25007@ron.nulle.part>
+
+
+On 16 December 2009 at 10:16, Peter Cowan wrote:
+| On Dec 16, 2009, at 7:06 AM, Dirk Eddelbuettel wrote:
+| 
+| > 
+| > On 16 December 2009 at 09:19, Hilmar Lapp wrote:
+| > | On Dec 16, 2009, at 7:36 AM, Dirk Eddelbuettel wrote:
+| > | 
+| > | > What I don't understand is why the lib that R loads itself (in the  
+| > | > Rcpp/libs/
+| > | > directory) is a .so.  Is that how it is supposed to be OS X?
+| > | 
+| > | 
+| > | No, it's the .dylib that it's supposed to be loading.
+| > 
+| > Ok, maybe Hilmar, Brian and I should take this off-list then.  My best idea
+| > (being the OS X ignoramus that I am) were to look at two other (and small !!)
+| > package that also link against Rcpp:
+| > 
+| > -- Earth Mover Distance
+| >    https://r-forge.r-project.org/projects/earthmovdist/
+| >    No log at R-Forge because no recent changes
+| > 
+| > -- RInside
+| >    https://r-forge.r-project.org/projects/rinside/
+| >    No log at R-Forge because I had a stupid mistake in a change
+| >    on Sunday that I fixed yesterday -- will work now but hasn't been
+| >    rebuilt on R-Forge yet
+| > 
+| > We simply need a smaller working example, see the exact gcc invocation on OS
+| > X and then compare what the more complicated (as ncl enters etc) phylobase
+| > does.  This ain't brain surgery and we will get this fixed.
+| 
+| I don't mind if this stays on list.  Many of us are OS X users, but don't understand the build process very well.
+
+Ok. I keep railing then :) I understand the build process [ and there is only
+one lesson: let R do as much as possible and don;t get in the way; Simon
+Urbanek drilled that into my head with some success ... ] but am clueless
+with OS X.
+ 
+| I've had similar problems in the past, and attributed it to NCL not being
+| build using the R make variables.  This is what I *thought* was going on,
+| it might be completely off base.  From 10.5 to 10.6 Apple changed the
+| default build architecture from i386 to x86_64.  R has typically been
+| distributed as a 32 bit (i386) build.  So all was fine when NCL was
+| building as the default in 10.5, but when moving to 10.6 32 bit R and the
+| default build doesn't work.  So I use the 64bit build of R to install and
+| run phylobase and it works fine.  But, doesn't constitute a general
+| solution. 
+
+I got to this via the automated generation of binary CRAN package in .deb
+form which I do at http://debian.cran.r-project.org.  phylobase failed
+miserably, and I blame ncl.  The configure files are old and should get
+replaced.  For Linux, I essentially sidestepped ncl's configure and used
+Makefile.win with one modification. Then it worked. That would not work for
+OS X due to multiarch.  But we will get to that.
+
+That said, we currently have an issue with a part I am maintaining (Rcpp) and
+I would like that squared off first.
+
+Hence my request (see above in the quoted part) for an OS X volunteer to
+look with me off-line at success / failure of RInside or EarthMovDist.
+
+| I'm sure the make files for NCL could be greatly simplified which could
+| help. But, it is currently beyond my abilities, and I don't currently have
+| the time to learn the make. 
+
+Ideally we would able to assume that the user has already installed ncl. In
+the real world down here that may never be the case, alas.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From omeara.brian at gmail.com  Thu Dec 17 17:43:24 2009
+From: omeara.brian at gmail.com (Brian O'Meara)
+Date: Thu, 17 Dec 2009 11:43:24 -0500
+Subject: [Phylobase-devl] Rcpp and OS X compiliation
+In-Reply-To: <19241.12742.508431.25007@ron.nulle.part>
+References: <278329D6-807D-49F4-B897-FD2E6C8E745F@gmail.com>
+	<323875C5-01E4-447E-AA92-F7AF98423CC4@duke.edu>
+	<19240.429.241392.54333@ron.nulle.part>
+	<91D5F7FF-5EC0-4D82-AB65-FCFC02D26BDC@duke.edu>
+	<175ED0CA-E864-4F50-B47D-B93EB904C28E@gmail.com>
+	<D9B64061-6106-4314-9B20-E2668A8ABFB7@duke.edu>
+	<19240.54337.548558.866458@ron.nulle.part>
+	<D35749F3-D44C-466F-A323-BA766C4EC30A@nescent.org>
+	<19240.63329.773495.454118@ron.nulle.part>
+	<9D875E18-54B0-4F6F-A443-989B8F568CF6@berkeley.edu>
+	<19241.12742.508431.25007@ron.nulle.part>
+Message-ID: <01B10F17-F7C3-4074-A1E4-63214E0E66D2@gmail.com>
+
+
+On Dec 16, 2009, at 2:15 PM, Dirk Eddelbuettel wrote:
+
+>
+> On 16 December 2009 at 10:16, Peter Cowan wrote:
+> | On Dec 16, 2009, at 7:06 AM, Dirk Eddelbuettel wrote:
+> |
+> | >
+> | > On 16 December 2009 at 09:19, Hilmar Lapp wrote:
+> | > | On Dec 16, 2009, at 7:36 AM, Dirk Eddelbuettel wrote:
+> | > |
+> | > | > What I don't understand is why the lib that R loads itself  
+> (in the
+> | > | > Rcpp/libs/
+> | > | > directory) is a .so.  Is that how it is supposed to be OS X?
+> | > |
+> | > |
+> | > | No, it's the .dylib that it's supposed to be loading.
+> | >
+> | > Ok, maybe Hilmar, Brian and I should take this off-list then.   
+> My best idea
+> | > (being the OS X ignoramus that I am) were to look at two other  
+> (and small !!)
+> | > package that also link against Rcpp:
+> | >
+> | > -- Earth Mover Distance
+> | >    https://r-forge.r-project.org/projects/earthmovdist/
+> | >    No log at R-Forge because no recent changes
+> | >
+> | > -- RInside
+> | >    https://r-forge.r-project.org/projects/rinside/
+> | >    No log at R-Forge because I had a stupid mistake in a change
+> | >    on Sunday that I fixed yesterday -- will work now but hasn't  
+> been
+> | >    rebuilt on R-Forge yet
+> | >
+> | > We simply need a smaller working example, see the exact gcc  
+> invocation on OS
+> | > X and then compare what the more complicated (as ncl enters etc)  
+> phylobase
+> | > does.  This ain't brain surgery and we will get this fixed.
+> |
+> | I don't mind if this stays on list.  Many of us are OS X users,  
+> but don't understand the build process very well.
+>
+> Ok. I keep railing then :) I understand the build process [ and  
+> there is only
+> one lesson: let R do as much as possible and don;t get in the way;  
+> Simon
+> Urbanek drilled that into my head with some success ... ] but am  
+> clueless
+> with OS X.
+>
+> | I've had similar problems in the past, and attributed it to NCL  
+> not being
+> | build using the R make variables.  This is what I *thought* was  
+> going on,
+> | it might be completely off base.  From 10.5 to 10.6 Apple changed  
+> the
+> | default build architecture from i386 to x86_64.  R has typically  
+> been
+> | distributed as a 32 bit (i386) build.  So all was fine when NCL was
+> | building as the default in 10.5, but when moving to 10.6 32 bit R  
+> and the
+> | default build doesn't work.  So I use the 64bit build of R to  
+> install and
+> | run phylobase and it works fine.  But, doesn't constitute a general
+> | solution.
+>
+> I got to this via the automated generation of binary CRAN package  
+> in .deb
+> form which I do at http://debian.cran.r-project.org.  phylobase failed
+> miserably, and I blame ncl.  The configure files are old and should  
+> get
+> replaced.  For Linux, I essentially sidestepped ncl's configure and  
+> used
+> Makefile.win with one modification. Then it worked. That would not  
+> work for
+> OS X due to multiarch.  But we will get to that.
+>
+> That said, we currently have an issue with a part I am maintaining  
+> (Rcpp) and
+> I would like that squared off first.
+>
+> Hence my request (see above in the quoted part) for an OS X  
+> volunteer to
+> look with me off-line at success / failure of RInside or EarthMovDist.
+
+I would be able to do this after Jan 9 (trying to get a grant in by  
+NSF's deadline), but someone else should feel free to jump in.
+
+Thanks, all.
+
+Brian
+
+
+>
+> | I'm sure the make files for NCL could be greatly simplified which  
+> could
+> | help. But, it is currently beyond my abilities, and I don't  
+> currently have
+> | the time to learn the make.
+>
+> Ideally we would able to assume that the user has already installed  
+> ncl. In
+> the real world down here that may never be the case, alas.
+>
+> Dirk
+>
+> -- 
+> Three out of two people have difficulties with fractions.
+
+------------------------------------------------------
+Brian O'Meara
+http://www.brianomeara.info
+Assistant Prof.
+Dept. Ecology & Evolutionary Biology
+U. of Tennessee, Knoxville
+
+

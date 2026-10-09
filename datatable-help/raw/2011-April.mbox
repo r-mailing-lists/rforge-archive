@@ -1,0 +1,3642 @@
+From daniele.amberti at ors.it  Tue Apr  5 09:34:32 2011
+From: daniele.amberti at ors.it (Daniele Amberti)
+Date: Tue, 5 Apr 2011 09:34:32 +0200
+Subject: [datatable-help] How to speed up grouping time series, help please
+Message-ID: <5C57984CA179A247803E12AAB0F7ABA6DB20979608@adorsmail01.ors.local>
+
+I retrieve for a few hundred times a group of time series (10-15 ts with 10000 values each), on every group I do some calculation, graphs etc. I wonder if there is a faster method than what presented below to get an appropriate timeseries object.
+
+Making a query with RODBC for every group I get a data frame like this:
+
+> X
+  ID                DATE     VALUE
+14  3 2000-01-01 00:00:03 0.5726334
+4   1 2000-01-01 00:00:03 0.8830174
+1   1 2000-01-01 00:00:00 0.2875775
+15  3 2000-01-01 00:00:04 0.1029247
+11  3 2000-01-01 00:00:00 0.9568333
+9   2 2000-01-01 00:00:03 0.5514350
+7   2 2000-01-01 00:00:01 0.5281055
+6   2 2000-01-01 00:00:00 0.0455565
+12  3 2000-01-01 00:00:01 0.4533342
+8   2 2000-01-01 00:00:02 0.8924190
+3   1 2000-01-01 00:00:02 0.4089769
+13  3 2000-01-01 00:00:02 0.6775706
+
+And I want to get a timeSeries object or xts object like this:
+
+                           1         2         3
+2000-01-01 00:00:00 0.2875775 0.0455565 0.9568333
+2000-01-01 00:00:01        NA 0.5281055 0.4533342
+2000-01-01 00:00:02 0.4089769 0.8924190 0.6775706
+2000-01-01 00:00:03 0.8830174 0.5514350 0.5726334
+2000-01-01 00:00:04        NA        NA 0.1029247
+
+Both classes accept a matrix so if I can create a matrix like the one represented above and an array of characters representing dates faster than what possible with xts:::merge, for example, I will have a faster implementation, this is the reason why I'm writing to datatable-help; I red vignettes, tests and did tests trying to generate a set of data.table (using .SD and by = ID) an then CJ but without success up to now, any input to test this approach will be really appreciate.
+
+Input data can be sorted or unsorted (the most complicated case is in the example, unsorted and missing data) in the sense that I can  sort in query if I can take an advantage from this.
+
+Below some code to generate the test case above.
+
+Thanks in advance for any input, best regards,
+Daniele
+
+
+set.seed(123)
+N <- 100 # number of observations, use 5 to replicate test case above
+K <- 3   # number of timeseries ID
+
+X <- data.frame(
+ ID = rep(1:K, each = N),
+ DATE = as.character(rep(as.POSIXct("2000-01-01", tz = "GMT")+ 0:(N-1), K)),
+ VALUE = runif(N*K), stringsAsFactors = FALSE)
+
+X <- X[sample(1:(N*K), N*K),] # sample observations to get random order (optional)
+X <- X[-(sample(1:nrow(X), floor(nrow(X)*0.2))),] # 20% missing
+
+head(X, 15)
+
+
+# an implementation in xts:
+xtsSplit <- function(x)
+{
+ library(xts)
+ x <- xts(x[,c("ID","VALUE")], as.POSIXct(x[,"DATE"]))
+ x <- do.call(merge, split(x$VALUE,x$ID))
+ return(x)
+}
+
+xtsSplitTime <- replicate(50,
+ system.time(xtsSplit(X))[[1]])
+median(xtsTime)
+
+
+ORS Srl
+
+Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+Tel. +39 0173 620211
+Fax. +39 0173 620299 / +39 0173 433111
+Web Site www.ors.it
+
+------------------------------------------------------------------------------------------------------------------------
+Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi allegati ? vietato e potrebbe costituire reato.
+Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se provvedesse alla distruzione dello stesso
+e degli eventuali allegati.
+Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non siano relative alle attivit? e/o
+alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla societ? stessa, n? la impegnano in alcun modo.
+
+From mdowle at mdowle.plus.com  Tue Apr  5 14:19:57 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 5 Apr 2011 13:19:57 +0100
+Subject: [datatable-help] How to speed up grouping time series,
+	help please
+References: <5C57984CA179A247803E12AAB0F7ABA6DB20979608@adorsmail01.ors.local>
+Message-ID: <inf1df$ive$1@dough.gmane.org>
+
+It's easier to help if you provide timings along with your example 
+reproducible code, please.
+How long is it taking, and how long do you think it should take?
+Please also try to avoid phrases such as "without success". Does that mean 
+you got an error
+message (if so, what was it) or wrong result (if so, what was wrong)?
+Matthew
+
+"Daniele Amberti" <daniele.amberti at ors.it> wrote in message 
+news:5C57984CA179A247803E12AAB0F7ABA6DB20979608 at adorsmail01.ors.local...
+>I retrieve for a few hundred times a group of time series (10-15 ts with 
+>10000 values each), on every group I do some calculation, graphs etc. I 
+>wonder if there is a faster method than what presented below to get an 
+>appropriate timeseries object.
+>
+> Making a query with RODBC for every group I get a data frame like this:
+>
+>> X
+>  ID                DATE     VALUE
+> 14  3 2000-01-01 00:00:03 0.5726334
+> 4   1 2000-01-01 00:00:03 0.8830174
+> 1   1 2000-01-01 00:00:00 0.2875775
+> 15  3 2000-01-01 00:00:04 0.1029247
+> 11  3 2000-01-01 00:00:00 0.9568333
+> 9   2 2000-01-01 00:00:03 0.5514350
+> 7   2 2000-01-01 00:00:01 0.5281055
+> 6   2 2000-01-01 00:00:00 0.0455565
+> 12  3 2000-01-01 00:00:01 0.4533342
+> 8   2 2000-01-01 00:00:02 0.8924190
+> 3   1 2000-01-01 00:00:02 0.4089769
+> 13  3 2000-01-01 00:00:02 0.6775706
+>
+> And I want to get a timeSeries object or xts object like this:
+>
+>                           1         2         3
+> 2000-01-01 00:00:00 0.2875775 0.0455565 0.9568333
+> 2000-01-01 00:00:01        NA 0.5281055 0.4533342
+> 2000-01-01 00:00:02 0.4089769 0.8924190 0.6775706
+> 2000-01-01 00:00:03 0.8830174 0.5514350 0.5726334
+> 2000-01-01 00:00:04        NA        NA 0.1029247
+>
+> Both classes accept a matrix so if I can create a matrix like the one 
+> represented above and an array of characters representing dates faster 
+> than what possible with xts:::merge, for example, I will have a faster 
+> implementation, this is the reason why I'm writing to datatable-help; I 
+> red vignettes, tests and did tests trying to generate a set of data.table 
+> (using .SD and by = ID) an then CJ but without success up to now, any 
+> input to test this approach will be really appreciate.
+>
+> Input data can be sorted or unsorted (the most complicated case is in the 
+> example, unsorted and missing data) in the sense that I can  sort in query 
+> if I can take an advantage from this.
+>
+> Below some code to generate the test case above.
+>
+> Thanks in advance for any input, best regards,
+> Daniele
+>
+>
+> set.seed(123)
+> N <- 100 # number of observations, use 5 to replicate test case above
+> K <- 3   # number of timeseries ID
+>
+> X <- data.frame(
+> ID = rep(1:K, each = N),
+> DATE = as.character(rep(as.POSIXct("2000-01-01", tz = "GMT")+ 0:(N-1), 
+> K)),
+> VALUE = runif(N*K), stringsAsFactors = FALSE)
+>
+> X <- X[sample(1:(N*K), N*K),] # sample observations to get random order 
+> (optional)
+> X <- X[-(sample(1:nrow(X), floor(nrow(X)*0.2))),] # 20% missing
+>
+> head(X, 15)
+>
+>
+> # an implementation in xts:
+> xtsSplit <- function(x)
+> {
+> library(xts)
+> x <- xts(x[,c("ID","VALUE")], as.POSIXct(x[,"DATE"]))
+> x <- do.call(merge, split(x$VALUE,x$ID))
+> return(x)
+> }
+>
+> xtsSplitTime <- replicate(50,
+> system.time(xtsSplit(X))[[1]])
+> median(xtsTime)
+>
+>
+> ORS Srl
+>
+> Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+> Tel. +39 0173 620211
+> Fax. +39 0173 620299 / +39 0173 433111
+> Web Site www.ors.it
+>
+> ------------------------------------------------------------------------------------------------------------------------
+> Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi 
+> allegati ? vietato e potrebbe costituire reato.
+> Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se 
+> provvedesse alla distruzione dello stesso
+> e degli eventuali allegati.
+> Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non 
+> siano relative alle attivit? e/o
+> alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla 
+> societ? stessa, n? la impegnano in alcun modo.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+
+
+
+
+From daniele.amberti at ors.it  Tue Apr  5 15:12:03 2011
+From: daniele.amberti at ors.it (Daniele Amberti)
+Date: Tue, 5 Apr 2011 15:12:03 +0200
+Subject: [datatable-help] How to speed up grouping time series,
+ help please
+In-Reply-To: <inf1df$ive$1@dough.gmane.org>
+References: <5C57984CA179A247803E12AAB0F7ABA6DB20979608@adorsmail01.ors.local>
+	<inf1df$ive$1@dough.gmane.org>
+Message-ID: <5C57984CA179A247803E12AAB0F7ABA6EB072D2DD9@adorsmail01.ors.local>
+
+Thanks for Your reply Matthew,
+On 10 ts, 10000 values each, it takes 5.7 seconds to reshape, I'm willing to reduce time at least by the half reducing my total batch time by 10 minutes approximately (over 70 minutes total).
+
+I'm trying to do something like:
+do.call(merge, x[, .SD, by=ID]) but data.table is not designed to work this way (return a data.table), there is no problem in data.table itself.
+I'm trying to extract K (10) data.table from  a data.table with keys ID, DATE and then CJ.
+
+
+Thanks in advance for any help.
+Best regards,
+Daniele
+
+-----Original Message-----
+From: datatable-help-bounces at r-forge.wu-wien.ac.at [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Matthew Dowle
+Sent: 05 April 2011 14:20
+To: datatable-help at r-forge.wu-wien.ac.at
+Subject: Re: [datatable-help] How to speed up grouping time series,help please
+
+It's easier to help if you provide timings along with your example reproducible code, please.
+How long is it taking, and how long do you think it should take?
+Please also try to avoid phrases such as "without success". Does that mean you got an error message (if so, what was it) or wrong result (if so, what was wrong)?
+Matthew
+
+"Daniele Amberti" <daniele.amberti at ors.it> wrote in message news:5C57984CA179A247803E12AAB0F7ABA6DB20979608 at adorsmail01.ors.local...
+>I retrieve for a few hundred times a group of time series (10-15 ts
+>with 10000 values each), on every group I do some calculation, graphs
+>etc. I wonder if there is a faster method than what presented below to
+>get an appropriate timeseries object.
+>
+> Making a query with RODBC for every group I get a data frame like this:
+>
+>> X
+>  ID                DATE     VALUE
+> 14  3 2000-01-01 00:00:03 0.5726334
+> 4   1 2000-01-01 00:00:03 0.8830174
+> 1   1 2000-01-01 00:00:00 0.2875775
+> 15  3 2000-01-01 00:00:04 0.1029247
+> 11  3 2000-01-01 00:00:00 0.9568333
+> 9   2 2000-01-01 00:00:03 0.5514350
+> 7   2 2000-01-01 00:00:01 0.5281055
+> 6   2 2000-01-01 00:00:00 0.0455565
+> 12  3 2000-01-01 00:00:01 0.4533342
+> 8   2 2000-01-01 00:00:02 0.8924190
+> 3   1 2000-01-01 00:00:02 0.4089769
+> 13  3 2000-01-01 00:00:02 0.6775706
+>
+> And I want to get a timeSeries object or xts object like this:
+>
+>                           1         2         3
+> 2000-01-01 00:00:00 0.2875775 0.0455565 0.9568333
+> 2000-01-01 00:00:01        NA 0.5281055 0.4533342
+> 2000-01-01 00:00:02 0.4089769 0.8924190 0.6775706
+> 2000-01-01 00:00:03 0.8830174 0.5514350 0.5726334
+> 2000-01-01 00:00:04        NA        NA 0.1029247
+>
+> Both classes accept a matrix so if I can create a matrix like the one
+> represented above and an array of characters representing dates faster
+> than what possible with xts:::merge, for example, I will have a faster
+> implementation, this is the reason why I'm writing to datatable-help;
+> I red vignettes, tests and did tests trying to generate a set of
+> data.table (using .SD and by = ID) an then CJ but without success up
+> to now, any input to test this approach will be really appreciate.
+>
+> Input data can be sorted or unsorted (the most complicated case is in
+> the example, unsorted and missing data) in the sense that I can  sort
+> in query if I can take an advantage from this.
+>
+> Below some code to generate the test case above.
+>
+> Thanks in advance for any input, best regards, Daniele
+>
+>
+> set.seed(123)
+> N <- 100 # number of observations, use 5 to replicate test case above
+> K <- 3   # number of timeseries ID
+>
+> X <- data.frame(
+> ID = rep(1:K, each = N),
+> DATE = as.character(rep(as.POSIXct("2000-01-01", tz = "GMT")+ 0:(N-1),
+> K)),
+> VALUE = runif(N*K), stringsAsFactors = FALSE)
+>
+> X <- X[sample(1:(N*K), N*K),] # sample observations to get random order
+> (optional)
+> X <- X[-(sample(1:nrow(X), floor(nrow(X)*0.2))),] # 20% missing
+>
+> head(X, 15)
+>
+>
+> # an implementation in xts:
+> xtsSplit <- function(x)
+> {
+> library(xts)
+> x <- xts(x[,c("ID","VALUE")], as.POSIXct(x[,"DATE"]))
+> x <- do.call(merge, split(x$VALUE,x$ID))
+> return(x)
+> }
+>
+> xtsSplitTime <- replicate(50,
+> system.time(xtsSplit(X))[[1]])
+> median(xtsTime)
+>
+>
+> ORS Srl
+>
+> Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+> Tel. +39 0173 620211
+> Fax. +39 0173 620299 / +39 0173 433111
+> Web Site www.ors.it
+>
+> ------------------------------------------------------------------------------------------------------------------------
+> Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi
+> allegati ? vietato e potrebbe costituire reato.
+> Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se
+> provvedesse alla distruzione dello stesso
+> e degli eventuali allegati.
+> Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non
+> siano relative alle attivit? e/o
+> alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla
+> societ? stessa, n? la impegnano in alcun modo.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+
+ORS Srl
+
+Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+Tel. +39 0173 620211
+Fax. +39 0173 620299 / +39 0173 433111
+Web Site www.ors.it
+
+------------------------------------------------------------------------------------------------------------------------
+Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi allegati ? vietato e potrebbe costituire reato.
+Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se provvedesse alla distruzione dello stesso
+e degli eventuali allegati.
+Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non siano relative alle attivit? e/o
+alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla societ? stessa, n? la impegnano in alcun modo.
+
+From mdowle at mdowle.plus.com  Wed Apr  6 00:48:18 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 5 Apr 2011 23:48:18 +0100
+Subject: [datatable-help] How to speed up grouping time series,
+ help please
+In-Reply-To: <5C57984CA179A247803E12AAB0F7ABA6EB072D2DD9@adorsmail01.ors.local>
+References: <5C57984CA179A247803E12AAB0F7ABA6DB20979608@adorsmail01.ors.local>
+	<inf1df$ive$1@dough.gmane.org>
+	<5C57984CA179A247803E12AAB0F7ABA6EB072D2DD9@adorsmail01.ors.local>
+Message-ID: <e7c0c6a8bb4802c4ec849c1a46537fc0.squirrel@webmail.plus.net>
+
+pls explain the big picture. I don't recognise why you're attempting to
+do.call merge.
+> Thanks for Your reply Matthew,
+> On 10 ts, 10000 values each, it takes 5.7 seconds to reshape, I'm willing
+> to reduce time at least by the half reducing my total batch time by 10
+> minutes approximately (over 70 minutes total).
+>
+> I'm trying to do something like:
+> do.call(mergfe, x[, .SD, by=ID]) but data.table is not designed to work
+> this way (return a data.table), there is no problem in data.table itself.
+> I'm trying to extract K (10) data.table from  a data.table with keys ID,
+> DATE and then CJ.
+>
+>
+> Thanks in advance for any help.
+> Best regards,
+> Daniele
+>
+> -----Original Message-----
+> From: datatable-help-bounces at r-forge.wu-wien.ac.at
+> [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Matthew
+> Dowle
+> Sent: 05 April 2011 14:20
+> To: datatable-help at r-forge.wu-wien.ac.at
+> Subject: Re: [datatable-help] How to speed up grouping time series,help
+> please
+>
+> It's easier to help if you provide timings along with your example
+> reproducible code, please.
+> How long is it taking, and how long do you think it should take?
+> Please also try to avoid phrases such as "without success". Does that mean
+> you got an error message (if so, what was it) or wrong result (if so, what
+> was wrong)?
+> Matthew
+>
+> "Daniele Amberti" <daniele.amberti at ors.it> wrote in message
+> news:5C57984CA179A247803E12AAB0F7ABA6DB20979608 at adorsmail01.ors.local...
+>>I retrieve for a few hundred times a group of time series (10-15 ts
+>>with 10000 values each), on every group I do some calculation, graphs
+>>etc. I wonder if there is a faster method than what presented below to
+>>get an appropriate timeseries object.
+>>
+>> Making a query with RODBC for every group I get a data frame like this:
+>>
+>>> X
+>>  ID                DATE     VALUE
+>> 14  3 2000-01-01 00:00:03 0.5726334
+>> 4   1 2000-01-01 00:00:03 0.8830174
+>> 1   1 2000-01-01 00:00:00 0.2875775
+>> 15  3 2000-01-01 00:00:04 0.1029247
+>> 11  3 2000-01-01 00:00:00 0.9568333
+>> 9   2 2000-01-01 00:00:03 0.5514350
+>> 7   2 2000-01-01 00:00:01 0.5281055
+>> 6   2 2000-01-01 00:00:00 0.0455565
+>> 12  3 2000-01-01 00:00:01 0.4533342
+>> 8   2 2000-01-01 00:00:02 0.8924190
+>> 3   1 2000-01-01 00:00:02 0.4089769
+>> 13  3 2000-01-01 00:00:02 0.6775706
+>>
+>> And I want to get a timeSeries object or xts object like this:
+>>
+>>                           1         2         3
+>> 2000-01-01 00:00:00 0.2875775 0.0455565 0.9568333
+>> 2000-01-01 00:00:01        NA 0.5281055 0.4533342
+>> 2000-01-01 00:00:02 0.4089769 0.8924190 0.6775706
+>> 2000-01-01 00:00:03 0.8830174 0.5514350 0.5726334
+>> 2000-01-01 00:00:04        NA        NA 0.1029247
+>>
+>> Both classes accept a matrix so if I can create a matrix like the one
+>> represented above and an array of characters representing dates faster
+>> than what possible with xts:::merge, for example, I will have a faster
+>> implementation, this is the reason why I'm writing to datatable-help;
+>> I red vignettes, tests and did tests trying to generate a set of
+>> data.table (using .SD and by = ID) an then CJ but without success up
+>> to now, any input to test this approach will be really appreciate.
+>>
+>> Input data can be sorted or unsorted (the most complicated case is in
+>> the example, unsorted and missing data) in the sense that I can  sort
+>> in query if I can take an advantage from this.
+>>
+>> Below some code to generate the test case above.
+>>
+>> Thanks in advance for any input, best regards, Daniele
+>>
+>>
+>> set.seed(123)
+>> N <- 100 # number of observations, use 5 to replicate test case above
+>> K <- 3   # number of timeseries ID
+>>
+>> X <- data.frame(
+>> ID = rep(1:K, each = N),
+>> DATE = as.character(rep(as.POSIXct("2000-01-01", tz = "GMT")+ 0:(N-1),
+>> K)),
+>> VALUE = runif(N*K), stringsAsFactors = FALSE)
+>>
+>> X <- X[sample(1:(N*K), N*K),] # sample observations to get random order
+>> (optional)
+>> X <- X[-(sample(1:nrow(X), floor(nrow(X)*0.2))),] # 20% missing
+>>
+>> head(X, 15)
+>>
+>>
+>> # an implementation in xts:
+>> xtsSplit <- function(x)
+>> {
+>> library(xts)
+>> x <- xts(x[,c("ID","VALUE")], as.POSIXct(x[,"DATE"]))
+>> x <- do.call(merge, split(x$VALUE,x$ID))
+>> return(x)
+>> }
+>>
+>> xtsSplitTime <- replicate(50,
+>> system.time(xtsSplit(X))[[1]])
+>> median(xtsTime)
+>>
+>>
+>> ORS Srl
+>>
+>> Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+>> Tel. +39 0173 620211
+>> Fax. +39 0173 620299 / +39 0173 433111
+>> Web Site www.ors.it
+>>
+>> ------------------------------------------------------------------------------------------------------------------------
+>> Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi
+>> allegati ? vietato e potrebbe costituire reato.
+>> Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati
+>> se
+>> provvedesse alla distruzione dello stesso
+>> e degli eventuali allegati.
+>> Opinioni, conclusioni o altre informazioni riportate nella e-mail, che
+>> non
+>> siano relative alle attivit? e/o
+>> alla missione aziendale di O.R.S. Srl si intendono non  attribuibili
+>> alla
+>> societ? stessa, n? la impegnano in alcun modo.
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+>
+>
+> ORS Srl
+>
+> Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+> Tel. +39 0173 620211
+> Fax. +39 0173 620299 / +39 0173 433111
+> Web Site www.ors.it
+>
+> ------------------------------------------------------------------------------------------------------------------------
+> Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi
+> allegati ? vietato e potrebbe costituire reato.
+> Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se
+> provvedesse alla distruzione dello stesso
+> e degli eventuali allegati.
+> Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non
+> siano relative alle attivit? e/o
+> alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla
+> societ? stessa, n? la impegnano in alcun modo.
+>
+
+
+
+From santosh.srinivas at gmail.com  Wed Apr  6 14:17:04 2011
+From: santosh.srinivas at gmail.com (sant)
+Date: Wed, 6 Apr 2011 05:17:04 -0700 (PDT)
+Subject: [datatable-help] Data type unintentionally converting on data table
+	on join
+Message-ID: <e8185247-aae5-4d2c-8c4b-1292c741eece@k22g2000yqh.googlegroups.com>
+
+Hello all,
+
+Sorry if this is obvious but once of my variable(datetime) is
+automatically changing with a join operation. I am not sure if this
+expected and I don't want that to happen
+I have three datasets the dputs are given at the end of the mail.
+
+The problem I am facing is shown as follows (pls help):
+
+#d1$datetime is num here
+str(d1)
+
+#Doing a join
+tmp <- J(d1,d2,d3)
+str(tmp)
+#tmp$datetime is int here
+
+#Why is this change?
+
+###############################################################################################################################################
+
+FIRST DATA SET
+
+> dput(d1)
+structure(list(ticker = c("OPTIDX-NIFTY-28APR2011-5100-CE", "OPTIDX-
+NIFTY-28APR2011-5100-CE",
+"OPTIDX-NIFTY-28APR2011-5100-CE", "OPTIDX-NIFTY-28APR2011-5100-CE",
+"OPTIDX-NIFTY-28APR2011-5100-CE", "OPTIDX-NIFTY-28APR2011-5100-CE"
+), datetime = c(20110405.092102, 20110405.092538, 20110405.093458,
+20110405.101124, 20110405.102041, 20110405.103659), der_typ =
+c("OPTIDX",
+"OPTIDX", "OPTIDX", "OPTIDX", "OPTIDX", "OPTIDX"), opt_typ = c("CE",
+"CE", "CE", "CE", "CE", "CE"), underlying = c("NIFTY", "NIFTY",
+"NIFTY", "NIFTY", "NIFTY", "NIFTY"), strike = c("5100", "5100",
+"5100", "5100", "5100", "5100"), expiry_dt = c("2011-04-28",
+"2011-04-28", "2011-04-28", "2011-04-28", "2011-04-28", "2011-04-28"
+), Id = structure(1:6, .Label = c("OPTIDX-NIFTY-28APR2011-5100-
+CE-20110405.092102",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.092538", "OPTIDX-
+NIFTY-28APR2011-5100-CE-20110405.093458",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.101124", "OPTIDX-
+NIFTY-28APR2011-5100-CE-20110405.102041",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.103659"), class =
+"factor")), .Names = c("ticker",
+"datetime", "der_typ", "opt_typ", "underlying", "strike",
+"expiry_dt",
+"Id"), row.names = c(NA, -6L), class = c("data.table", "data.frame"
+))
+>
+
+SECOND DATA SET
+
+> dput(d2)
+structure(list(Id = structure(1:6, .Label = c("OPTIDX-
+NIFTY-28APR2011-5100-CE-20110405.092102",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.092538", "OPTIDX-
+NIFTY-28APR2011-5100-CE-20110405.093458",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.101124", "OPTIDX-
+NIFTY-28APR2011-5100-CE-20110405.102041",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.103659"), class = "factor"),
+    price = c(826, 820, 819, 830.2, 825.45, 835.15)), .Names =
+c("Id",
+"price"), row.names = c(NA, -6L), class = c("data.table", "data.frame"
+))
+>
+
+THIRD DATA SET
+
+> dput(d3)
+structure(list(Id = structure(1:6, .Label = c("OPTIDX-
+NIFTY-28APR2011-5100-CE-20110405.092102",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.092538", "OPTIDX-
+NIFTY-28APR2011-5100-CE-20110405.093458",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.101124", "OPTIDX-
+NIFTY-28APR2011-5100-CE-20110405.102041",
+"OPTIDX-NIFTY-28APR2011-5100-CE-20110405.103659"), class = "factor"),
+    volume = c(50, 50, 200, 50, 100, 50)), .Names = c("Id", "volume"
+), row.names = c(NA, -6L), class = c("data.table", "data.frame"
+))
+>
+
+
+
+> sessionInfo()
+R version 2.12.1 (2010-12-16)
+Platform: i386-pc-mingw32/i386 (32-bit)
+
+locale:
+[1] LC_COLLATE=English_United Kingdom.1252  LC_CTYPE=English_United
+Kingdom.1252    LC_MONETARY=English_United Kingdom.1252
+LC_NUMERIC=C                            LC_TIME=English_United Kingdom.
+1252
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods
+base
+
+other attached packages:
+[1] data.table_1.5.3
+
+loaded via a namespace (and not attached):
+[1] tools_2.12.1
+>
+
+From TShort at epri.com  Wed Apr  6 14:48:21 2011
+From: TShort at epri.com (Short, Tom)
+Date: Wed, 6 Apr 2011 05:48:21 -0700
+Subject: [datatable-help] Data type unintentionally converting on data
+	tableon join
+In-Reply-To: <e8185247-aae5-4d2c-8c4b-1292c741eece@k22g2000yqh.googlegroups.com>
+References: <e8185247-aae5-4d2c-8c4b-1292c741eece@k22g2000yqh.googlegroups.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E306906413@uspalex03.epri.com>
+
+> -----Original Message-----
+> From: datatable-help-bounces at r-forge.wu-wien.ac.at 
+> [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On 
+> Behalf Of sant
+> Sent: Wednesday, April 06, 2011 08:17
+> To: datatable-help at r-forge.wu-wien.ac.at
+> Subject: [datatable-help] Data type unintentionally 
+> converting on data tableon join
+> 
+> Hello all,
+> 
+> Sorry if this is obvious but once of my variable(datetime) is 
+> automatically changing with a join operation. I am not sure 
+> if this expected and I don't want that to happen I have three 
+> datasets the dputs are given at the end of the mail.
+> 
+> The problem I am facing is shown as follows (pls help):
+> 
+> #d1$datetime is num here
+> str(d1)
+> 
+> #Doing a join
+> tmp <- J(d1,d2,d3)
+
+That's not what J is for. If you just want to rbind columns, do this:
+
+data.table(d1, d2, d3)
+
+If you want true joins, do something like this:
+
+setkey(d1, Id)
+setkey(d2, Id)
+merge(d1, d2)
+
+Or to merge individual entities, do:
+
+d1$price <- d2[d1, price]
+
+- Tom
+
+From daniele.amberti at ors.it  Thu Apr  7 09:43:37 2011
+From: daniele.amberti at ors.it (Daniele Amberti)
+Date: Thu, 7 Apr 2011 09:43:37 +0200
+Subject: [datatable-help] How to speed up grouping time series,
+ help please
+In-Reply-To: <e7c0c6a8bb4802c4ec849c1a46537fc0.squirrel@webmail.plus.net>
+References: <5C57984CA179A247803E12AAB0F7ABA6DB20979608@adorsmail01.ors.local>
+	<inf1df$ive$1@dough.gmane.org>
+	<5C57984CA179A247803E12AAB0F7ABA6EB072D2DD9@adorsmail01.ors.local>
+	<e7c0c6a8bb4802c4ec849c1a46537fc0.squirrel@webmail.plus.net>
+Message-ID: <5C57984CA179A247803E12AAB0F7ABA6EB77009594@adorsmail01.ors.local>
+
+Sorry for delayed answer Matthew and thanks for Your interest in the topic.
+I can get the appropriate matrix shape from
+> X
+  ID                DATE     VALUE
+14  3 2000-01-01 00:00:03 0.5726334
+4   1 2000-01-01 00:00:03 0.8830174
+1   1 2000-01-01 00:00:00 0.2875775
+15  3 2000-01-01 00:00:04 0.1029247
+11  3 2000-01-01 00:00:00 0.9568333
+9   2 2000-01-01 00:00:03 0.5514350
+7   2 2000-01-01 00:00:01 0.5281055
+6   2 2000-01-01 00:00:00 0.0455565
+12  3 2000-01-01 00:00:01 0.4533342
+8   2 2000-01-01 00:00:02 0.8924190
+3   1 2000-01-01 00:00:02 0.4089769
+13  3 2000-01-01 00:00:02 0.6775706
+
+With
+reshape(X, idvar = "DATE", timevar = "ID", direction = "wide")
+                  DATE   VALUE.3   VALUE.1   VALUE.2
+14 2000-01-01 00:00:03 0.5726334 0.8830174 0.5514350
+1  2000-01-01 00:00:00 0.9568333 0.2875775 0.0455565
+15 2000-01-01 00:00:04 0.1029247        NA        NA
+7  2000-01-01 00:00:01 0.4533342        NA 0.5281055
+8  2000-01-01 00:00:02 0.6775706 0.4089769 0.8924190
+and then sorting by date.
+
+What I was trying to do is to:
+ - DT <- data.table(X)
+ - setKey(DT, ID, DATE)
+... than start the staff I'm not able to manage:
+My idea was to have 3 data tables in a list and then merge, the code You refer to (do.call(merge ...)) is not working as described and so is not really relevant here. Also
+Also data.table do not implement a merge method so this approach it's probably not optimal.
+Another option can be data.table and reshape, a discussion already took place:
+http://www.mail-archive.com/r-help at r-project.org/msg102833.html
+but I didn't find a solution to the problem from that.
+
+Since data.table is so fast in sorting and grouping I'm wondering if there is the possibility to reshape data as described in the example faster then what actually I'm able to do leveraging xts, split and merge functions.
+ X <- xts(X[,c("ID","VALUE")], as.POSIXct(X[,"DATE"]))
+ X <- do.call(merge, split(X$VALUE,X$ID))
+
+My understanding is that data.table was created with time series in mind (also supported by Your presentation at LondonR), since most advanced time series objects in R (xts, timeSeries or zoo) need to be created as described in previous post, to have a really fast approach to reshape data and get a suitable format for specialized time series objects would be a very nice feature.
+
+
+Thanks in advance,
+Daniele
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowle at mdowle.plus.com]
+Sent: 06 April 2011 00:48
+To: Daniele Amberti
+Cc: datatable-help at r-forge.wu-wien.ac.at; Matthew Dowle
+Subject: RE: [datatable-help] How to speed up grouping time series,help please
+
+pls explain the big picture. I don't recognise why you're attempting to
+do.call merge.
+> Thanks for Your reply Matthew,
+> On 10 ts, 10000 values each, it takes 5.7 seconds to reshape, I'm willing
+> to reduce time at least by the half reducing my total batch time by 10
+> minutes approximately (over 70 minutes total).
+>
+> I'm trying to do something like:
+> do.call(mergfe, x[, .SD, by=ID]) but data.table is not designed to work
+> this way (return a data.table), there is no problem in data.table itself.
+> I'm trying to extract K (10) data.table from  a data.table with keys ID,
+> DATE and then CJ.
+>
+>
+> Thanks in advance for any help.
+> Best regards,
+> Daniele
+>
+> -----Original Message-----
+> From: datatable-help-bounces at r-forge.wu-wien.ac.at
+> [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Matthew
+> Dowle
+> Sent: 05 April 2011 14:20
+> To: datatable-help at r-forge.wu-wien.ac.at
+> Subject: Re: [datatable-help] How to speed up grouping time series,help
+> please
+>
+> It's easier to help if you provide timings along with your example
+> reproducible code, please.
+> How long is it taking, and how long do you think it should take?
+> Please also try to avoid phrases such as "without success". Does that mean
+> you got an error message (if so, what was it) or wrong result (if so, what
+> was wrong)?
+> Matthew
+>
+> "Daniele Amberti" <daniele.amberti at ors.it> wrote in message
+> news:5C57984CA179A247803E12AAB0F7ABA6DB20979608 at adorsmail01.ors.local...
+>>I retrieve for a few hundred times a group of time series (10-15 ts
+>>with 10000 values each), on every group I do some calculation, graphs
+>>etc. I wonder if there is a faster method than what presented below to
+>>get an appropriate timeseries object.
+>>
+>> Making a query with RODBC for every group I get a data frame like this:
+>>
+>>> X
+>>  ID                DATE     VALUE
+>> 14  3 2000-01-01 00:00:03 0.5726334
+>> 4   1 2000-01-01 00:00:03 0.8830174
+>> 1   1 2000-01-01 00:00:00 0.2875775
+>> 15  3 2000-01-01 00:00:04 0.1029247
+>> 11  3 2000-01-01 00:00:00 0.9568333
+>> 9   2 2000-01-01 00:00:03 0.5514350
+>> 7   2 2000-01-01 00:00:01 0.5281055
+>> 6   2 2000-01-01 00:00:00 0.0455565
+>> 12  3 2000-01-01 00:00:01 0.4533342
+>> 8   2 2000-01-01 00:00:02 0.8924190
+>> 3   1 2000-01-01 00:00:02 0.4089769
+>> 13  3 2000-01-01 00:00:02 0.6775706
+>>
+>> And I want to get a timeSeries object or xts object like this:
+>>
+>>                           1         2         3
+>> 2000-01-01 00:00:00 0.2875775 0.0455565 0.9568333
+>> 2000-01-01 00:00:01        NA 0.5281055 0.4533342
+>> 2000-01-01 00:00:02 0.4089769 0.8924190 0.6775706
+>> 2000-01-01 00:00:03 0.8830174 0.5514350 0.5726334
+>> 2000-01-01 00:00:04        NA        NA 0.1029247
+>>
+>> Both classes accept a matrix so if I can create a matrix like the one
+>> represented above and an array of characters representing dates faster
+>> than what possible with xts:::merge, for example, I will have a faster
+>> implementation, this is the reason why I'm writing to datatable-help;
+>> I red vignettes, tests and did tests trying to generate a set of
+>> data.table (using .SD and by = ID) an then CJ but without success up
+>> to now, any input to test this approach will be really appreciate.
+>>
+>> Input data can be sorted or unsorted (the most complicated case is in
+>> the example, unsorted and missing data) in the sense that I can  sort
+>> in query if I can take an advantage from this.
+>>
+>> Below some code to generate the test case above.
+>>
+>> Thanks in advance for any input, best regards, Daniele
+>>
+>>
+>> set.seed(123)
+>> N <- 100 # number of observations, use 5 to replicate test case above
+>> K <- 3   # number of timeseries ID
+>>
+>> X <- data.frame(
+>> ID = rep(1:K, each = N),
+>> DATE = as.character(rep(as.POSIXct("2000-01-01", tz = "GMT")+ 0:(N-1),
+>> K)),
+>> VALUE = runif(N*K), stringsAsFactors = FALSE)
+>>
+>> X <- X[sample(1:(N*K), N*K),] # sample observations to get random order
+>> (optional)
+>> X <- X[-(sample(1:nrow(X), floor(nrow(X)*0.2))),] # 20% missing
+>>
+>> head(X, 15)
+>>
+>>
+>> # an implementation in xts:
+>> xtsSplit <- function(x)
+>> {
+>> library(xts)
+>> x <- xts(x[,c("ID","VALUE")], as.POSIXct(x[,"DATE"]))
+>> x <- do.call(merge, split(x$VALUE,x$ID))
+>> return(x)
+>> }
+>>
+>> xtsSplitTime <- replicate(50,
+>> system.time(xtsSplit(X))[[1]])
+>> median(xtsTime)
+>>
+>>
+>> ORS Srl
+>>
+>> Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+>> Tel. +39 0173 620211
+>> Fax. +39 0173 620299 / +39 0173 433111
+>> Web Site www.ors.it
+>>
+>> ------------------------------------------------------------------------------------------------------------------------
+>> Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi
+>> allegati ? vietato e potrebbe costituire reato.
+>> Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati
+>> se
+>> provvedesse alla distruzione dello stesso
+>> e degli eventuali allegati.
+>> Opinioni, conclusioni o altre informazioni riportate nella e-mail, che
+>> non
+>> siano relative alle attivit? e/o
+>> alla missione aziendale di O.R.S. Srl si intendono non  attribuibili
+>> alla
+>> societ? stessa, n? la impegnano in alcun modo.
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+>
+>
+> ORS Srl
+>
+> Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+> Tel. +39 0173 620211
+> Fax. +39 0173 620299 / +39 0173 433111
+> Web Site www.ors.it
+>
+> ------------------------------------------------------------------------------------------------------------------------
+> Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi
+> allegati ? vietato e potrebbe costituire reato.
+> Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se
+> provvedesse alla distruzione dello stesso
+> e degli eventuali allegati.
+> Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non
+> siano relative alle attivit? e/o
+> alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla
+> societ? stessa, n? la impegnano in alcun modo.
+>
+
+
+
+ORS Srl
+
+Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+Tel. +39 0173 620211
+Fax. +39 0173 620299 / +39 0173 433111
+Web Site www.ors.it
+
+------------------------------------------------------------------------------------------------------------------------
+Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi allegati ? vietato e potrebbe costituire reato.
+Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se provvedesse alla distruzione dello stesso
+e degli eventuali allegati.
+Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non siano relative alle attivit? e/o
+alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla societ? stessa, n? la impegnano in alcun modo.
+
+From mdowle at mdowle.plus.com  Thu Apr  7 10:39:17 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 7 Apr 2011 09:39:17 +0100
+Subject: [datatable-help] How to speed up grouping time series,
+	help please
+References: <5C57984CA179A247803E12AAB0F7ABA6DB20979608@adorsmail01.ors.local><inf1df$ive$1@dough.gmane.org><5C57984CA179A247803E12AAB0F7ABA6EB072D2DD9@adorsmail01.ors.local><e7c0c6a8bb4802c4ec849c1a46537fc0.squirrel@webmail.plus.net>
+	<5C57984CA179A247803E12AAB0F7ABA6EB77009594@adorsmail01.ors.local>
+Message-ID: <injt7o$995$1@dough.gmane.org>
+
+
+Hi Daniele,
+
+Maybe someone else on the list can see what you mean better than I can :-)
+
+Otherwise, you're stuck with me!  ...
+
+What I mean by 'big picture' is what you're really trying to do i.e. the end 
+result.
+
+For example: " I have measurements of 10 thousands things observed very
+often and sometimes twice in the same second. I would like the mean
+measurement every 5 minutes, but when several measurements occur in the
+same second I would like to include just the maximum of those ones. Here
+is some code you can paste into R to generate some data, and here is my
+attempt so far ..."
+
+The problems with your last post include  i) what is X, a data.frame or
+or a data.table?   ii) which reshape are you using the stats one or the
+reshape package?  iii) there is nothing I can actually paste into an R
+prompt and  iv) what is the final result you really want to achieve?
+
+Also, please read the section headed "describe the goal, not the step" here 
+:
+      http://www.catb.org/~esr/faqs/smart-questions.html
+which is the last link in the r-help posting guide.
+
+Thanks,
+Matthew
+
+
+"Daniele Amberti" <daniele.amberti at ors.it> wrote in message 
+news:5C57984CA179A247803E12AAB0F7ABA6EB77009594 at adorsmail01.ors.local...
+Sorry for delayed answer Matthew and thanks for Your interest in the topic.
+I can get the appropriate matrix shape from
+> X
+  ID                DATE     VALUE
+14  3 2000-01-01 00:00:03 0.5726334
+4   1 2000-01-01 00:00:03 0.8830174
+1   1 2000-01-01 00:00:00 0.2875775
+15  3 2000-01-01 00:00:04 0.1029247
+11  3 2000-01-01 00:00:00 0.9568333
+9   2 2000-01-01 00:00:03 0.5514350
+7   2 2000-01-01 00:00:01 0.5281055
+6   2 2000-01-01 00:00:00 0.0455565
+12  3 2000-01-01 00:00:01 0.4533342
+8   2 2000-01-01 00:00:02 0.8924190
+3   1 2000-01-01 00:00:02 0.4089769
+13  3 2000-01-01 00:00:02 0.6775706
+
+With
+reshape(X, idvar = "DATE", timevar = "ID", direction = "wide")
+                  DATE   VALUE.3   VALUE.1   VALUE.2
+14 2000-01-01 00:00:03 0.5726334 0.8830174 0.5514350
+1  2000-01-01 00:00:00 0.9568333 0.2875775 0.0455565
+15 2000-01-01 00:00:04 0.1029247        NA        NA
+7  2000-01-01 00:00:01 0.4533342        NA 0.5281055
+8  2000-01-01 00:00:02 0.6775706 0.4089769 0.8924190
+and then sorting by date.
+
+What I was trying to do is to:
+ - DT <- data.table(X)
+ - setKey(DT, ID, DATE)
+... than start the staff I'm not able to manage:
+My idea was to have 3 data tables in a list and then merge, the code You 
+refer to (do.call(merge ...)) is not working as described and so is not 
+really relevant here. Also
+Also data.table do not implement a merge method so this approach it's 
+probably not optimal.
+Another option can be data.table and reshape, a discussion already took 
+place:
+http://www.mail-archive.com/r-help at r-project.org/msg102833.html
+but I didn't find a solution to the problem from that.
+
+Since data.table is so fast in sorting and grouping I'm wondering if there 
+is the possibility to reshape data as described in the example faster then 
+what actually I'm able to do leveraging xts, split and merge functions.
+ X <- xts(X[,c("ID","VALUE")], as.POSIXct(X[,"DATE"]))
+ X <- do.call(merge, split(X$VALUE,X$ID))
+
+My understanding is that data.table was created with time series in mind 
+(also supported by Your presentation at LondonR), since most advanced time 
+series objects in R (xts, timeSeries or zoo) need to be created as described 
+in previous post, to have a really fast approach to reshape data and get a 
+suitable format for specialized time series objects would be a very nice 
+feature.
+
+
+Thanks in advance,
+Daniele
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowle at mdowle.plus.com]
+Sent: 06 April 2011 00:48
+To: Daniele Amberti
+Cc: datatable-help at r-forge.wu-wien.ac.at; Matthew Dowle
+Subject: RE: [datatable-help] How to speed up grouping time series,help 
+please
+
+pls explain the big picture. I don't recognise why you're attempting to
+do.call merge.
+> Thanks for Your reply Matthew,
+> On 10 ts, 10000 values each, it takes 5.7 seconds to reshape, I'm willing
+> to reduce time at least by the half reducing my total batch time by 10
+> minutes approximately (over 70 minutes total).
+>
+> I'm trying to do something like:
+> do.call(mergfe, x[, .SD, by=ID]) but data.table is not designed to work
+> this way (return a data.table), there is no problem in data.table itself.
+> I'm trying to extract K (10) data.table from  a data.table with keys ID,
+> DATE and then CJ.
+>
+>
+> Thanks in advance for any help.
+> Best regards,
+> Daniele
+>
+> -----Original Message-----
+> From: datatable-help-bounces at r-forge.wu-wien.ac.at
+> [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Matthew
+> Dowle
+> Sent: 05 April 2011 14:20
+> To: datatable-help at r-forge.wu-wien.ac.at
+> Subject: Re: [datatable-help] How to speed up grouping time series,help
+> please
+>
+> It's easier to help if you provide timings along with your example
+> reproducible code, please.
+> How long is it taking, and how long do you think it should take?
+> Please also try to avoid phrases such as "without success". Does that mean
+> you got an error message (if so, what was it) or wrong result (if so, what
+> was wrong)?
+> Matthew
+>
+> "Daniele Amberti" <daniele.amberti at ors.it> wrote in message
+> news:5C57984CA179A247803E12AAB0F7ABA6DB20979608 at adorsmail01.ors.local...
+>>I retrieve for a few hundred times a group of time series (10-15 ts
+>>with 10000 values each), on every group I do some calculation, graphs
+>>etc. I wonder if there is a faster method than what presented below to
+>>get an appropriate timeseries object.
+>>
+>> Making a query with RODBC for every group I get a data frame like this:
+>>
+>>> X
+>>  ID                DATE     VALUE
+>> 14  3 2000-01-01 00:00:03 0.5726334
+>> 4   1 2000-01-01 00:00:03 0.8830174
+>> 1   1 2000-01-01 00:00:00 0.2875775
+>> 15  3 2000-01-01 00:00:04 0.1029247
+>> 11  3 2000-01-01 00:00:00 0.9568333
+>> 9   2 2000-01-01 00:00:03 0.5514350
+>> 7   2 2000-01-01 00:00:01 0.5281055
+>> 6   2 2000-01-01 00:00:00 0.0455565
+>> 12  3 2000-01-01 00:00:01 0.4533342
+>> 8   2 2000-01-01 00:00:02 0.8924190
+>> 3   1 2000-01-01 00:00:02 0.4089769
+>> 13  3 2000-01-01 00:00:02 0.6775706
+>>
+>> And I want to get a timeSeries object or xts object like this:
+>>
+>>                           1         2         3
+>> 2000-01-01 00:00:00 0.2875775 0.0455565 0.9568333
+>> 2000-01-01 00:00:01        NA 0.5281055 0.4533342
+>> 2000-01-01 00:00:02 0.4089769 0.8924190 0.6775706
+>> 2000-01-01 00:00:03 0.8830174 0.5514350 0.5726334
+>> 2000-01-01 00:00:04        NA        NA 0.1029247
+>>
+>> Both classes accept a matrix so if I can create a matrix like the one
+>> represented above and an array of characters representing dates faster
+>> than what possible with xts:::merge, for example, I will have a faster
+>> implementation, this is the reason why I'm writing to datatable-help;
+>> I red vignettes, tests and did tests trying to generate a set of
+>> data.table (using .SD and by = ID) an then CJ but without success up
+>> to now, any input to test this approach will be really appreciate.
+>>
+>> Input data can be sorted or unsorted (the most complicated case is in
+>> the example, unsorted and missing data) in the sense that I can  sort
+>> in query if I can take an advantage from this.
+>>
+>> Below some code to generate the test case above.
+>>
+>> Thanks in advance for any input, best regards, Daniele
+>>
+>>
+>> set.seed(123)
+>> N <- 100 # number of observations, use 5 to replicate test case above
+>> K <- 3   # number of timeseries ID
+>>
+>> X <- data.frame(
+>> ID = rep(1:K, each = N),
+>> DATE = as.character(rep(as.POSIXct("2000-01-01", tz = "GMT")+ 0:(N-1),
+>> K)),
+>> VALUE = runif(N*K), stringsAsFactors = FALSE)
+>>
+>> X <- X[sample(1:(N*K), N*K),] # sample observations to get random order
+>> (optional)
+>> X <- X[-(sample(1:nrow(X), floor(nrow(X)*0.2))),] # 20% missing
+>>
+>> head(X, 15)
+>>
+>>
+>> # an implementation in xts:
+>> xtsSplit <- function(x)
+>> {
+>> library(xts)
+>> x <- xts(x[,c("ID","VALUE")], as.POSIXct(x[,"DATE"]))
+>> x <- do.call(merge, split(x$VALUE,x$ID))
+>> return(x)
+>> }
+>>
+>> xtsSplitTime <- replicate(50,
+>> system.time(xtsSplit(X))[[1]])
+>> median(xtsTime)
+>>
+>>
+>> ORS Srl
+>>
+>> Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+>> Tel. +39 0173 620211
+>> Fax. +39 0173 620299 / +39 0173 433111
+>> Web Site www.ors.it
+>>
+>> ------------------------------------------------------------------------------------------------------------------------
+>> Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi
+>> allegati ? vietato e potrebbe costituire reato.
+>> Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati
+>> se
+>> provvedesse alla distruzione dello stesso
+>> e degli eventuali allegati.
+>> Opinioni, conclusioni o altre informazioni riportate nella e-mail, che
+>> non
+>> siano relative alle attivit? e/o
+>> alla missione aziendale di O.R.S. Srl si intendono non  attribuibili
+>> alla
+>> societ? stessa, n? la impegnano in alcun modo.
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+>
+>
+> ORS Srl
+>
+> Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+> Tel. +39 0173 620211
+> Fax. +39 0173 620299 / +39 0173 433111
+> Web Site www.ors.it
+>
+> ------------------------------------------------------------------------------------------------------------------------
+> Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi
+> allegati ? vietato e potrebbe costituire reato.
+> Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se
+> provvedesse alla distruzione dello stesso
+> e degli eventuali allegati.
+> Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non
+> siano relative alle attivit? e/o
+> alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla
+> societ? stessa, n? la impegnano in alcun modo.
+>
+
+
+
+ORS Srl
+
+Via Agostino Morando 1/3 12060 Roddi (Cn) - Italy
+Tel. +39 0173 620211
+Fax. +39 0173 620299 / +39 0173 433111
+Web Site www.ors.it
+
+------------------------------------------------------------------------------------------------------------------------
+Qualsiasi utilizzo non autorizzato del presente messaggio e dei suoi 
+allegati ? vietato e potrebbe costituire reato.
+Se lei avesse ricevuto erroneamente questo messaggio, Le saremmo grati se 
+provvedesse alla distruzione dello stesso
+e degli eventuali allegati.
+Opinioni, conclusioni o altre informazioni riportate nella e-mail, che non 
+siano relative alle attivit? e/o
+alla missione aziendale di O.R.S. Srl si intendono non  attribuibili alla 
+societ? stessa, n? la impegnano in alcun modo. 
+
+
+
+
+From djmuser at gmail.com  Thu Apr  7 11:37:59 2011
+From: djmuser at gmail.com (djmuseR)
+Date: Thu, 7 Apr 2011 02:37:59 -0700 (PDT)
+Subject: [datatable-help] How to speed up grouping time series,
+	help please
+In-Reply-To: <injt7o$995$1@dough.gmane.org>
+References: <5C57984CA179A247803E12AAB0F7ABA6DB20979608@adorsmail01.ors.local>
+	<inf1df$ive$1@dough.gmane.org>
+	<5C57984CA179A247803E12AAB0F7ABA6EB072D2DD9@adorsmail01.ors.local>
+	<e7c0c6a8bb4802c4ec849c1a46537fc0.squirrel@webmail.plus.net>
+	<5C57984CA179A247803E12AAB0F7ABA6EB77009594@adorsmail01.ors.local>
+	<injt7o$995$1@dough.gmane.org>
+Message-ID: <1302169079596-3432872.post@n4.nabble.com>
+
+Hi Daniele:
+
+Further to Matthew's comments:
+
+When you copy and paste data from the console into an e-mail, there is no
+guarantee that the person on the other end will have an easy time reading
+it. From past experience, I can already tell you that if I tried to copy
+your data snippet into an R session with the read.table(textConnection(" 
+")) mantra, I would get a read error because there is a space between the
+day and the time in each record. It would 'see' four observations but only
+three variable names are present -> error. 
+
+The better thing to do is to use dput(): it conveys class information,
+attributes, etc. correctly in an easily transportable text file. That way,
+the data object you see will be the same as the data object a potential
+helper will see. See Santosh Srinivas' recent post in this forum for some
+good examples. 
+
+The R Posting Guide provides a number of useful guidelines for framing a
+help request that greatly improves the chances of receiving one or more
+prompt and productive replies. Pretty much everything that Matthew raised is
+mentioned in the Posting Guide, too.
+
+HTH,
+Dennis
+
+--
+View this message in context: http://r.789695.n4.nabble.com/How-to-speed-up-grouping-time-series-help-please-tp3427315p3432872.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From santosh.srinivas at gmail.com  Thu Apr  7 12:54:22 2011
+From: santosh.srinivas at gmail.com (Santosh Srinivas)
+Date: Thu, 7 Apr 2011 16:24:22 +0530
+Subject: [datatable-help] Help with using roll = TRUE ... need some
+ variation of VLOOKUP in excel with LOCF
+Message-ID: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com>
+
+Hi All,
+
+I am completely stuck on this and I want to do this only with
+data.table! Here are the data files (click link pls): http://bit.ly/e5P5d5
+
+I am just not able to make the roll functions work.
+I have the two data sets 1) Options and 2) Futures
+
+Please take a look at the data so that the question becomes quite easy
+to understand.
+
+The options have repeated datetimes ... and the options and futures
+timestamps do not match 1 to 1
+
+> NROW(dt_Opt_Final)
+[1] 11793
+> NROW(unique(dt_Opt_Final$datetime))
+[1] 6292
+
+I want to get the nearest futures price available for every option.
+
+I believe it should be able to get my data using
+dt_Fut_Final[dt_Opt_Final, roll=TRUE]
+(But I tried all combinations of setkey but unable to get it to work).
+
+I tried setting keys but I think I am losing information because the datetime
+between the two datasets are absolute values but the conversion to
+factors when I do setkey loses the relative information the two
+datasets.
+
+Please help!
+
+Thanks,
+Santosh
+
+From santosh.srinivas at gmail.com  Thu Apr  7 14:02:48 2011
+From: santosh.srinivas at gmail.com (sant)
+Date: Thu, 7 Apr 2011 05:02:48 -0700 (PDT)
+Subject: [datatable-help] Help with using roll = TRUE ... need some
+ variation of VLOOKUP in excel with LOCF
+In-Reply-To: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com>
+References: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com>
+Message-ID: <3ecbc035-ed84-4e39-b93f-9c1386d28e9d@f2g2000yqf.googlegroups.com>
+
+Hi All,
+
+I am not sure if this is a hack ... but I did the following
+manipulations after loading the data from the link.
+I think I've managed to get the data ... only not sure if it is the
+correct way of doing this.
+
+dt_Opt_Final$time <- with(dt_Opt_Final, substr(datetime, 9,
+length(datetime))) #Extracting the time part only
+dt_Opt_Final$time <- as.numeric(dt_Opt_Final$time) * 1e6 #So that the
+hierarchy of the timestamp is preserved
+dt_Opt_Final$time <- as.integer(dt_Opt_Final$time) #since roll works
+only when the key is an integer
+setkey(dt_Opt_Final, "time")
+
+dt_Fut_Final$time <- with(dt_Fut_Final, substr(datetime, 9,
+length(datetime))) #Extracting the time part only
+dt_Fut_Final$time <- as.numeric(dt_Fut_Final$time) * 1e6 #So that the
+hierarchy of the timestamp is preserved
+dt_Fut_Final$time <- as.integer(dt_Fut_Final$time) #since roll works
+only when the key is an integer
+setkey(dt_Fut_Final, "time")
+
+tmp <- dt_Fut_Final[dt_Opt_Final, list(Id, price),roll=TRUE]
+dt_Final <- data.table(dt_Opt_Final, tmp)
+print(dt_Final, nrows=100)
+
+
+On Apr 7, 3:54?pm, Santosh Srinivas <santosh.srini... at gmail.com>
+wrote:
+> Hi All,
+>
+> I am completely stuck on this and I want to do this only with
+> data.table! Here are the data files (click link pls):http://bit.ly/e5P5d5
+>
+> I am just not able to make the roll functions work.
+> I have the two data sets 1) Options and 2) Futures
+>
+> Please take a look at the data so that the question becomes quite easy
+> to understand.
+>
+> The options have repeated datetimes ... and the options and futures
+> timestamps do not match 1 to 1
+>
+> > NROW(dt_Opt_Final)
+> [1] 11793
+> > NROW(unique(dt_Opt_Final$datetime))
+>
+> [1] 6292
+>
+> I want to get the nearest futures price available for every option.
+>
+> I believe it should be able to get my data using
+> dt_Fut_Final[dt_Opt_Final, roll=TRUE]
+> (But I tried all combinations of setkey but unable to get it to work).
+>
+> I tried setting keys but I think I am losing information because the datetime
+> between the two datasets are absolute values but the conversion to
+> factors when I do setkey loses the relative information the two
+> datasets.
+>
+> Please help!
+>
+> Thanks,
+> Santosh
+> _______________________________________________
+> datatable-help mailing list
+> datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl...
+
+From mdowle at mdowle.plus.com  Thu Apr  7 15:05:13 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 7 Apr 2011 14:05:13 +0100
+Subject: [datatable-help] Help with using roll = TRUE ... need some
+	variation of VLOOKUP in excel with LOCF
+References: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com>
+	<3ecbc035-ed84-4e39-b93f-9c1386d28e9d@f2g2000yqf.googlegroups.com>
+Message-ID: <inkcqd$603$1@dough.gmane.org>
+
+
+Hi Santosh,
+
+Thanks. Looks like the task is fairly clear and your latest post
+should produce output. I'm unlikely to have free (free) time
+until next week. Maybe you'll get lucky and somebody else
+can help before then.
+
+Matthew
+
+
+"sant" <santosh.srinivas at gmail.com> wrote in message 
+news:3ecbc035-ed84-4e39-b93f-9c1386d28e9d at f2g2000yqf.googlegroups.com...
+Hi All,
+
+I am not sure if this is a hack ... but I did the following
+manipulations after loading the data from the link.
+I think I've managed to get the data ... only not sure if it is the
+correct way of doing this.
+
+dt_Opt_Final$time <- with(dt_Opt_Final, substr(datetime, 9,
+length(datetime))) #Extracting the time part only
+dt_Opt_Final$time <- as.numeric(dt_Opt_Final$time) * 1e6 #So that the
+hierarchy of the timestamp is preserved
+dt_Opt_Final$time <- as.integer(dt_Opt_Final$time) #since roll works
+only when the key is an integer
+setkey(dt_Opt_Final, "time")
+
+dt_Fut_Final$time <- with(dt_Fut_Final, substr(datetime, 9,
+length(datetime))) #Extracting the time part only
+dt_Fut_Final$time <- as.numeric(dt_Fut_Final$time) * 1e6 #So that the
+hierarchy of the timestamp is preserved
+dt_Fut_Final$time <- as.integer(dt_Fut_Final$time) #since roll works
+only when the key is an integer
+setkey(dt_Fut_Final, "time")
+
+tmp <- dt_Fut_Final[dt_Opt_Final, list(Id, price),roll=TRUE]
+dt_Final <- data.table(dt_Opt_Final, tmp)
+print(dt_Final, nrows=100)
+
+
+On Apr 7, 3:54 pm, Santosh Srinivas <santosh.srini... at gmail.com>
+wrote:
+> Hi All,
+>
+> I am completely stuck on this and I want to do this only with
+> data.table! Here are the data files (click link pls):http://bit.ly/e5P5d5
+>
+> I am just not able to make the roll functions work.
+> I have the two data sets 1) Options and 2) Futures
+>
+> Please take a look at the data so that the question becomes quite easy
+> to understand.
+>
+> The options have repeated datetimes ... and the options and futures
+> timestamps do not match 1 to 1
+>
+> > NROW(dt_Opt_Final)
+> [1] 11793
+> > NROW(unique(dt_Opt_Final$datetime))
+>
+> [1] 6292
+>
+> I want to get the nearest futures price available for every option.
+>
+> I believe it should be able to get my data using
+> dt_Fut_Final[dt_Opt_Final, roll=TRUE]
+> (But I tried all combinations of setkey but unable to get it to work).
+>
+> I tried setting keys but I think I am losing information because the 
+> datetime
+> between the two datasets are absolute values but the conversion to
+> factors when I do setkey loses the relative information the two
+> datasets.
+>
+> Please help!
+>
+> Thanks,
+> Santosh
+> _______________________________________________
+> datatable-help mailing list
+> datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl... 
+
+
+
+
+From andreas.borg at unimedizin-mainz.de  Mon Apr 11 15:05:28 2011
+From: andreas.borg at unimedizin-mainz.de (Andreas Borg)
+Date: Mon, 11 Apr 2011 15:05:28 +0200
+Subject: [datatable-help] Error inside [.data.table
+Message-ID: <4DA2FC98.70903@unimedizin-mainz.de>
+
+Hello,
+
+I get an error using the [-operator for a data table object that is hard 
+to understand. Basically, what I want to do is the following: I have a 
+data.table with a number of binary patterns, possibly including IDs or 
+other additional columns. I want to process them grouped by the outcome 
+of some variables, e.g. count the number of examples that have 1s in 
+some specified columns. Unfortunately, I cannot reproduce the error with 
+simple test data, but with data from our package RecordLinkage:
+
+install.packages("RecordLinkage") # just for convenienve as this is not 
+a common package
+library(RecordLinkage)
+library(data.table)
+data(RLdata500)
+rpairs <- compare.dedup(RLdata500, blockfld=list(5,6,7))
+p <- rpairs$pairs
+p[is.na(p)] <- 0
+p <- data.table(p)
+# Everything up to here sets up test data. Now define a key and 
+aggregate by the key columns
+keyCol <- c("fname_c1", "lname_c2")
+key(p) <- keyCol
+p[, length(fname_c2), by=keyCol]
+
+The last expression results in:
+
+Fehler in `[[<-.data.frame`(`*tmp*`, jj, value = 0:1) :
+  replacement has 2 rows, data has 15627
+
+
+However, when I construct a similar table manually, everything works fine:
+
+expr <- quote(as.numeric(sample(0:1, 1000, replace=TRUE)))
+dt <- data.table(fname_c1=eval(expr), fname_c2=eval(expr))
+key(dt) <- c("fname_c1", "fname_c2")
+dt[, length(fname_c2), by=c("fname_c1", "fname_c2")]
+
+Also, with other combinations of attributes I get the first example 
+working as well:
+
+keyCol <- c("fname_c1", "lname_c2")
+key(p) <- keyCol
+p[, length(fname_c2), by=keyCol]
+
+
+I am not even sure if the error is strictly reproducible.
+
+Any idea what could be wrong?
+
+Best regards,
+
+Andreas
+
+-- 
+Andreas Borg
+Medizinische Informatik
+
+UNIVERSIT?TSMEDIZIN
+der Johannes Gutenberg-Universit?t
+Institut f?r Medizinische Biometrie, Epidemiologie und Informatik
+Obere Zahlbacher Stra?e 69, 55131 Mainz
+www.imbei.uni-mainz.de
+
+Telefon +49 (0) 6131 175062
+E-Mail: borg at imbei.uni-mainz.de
+
+Diese E-Mail enth?lt vertrauliche und/oder rechtlich gesch?tzte Informationen. Wenn Sie nicht der
+richtige Adressat sind oder diese E-Mail irrt?mlich erhalten haben, informieren Sie bitte sofort den
+Absender und l?schen Sie diese Mail. Das unerlaubte Kopieren sowie die unbefugte Weitergabe
+dieser Mail und der darin enthaltenen Informationen ist nicht gestattet.
+
+
+From mailinglist.honeypot at gmail.com  Mon Apr 11 16:24:35 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 11 Apr 2011 10:24:35 -0400
+Subject: [datatable-help] Error inside [.data.table
+In-Reply-To: <4DA2FC98.70903@unimedizin-mainz.de>
+References: <4DA2FC98.70903@unimedizin-mainz.de>
+Message-ID: <BANLkTi=DCu9g3aFwRLKkMAEO-M4KSgZ13A@mail.gmail.com>
+
+Hi Andreas,
+
+On Mon, Apr 11, 2011 at 9:05 AM, Andreas Borg
+<andreas.borg at unimedizin-mainz.de> wrote:
+> Hello,
+>
+> I get an error using the [-operator for a data table object that is hard to
+> understand. Basically, what I want to do is the following: I have a
+> data.table with a number of binary patterns, possibly including IDs or other
+> additional columns. I want to process them grouped by the outcome of some
+> variables, e.g. count the number of examples that have 1s in some specified
+> columns. Unfortunately, I cannot reproduce the error with simple test data,
+> but with data from our package RecordLinkage:
+>
+> install.packages("RecordLinkage") # just for convenienve as this is not a
+> common package
+> library(RecordLinkage)
+> library(data.table)
+> data(RLdata500)
+> rpairs <- compare.dedup(RLdata500, blockfld=list(5,6,7))
+> p <- rpairs$pairs
+> p[is.na(p)] <- 0
+> p <- data.table(p)
+> # Everything up to here sets up test data. Now define a key and aggregate by
+> the key columns
+> keyCol <- c("fname_c1", "lname_c2")
+> key(p) <- keyCol
+> p[, length(fname_c2), by=keyCol]
+>
+> The last expression results in:
+>
+> Fehler in `[[<-.data.frame`(`*tmp*`, jj, value = 0:1) :
+> ?replacement has 2 rows, data has 15627
+
+I believe this was a bug that was fixed since the last release of data.table.
+
+Assuming you are using data.table 1.5.3 (you didn't provide
+sessionInfo :-), explicitly naming hte key columns will work, eg:
+
+R> p[, length(fname_c2), by=list(fname_c1, lname_c2)]
+     fname_c1 lname_c2    V1
+[1,]        0        0 15454
+[2,]        1        0   173
+
+If you install data.table from R-forge, your current incantation will
+work as well, eg:
+
+R> install.packages('data.table', repos='http://r-forge.r-project.org')
+R> # ... reload all your data and what not
+R> p[, length(fname_c2), by=keyCol]
+     fname_c1 lname_c2    V1
+[1,]        0        0 15454
+[2,]        1        0   173
+
+R> sessionInfo()
+R version 2.12.1 (2010-12-16)
+Platform: x86_64-apple-darwin9.8.0/x86_64 (64-bit)
+...
+other attached packages:
+ [1] data.table_1.5.4    RecordLinkage_0.3-1 RSQLite_0.9-4
+...
+
+Hope that helps,
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From andreas.borg at unimedizin-mainz.de  Mon Apr 11 16:51:44 2011
+From: andreas.borg at unimedizin-mainz.de (Andreas Borg)
+Date: Mon, 11 Apr 2011 16:51:44 +0200
+Subject: [datatable-help] Error inside [.data.table
+In-Reply-To: <BANLkTi=DCu9g3aFwRLKkMAEO-M4KSgZ13A@mail.gmail.com>
+References: <4DA2FC98.70903@unimedizin-mainz.de>
+	<BANLkTi=DCu9g3aFwRLKkMAEO-M4KSgZ13A@mail.gmail.com>
+Message-ID: <4DA31580.6040409@unimedizin-mainz.de>
+
+Thanks, that did it. I only had version 1.5.3 from CRAN.
+
+Andreas
+> I believe this was a bug that was fixed since the last release of data.table.
+>
+> Assuming you are using data.table 1.5.3 (you didn't provide
+> sessionInfo :-), explicitly naming hte key columns will work, eg:
+>
+> R> p[, length(fname_c2), by=list(fname_c1, lname_c2)]
+>      fname_c1 lname_c2    V1
+> [1,]        0        0 15454
+> [2,]        1        0   173
+>
+> If you install data.table from R-forge, your current incantation will
+> work as well, eg:
+>
+> R> install.packages('data.table', repos='http://r-forge.r-project.org')
+> R> # ... reload all your data and what not
+> R> p[, length(fname_c2), by=keyCol]
+>      fname_c1 lname_c2    V1
+> [1,]        0        0 15454
+> [2,]        1        0   173
+>
+> R> sessionInfo()
+> R version 2.12.1 (2010-12-16)
+> Platform: x86_64-apple-darwin9.8.0/x86_64 (64-bit)
+> ...
+> other attached packages:
+>  [1] data.table_1.5.4    RecordLinkage_0.3-1 RSQLite_0.9-4
+> ...
+>
+> Hope that helps,
+>
+> -steve
+>
+>   
+
+
+-- 
+Andreas Borg
+Medizinische Informatik
+
+UNIVERSIT?TSMEDIZIN
+der Johannes Gutenberg-Universit?t
+Institut f?r Medizinische Biometrie, Epidemiologie und Informatik
+Obere Zahlbacher Stra?e 69, 55131 Mainz
+www.imbei.uni-mainz.de
+
+Telefon +49 (0) 6131 175062
+E-Mail: borg at imbei.uni-mainz.de
+
+Diese E-Mail enth?lt vertrauliche und/oder rechtlich gesch?tzte Informationen. Wenn Sie nicht der
+richtige Adressat sind oder diese E-Mail irrt?mlich erhalten haben, informieren Sie bitte sofort den
+Absender und l?schen Sie diese Mail. Das unerlaubte Kopieren sowie die unbefugte Weitergabe
+dieser Mail und der darin enthaltenen Informationen ist nicht gestattet.
+
+
+From mdowle at mdowle.plus.com  Tue Apr 12 00:12:24 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 11 Apr 2011 23:12:24 +0100
+Subject: [datatable-help] Help with using roll = TRUE ... need some
+ variation of VLOOKUP in excel with LOCF
+In-Reply-To: <inkcqd$603$1@dough.gmane.org>
+References: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com>
+	<3ecbc035-ed84-4e39-b93f-9c1386d28e9d@f2g2000yqf.googlegroups.com>
+	<inkcqd$603$1@dough.gmane.org>
+Message-ID: <1302559944.18238.207.camel@netbook>
+
+I took a quick look. I don't completely follow
+what you're doing (e.g. why the dates are factors)
+but have you seen IDateTime? 
+Or the other way you can do this is have one column
+as date (IDate) and another as time (ITime); a
+2 column key. That way you can ensure you join within
+the same day, but the prevailing record by time that day.
+HTH
+Matthew
+
+On Thu, 2011-04-07 at 14:05 +0100, Matthew Dowle wrote:
+> Hi Santosh,
+> 
+> Thanks. Looks like the task is fairly clear and your latest post
+> should produce output. I'm unlikely to have free (free) time
+> until next week. Maybe you'll get lucky and somebody else
+> can help before then.
+> 
+> Matthew
+> 
+> 
+> "sant" <santosh.srinivas at gmail.com> wrote in message 
+> news:3ecbc035-ed84-4e39-b93f-9c1386d28e9d at f2g2000yqf.googlegroups.com...
+> Hi All,
+> 
+> I am not sure if this is a hack ... but I did the following
+> manipulations after loading the data from the link.
+> I think I've managed to get the data ... only not sure if it is the
+> correct way of doing this.
+> 
+> dt_Opt_Final$time <- with(dt_Opt_Final, substr(datetime, 9,
+> length(datetime))) #Extracting the time part only
+> dt_Opt_Final$time <- as.numeric(dt_Opt_Final$time) * 1e6 #So that the
+> hierarchy of the timestamp is preserved
+> dt_Opt_Final$time <- as.integer(dt_Opt_Final$time) #since roll works
+> only when the key is an integer
+> setkey(dt_Opt_Final, "time")
+> 
+> dt_Fut_Final$time <- with(dt_Fut_Final, substr(datetime, 9,
+> length(datetime))) #Extracting the time part only
+> dt_Fut_Final$time <- as.numeric(dt_Fut_Final$time) * 1e6 #So that the
+> hierarchy of the timestamp is preserved
+> dt_Fut_Final$time <- as.integer(dt_Fut_Final$time) #since roll works
+> only when the key is an integer
+> setkey(dt_Fut_Final, "time")
+> 
+> tmp <- dt_Fut_Final[dt_Opt_Final, list(Id, price),roll=TRUE]
+> dt_Final <- data.table(dt_Opt_Final, tmp)
+> print(dt_Final, nrows=100)
+> 
+> 
+> On Apr 7, 3:54 pm, Santosh Srinivas <santosh.srini... at gmail.com>
+> wrote:
+> > Hi All,
+> >
+> > I am completely stuck on this and I want to do this only with
+> > data.table! Here are the data files (click link pls):http://bit.ly/e5P5d5
+> >
+> > I am just not able to make the roll functions work.
+> > I have the two data sets 1) Options and 2) Futures
+> >
+> > Please take a look at the data so that the question becomes quite easy
+> > to understand.
+> >
+> > The options have repeated datetimes ... and the options and futures
+> > timestamps do not match 1 to 1
+> >
+> > > NROW(dt_Opt_Final)
+> > [1] 11793
+> > > NROW(unique(dt_Opt_Final$datetime))
+> >
+> > [1] 6292
+> >
+> > I want to get the nearest futures price available for every option.
+> >
+> > I believe it should be able to get my data using
+> > dt_Fut_Final[dt_Opt_Final, roll=TRUE]
+> > (But I tried all combinations of setkey but unable to get it to work).
+> >
+> > I tried setting keys but I think I am losing information because the 
+> > datetime
+> > between the two datasets are absolute values but the conversion to
+> > factors when I do setkey loses the relative information the two
+> > datasets.
+> >
+> > Please help!
+> >
+> > Thanks,
+> > Santosh
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl... 
+> 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From santosh.srinivas at gmail.com  Tue Apr 12 01:09:11 2011
+From: santosh.srinivas at gmail.com (Santosh Srinivas)
+Date: Tue, 12 Apr 2011 04:39:11 +0530
+Subject: [datatable-help] Help with using roll = TRUE ... need some
+ variation of VLOOKUP in excel with LOCF
+In-Reply-To: <1302559944.18238.207.camel@netbook>
+References: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com>
+	<3ecbc035-ed84-4e39-b93f-9c1386d28e9d@f2g2000yqf.googlegroups.com>
+	<inkcqd$603$1@dough.gmane.org> <1302559944.18238.207.camel@netbook>
+Message-ID: <BANLkTikLVAxfXuU64fjE4HeMKX4-xSwsbw@mail.gmail.com>
+
+Thanks Mathew. Never heard of IDateTime. I'll try that today.
+Sorry about the data structure, it has both the "base" data and the
+results of my transformations (may have messed the conversions up
+trying to get this thing to work .... tried all options I knew of
+then)
+
+
+On Tue, Apr 12, 2011 at 3:42 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> I took a quick look. I don't completely follow
+> what you're doing (e.g. why the dates are factors)
+> but have you seen IDateTime?
+> Or the other way you can do this is have one column
+> as date (IDate) and another as time (ITime); a
+> 2 column key. That way you can ensure you join within
+> the same day, but the prevailing record by time that day.
+> HTH
+> Matthew
+>
+> On Thu, 2011-04-07 at 14:05 +0100, Matthew Dowle wrote:
+>> Hi Santosh,
+>>
+>> Thanks. Looks like the task is fairly clear and your latest post
+>> should produce output. I'm unlikely to have free (free) time
+>> until next week. Maybe you'll get lucky and somebody else
+>> can help before then.
+>>
+>> Matthew
+>>
+>>
+>> "sant" <santosh.srinivas at gmail.com> wrote in message
+>> news:3ecbc035-ed84-4e39-b93f-9c1386d28e9d at f2g2000yqf.googlegroups.com...
+>> Hi All,
+>>
+>> I am not sure if this is a hack ... but I did the following
+>> manipulations after loading the data from the link.
+>> I think I've managed to get the data ... only not sure if it is the
+>> correct way of doing this.
+>>
+>> dt_Opt_Final$time <- with(dt_Opt_Final, substr(datetime, 9,
+>> length(datetime))) #Extracting the time part only
+>> dt_Opt_Final$time <- as.numeric(dt_Opt_Final$time) * 1e6 #So that the
+>> hierarchy of the timestamp is preserved
+>> dt_Opt_Final$time <- as.integer(dt_Opt_Final$time) #since roll works
+>> only when the key is an integer
+>> setkey(dt_Opt_Final, "time")
+>>
+>> dt_Fut_Final$time <- with(dt_Fut_Final, substr(datetime, 9,
+>> length(datetime))) #Extracting the time part only
+>> dt_Fut_Final$time <- as.numeric(dt_Fut_Final$time) * 1e6 #So that the
+>> hierarchy of the timestamp is preserved
+>> dt_Fut_Final$time <- as.integer(dt_Fut_Final$time) #since roll works
+>> only when the key is an integer
+>> setkey(dt_Fut_Final, "time")
+>>
+>> tmp <- dt_Fut_Final[dt_Opt_Final, list(Id, price),roll=TRUE]
+>> dt_Final <- data.table(dt_Opt_Final, tmp)
+>> print(dt_Final, nrows=100)
+>>
+>>
+>> On Apr 7, 3:54 pm, Santosh Srinivas <santosh.srini... at gmail.com>
+>> wrote:
+>> > Hi All,
+>> >
+>> > I am completely stuck on this and I want to do this only with
+>> > data.table! Here are the data files (click link pls):http://bit.ly/e5P5d5
+>> >
+>> > I am just not able to make the roll functions work.
+>> > I have the two data sets 1) Options and 2) Futures
+>> >
+>> > Please take a look at the data so that the question becomes quite easy
+>> > to understand.
+>> >
+>> > The options have repeated datetimes ... and the options and futures
+>> > timestamps do not match 1 to 1
+>> >
+>> > > NROW(dt_Opt_Final)
+>> > [1] 11793
+>> > > NROW(unique(dt_Opt_Final$datetime))
+>> >
+>> > [1] 6292
+>> >
+>> > I want to get the nearest futures price available for every option.
+>> >
+>> > I believe it should be able to get my data using
+>> > dt_Fut_Final[dt_Opt_Final, roll=TRUE]
+>> > (But I tried all combinations of setkey but unable to get it to work).
+>> >
+>> > I tried setting keys but I think I am losing information because the
+>> > datetime
+>> > between the two datasets are absolute values but the conversion to
+>> > factors when I do setkey loses the relative information the two
+>> > datasets.
+>> >
+>> > Please help!
+>> >
+>> > Thanks,
+>> > Santosh
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl...
+>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+
+From karl at huftis.org  Tue Apr 12 09:57:50 2011
+From: karl at huftis.org (Karl Ove Hufthammer)
+Date: Tue, 12 Apr 2011 00:57:50 -0700
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+Message-ID: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+
+Dear list members,
+
+I?m having some problems using a data.table to perform a two-way lookup.
+Here?s a simple example of what I?m trying to do:
+
+I have a data.frame/data.table that looks like this
+x   y
+1   a
+1   b
+2   a
+3   c
+
+For a certain value in ?y?, I want to extract the corresponding values of
+?x?. Then I want to use these values of ?x? to extract the corresponding
+values of ?y?. So if I start with y=a, I will get x=1,2, which will give me
+y=a,b,a (or preferably just y=a,b). (I would then iterate this to till each
+iteration doesn?t increase the length of y, so that I finally get all ?y?
+values connected to y=a.)
+
+I have found one way of achieving this, creating two identical data.tables
+with different keys:
+
+  options(stringsAsFactors=FALSE)
+  dat=data.frame(x=c("1","1","2","3"), y=c("a","b","a","c"))
+  dat
+  A <- B <- data.table(dat)
+  key(A)="x"
+  key(B)="y"
+
+  A[B["a"][,x]][,y]
+
+The problem is performance (my real-life data.table is *much* larger),
+since B["a"][,x] outputs a character vector. When this is used in A[?], the
+character is converted to a factor with appropriate levels, and it turns
+out (shown using ?Rprof?) that the majority of the time running the
+function is taken up by ?levels<-?, i.e., creating this factor / attaching
+the levels.
+
+I believe one potential solution would be to have both ?x? and ?y? being
+factors, so that there is no conversion to/from characters. This would
+eliminate both the conversion ?"a" to factor? and ?B["a"][,x] to factor?.
+However, ?data.table? doesn?t accept ?i? being a factor (and if I convert
+it to the internal numeric codes, it thinks I mean row numbers).
+
+Any suggestions on how to solve this?
+
+I also wonder if it is possible for a data.table to only return unique
+values of a column? For the above example I would like the output y=a,b.
+Note that for instance
+
+  A[B["a"][,x],mult="first"][,y]
+
+does not work, as this returns the first value of ?y? for each x (here
+y=a,a).
+
+My last question is why
+
+  A[B["a"][,x], y, mult="all"]
+
+returns a two-column data.table/data.frame, while
+
+  A[B["a"][,x], y, mult="first"]
+
+returns a character vector. I would expect both of them to return a
+character vector. Is this a feature or simply a bug?
+
+-- 
+Regards,
+Karl Ove Hufthammer
+
+From TShort at epri.com  Tue Apr 12 12:53:45 2011
+From: TShort at epri.com (Short, Tom)
+Date: Tue, 12 Apr 2011 03:53:45 -0700
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+In-Reply-To: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+References: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com>
+
+
+> -----Original Message-----
+> From: datatable-help-bounces at r-forge.wu-wien.ac.at 
+> [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On 
+> Behalf Of Karl Ove Hufthammer
+>
+> I have found one way of achieving this, creating two 
+> identical data.tables with different keys:
+> 
+>   options(stringsAsFactors=FALSE)
+>   dat=data.frame(x=c("1","1","2","3"), y=c("a","b","a","c"))
+>   dat
+>   A <- B <- data.table(dat)
+>   key(A)="x"
+>   key(B)="y"
+> 
+>   A[B["a"][,x]][,y]
+> 
+> The problem is performance (my real-life data.table is *much* 
+> larger), since B["a"][,x] outputs a character vector. When 
+> this is used in A[...], the character is converted to a factor 
+> with appropriate levels, and it turns out (shown using 
+> 'Rprof') that the majority of the time running the function 
+> is taken up by 'levels<-', i.e., creating this factor / 
+> attaching the levels.
+> 
+> I believe one potential solution would be to have both 'x' 
+> and 'y' being factors, so that there is no conversion to/from 
+> characters. This would eliminate both the conversion '"a" to 
+> factor' and 'B["a"][,x] to factor'.
+> However, 'data.table' doesn't accept 'i' being a factor (and 
+> if I convert it to the internal numeric codes, it thinks I 
+> mean row numbers).
+> 
+> Any suggestions on how to solve this?
+
+To answer part of your inquiry, you can use factors by enclosing i with
+J() as follows:
+
+options(stringsAsFactors=TRUE)
+dat=data.frame(x=c("1","1","2","3"), y=c("a","b","a","c"))
+A <- B <- data.table(dat)
+key(A)="x"
+key(B)="y"
+A[J(B["a"][,x])][,y]
+
+- Tom
+
+From jhibschman+r at gmail.com  Tue Apr 12 21:35:19 2011
+From: jhibschman+r at gmail.com (Johann Hibschman)
+Date: Tue, 12 Apr 2011 14:35:19 -0500
+Subject: [datatable-help] aggregation error under 1.5.3
+Message-ID: <u1otye3w9e0.fsf@lx-chrateresearch01.citadelgroup.com>
+
+I finally managed to upgrade to 1.5.3, but now I'm seeing errors when
+aggregating data tables:
+
+  > d <- data.table(a=as.integer(c(1, 1, 2, 2, 3, 3)), b=1:6 %% 2, c=1:6)
+  > d[b==1,list(c=sum(c)),by=list(a)]
+  Error in i[1, ivars, with = FALSE] : incorrect number of dimensions
+
+Does anyone know what's going on with this?
+
+Thanks,
+Johann
+
+
+From mailinglist.honeypot at gmail.com  Tue Apr 12 21:51:50 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 12 Apr 2011 15:51:50 -0400
+Subject: [datatable-help] aggregation error under 1.5.3
+In-Reply-To: <u1otye3w9e0.fsf@lx-chrateresearch01.citadelgroup.com>
+References: <u1otye3w9e0.fsf@lx-chrateresearch01.citadelgroup.com>
+Message-ID: <BANLkTi=b8QiJS2mzd2xX3gDiGhGZDQZWcQ@mail.gmail.com>
+
+Hi,
+
+On Tue, Apr 12, 2011 at 3:35 PM, Johann Hibschman
+<jhibschman+r at gmail.com> wrote:
+> I finally managed to upgrade to 1.5.3, but now I'm seeing errors when
+> aggregating data tables:
+>
+> ?> d <- data.table(a=as.integer(c(1, 1, 2, 2, 3, 3)), b=1:6 %% 2, c=1:6)
+> ?> d[b==1,list(c=sum(c)),by=list(a)]
+> ?Error in i[1, ivars, with = FALSE] : incorrect number of dimensions
+>
+> Does anyone know what's going on with this?
+
+Not off the top of my head (although I'm sure Matthew will figure it
+out quite quickly).
+
+In the meantime, you could do this like so:
+
+R> d[b==1][, list(c=sum(c)), by=list(a)]
+
+If your `d` data.table is large, though, you might consider:
+
+R> key(d) <- c('b', 'a')
+R> d[J(1)][, list(c=sum(c)), by=list(a)]
+
+Also, I'm using the development version of data.table from R-forge,
+but I don't think that'll make a difference in this case.
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Wed Apr 13 00:56:44 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 12 Apr 2011 23:56:44 +0100
+Subject: [datatable-help] Help with using roll = TRUE ... need some
+ variation of VLOOKUP in excel with LOCF
+In-Reply-To: <BANLkTikLVAxfXuU64fjE4HeMKX4-xSwsbw@mail.gmail.com>
+References: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com>
+	<3ecbc035-ed84-4e39-b93f-9c1386d28e9d@f2g2000yqf.googlegroups.com>
+	<inkcqd$603$1@dough.gmane.org> <1302559944.18238.207.camel@netbook>
+	<BANLkTikLVAxfXuU64fjE4HeMKX4-xSwsbw@mail.gmail.com>
+Message-ID: <1302649004.18238.211.camel@netbook>
+
+There wasn't actually a link to IDateTime from ?data.table in 1.5.3, but
+there has been in 1.5.4 on R-Forge for a while (in 'see also'), so it
+should be easier to find going forward, hopefully.
+Matthew
+
+On Tue, 2011-04-12 at 04:39 +0530, Santosh Srinivas wrote:
+> Thanks Mathew. Never heard of IDateTime. I'll try that today.
+> Sorry about the data structure, it has both the "base" data and the
+> results of my transformations (may have messed the conversions up
+> trying to get this thing to work .... tried all options I knew of
+> then)
+> 
+> 
+> On Tue, Apr 12, 2011 at 3:42 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > I took a quick look. I don't completely follow
+> > what you're doing (e.g. why the dates are factors)
+> > but have you seen IDateTime?
+> > Or the other way you can do this is have one column
+> > as date (IDate) and another as time (ITime); a
+> > 2 column key. That way you can ensure you join within
+> > the same day, but the prevailing record by time that day.
+> > HTH
+> > Matthew
+> >
+> > On Thu, 2011-04-07 at 14:05 +0100, Matthew Dowle wrote:
+> >> Hi Santosh,
+> >>
+> >> Thanks. Looks like the task is fairly clear and your latest post
+> >> should produce output. I'm unlikely to have free (free) time
+> >> until next week. Maybe you'll get lucky and somebody else
+> >> can help before then.
+> >>
+> >> Matthew
+> >>
+> >>
+> >> "sant" <santosh.srinivas at gmail.com> wrote in message
+> >> news:3ecbc035-ed84-4e39-b93f-9c1386d28e9d at f2g2000yqf.googlegroups.com...
+> >> Hi All,
+> >>
+> >> I am not sure if this is a hack ... but I did the following
+> >> manipulations after loading the data from the link.
+> >> I think I've managed to get the data ... only not sure if it is the
+> >> correct way of doing this.
+> >>
+> >> dt_Opt_Final$time <- with(dt_Opt_Final, substr(datetime, 9,
+> >> length(datetime))) #Extracting the time part only
+> >> dt_Opt_Final$time <- as.numeric(dt_Opt_Final$time) * 1e6 #So that the
+> >> hierarchy of the timestamp is preserved
+> >> dt_Opt_Final$time <- as.integer(dt_Opt_Final$time) #since roll works
+> >> only when the key is an integer
+> >> setkey(dt_Opt_Final, "time")
+> >>
+> >> dt_Fut_Final$time <- with(dt_Fut_Final, substr(datetime, 9,
+> >> length(datetime))) #Extracting the time part only
+> >> dt_Fut_Final$time <- as.numeric(dt_Fut_Final$time) * 1e6 #So that the
+> >> hierarchy of the timestamp is preserved
+> >> dt_Fut_Final$time <- as.integer(dt_Fut_Final$time) #since roll works
+> >> only when the key is an integer
+> >> setkey(dt_Fut_Final, "time")
+> >>
+> >> tmp <- dt_Fut_Final[dt_Opt_Final, list(Id, price),roll=TRUE]
+> >> dt_Final <- data.table(dt_Opt_Final, tmp)
+> >> print(dt_Final, nrows=100)
+> >>
+> >>
+> >> On Apr 7, 3:54 pm, Santosh Srinivas <santosh.srini... at gmail.com>
+> >> wrote:
+> >> > Hi All,
+> >> >
+> >> > I am completely stuck on this and I want to do this only with
+> >> > data.table! Here are the data files (click link pls):http://bit.ly/e5P5d5
+> >> >
+> >> > I am just not able to make the roll functions work.
+> >> > I have the two data sets 1) Options and 2) Futures
+> >> >
+> >> > Please take a look at the data so that the question becomes quite easy
+> >> > to understand.
+> >> >
+> >> > The options have repeated datetimes ... and the options and futures
+> >> > timestamps do not match 1 to 1
+> >> >
+> >> > > NROW(dt_Opt_Final)
+> >> > [1] 11793
+> >> > > NROW(unique(dt_Opt_Final$datetime))
+> >> >
+> >> > [1] 6292
+> >> >
+> >> > I want to get the nearest futures price available for every option.
+> >> >
+> >> > I believe it should be able to get my data using
+> >> > dt_Fut_Final[dt_Opt_Final, roll=TRUE]
+> >> > (But I tried all combinations of setkey but unable to get it to work).
+> >> >
+> >> > I tried setting keys but I think I am losing information because the
+> >> > datetime
+> >> > between the two datasets are absolute values but the conversion to
+> >> > factors when I do setkey loses the relative information the two
+> >> > datasets.
+> >> >
+> >> > Please help!
+> >> >
+> >> > Thanks,
+> >> > Santosh
+> >> > _______________________________________________
+> >> > datatable-help mailing list
+> >> > datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl...
+> >>
+> >>
+> >>
+> >> _______________________________________________
+> >> datatable-help mailing list
+> >> datatable-help at lists.r-forge.r-project.org
+> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> >
+> >
+
+
+
+From mdowle at mdowle.plus.com  Wed Apr 13 01:20:23 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 13 Apr 2011 00:20:23 +0100
+Subject: [datatable-help] aggregation error under 1.5.3
+In-Reply-To: <BANLkTi=b8QiJS2mzd2xX3gDiGhGZDQZWcQ@mail.gmail.com>
+References: <u1otye3w9e0.fsf@lx-chrateresearch01.citadelgroup.com>
+	<BANLkTi=b8QiJS2mzd2xX3gDiGhGZDQZWcQ@mail.gmail.com>
+Message-ID: <1302650423.18238.213.camel@netbook>
+
+Yes that is known bug #1294. Haven't had a chance to fix it yet, but
+it's quite an annoying one. Steve's workaround is correct in the
+meantime.
+Matthew
+
+On Tue, 2011-04-12 at 15:51 -0400, Steve Lianoglou wrote:
+> Hi,
+> 
+> On Tue, Apr 12, 2011 at 3:35 PM, Johann Hibschman
+> <jhibschman+r at gmail.com> wrote:
+> > I finally managed to upgrade to 1.5.3, but now I'm seeing errors when
+> > aggregating data tables:
+> >
+> >  > d <- data.table(a=as.integer(c(1, 1, 2, 2, 3, 3)), b=1:6 %% 2, c=1:6)
+> >  > d[b==1,list(c=sum(c)),by=list(a)]
+> >  Error in i[1, ivars, with = FALSE] : incorrect number of dimensions
+> >
+> > Does anyone know what's going on with this?
+> 
+> Not off the top of my head (although I'm sure Matthew will figure it
+> out quite quickly).
+> 
+> In the meantime, you could do this like so:
+> 
+> R> d[b==1][, list(c=sum(c)), by=list(a)]
+> 
+> If your `d` data.table is large, though, you might consider:
+> 
+> R> key(d) <- c('b', 'a')
+> R> d[J(1)][, list(c=sum(c)), by=list(a)]
+> 
+> Also, I'm using the development version of data.table from R-forge,
+> but I don't think that'll make a difference in this case.
+> 
+> -steve
+> 
+
+
+
+From mdowle at mdowle.plus.com  Wed Apr 13 11:05:56 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 13 Apr 2011 10:05:56 +0100
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com>
+References: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+	<72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com>
+Message-ID: <1302685556.31099.81.camel@netbook>
+
+Hi Karl,
+For a while the "1" and "2" (integers stored as character) confused me.
+I thought you wanted a,b because that was the value of A[1:2,x]. Now I'm
+over that, comments inserted below ...
+
+On Tue, 2011-04-12 at 03:53 -0700, Short, Tom wrote:
+> > -----Original Message-----
+> > From: datatable-help-bounces at r-forge.wu-wien.ac.at 
+> > [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On 
+> > Behalf Of Karl Ove Hufthammer
+> >
+> > I have found one way of achieving this, creating two 
+> > identical data.tables with different keys:
+> > 
+> >   options(stringsAsFactors=FALSE)
+> >   dat=data.frame(x=c("1","1","2","3"), y=c("a","b","a","c"))
+> >   dat
+> >   A <- B <- data.table(dat)
+> >   key(A)="x"
+> >   key(B)="y"
+> > 
+> >   A[B["a"][,x]][,y]
+> > 
+> > The problem is performance (my real-life data.table is *much* 
+> > larger), since B["a"][,x] outputs a character vector.
+
+Not character, B["a"][,x] returns a factor for me.
+
+> > When 
+> > this is used in A[...], the character is converted to a factor 
+> > with appropriate levels, and it turns out (shown using 
+> > 'Rprof') that the majority of the time running the function 
+> > is taken up by 'levels<-', i.e., creating this factor / 
+> > attaching the levels.
+
+Interesting. I doubt it's converting character to factor (because it's
+already factor), rather matching the levels of column in the i table to
+the levels of the column in the x table (in this case B). It then
+changes the levels in a working copy of the i column so the binary
+search can work on 2 integer columns where those integers mean the same
+level. There are some performance issues nestled in there which only
+come to light when you have very many levels (e.g. 100,000+ levels). I
+can't remember where it starts to bite. How many levels do you have in
+the real data?
+
+I've done quite a bit of work on allowing keys to be character. The need
+to match levels to levels then goes away and saves some copies too.
+Sorting character is very slow (which is why data.table likes integers
+of course) but to solve that we now have a counting sort for character.
+That C code is committed but not hooked up yet.
+
+Short answer then ... you might be hitting a known performance issue. If
+you have some way to generate the large dataset with large number of
+levels it would be great to have some more test cases to play with.
+More comments below ...
+
+> > 
+> > I believe one potential solution would be to have both 'x' 
+> > and 'y' being factors, so that there is no conversion to/from 
+> > characters. This would eliminate both the conversion '"a" to 
+> > factor' and 'B["a"][,x] to factor'.
+> > However, 'data.table' doesn't accept 'i' being a factor (and 
+> > if I convert it to the internal numeric codes, it thinks I 
+> > mean row numbers).
+Yes, that means row numbers, don't do that! :-)
+> > 
+> > Any suggestions on how to solve this?
+> 
+> To answer part of your inquiry, you can use factors by enclosing i with
+> J() as follows:
+> 
+> options(stringsAsFactors=TRUE)
+> dat=data.frame(x=c("1","1","2","3"), y=c("a","b","a","c"))
+> A <- B <- data.table(dat)
+> key(A)="x"
+> key(B)="y"
+> A[J(B["a"][,x])][,y]
+Only slight improvement on that for speed I can think of is :
+  A[J(B["a"]$x)]$y
+but that would only make a difference if this is being repeated many
+times. Karl's example seems like a very rare but valid reason to iterate
+the query.
+
+>> I also wonder if it is possible for a data.table to only
+>> return unique values of a column? For the above example
+>> I would like the output y=a,b.
+>> Note that for instance
+>>  A[B["a"][,x],mult="first"][,y]
+>> does not work, as this returns the first value of ?y? for
+>> each x (here y=a,a).
+How about :
+A[J(B["a"][,x])][,unique(y)]
+>>
+>> My last question is why
+>>
+>>  A[B["a"][,x], y, mult="all"]
+>>
+>> returns a two-column data.table/data.frame, while
+>>
+>>  A[B["a"][,x], y, mult="first"]
+>>
+>> returns a character vector. I would expect both of
+>> them to return a character vector. Is this a feature
+>> or simply a bug?
+Try FAQs (latest on homepage): 2.2 and 2.17
+Also ...
+It seems strange perhaps because "a" is a single group.
+It may have been a variable containing "a" or c("a","b")
+and in data.table we prefer consistent return types
+regardless of the data passed in. [Background: I dislike
+having to remember to write drop=FALSE in [.data.frame and
+believe that is the source of many bugs in user code.]
+In general the rule is that the type of j is the type of
+the result. When j is a vector the result will be vector,
+and if you want a data.table, then wrap with list(). [As per FAQ 1.3].
+*Except* when grouping (either by i or by by) since you
+are unlikely to want to lose which items in the result
+correspond to which groups. That is tightly coupled to
+.SD (now) excluding the grouping columns.
+With all the above in mind, mult="first" and mult="last" is not
+considered grouping. In those cases the table is subset by i, then
+j is run once on the result. Thats when j=y vs j=list(y)
+makes a difference.  mult="all" is different
+because it has a dual meaning: subset and grouping.
+
+All that said, it has been tricky to get right. If anyone can see a
+better way to do it then please do suggest.
+
+Matthew
+
+
+> 
+> - Tom
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From karl at huftis.org  Wed Apr 13 13:04:52 2011
+From: karl at huftis.org (Karl Ove Hufthammer)
+Date: Wed, 13 Apr 2011 04:04:52 -0700
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+In-Reply-To: <1302685556.31099.81.camel@netbook>
+References: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+	<72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com>
+	<1302685556.31099.81.camel@netbook>
+Message-ID: <5534c04fe365a0ea2a712e299d9a4c4c@localhost>
+
+Thank you for your detailed reply. Comments below:
+
+On Wed, 13 Apr 2011 10:05:56 +0100, Matthew Dowle <mdowle at mdowle.plus.com>
+wrote:
+>>>   options(stringsAsFactors=FALSE)
+>>>   dat=data.frame(x=c("1","1","2","3"), y=c("a","b","a","c"))
+>>>   dat
+>>>   A <- B <- data.table(dat)
+>>>   key(A)="x"
+>>>   key(B)="y"
+>>> 
+>>>   A[B["a"][,x]][,y]
+>>> 
+>>> The problem is performance (my real-life data.table is *much* 
+>>> larger), since B["a"][,x] outputs a character vector.
+> 
+> Not character, B["a"][,x] returns a factor for me.
+
+Did you remember to run the line ?options(stringsAsFactors=FALSE)??
+
+The ?x? column in ?B? is a character vector when the data.table is
+created from a data.frame with ?x? as a character vector (but a
+factor if I create the data.table directly).
+
+>> > When 
+>> > this is used in A[...], the character is converted to a factor 
+>> > with appropriate levels, and it turns out (shown using 
+>> > 'Rprof') that the majority of the time running the function 
+>> > is taken up by 'levels<-', i.e., creating this factor / 
+>> > attaching the levels.
+> 
+> Interesting. I doubt it's converting character to factor (because it's
+> already factor), rather matching the levels of column in the i table to
+> the levels of the column in the x table (in this case B). It then
+> changes the levels in a working copy of the i column so the binary
+> search can work on 2 integer columns where those integers mean the same
+> level. There are some performance issues nestled in there which only
+> come to light when you have very many levels (e.g. 100,000+ levels). I
+> can't remember where it starts to bite. How many levels do you have in
+> the real data?
+
+I have about 150,000 levels in one of the keys and 30,000 in the other.
+
+> Short answer then ... you might be hitting a known performance issue. If
+> you have some way to generate the large dataset with large number of
+> levels it would be great to have some more test cases to play with.
+
+I?ve tried to come up with a similar generated dataset and example code.
+The result is much faster than similar code on my real data set, but still
+
+shows (using ?Rprof?) that ?levels<-? is the main bottle-neck, as about
+one
+third of the time is spent there. Here?s the code. I?ve included both
+a tiny example to show how the function is supposed to work, and a larger
+and slower example (which is still pretty fast, about thirty seconds
+on my computer):
+
+------------------------------------------------------------------------
+
+# Don't automatically convert strings to factors ...
+options(stringsAsFactors=FALSE)
+
+library(data.table)
+library(Hmisc) # For %nin%
+
+
+
+## Small example
+
+xy=matrix(c(1,"A",2,"A",2,"B",3,"B",3,"D",4,"B",5,"C",6,"C",7,"D"),
+ncol=2, byrow=TRUE)
+xy=as.data.frame(xy)
+names(xy)=c("x","y")
+xy
+# For now, skip the large example below ...
+
+
+
+## Large example
+
+# Number of x values
+nx=300e3
+
+# Maximum number of unique y values
+ny=60e3
+
+# Probability of an x value having being
+# connected to 1:length(probs) y values
+probs=c(40,12,5,3,1,1)
+
+# Sample some x and y values
+values=replicate(nx, sample(ny, sample(length(probs), 1, prob=probs)))
+
+# Create the data.frame
+xy=data.frame(x=as.character(rep(seq_along(values), times=sapply(values,
+length))),
+              y=as.character(unlist(values)))
+
+
+     
+# Create lookup data.tables
+x2y=data.table(xy)
+key(x2y)="x"
+
+y2x=data.table(xy)
+key(y2x)="y"
+
+## For each value of y, find the other values of y
+## connected to y via x (directly or indirectly),
+## (and group them in families)
+
+processed=logical(nrow(xy)) # Indicates which rows we have already
+processed
+group=numeric(nrow(xy))     # Vector giving the group number of each y (or
+x)
+
+nr=1
+while( any(!processed) ) {
+    cat(nr,"\n") # Some progres info ...
+
+    # Just grab the first y value not yet processed
+    y.current=as.character(y2x$y[which(!processed)[1]])
+   
+    # List of connected y.values
+    y.group=as.list(y.current)   
+   
+    # Find the y values 'directly' connected to the current values,
+    # and repeat process until there are no new y values found
+    repeat {
+         y.connected=unique(x2y[y2x[y.current,][,x]]$y) # Directly
+connected y values
+         y.new=y.connected[y.connected %nin% y.group]   # Only the *new* y
+values discovered
+
+        if(length(y.new) == 0) # Stopp if didn't find any new y values
+            break
+        y.group=c(y.group, y.new) # Note: Since this is a list, not a
+vector, increasing its length have little performance problems
+        y.current=y.new           # Repeat the process, but with the new y
+values found as the starting point
+    }
+   
+    y.group=unlist(y.group)       # Convert to a vector
+    used=y2x[y.group, which=TRUE] # Indices of the y valued grouped this
+time
+    processed[used]=TRUE          # Mark the rows as processed
+    group[used]=nr                # Add the group numbers
+    nr=nr+1                       # Increase the group number for the next
+iteration
+}
+
+max(group) # Number of groups
+
+res=cbind(y2x, group) # Add the group numbers to the data
+res                   # Show the results
+
+------------------------------------------------------------------------
+
+Note that it is possible to improve the speed a bit (and making the code
+more difficult to read) by using numeric values and levels()[...]
+instead of (implicit or explicit) as.character coercion inside the
+?repeat?
+loop, but most of the time is taken up by ?levels<-? still.
+
+>>> I also wonder if it is possible for a data.table to only
+>>> return unique values of a column? For the above example
+>>> I would like the output y=a,b.
+>>> Note that for instance
+>>>  A[B["a"][,x],mult="first"][,y]
+>>> does not work, as this returns the first value of ?y? for
+>>> each x (here y=a,a).
+> How about :
+> A[J(B["a"][,x])][,unique(y)]
+
+Thanks. I?m still getting used to the data.table syntax.
+It works fine, but offers no speed benefit over just
+running ?unique()? on the result, so I guess the which syntax
+to use just depends on what you think looks best.
+
+>>> My last question is why
+>>>
+>>>  A[B["a"][,x], y, mult="all"]
+>>>
+>>> returns a two-column data.table/data.frame, while
+>>>
+>>>  A[B["a"][,x], y, mult="first"]
+>>>
+>>> returns a character vector. I would expect both of
+>>> them to return a character vector. Is this a feature
+>>> or simply a bug?
+[snip]
+> With all the above in mind, mult="first" and mult="last" is not
+> considered grouping. In those cases the table is subset by i, then
+> j is run once on the result. Thats when j=y vs j=list(y)
+> makes a difference.  mult="all" is different
+> because it has a dual meaning: subset and grouping.
+
+OK. It?s at least somewhat clearer to me now. :)
+Thank you.
+
+-- 
+Karl Ove Hufthammer
+
+From mdowle at mdowle.plus.com  Thu Apr 14 10:02:08 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 14 Apr 2011 09:02:08 +0100
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+In-Reply-To: <5534c04fe365a0ea2a712e299d9a4c4c@localhost>
+References: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+	<72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com>
+	<1302685556.31099.81.camel@netbook>
+	<5534c04fe365a0ea2a712e299d9a4c4c@localhost>
+Message-ID: <1302768129.31099.147.camel@netbook>
+
+On Wed, 2011-04-13 at 04:04 -0700, Karl Ove Hufthammer wrote:
+> Thank you for your detailed reply. Comments below:
+> 
+> On Wed, 13 Apr 2011 10:05:56 +0100, Matthew Dowle <mdowle at mdowle.plus.com>
+> wrote:
+> >>>   options(stringsAsFactors=FALSE)
+> >>>   dat=data.frame(x=c("1","1","2","3"), y=c("a","b","a","c"))
+> >>>   dat
+> >>>   A <- B <- data.table(dat)
+> >>>   key(A)="x"
+> >>>   key(B)="y"
+> >>> 
+> >>>   A[B["a"][,x]][,y]
+> >>> 
+> >>> The problem is performance (my real-life data.table is *much* 
+> >>> larger), since B["a"][,x] outputs a character vector.
+> > 
+> > Not character, B["a"][,x] returns a factor for me.
+> 
+> Did you remember to run the line ?options(stringsAsFactors=FALSE)??
+> The ?x? column in ?B? is a character vector when the data.table is
+> created from a data.frame with ?x? as a character vector (but a
+> factor if I create the data.table directly).
+I just created the data.table directly. Ok, I'm with you now.
+
+> I have about 150,000 levels in one of the keys and 30,000 in the other.
+Thanks. Might be the known issue, but looking at your code it's likely
+something more basic.
+
+> I?ve tried to come up with a similar generated dataset and example code.
+> The result is much faster than similar code on my real data set, but still
+> 
+> shows (using ?Rprof?) that ?levels<-? is the main bottle-neck, as about
+> one
+> third of the time is spent there. Here?s the code. I?ve included both
+> a tiny example to show how the function is supposed to work, and a larger
+> and slower example (which is still pretty fast, about thirty seconds
+> on my computer):
+> 
+> ------------------------------------------------------------------------
+
+I've been looking at the code for 40 minutes. It generates data and runs
+but I can't grasp the big picture. If I was doing iterative
+connectedness I'd just iterate bulk joins until no new connections
+turned up. I don't see why there is processed vector as long as the
+table, or why it appears to do just the first y on the first iteration
+(why not all the unique y in one go on the first step?), or what the
+group column added at the end represents.
+
+In terms of the levels<-, could I ask for a simpler example isolating
+that please.
+
+Other thoughts :
+Why can't all columns of x2y and y2x be factor?
+More to the point, why store the x integers as character? Can't they be
+kept as integers and the levels<- thing goes away. Is it at all possible
+you didn't know that x2y[J(c(1,6,8))] joins using the integer values and
+doesn't refer to the row numbers?
+
+Matthew
+
+
+
+
+From santosh.srinivas at gmail.com  Thu Apr 14 10:05:38 2011
+From: santosh.srinivas at gmail.com (sant)
+Date: Thu, 14 Apr 2011 01:05:38 -0700 (PDT)
+Subject: [datatable-help] Help with using roll = TRUE ... need some
+ variation of VLOOKUP in excel with LOCF
+In-Reply-To: <1302649004.18238.211.camel@netbook>
+References: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com>
+	<3ecbc035-ed84-4e39-b93f-9c1386d28e9d@f2g2000yqf.googlegroups.com>
+	<inkcqd$603$1@dough.gmane.org> <1302559944.18238.207.camel@netbook>
+	<BANLkTikLVAxfXuU64fjE4HeMKX4-xSwsbw@mail.gmail.com>
+	<1302649004.18238.211.camel@netbook>
+Message-ID: <b9a40b41-5945-46f4-9afb-8105bdfc502e@r19g2000prm.googlegroups.com>
+
+Thanks Mathew.
+
+I used IDate and ITime and they seamlessly integrate with the key
+requirements for the roll to work (as far as I can see currently).
+Now the keys seem logical to me.
+
+Thanks for your help.
+
+On Apr 13, 3:56?am, Matthew Dowle <mdo... at mdowle.plus.com> wrote:
+> There wasn't actually a link to IDateTime from ?data.table in 1.5.3, but
+> there has been in 1.5.4 on R-Forge for a while (in 'see also'), so it
+> should be easier to find going forward, hopefully.
+> Matthew
+>
+>
+>
+>
+>
+>
+>
+>
+>
+> On Tue, 2011-04-12 at 04:39 +0530, Santosh Srinivas wrote:
+> > Thanks Mathew. Never heard of IDateTime. I'll try that today.
+> > Sorry about the data structure, it has both the "base" data and the
+> > results of my transformations (may have messed the conversions up
+> > trying to get this thing to work .... tried all options I knew of
+> > then)
+>
+> > On Tue, Apr 12, 2011 at 3:42 AM, Matthew Dowle <mdo... at mdowle.plus.com> wrote:
+> > > I took a quick look. I don't completely follow
+> > > what you're doing (e.g. why the dates are factors)
+> > > but have you seen IDateTime?
+> > > Or the other way you can do this is have one column
+> > > as date (IDate) and another as time (ITime); a
+> > > 2 column key. That way you can ensure you join within
+> > > the same day, but the prevailing record by time that day.
+> > > HTH
+> > > Matthew
+>
+> > > On Thu, 2011-04-07 at 14:05 +0100, Matthew Dowle wrote:
+> > >> Hi Santosh,
+>
+> > >> Thanks. Looks like the task is fairly clear and your latest post
+> > >> should produce output. I'm unlikely to have free (free) time
+> > >> until next week. Maybe you'll get lucky and somebody else
+> > >> can help before then.
+>
+> > >> Matthew
+>
+> > >> "sant" <santosh.srini... at gmail.com> wrote in message
+> > >>news:3ecbc035-ed84-4e39-b93f-9c1386d28e9d at f2g2000yqf.googlegroups.com...
+> > >> Hi All,
+>
+> > >> I am not sure if this is a hack ... but I did the following
+> > >> manipulations after loading the data from the link.
+> > >> I think I've managed to get the data ... only not sure if it is the
+> > >> correct way of doing this.
+>
+> > >> dt_Opt_Final$time <- with(dt_Opt_Final, substr(datetime, 9,
+> > >> length(datetime))) #Extracting the time part only
+> > >> dt_Opt_Final$time <- as.numeric(dt_Opt_Final$time) * 1e6 #So that the
+> > >> hierarchy of the timestamp is preserved
+> > >> dt_Opt_Final$time <- as.integer(dt_Opt_Final$time) #since roll works
+> > >> only when the key is an integer
+> > >> setkey(dt_Opt_Final, "time")
+>
+> > >> dt_Fut_Final$time <- with(dt_Fut_Final, substr(datetime, 9,
+> > >> length(datetime))) #Extracting the time part only
+> > >> dt_Fut_Final$time <- as.numeric(dt_Fut_Final$time) * 1e6 #So that the
+> > >> hierarchy of the timestamp is preserved
+> > >> dt_Fut_Final$time <- as.integer(dt_Fut_Final$time) #since roll works
+> > >> only when the key is an integer
+> > >> setkey(dt_Fut_Final, "time")
+>
+> > >> tmp <- dt_Fut_Final[dt_Opt_Final, list(Id, price),roll=TRUE]
+> > >> dt_Final <- data.table(dt_Opt_Final, tmp)
+> > >> print(dt_Final, nrows=100)
+>
+> > >> On Apr 7, 3:54 pm, Santosh Srinivas <santosh.srini... at gmail.com>
+> > >> wrote:
+> > >> > Hi All,
+>
+> > >> > I am completely stuck on this and I want to do this only with
+> > >> > data.table! Here are the data files (click link pls):http://bit.ly/e5P5d5
+>
+> > >> > I am just not able to make the roll functions work.
+> > >> > I have the two data sets 1) Options and 2) Futures
+>
+> > >> > Please take a look at the data so that the question becomes quite easy
+> > >> > to understand.
+>
+> > >> > The options have repeated datetimes ... and the options and futures
+> > >> > timestamps do not match 1 to 1
+>
+> > >> > > NROW(dt_Opt_Final)
+> > >> > [1] 11793
+> > >> > > NROW(unique(dt_Opt_Final$datetime))
+>
+> > >> > [1] 6292
+>
+> > >> > I want to get the nearest futures price available for every option.
+>
+> > >> > I believe it should be able to get my data using
+> > >> > dt_Fut_Final[dt_Opt_Final, roll=TRUE]
+> > >> > (But I tried all combinations of setkey but unable to get it to work).
+>
+> > >> > I tried setting keys but I think I am losing information because the
+> > >> > datetime
+> > >> > between the two datasets are absolute values but the conversion to
+> > >> > factors when I do setkey loses the relative information the two
+> > >> > datasets.
+>
+> > >> > Please help!
+>
+> > >> > Thanks,
+> > >> > Santosh
+> > >> > _______________________________________________
+> > >> > datatable-help mailing list
+> > >> > datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl...
+>
+> > >> _______________________________________________
+> > >> datatable-help mailing list
+> > >> datatable-h... at lists.r-forge.r-project.org
+> > >>https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl...
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl...
+
+From mdowle at mdowle.plus.com  Thu Apr 14 10:11:53 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 14 Apr 2011 09:11:53 +0100
+Subject: [datatable-help] Help with using roll = TRUE ... need some
+	variation of VLOOKUP in excel with LOCF
+References: <BANLkTikqVXyEUZgYHDYqOs6KxbLto+VJjg@mail.gmail.com><3ecbc035-ed84-4e39-b93f-9c1386d28e9d@f2g2000yqf.googlegroups.com><inkcqd$603$1@dough.gmane.org>
+	<1302559944.18238.207.camel@netbook><BANLkTikLVAxfXuU64fjE4HeMKX4-xSwsbw@mail.gmail.com><1302649004.18238.211.camel@netbook>
+	<b9a40b41-5945-46f4-9afb-8105bdfc502e@r19g2000prm.googlegroups.com>
+Message-ID: <io6a8b$1rk$1@dough.gmane.org>
+
+Thanks for the update, good to hear.
+Tom added IDateTime to data.table so thanks go to him.
+
+"sant" <santosh.srinivas at gmail.com> wrote in message 
+news:b9a40b41-5945-46f4-9afb-8105bdfc502e at r19g2000prm.googlegroups.com...
+Thanks Mathew.
+
+I used IDate and ITime and they seamlessly integrate with the key
+requirements for the roll to work (as far as I can see currently).
+Now the keys seem logical to me.
+
+Thanks for your help.
+
+On Apr 13, 3:56 am, Matthew Dowle <mdo... at mdowle.plus.com> wrote:
+> There wasn't actually a link to IDateTime from ?data.table in 1.5.3, but
+> there has been in 1.5.4 on R-Forge for a while (in 'see also'), so it
+> should be easier to find going forward, hopefully.
+> Matthew
+>
+>
+>
+>
+>
+>
+>
+>
+>
+> On Tue, 2011-04-12 at 04:39 +0530, Santosh Srinivas wrote:
+> > Thanks Mathew. Never heard of IDateTime. I'll try that today.
+> > Sorry about the data structure, it has both the "base" data and the
+> > results of my transformations (may have messed the conversions up
+> > trying to get this thing to work .... tried all options I knew of
+> > then)
+>
+> > On Tue, Apr 12, 2011 at 3:42 AM, Matthew Dowle <mdo... at mdowle.plus.com> 
+> > wrote:
+> > > I took a quick look. I don't completely follow
+> > > what you're doing (e.g. why the dates are factors)
+> > > but have you seen IDateTime?
+> > > Or the other way you can do this is have one column
+> > > as date (IDate) and another as time (ITime); a
+> > > 2 column key. That way you can ensure you join within
+> > > the same day, but the prevailing record by time that day.
+> > > HTH
+> > > Matthew
+>
+> > > On Thu, 2011-04-07 at 14:05 +0100, Matthew Dowle wrote:
+> > >> Hi Santosh,
+>
+> > >> Thanks. Looks like the task is fairly clear and your latest post
+> > >> should produce output. I'm unlikely to have free (free) time
+> > >> until next week. Maybe you'll get lucky and somebody else
+> > >> can help before then.
+>
+> > >> Matthew
+>
+> > >> "sant" <santosh.srini... at gmail.com> wrote in message
+> > >>news:3ecbc035-ed84-4e39-b93f-9c1386d28e9d at f2g2000yqf.googlegroups.com...
+> > >> Hi All,
+>
+> > >> I am not sure if this is a hack ... but I did the following
+> > >> manipulations after loading the data from the link.
+> > >> I think I've managed to get the data ... only not sure if it is the
+> > >> correct way of doing this.
+>
+> > >> dt_Opt_Final$time <- with(dt_Opt_Final, substr(datetime, 9,
+> > >> length(datetime))) #Extracting the time part only
+> > >> dt_Opt_Final$time <- as.numeric(dt_Opt_Final$time) * 1e6 #So that the
+> > >> hierarchy of the timestamp is preserved
+> > >> dt_Opt_Final$time <- as.integer(dt_Opt_Final$time) #since roll works
+> > >> only when the key is an integer
+> > >> setkey(dt_Opt_Final, "time")
+>
+> > >> dt_Fut_Final$time <- with(dt_Fut_Final, substr(datetime, 9,
+> > >> length(datetime))) #Extracting the time part only
+> > >> dt_Fut_Final$time <- as.numeric(dt_Fut_Final$time) * 1e6 #So that the
+> > >> hierarchy of the timestamp is preserved
+> > >> dt_Fut_Final$time <- as.integer(dt_Fut_Final$time) #since roll works
+> > >> only when the key is an integer
+> > >> setkey(dt_Fut_Final, "time")
+>
+> > >> tmp <- dt_Fut_Final[dt_Opt_Final, list(Id, price),roll=TRUE]
+> > >> dt_Final <- data.table(dt_Opt_Final, tmp)
+> > >> print(dt_Final, nrows=100)
+>
+> > >> On Apr 7, 3:54 pm, Santosh Srinivas <santosh.srini... at gmail.com>
+> > >> wrote:
+> > >> > Hi All,
+>
+> > >> > I am completely stuck on this and I want to do this only with
+> > >> > data.table! Here are the data files (click link 
+> > >> > pls):http://bit.ly/e5P5d5
+>
+> > >> > I am just not able to make the roll functions work.
+> > >> > I have the two data sets 1) Options and 2) Futures
+>
+> > >> > Please take a look at the data so that the question becomes quite 
+> > >> > easy
+> > >> > to understand.
+>
+> > >> > The options have repeated datetimes ... and the options and futures
+> > >> > timestamps do not match 1 to 1
+>
+> > >> > > NROW(dt_Opt_Final)
+> > >> > [1] 11793
+> > >> > > NROW(unique(dt_Opt_Final$datetime))
+>
+> > >> > [1] 6292
+>
+> > >> > I want to get the nearest futures price available for every option.
+>
+> > >> > I believe it should be able to get my data using
+> > >> > dt_Fut_Final[dt_Opt_Final, roll=TRUE]
+> > >> > (But I tried all combinations of setkey but unable to get it to 
+> > >> > work).
+>
+> > >> > I tried setting keys but I think I am losing information because 
+> > >> > the
+> > >> > datetime
+> > >> > between the two datasets are absolute values but the conversion to
+> > >> > factors when I do setkey loses the relative information the two
+> > >> > datasets.
+>
+> > >> > Please help!
+>
+> > >> > Thanks,
+> > >> > Santosh
+> > >> > _______________________________________________
+> > >> > datatable-help mailing list
+> > >> > datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl...
+>
+> > >> _______________________________________________
+> > >> datatable-help mailing list
+> > >> datatable-h... at lists.r-forge.r-project.org
+> > >>https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl...
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-h... at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl... 
+
+
+
+
+From karl at huftis.org  Thu Apr 14 13:57:47 2011
+From: karl at huftis.org (Karl Ove Hufthammer)
+Date: Thu, 14 Apr 2011 04:57:47 -0700
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+In-Reply-To: <1302768129.31099.147.camel@netbook>
+References: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+	<72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com>
+	<1302685556.31099.81.camel@netbook>
+	<5534c04fe365a0ea2a712e299d9a4c4c@localhost>
+	<1302768129.31099.147.camel@netbook>
+Message-ID: <60bcb49de6705c6e5ae63fb50f3df3f8@localhost>
+
+On Thu, 14 Apr 2011 09:02:08 +0100, Matthew Dowle <mdowle at mdowle.plus.com>
+wrote:
+> On Wed, 2011-04-13 at 04:04 -0700, Karl Ove Hufthammer wrote:
+>> I?ve tried to come up with a similar generated dataset and example
+code.
+>> The result is much faster than similar code on my real data set, but
+>> still shows (using ?Rprof?) that ?levels<-? is the main bottle-neck, as
+about
+>> one third of the time is spent there. Here?s the code. I?ve included
+both
+>> a tiny example to show how the function is supposed to work, and a
+larger
+>> and slower example (which is still pretty fast, about thirty seconds
+>> on my computer):
+> 
+> I've been looking at the code for 40 minutes. It generates data and runs
+> but I can't grasp the big picture. If I was doing iterative
+> connectedness I'd just iterate bulk joins until no new connections
+> turned up. I don't see why there is processed vector as long as the
+> table, or why it appears to do just the first y on the first iteration
+> (why not all the unique y in one go on the first step?), or what the
+> group column added at the end represents.
+
+It?s very possible that I have been missing something obvious. The goal of
+the algorithm is to group the y values that are connected. So a y value
+with group index 5 can reach all other y values with group index 5, by
+going
+to a x value, from the x value to a y value, perhaps back to an x value,
+?,
+before finally ending up the y value we are interested in.
+
+I?m not sure what you mean with ?iterate bulk joins?. Or, I thought that
+was
+what I was doing ? :)
+
+> In terms of the levels<-, could I ask for a simpler example isolating
+> that please.
+
+Well, I guess the relevant line is really just the one containing
+  x2y[y2x[y.current,][,x]]
+ 
+> Other thoughts :
+> Why can't all columns of x2y and y2x be factor?
+
+They can. They just happened to be characters. And having them as levels
+doesn?t help, as the data.table function don?t know if they have identical
+levels. (Though perhaps it?s faster to check if the levels are identical,
+so you could skip the creation of a temporary object to match the levels?)
+
+> More to the point, why store the x integers as character? Can't they be
+> kept as integers and the levels<- thing goes away.
+
+It?s only in this simplified example that they?re numbers. In my real
+dataset
+they?re character strings.
+
+-- 
+Karl Ove Hufthammer
+
+From TShort at epri.com  Thu Apr 14 14:58:58 2011
+From: TShort at epri.com (Short, Tom)
+Date: Thu, 14 Apr 2011 05:58:58 -0700
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+In-Reply-To: <60bcb49de6705c6e5ae63fb50f3df3f8@localhost>
+References: <daa53ef5256d330d7ef0013be34b63b8@localhost><72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com><1302685556.31099.81.camel@netbook><5534c04fe365a0ea2a712e299d9a4c4c@localhost><1302768129.31099.147.camel@netbook>
+	<60bcb49de6705c6e5ae63fb50f3df3f8@localhost>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E306968B87@uspalex03.epri.com>
+
+> -----Original Message-----
+> From: datatable-help-bounces at r-forge.wu-wien.ac.at 
+> [mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On 
+> Behalf Of Karl Ove Hufthammer
+> Sent: Thursday, April 14, 2011 07:58
+> To: mdowle at mdowle.plus.com
+> Cc: datatable-help at r-forge.wu-wien.ac.at
+> Subject: Re: [datatable-help] Using a data.table to perform a 
+> two-way lookup
+> 
+> On Thu, 14 Apr 2011 09:02:08 +0100, Matthew Dowle 
+> <mdowle at mdowle.plus.com>
+> wrote:
+> > On Wed, 2011-04-13 at 04:04 -0700, Karl Ove Hufthammer wrote:
+> >> I've tried to come up with a similar generated dataset and example
+> code.
+> >> The result is much faster than similar code on my real 
+> data set, but 
+> >> still shows (using 'Rprof') that 'levels<-' is the main 
+> bottle-neck, 
+> >> as
+> about
+> >> one third of the time is spent there. Here's the code. 
+> I've included
+> both
+> >> a tiny example to show how the function is supposed to work, and a
+> larger
+> >> and slower example (which is still pretty fast, about 
+> thirty seconds 
+> >> on my computer):
+
+If you want to shave that 1/3 off, you can convert your factor columns
+to integers, do your processing, then manually reapply factor levels
+when your processing is all done.
+
+- Tom
+
+From jhibschman+r at gmail.com  Thu Apr 14 15:57:02 2011
+From: jhibschman+r at gmail.com (Johann Hibschman)
+Date: Thu, 14 Apr 2011 08:57:02 -0500
+Subject: [datatable-help] aggregation error under 1.5.3
+References: <u1otye3w9e0.fsf@lx-chrateresearch01.citadelgroup.com>
+	<BANLkTi=b8QiJS2mzd2xX3gDiGhGZDQZWcQ@mail.gmail.com>
+	<1302650423.18238.213.camel@netbook>
+Message-ID: <u1opqopvsup.fsf@lx-chrateresearch01.citadelgroup.com>
+
+Matthew Dowle <mdowle at mdowle.plus.com> writes:
+
+> Yes that is known bug #1294. Haven't had a chance to fix it yet, but
+> it's quite an annoying one. Steve's workaround is correct in the
+> meantime.
+
+Thanks; I should have checked the bug list.  Can I contribute a unit
+test?  I would think something like:
+
+  test(88.5, TESTDT[a=="d",list(MySum=sum(v)),by=list(b)],
+    data.table(b=INT(6,9), MySum=INT(7,11)))
+
+would work.  (That's based on just a few minutes of looking at the
+sources, so I may have mangled something.)
+
+Thanks,
+Johann
+
+
+From mdowle at mdowle.plus.com  Thu Apr 14 22:00:50 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 14 Apr 2011 21:00:50 +0100
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+In-Reply-To: <60bcb49de6705c6e5ae63fb50f3df3f8@localhost>
+References: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+	<72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com>
+	<1302685556.31099.81.camel@netbook>
+	<5534c04fe365a0ea2a712e299d9a4c4c@localhost>
+	<1302768129.31099.147.camel@netbook>
+	<60bcb49de6705c6e5ae63fb50f3df3f8@localhost>
+Message-ID: <1302811250.31099.165.camel@netbook>
+
+Hi Karl,
+
+> I?m not sure what you mean with ?iterate bulk joins?. Or, I thought that
+> was what I was doing ? :)
+
+It was the [1] in this :
+
+  y.current=as.character(y2x$y[which(!processed)[1]])
+                                                ^^^
+that made me think it was joining one value at a time. By bulk join I
+meant doing all the unique(y) in one join, rather than one by one, if
+possible.
+
+> > More to the point, why store the x integers as character? Can't they be
+> > kept as integers and the levels<- thing goes away.
+> 
+> It?s only in this simplified example that they?re numbers. In my real
+> dataset they?re character strings.
+Ah ok.  Makes sense now.  Tom's idea to drop the levels and put them
+back afterwards sounds like a good way to go then.
+
+It's on the FR list to add secondary keys, btw. If we had that then you
+wouldn't need to copy the table just to give it a different key.
+
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Thu Apr 14 22:06:12 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 14 Apr 2011 21:06:12 +0100
+Subject: [datatable-help] Using a data.table to perform a two-way lookup
+In-Reply-To: <1302811250.31099.165.camel@netbook>
+References: <daa53ef5256d330d7ef0013be34b63b8@localhost>
+	<72CF3C50F4AF5B4BB678383F11CEF0E306906E28@uspalex03.epri.com>
+	<1302685556.31099.81.camel@netbook>
+	<5534c04fe365a0ea2a712e299d9a4c4c@localhost>
+	<1302768129.31099.147.camel@netbook>
+	<60bcb49de6705c6e5ae63fb50f3df3f8@localhost>
+	<1302811250.31099.165.camel@netbook>
+Message-ID: <1302811572.31099.170.camel@netbook>
+
+Oh and if the total size of your real table is a large part of RAM and
+holding a copy is a struggle, then you can always do a 'manual'
+secondary key. Basically create an indexing table storing the row
+numbers to look up in the big table,  and set it's key to be the other
+column. There are some past threads on that, search for "secondary".
+Matthew
+
+On Thu, 2011-04-14 at 21:00 +0100, Matthew Dowle wrote:
+> Hi Karl,
+> 
+> > I?m not sure what you mean with ?iterate bulk joins?. Or, I thought that
+> > was what I was doing ? :)
+> 
+> It was the [1] in this :
+> 
+>   y.current=as.character(y2x$y[which(!processed)[1]])
+>                                                 ^^^
+> that made me think it was joining one value at a time. By bulk join I
+> meant doing all the unique(y) in one join, rather than one by one, if
+> possible.
+> 
+> > > More to the point, why store the x integers as character? Can't they be
+> > > kept as integers and the levels<- thing goes away.
+> > 
+> > It?s only in this simplified example that they?re numbers. In my real
+> > dataset they?re character strings.
+> Ah ok.  Makes sense now.  Tom's idea to drop the levels and put them
+> back afterwards sounds like a good way to go then.
+> 
+> It's on the FR list to add secondary keys, btw. If we had that then you
+> wouldn't need to copy the table just to give it a different key.
+> 
+> Matthew
+> 
+> 
+
+
+
+From mdowle at mdowle.plus.com  Mon Apr 18 23:48:51 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 18 Apr 2011 22:48:51 +0100
+Subject: [datatable-help] aggregation error under 1.5.3
+In-Reply-To: <u1opqopvsup.fsf@lx-chrateresearch01.citadelgroup.com>
+References: <u1otye3w9e0.fsf@lx-chrateresearch01.citadelgroup.com>
+	<BANLkTi=b8QiJS2mzd2xX3gDiGhGZDQZWcQ@mail.gmail.com>
+	<1302650423.18238.213.camel@netbook>
+	<u1opqopvsup.fsf@lx-chrateresearch01.citadelgroup.com>
+Message-ID: <1303163331.10891.63.camel@netbook>
+
+Johann,
+Now fixed. Thanks for unit test - added.
+Matthew
+
+On Thu, 2011-04-14 at 08:57 -0500, Johann Hibschman wrote:
+> Matthew Dowle <mdowle at mdowle.plus.com> writes:
+> 
+> > Yes that is known bug #1294. Haven't had a chance to fix it yet, but
+> > it's quite an annoying one. Steve's workaround is correct in the
+> > meantime.
+> 
+> Thanks; I should have checked the bug list.  Can I contribute a unit
+> test?  I would think something like:
+> 
+>   test(88.5, TESTDT[a=="d",list(MySum=sum(v)),by=list(b)],
+>     data.table(b=INT(6,9), MySum=INT(7,11)))
+> 
+> would work.  (That's based on just a few minutes of looking at the
+> sources, so I may have mangled something.)
+> 
+> Thanks,
+> Johann
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Tue Apr 19 00:00:51 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 18 Apr 2011 23:00:51 +0100
+Subject: [datatable-help] data.table by versus apply
+In-Reply-To: <1298826846.1803.43.camel@netbook>
+References: <8AD9137B75B37049AA711A4B64CEDB694A971911B2@AUSP01VMBX05.collaborationhost.net>
+	<1298826846.1803.43.camel@netbook>
+Message-ID: <1303164051.10891.66.camel@netbook>
+
+Damian,
+Bug #1301 fixed. Workaround below no longer needed.
+Matthew
+
+On Sun, 2011-02-27 at 17:14 +0000, Matthew Dowle wrote:
+> Hi,
+> 
+> How about this :
+> 
+> fns=c(max,min)
+> test.dt <- data.table(ID=1:10, SCORE_1=rnorm(10), SCORE_2=rnorm(10),
+> SCORE_3=rnorm(10), fn=c(rep(1, 5), rep(2, 5)))
+> 
+> test.dt[,fns[[fn]](SCORE_1,SCORE_2,SCORE_3),by=ID]  # bug #1301 raised
+> 
+> test.dt[,{fn;fns[[fn]](SCORE_1,SCORE_2,SCORE_3)},by=ID]  # workaround
+>       ID         V1
+>  [1,]  1 -1.6788065
+>  [2,]  2 -1.4021021
+>  [3,]  3 -1.0469943
+>  [4,]  4 -1.2663419
+>  [5,]  5 -0.2765518
+>  [6,]  6  0.3511581
+>  [7,]  7  1.1809315
+>  [8,]  8  0.3570631
+>  [9,]  9  0.9680948
+> [10,] 10  1.3025652
+> 
+> The bug is because the variable 'fn' isn't being detected as used by j
+> (incorrectly) so it isn't being subset. Maybe because it appears inside
+> the [[]]. Using fn explicity in the workaround gets around that. Raised
+> bug #1301 to fix that.
+> 
+> Also, data.table could be enhanced to allow a column to contain a list
+> of functions directly, rather than a lookup. Should be ok provided it
+> was pointers to functions rather than the functions themselves repeated
+> over and over. Might be quite useful. FR#1302 raised to do that. You can
+> probably create data.frame and data.table with a list column containing
+> functions already, but whether operations on those columns work I doubt.
+> Might not be very difficult to do though.
+> 
+> Thanks for helping to discover a new bug and new fr !
+> 
+> Matthew
+> 
+> 
+> On Sat, 2011-02-26 at 16:55 -0600, Damian Betebenner wrote:
+> > All,
+> >
+> > I?m curious from a speed perspective what the analog of apply is in
+> > data.table as I have a problem where, for each row,  I want to take
+> > either the min or the max of several columns depending upon the value
+> > of a third column:
+> > 
+> > For example:
+> > 
+> > test.dt <- data.table(ID=1:10, SCORE_1=rnorm(10), SCORE_2=rnorm(10),
+> > SCORE_3=rnorm(10), MAX_OR_MIN=c(rep("Max", 5), rep("Min", 5)))
+> > 
+> > For each row I?d like to get the max of SCORE_1, SCORE_2, and SCORE_3
+> > if the MAX_OR_MIN value is MAX and the min of SCORE_1, SCORE_2, and
+> > SCORE_3 if the MAX_OR_MIN value is MIN. 
+> > 
+> > It isn?t too difficult to come up with a ?bulky? and slow solution,
+> > but I?m wondering if I?m missing a way in which data.table would make
+> > such an effort elegant and quick.
+> >
+> > Any help greatly appreciated.  
+> > 
+> > Damian Betebenner
+> > 
+> > Center for Assessment
+> > 
+> > PO Box 351
+> > 
+> > Dover, NH   03821-0351
+> > 
+> >  
+> > 
+> > Phone (office): (603) 516-7900
+> > 
+> > Phone (cell): (857) 234-2474
+> > 
+> > Fax: (603) 516-7910
+> > 
+> >  
+> > 
+> > dbetebenner at nciea.org
+> > 
+> > www.nciea.org
+> > 
+> >  
+> > 
+> >  
+> > 
+> >  
+> > 
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Tue Apr 19 21:18:56 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 19 Apr 2011 20:18:56 +0100
+Subject: [datatable-help] Column names after self join
+In-Reply-To: <1301556372.18343.21.camel@netbook>
+References: <4D931A45.7070802@unimedizin-mainz.de>
+	<1301556372.18343.21.camel@netbook>
+Message-ID: <1303240736.3445.16.camel@netbook>
+
+Andreas,
+Bug #1340 fixed so that now works as you expected.
+That clears the known bug list.
+Matthew
+
+On Thu, 2011-03-31 at 08:26 +0100, Matthew Dowle wrote:
+> Hi Andreas,
+> 
+> Agreed, thanks - added bug #1340 re the column names.
+> 
+> The example data seems a little too cut down but if I understand
+> correctly then this idiom might be better :
+> 
+> > setkey(dt,x1,id)
+> > dt[J(x1,id-1,id,x2),roll=TRUE,nomatch=0]
+>      x1 id x2 id.1 x2.1
+> [1,]  a  1  1    2    2
+> > 
+> 
+> That has the same column name issue but in the result this time and may
+> be easier to work around in the meantime. I've assumed you've already
+> tried grouping by x1 and using .SD.
+> 
+> Matthew
+> 
+> 
+> On Wed, 2011-03-30 at 13:55 +0200, Andreas Borg wrote:
+> > Dear list members,
+> > 
+> > I started incorporating data.tabe into the RecordLinkage package for
+> > speed improvement. Right now I am trying to use a self join on a
+> > data.table to find from a dataset all record pairs that have equal
+> > values for a specified column. An example table:
+> > 
+> > > dt <- data.table(id=1:4, x1=c("a","a","b","c"), x2=c(1,2,3,3), key="x1")
+> > > dt
+> >      id x1 x2
+> > [1,]  1  a  1
+> > [2,]  2  a  2
+> > [3,]  3  b  3
+> > [4,]  4  c  3
+> > 
+> > I do a self join to find all pairs of rows with same value for x1:
+> > 
+> > > dt[dt]
+> >      x1 id x2 id.1 x2.1
+> > [1,]  a  1  1    1    1
+> > [2,]  a  2  2    1    1
+> > [3,]  a  1  1    2    2
+> > [4,]  a  2  2    2    2
+> > [5,]  b  3  3    3    3
+> > [6,]  c  4  3    4    3
+> > 
+> > 
+> > The problem comes now: I want to select the columns "id" and "id.1" and
+> > let only rows with id < id.1 pass (which means that each pair appears
+> > only once and a row is not matched to itself). Naturally, this would be:
+> > 
+> > dt[dt][id < id.1]
+> > 
+> > but I get an error, because "id.1" is really "id" internally:
+> > 
+> > > summary.default(dt[dt])
+> >    Length Class  Mode
+> > x1 6      factor numeric
+> > id 6      -none- numeric
+> > x2 6      -none- numeric
+> > id 6      -none- numeric
+> > x2 6      -none- numeric
+> > 
+> > and also the other components are ambigiuos, so there seems to be no way
+> > to discern between the two "id" columns. I would propose to change this
+> > behaviour to the one of merge, where one gets unambigous column names:
+> > 
+> > > summary.default(merge(dt, dt, by="x1"))
+> >      Length Class  Mode
+> > id   6      -none- numeric
+> > x1   6      factor numeric
+> > x2   6      -none- numeric
+> > id.1 6      -none- numeric
+> > x2.1 6      -none- numeric
+> > 
+> > Or is there any other possibility to deal with this?
+> > 
+> > Anyway, thanks to the developers for creating this useful package!
+> > 
+> > Best regards,
+> > 
+> > Andreas
+> > 
+> > 
+> > 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Fri Apr 22 09:30:29 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 22 Apr 2011 08:30:29 +0100
+Subject: [datatable-help] v1.6 has been submitted to CRAN
+Message-ID: <1303457429.7680.94.camel@netbook>
+
+
+(but it seems that CRAN incoming is queued up for over a week so might
+not make it to CRAN for a while...)
+
+
+NEW FEATURES
+
+   o    data.table now plays nicely with S4 classes. Slots can be
+        defined to be S4 objects, S4 classes can inherit from   
+        data.table, and S4 function dispatch works on data.table 
+        objects. See the tests in inst/tests/test-S4.R, and from
+        the R prompt: ?"data.table-class"
+
+   o    merge.data.table now works more like merge.data.frame:
+        (i) suffixes are consistent with merge.data.frame; existing 
+        users may set options(datatable.pre.suffixes=TRUE) for backwards
+        compatibility.
+        (ii) support for 'by' argument added (FR #1315).
+        However, X[Y] syntax is preferred; some users never use merge.
+  
+
+BUG FIXES
+
+   o    by=key(DT) now works when the number of rows is not
+        divisible by the number of groups (#1298, an odd bug).
+        Thanks to Steve Lianoglou for reporting.
+        
+   o    Combining i and by where i is logical or integer subset now
+        works, fixing bug #1294. Thanks to Johann Hibschman for
+        contributing a new test.
+   
+   o    Variable scope inside [[...]] now works without a workaround
+        required. This can be useful for looking up which function 
+        to call based on the data e.g. DT[,fns[[fn]](colA),by=ID].
+        Thanks to Damian Betebenner for reporting.
+        
+   o    Column names in self joins such as DT[DT] are no longer
+        duplicated, fixing bug #1340. Thanks to Andreas Borg for
+        reporting.
+        
+
+USER-VISIBLE CHANGES
+
+   o    Additions and updates to FAQ vignette. Thanks to Dennis
+        Murphy for his thorough proof reading.
+        
+   o    Welcome to Steve Lianoglou who joins the project
+        contributing S4-ization, testing using testthat, and more.
+        
+   o    IDateTime is now linked from ?data.table. data.table users
+        unaware of IDateTime, please do take a look. Tom added
+        IDateTime in v1.5 (see below).
+
+
+
+

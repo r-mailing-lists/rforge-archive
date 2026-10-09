@@ -1,0 +1,210 @@
+From emmanuel.brasil at gmail.com  Thu Feb 19 14:45:58 2009
+From: emmanuel.brasil at gmail.com (Pedro Emmanuel Alvarenga Americano do Brasil)
+Date: Thu, 19 Feb 2009 10:45:58 -0300
+Subject: [Diagnosismed-list] Fwd: ROC()
+In-Reply-To: <20090219093424.650DB9C821@r-forge.r-project.org>
+References: <20090219093424.650DB9C821@r-forge.r-project.org>
+Message-ID: <a37cfb5a0902190545n233395e0r6c9f84a793f8c559@mail.gmail.com>
+
+---------- Forwarded message ----------
+From: Alexander Hapfelmeier <Alexander.Hapfelmeier at tum.de>
+Date: 2009/2/19
+Subject: ROC()
+To: emmanuel.brasil at gmail.com
+
+
+Hallo Sir,
+
+Today I searched some functionalities for ROC-Curves and found your function
+ROC(). It is a very good function to analyse ROC-Curves but its
+documentation brings up some questions. How are the CI computed? So I
+checked the code itself. CI are computed by Wilsons method. But there seems
+to be a problem with the CI auf the AUC. It is not the 95%-KI as you compute
+AUC +- SE(AUC). For me it is not clear if you did this by purpose or if it
+is a mistake.
+
+So I have two suggestions:
+- Maybe you could improve your documentation by including some
+specifications about the computational background e.g. mentioning that CI
+are computed by Wilsons method and so on...
+- A singificance level to the CI of the AUC should be added.
+
+Thank you very much for your efforts.
+Sincerely,
+Alexander Hapfelmeier
+
+
+
+-- 
+Abra?o forte e que a for?a esteja com voc?,
+Pedro Emmanuel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/diagnosismed-list/attachments/20090219/da50490c/attachment.htm 
+
+From emmanuel.brasil at gmail.com  Thu Feb 19 15:18:13 2009
+From: emmanuel.brasil at gmail.com (Pedro Emmanuel Alvarenga Americano do Brasil)
+Date: Thu, 19 Feb 2009 11:18:13 -0300
+Subject: [Diagnosismed-list] ROC function - fix AUC interval
+Message-ID: <a37cfb5a0902190618w6b2ccab3u5374b12d80b046fe@mail.gmail.com>
+
+DiagnosisMed friends,
+
+Finally we are getting some requests about the functions available in the
+package. Therefore, It would be nice if we get used to share this
+informations in the diagnosismed email list.
+
+As in earlier emails the ROC function in the packages has a error in the AUC
+confidence limist. It did come to my attention in late december. This week
+two emails from users came quastioning about the AUC and its confidence
+limists. Tura proposed a fix. However the fix gave me some errors when I
+runned the function. There goes...
+
+# gold is the vector meneaning the reference standard e test is the test
+under evaluarion
+
+  if (is.numeric(gold)==TRUE){
+  # Making test summary, overall, disease only, without disease only
+  test.summary<-round(c(summary(test),sd(test)),digits=5)
+
+test.summary<-rbind(test.summary,round(c(summary(test[gold==0]),sd(test[gold==0])),digits=5))
+
+test.summary<-rbind(test.summary,round(c(summary(test[gold==1]),sd(test[gold==1])),digits=5))
+  colnames(test.summary)<-c("Min.","1st Qu.","Median","Mean","3rd
+Qu.","Max.","SD")
+  rownames(test.summary)<-c("Overall summary","Without disease", "With
+disease")
+  # Estimating the AUC and confidence limits, inspired in
+auc{PresenceAbsence}
+  # m length(test[gold == 0])
+  # n length(test[gold == 1])
+  AUC <- ((as.double(length(test[gold == 0]))) * (as.double(length(test[gold
+==
+       1]))) + ((as.double(length(test[gold == 0]))) * ((as.double(length(
+       test[gold == 0]))) + 1))/2 - sum(rank(test,ties.method = "average")[
+       gold == 0]))/((as.double(length(test[gold == 0]))) * (as.double(
+       length(test[gold == 1]))))
+  AUC[AUC < 0.5] <- 1 - AUC
+  X<-test[gold==1] # pag 209
+  Y<-test[gold==1] # pag 209
+  }
+
+# The same as before just with different codes in the variables
+
+  if (is.factor(gold)==TRUE){
+  # The same tests summary but with different reference standard codes
+  test.summary<-round(c(summary(test),sd(test)),digits=5)
+
+test.summary<-rbind(test.summary,round(c(summary(test[gold=="negative"]),sd(test[gold=="negative"])),digits=5))
+
+test.summary<-rbind(test.summary,round(c(summary(test[gold=="positive"]),sd(test[gold=="positive"])),digits=5))
+  colnames(test.summary)<-c("Min.","1st Qu.","Median","Mean","3rd
+Qu.","Max.","SD")
+  rownames(test.summary)<-c("Overall summary","Without disease", "With
+disease")
+  AUC <- ((as.double(length(test[gold =="negative"]))) *
+(as.double(length(test[gold ==
+       "positive"]))) + ((as.double(length(test[gold =="negative"]))) *
+((as.double(length(
+       test[gold =="negative"]))) + 1))/2 - sum(rank(test,ties.method =
+"average")[
+       gold =="negative"]))/((as.double(length(test[gold =="negative"]))) *
+(as.double(
+       length(test[gold == "positive"]))))
+  AUC[AUC < 0.5] <- 1 - AUC
+  X<-test[gold=="negative"] # pag 209
+  Y<-test[gold=="positive"] # pag 209
+  }
+
+# Here is the fix
+
+  m<-length(X) # pag 209
+  n<-length(Y) # pag 209
+  D10X<-function(Xi){(1/n)*sum(Y>=Xi)} # pag 211 * I believe the error is
+here* although not sure
+  DO1Y<-function(Yi){(1/m)*sum(Yi>=X)} # pag 211
+
+VAR.AUC<-sum((tapply(X,X,"D10X")-AUC)^2)/(m*(m-1))+sum((tapply(Y,Y,"D10X")-AUC)^2)/(n*(n-1))
+# pag 211
+  SD.AUC<-sqrt(VAR.AUC)
+  alpha<-1-CL
+  AUC.summary<-c(AUC- qnorm(1-alpha/2)*SD.AUC,AUC,AUC+
+qnorm(1-alpha/2)*SD.AUC)
+  names(AUC.summary)<-c("AUC inf conf limit", "AUC","AUC sup conf limit")
+
+# here is the output and the error below. the graph comes OK...
+
+> ROC(rocdata$Gold,rocdata$test1)
+$pop.prevalence
+Informed disease prevalence - same as sample prevalence if not informed
+                                                              0.3445946
+
+$sample.size
+[1] 148
+
+$sample.prevalence
+Observed prevalence by gold standard
+                           0.3445946
+
+$test.summary
+                 Min. 1st Qu. Median   Mean 3rd Qu.  Max.      SD
+Overall summary 0.056   0.102 0.1315 0.3835  0.6312 1.914 0.39349
+Without disease 0.056   0.098 0.1110 0.1590  0.1330 0.837 0.15833
+With disease    0.098   0.557 0.7950 0.8106  1.0490 1.914 0.35106
+
+$AUC.summary
+AUC inf conf limit                AUC AUC sup conf limit
+         0.7545496          0.9540125          1.1534755
+
+$test.best.cutoff
+                   best.cutoff Sensitivity Se.inf.cl Se.sup.cl Specificity
+Sp.inf.cl Sp.sup.cl   PLR PLR.inf.cl PLR.sup.cl
+Max. Accuracy            0.365      0.9216    0.8150    0.9691
+0.9278    0.8585    0.9646 12.76       4.74      34.36
+Max. DOR                 0.275      0.9608    0.8678    0.9892
+0.8969    0.8205    0.9430  9.32       4.13      21.05
+Min. Error rate          0.365      0.9216    0.8150    0.9691
+0.9278    0.8585    0.9646 12.76       4.74      34.36
+Max. Accuracy area       0.275      0.9608    0.8678    0.9892
+0.8969    0.8205    0.9430  9.32       4.13      21.05
+Max. Sens+Spec           0.275      0.9608    0.8678    0.9892
+0.8969    0.8205    0.9430  9.32       4.13      21.05
+Max. Youden              0.275      0.9608    0.8678    0.9892
+0.8969    0.8205    0.9430  9.32       4.13      21.05
+Se=Sp                    0.356      0.9216    0.8150    0.9691
+0.9175    0.8456    0.9576 11.17       4.44      28.08
+Min. ROC distance        0.365      0.9216    0.8150    0.9691
+0.9278    0.8585    0.9646 12.76       4.74      34.36
+Max. Efficiency          0.365      0.9216    0.8150    0.9691
+0.9278    0.8585    0.9646 12.76       4.74      34.36
+Min. MCT                 0.365      0.9216    0.8150    0.9691
+0.9278    0.8585    0.9646 12.76       4.74      34.36
+
+Warning messages:
+1: In Y >= Xi :
+  longer object length is not a multiple of shorter object length
+2: In Y >= Xi :
+  longer object length is not a multiple of shorter object length
+3: In Y >= Xi :
+  longer object length is not a multiple of shorter object length
+4: In Y >= Xi :
+  longer object length is not a multiple of shorter object length
+5: In Y >= Xi :
+  longer object length is not a multiple of shorter object length
+6: In Y >= Xi :
+  longer object length is not a multiple of shorter object length
+
+# Besides I would expect the interval to come closer to something like 0,907
+and 0,982 as some other analsys I did way before and comparing with some
+other software. It seems weird AUC conf limist wider than the upper limit 1.
+
+
+
+
+-- 
+Abra?o forte e que a for?a esteja com voc?,
+Pedro Emmanuel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/diagnosismed-list/attachments/20090219/771583d9/attachment-0001.htm 
+

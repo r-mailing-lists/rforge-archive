@@ -1,0 +1,2817 @@
+From mdowle at mdowle.plus.com  Sat May  1 15:47:21 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 01 May 2010 14:47:21 +0100
+Subject: [datatable-help] [R] Using plyr::dply more (memory) efficiently?
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E3055CBF60@uspalex03.epri.com>
+References: <w2kbbdc7ed01004290606lc425e47cs95b36f6bf0ab3d@mail.gmail.com>
+	<hrc2vq$6l4$1@dough.gmane.org>
+	<t2ybbdc7ed01004290812n433515b5vb15b49c170f5a353@mail.gmail.com>
+	<hrc9kb$3ca$1@dough.gmane.org>
+	<x2hbbdc7ed01004290905ga1b41499m7c233c1ca8c7ffd1@mail.gmail.com>
+	<6613dd2e5c6d46462f932bf316369244.squirrel@webmail.plus.net>
+	<q2kbbdc7ed01004290946j2565c3cej70aadcd222f09ac2@mail.gmail.com>
+	<1272651335.6455.15.camel@Adam>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3055CBF60@uspalex03.epri.com>
+Message-ID: <1272721641.2790.34.camel@Adam>
+
+Fixed in setkey now. Test 150:158 added.
+
+Steve, r-forge usually takes a night or two to update, then if you
+re-install from r-forge and let us know if ok.
+
+Matthew
+
+
+On Fri, 2010-04-30 at 11:52 -0700, Short, Tom wrote:
+> Interesting issue. Thanks, Steve.
+> 
+> I'd prefer a check or force reordering in setkey rather than in
+> data.table or [.data.table. 
+> 
+> I'd rather not forbid out-of-order levels for non-key columns.
+> Out-of-order levels are sometimes nice to get legends and panels in the
+> order I like when plotting with lattice. 
+> 
+> By seems to work okay with out-of-order levels:
+> 
+> > a = data.table(a = rep(1:5, 2), b = factor(letters[rep(1:5, each =
+> 2)], levels = letters[5:1]), key = "b")
+> > a[J("b")] # the problem
+>       a    b
+> [1,] NA <NA>
+> > a[, b, by = "a"]
+>       a b
+>  [1,] 1 c
+>  [2,] 1 a
+>  [3,] 2 d
+>  [4,] 2 a
+>  [5,] 3 d
+>  [6,] 3 b
+>  [7,] 4 e
+>  [8,] 4 b
+>  [9,] 5 e
+> [10,] 5 c
+> > a[, a, by = "b"]
+>       b a
+>  [1,] e 4
+>  [2,] e 5
+>  [3,] d 2
+>  [4,] d 3
+>  [5,] c 5
+>  [6,] c 1
+>  [7,] b 3
+>  [8,] b 4
+>  [9,] a 1
+> [10,] a 2
+> 
+> - Tom
+> 
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of
+> Matthew Dowle
+> Sent: Friday, April 30, 2010 2:16 PM
+> To: datatable-help at lists.r-forge.r-project.org
+> Cc: lianos at cbio.mskcc.org
+> Subject: Re: [datatable-help] [R] Using plyr::dply more (memory)
+> efficiently?
+> 
+> 
+> Looks like Steve found a bug, see below. [ He gave ok to forward to the
+> list. ]  Thanks Steve.
+> 
+> If a data.frame df has a factor column x where the levels are not
+> sorted, perhaps if its been created from somewhere else or other
+> code, then dt=data.table(df) doesn't sort those levels.
+> setkey(dt,x) then doesn't sort it, and lookup doesn't work.
+> 
+> Change could be in data.table (to make ssre all factor columns have
+> sorted levels), or just in setkey for those columns in the key only.
+> 
+> Not sure if add hoc 'by' works ok on factor levels with out-of-order
+> levels,  so the change might need to be in data.table().
+> 
+> Or something else I didn't think of. Any views?
+> 
+> In the meantime, one workaround to sort the levels :
+> 
+> check.cds$symbol = factor(as.character(check.cds$symbol))
+> key(check.cds) = NULL   # to clear the key if its already there
+> setkey(check.cds,symbol)
+> 
+> 
+> Matthew
+> 
+> 
+> On Thu, 2010-04-29 at 12:46 -0400, Steve Lianoglou wrote:
+> > Actually, the keys aren't working for me as I expect. Witness that the
+> > "symbol" column is defined as a key in the `check.cds` object:
+> > 
+> > R> tables()
+> >      NAME          NROW MB COLS                                   KEY
+> > [1,] check.cds   18,829 3  transcript,symbol,counts,exon.width symbol
+> > [2,] intron      18,532 3  transcript,symbol,counts,exon.width
+> > [3,] x           18,829 3  transcript,symbol,counts,exon.width
+> > 
+> > R> head(check.cds)
+> >      transcript symbol counts exon.width
+> > [1,]      OR4F5  OR4F5      0        125
+> > [2,]     OR4F16 OR4F16      0          0
+> > [3,]     OR4F29 OR4F29      0          0
+> > [4,]      OR4F3  OR4F3      0          0
+> > [5,]     SAMD11 SAMD11      3       2040
+> > [6,]      NOC2L  NOC2L     12       1772
+> > 
+> > R> check.cds["NOC2L",]
+> >      transcript symbol counts exon.width
+> > [1,]       <NA>   <NA>     NA         NA
+> > 
+> > R> check.cds[symbol == "NOC2L",]
+> >      transcript symbol counts exon.width
+> > [1,]      NOC2L  NOC2L     12       1772
+> > 
+> > Am I doing something wrong?
+> > 
+> > I'm using R 2.11 and data.table_1.4
+> > 
+> > -steve
+> > 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-h
+> elp
+
+
+
+From mailinglist.honeypot at gmail.com  Mon May  3 02:34:45 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Sun, 2 May 2010 20:34:45 -0400
+Subject: [datatable-help] Is the (re-)sorting of a data.table by setting its
+	key stable?
+Message-ID: <w2xbbdc7ed01005021734g2817e261rf77bd4772adbb3d@mail.gmail.com>
+
+Hi all,
+
+Firstly, thanks for fixing the bug regarding the non-resorting of a
+data.table when it was transformed from a pre-existing data.table. I
+just checked out the latest code from SVN and it seems to work as
+expected.
+
+Now on to the question:
+
+Say I have a data.frame `gene.annos` like so:
+
+      symbol  exon.start   exon.width   exon.anno
+      WASH5P        4225          468         utr
+      WASH5P        4833           69         utr
+      WASH5P        5659          152         utr
+LOC100288778        4225          468         utr
+LOC100288778        4833           69         utr
+LOC100288778        5659          152         utr
+     FAM138F       24475          563         utr
+     FAM138F       25140          205         utr
+     FAM138F       25584          361         utr
+
+Now say I create a new data.table from the data.frame, and set the
+data.table's key to "symbol".
+
+Is it guaranteed for the rows in each "subgroup" be moved around in
+the same order as they appeared originally?
+
+For instance, if I did that on this data.table, the information for
+"FAM13AF" would be pushed to the top, but would the 1st, 2nd, and 3rd
+rows for FAM13AF in the new data.table be the same 1st, 2nd, and 3rd
+rows for FAM13AF in the original data.frame?
+
+It looks like it's keeping them in order, but I just wanted to be sure
+that this behavior is a guarantee by design, and not a happy
+coincidence for now.
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+ | Memorial Sloan-Kettering Cancer Center
+ | Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From TShort at epri.com  Mon May  3 02:42:32 2010
+From: TShort at epri.com (Short, Tom)
+Date: Sun, 2 May 2010 17:42:32 -0700
+Subject: [datatable-help] Is the (re-)sorting of a data.table by setting
+	itskey stable?
+In-Reply-To: <w2xbbdc7ed01005021734g2817e261rf77bd4772adbb3d@mail.gmail.com>
+References: <w2xbbdc7ed01005021734g2817e261rf77bd4772adbb3d@mail.gmail.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E3055CC0C7@uspalex03.epri.com>
+
+Hello Steve, 
+
+It's by design. The sorting/grouping that is done when you set a key is
+done internally using either the function "order" or "sort.list" with
+the radix option. Both are "stable", meaning that the order of the other
+columns is maintained.
+
+- Tom
+
+-----Original Message-----
+From: datatable-help-bounces at lists.r-forge.r-project.org
+[mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of
+Steve Lianoglou
+Sent: Sunday, May 02, 2010 8:35 PM
+To: datatable-help at lists.r-forge.r-project.org
+Subject: [datatable-help] Is the (re-)sorting of a data.table by setting
+itskey stable?
+
+Hi all,
+
+Firstly, thanks for fixing the bug regarding the non-resorting of a
+data.table when it was transformed from a pre-existing data.table. I
+just checked out the latest code from SVN and it seems to work as
+expected.
+
+Now on to the question:
+
+Say I have a data.frame `gene.annos` like so:
+
+      symbol  exon.start   exon.width   exon.anno
+      WASH5P        4225          468         utr
+      WASH5P        4833           69         utr
+      WASH5P        5659          152         utr
+LOC100288778        4225          468         utr
+LOC100288778        4833           69         utr
+LOC100288778        5659          152         utr
+     FAM138F       24475          563         utr
+     FAM138F       25140          205         utr
+     FAM138F       25584          361         utr
+
+Now say I create a new data.table from the data.frame, and set the
+data.table's key to "symbol".
+
+Is it guaranteed for the rows in each "subgroup" be moved around in
+the same order as they appeared originally?
+
+For instance, if I did that on this data.table, the information for
+"FAM13AF" would be pushed to the top, but would the 1st, 2nd, and 3rd
+rows for FAM13AF in the new data.table be the same 1st, 2nd, and 3rd
+rows for FAM13AF in the original data.frame?
+
+It looks like it's keeping them in order, but I just wanted to be sure
+that this behavior is a guarantee by design, and not a happy
+coincidence for now.
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+ | Memorial Sloan-Kettering Cancer Center
+ | Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+_______________________________________________
+datatable-help mailing list
+datatable-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-h
+elp
+
+From Uwe.Ligges at R-Project.org  Mon May  3 13:21:42 2010
+From: Uwe.Ligges at R-Project.org (Uwe.Ligges at R-Project.org)
+Date: Mon, 03 May 2010 13:21:42 +0200
+Subject: [datatable-help] Package data.table_1.4.1.tar.gz has been built for
+	Windows
+Message-ID: <01caeab2$Blat.v2.2.2$ce8ad026@mail.statistik.tu-dortmund.de>
+
+Dear package maintainer,
+ 
+this notification has been generated automatically.
+Your package data.table_1.4.1.tar.gz has been built for Windows and
+will be published within 24 hours in the corresponding CRAN directory
+(CRAN/bin/windows/contrib/2.11/).
+R version 2.11.0 (2010-04-22) (32-bit)
+ 
+All the best,
+Uwe Ligges
+(Maintainer of binary packages for Windows)
+
+
+From mdowle at mdowle.plus.com  Thu May  6 20:15:36 2010
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 06 May 2010 19:15:36 +0100
+Subject: [datatable-help] data.table 1.4.1 now on CRAN
+Message-ID: <1273169736.27760.7.camel@Adam>
+
+data.table is an enhanced data.frame with fast subset, fast
+grouping and fast merge. It uses a short and flexible syntax
+which extends existing R concepts.
+
+Example:
+    DT[a>3,sum(b*c),by=d]
+where DT is a data.table with 4 columns (a,b,c,d).
+
+data.table 1.4.1 :
+
+* grouping is now 10+ times faster than tapply()
+* extract is 100+ times faster than ==, as before
+* 3 new vignettes: Intro, FAQ & Timings
+* NEWS file contains further details
+
+http://datatable.r-forge.r-project.org/
+
+http://cran.r-project.org/web/packages/data.table/index.html
+
+There is a new mailing list, datatable-help. Please do send comments,
+feedback, problems and questions.
+
+Matthew and Tom
+
+
+
+
+From harishv_99 at yahoo.com  Fri May  7 17:08:07 2010
+From: harishv_99 at yahoo.com (Harish)
+Date: Fri, 7 May 2010 08:08:07 -0700 (PDT)
+Subject: [datatable-help] Not getting behavior described in FAQ
+Message-ID: <37131.2151.qm@web30803.mail.mud.yahoo.com>
+
+Hi,
+
+I recently ran across data.table and am experimenting with it.? I have a few questions that I am hoping to get your help with.
+
+*** Question #1 ***
+I like the concept of data.tables quite a bit and would like to use it as much as possible.? However, some other packages I want to use (e.g. ggplot2) need data frames as inputs.
+
+Would I take a huge performance hit if I convert to data frames intermittently and use data.tables as much as possible?? Or should I use data.tables only when I have significant querying to do?
+
+*** Question #2 ***
+For some reason, FAQ 1.1 and 1.2 do not work for me as described.
+
+I have version 1.4 of the data.table package (downloaded from r-forge today).
+
+Example:
+???a <- as.data.table(installed.packages())
+???a[,5]
+???a[,"Version"]
+
+==> a[,5] does not return 5 as indicated in the FAQ 1.1, but returns the 5th column.
+==> a[,"Version"] does not return "Version" as indicated in the FAQ 1.2, but returns the "Version" column.
+
+What is the bug -- the FAQ or the behavior of the code?
+
+*** Question #3 ***
+
+FAQ 1.10 says "although it appears as though x[y] does not return the columns in y, you can actually use the columns from y in the j expression."? However, I don't get this behavior.
+
+Example:
+???x <- data.table( a=rep(letters[1:4], each=3), b=rep(letters[10:12], times=4), v=1:12, key='a,b')
+
+???y <- data.table( a=letters[1:3], b=letters[10:12], col3=1:3, key='a,b' )
+
+Then, I expect one of the following to give me col3 from y...
+???x[y,"col3", with=FALSE]
+???x[y, list(col3)]
+...but I don't.
+
+What am I doing wrong?
+
+
+BTW, this is a great package.
+
+Regards,
+Harish
+
+
+
+
+      
+
+From TShort at epri.com  Fri May  7 18:59:29 2010
+From: TShort at epri.com (Short, Tom)
+Date: Fri, 7 May 2010 09:59:29 -0700
+Subject: [datatable-help] Not getting behavior described in FAQ
+In-Reply-To: <37131.2151.qm@web30803.mail.mud.yahoo.com>
+References: <37131.2151.qm@web30803.mail.mud.yahoo.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E30561CFD2@uspalex03.epri.com>
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Harish
+> Sent: Friday, May 07, 2010 11:08 AM
+> To: datatable-help at lists.r-forge.r-project.org
+> Subject: [datatable-help] Not getting behavior described in FAQ
+> 
+> Hi,
+> 
+> I recently ran across data.table and am experimenting with 
+> it.? I have a few questions that I am hoping to get your help with.
+> 
+> *** Question #1 ***
+> I like the concept of data.tables quite a bit and would like 
+> to use it as much as possible.? However, some other packages 
+> I want to use (e.g. ggplot2) need data frames as inputs.
+> 
+> Would I take a huge performance hit if I convert to data 
+> frames intermittently and use data.tables as much as 
+> possible?? Or should I use data.tables only when I have 
+> significant querying to do?
+
+Converting back and forth between data tables and data frames is
+efficient. Just use:
+
+as.data.table(df) or as.data.frame(dt)
+
+This still involves a copy though. For very large data
+table/frames, you can manually set the class directly to avoid a
+copy. 
+
+class(dd) <- "data.frame"
+attr(dd,"row.names") <- 1:nrow(dd) # needed to get row names
+
+or the other way:
+
+class(dd) <- "data.table"
+ 
+> *** Question #2 ***
+> For some reason, FAQ 1.1 and 1.2 do not work for me as described.
+> 
+> I have version 1.4 of the data.table package (downloaded from 
+> r-forge today).
+> 
+> Example:
+> ???a <- as.data.table(installed.packages())
+> ???a[,5]
+> ???a[,"Version"]
+> 
+> ==> a[,5] does not return 5 as indicated in the FAQ 1.1, but 
+> returns the 5th column.
+> ==> a[,"Version"] does not return "Version" as indicated in 
+> the FAQ 1.2, but returns the "Version" column.
+> 
+> What is the bug -- the FAQ or the behavior of the code?
+
+I think it's a bug in the FAQ. This was only recently
+changed. For the cases where j is a single number or character
+string, it's the same as using "with=FALSE". So,
+
+a[,5] returns a data table consisting of the fifth column, but
+a[,5 + 0] returns the number five, and a[,5:6] returns 5:6.  
+
+a[,"Version"] returns a data table consisting of the "Version"
+column, but a[,c("Version")] and a[,c("Version","Package")]
+return character strings.
+
+
+> *** Question #3 ***
+> 
+> FAQ 1.10 says "although it appears as though x[y] does not 
+> return the columns in y, you can actually use the columns 
+> from y in the j expression."? However, I don't get this behavior.
+> 
+> Example:
+> ???x <- data.table( a=rep(letters[1:4], each=3), 
+> b=rep(letters[10:12], times=4), v=1:12, key='a,b')
+> 
+> ???y <- data.table( a=letters[1:3], b=letters[10:12], 
+> col3=1:3, key='a,b' )
+> 
+> Then, I expect one of the following to give me col3 from y...
+> ???x[y,"col3", with=FALSE]
+> ???x[y, list(col3)]
+> ...but I don't.
+> 
+> What am I doing wrong?
+
+In the move to Matthew's new code to speed up grouping, I think
+this feature got removed. I think we'd like to re-introduce it,
+but I'm not sure about the feasibility or timetable for that.
+
+For now, if you want to mix columns like that, you have to use
+merge and then possibly index further on the merged data.
+
+z <- merge(x,y)
+
+     a b v col3
+[1,] a j 1    1
+[2,] b k 5    2
+[3,] c l 9    3
+
+Thanks for the input, Harish.
+
+- Tom
+
+From jhibschman at gmail.com  Fri May  7 22:53:02 2010
+From: jhibschman at gmail.com (Johann Hibschman)
+Date: Fri, 7 May 2010 16:53:02 -0400
+Subject: [datatable-help] Access to local variables in "j" expressions
+Message-ID: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com>
+
+I'm just taking a look at data.table again, now that 1.4.1 has been
+released. I tried the following:
+
+  dt.test <- data.table(n=c("a","a","b"), x=1:3, key="n")
+
+  global.sum7 <- function (y) {
+?  sum(y) + 7
+  }
+
+  test.1 <- function (dt) {
+?  local.sum7 <- global.sum7
+  ?dt[, list(out=local.sum7(x)), by=n]
+  }
+
+  test.1(dt.test)
+
+?This failed, with 'Error in eval(expr, envir, enclos) : could not
+find function "local.sum7"'. Looking at the documentation, I see:
+
+     The j expression 'sees' variables in the calling frame and above
+     including .GlobalEnv, see the examples. This is base R
+     functionality from eval() and with().
+
+That led me to think that the above would work. Is this a bug, or am I
+not understanding something?
+
+Thanks,
+Johann
+
+From TShort at epri.com  Sat May  8 13:34:31 2010
+From: TShort at epri.com (Short, Tom)
+Date: Sat, 8 May 2010 04:34:31 -0700
+Subject: [datatable-help] Access to local variables in "j" expressions
+In-Reply-To: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com>
+References: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E30561D134@uspalex03.epri.com>
+
+I think it's a bug, Johann. I'll dig deeper. Thanks for reporting it.
+
+- Tom
+ 
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Johann Hibschman
+> Sent: Friday, May 07, 2010 4:53 PM
+> To: datatable-help at lists.r-forge.r-project.org
+> Subject: [datatable-help] Access to local variables in "j" expressions
+> 
+> I'm just taking a look at data.table again, now that 1.4.1 
+> has been released. I tried the following:
+> 
+>   dt.test <- data.table(n=c("a","a","b"), x=1:3, key="n")
+> 
+>   global.sum7 <- function (y) {
+> ?  sum(y) + 7
+>   }
+> 
+>   test.1 <- function (dt) {
+> ?  local.sum7 <- global.sum7
+>   ?dt[, list(out=local.sum7(x)), by=n]
+>   }
+> 
+>   test.1(dt.test)
+> 
+> ?This failed, with 'Error in eval(expr, envir, enclos) : 
+> could not find function "local.sum7"'. Looking at the 
+> documentation, I see:
+> 
+>      The j expression 'sees' variables in the calling frame and above
+>      including .GlobalEnv, see the examples. This is base R
+>      functionality from eval() and with().
+> 
+> That led me to think that the above would work. Is this a 
+> bug, or am I not understanding something?
+> 
+> Thanks,
+> Johann
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From TShort at epri.com  Sat May  8 16:58:08 2010
+From: TShort at epri.com (Short, Tom)
+Date: Sat, 8 May 2010 07:58:08 -0700
+Subject: [datatable-help] Access to local variables in "j" expressions
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E30561D134@uspalex03.epri.com>
+References: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D134@uspalex03.epri.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E30561D13E@uspalex03.epri.com>
+
+I've got a fix for this. It'll probably be a couple of days before I can get it up to R-forge.
+
+- Tom
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Short, Tom
+> Sent: Saturday, May 08, 2010 7:35 AM
+> To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Access to local variables in 
+> "j" expressions
+> 
+> I think it's a bug, Johann. I'll dig deeper. Thanks for reporting it.
+> 
+> - Tom
+>  
+> 
+> > -----Original Message-----
+> > From: datatable-help-bounces at lists.r-forge.r-project.org
+> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> > On Behalf Of Johann Hibschman
+> > Sent: Friday, May 07, 2010 4:53 PM
+> > To: datatable-help at lists.r-forge.r-project.org
+> > Subject: [datatable-help] Access to local variables in "j" 
+> expressions
+> > 
+> > I'm just taking a look at data.table again, now that 1.4.1 has been 
+> > released. I tried the following:
+> > 
+> >   dt.test <- data.table(n=c("a","a","b"), x=1:3, key="n")
+> > 
+> >   global.sum7 <- function (y) {
+> > ?  sum(y) + 7
+> >   }
+> > 
+> >   test.1 <- function (dt) {
+> > ?  local.sum7 <- global.sum7
+> >   ?dt[, list(out=local.sum7(x)), by=n]
+> >   }
+> > 
+> >   test.1(dt.test)
+> > 
+> > ?This failed, with 'Error in eval(expr, envir, enclos) : 
+> > could not find function "local.sum7"'. Looking at the 
+> documentation, I 
+> > see:
+> > 
+> >      The j expression 'sees' variables in the calling frame 
+> and above
+> >      including .GlobalEnv, see the examples. This is base R
+> >      functionality from eval() and with().
+> > 
+> > That led me to think that the above would work. Is this a 
+> bug, or am I 
+> > not understanding something?
+> > 
+> > Thanks,
+> > Johann
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> atatable-help
+> > 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From TShort at epri.com  Sat May  8 20:17:13 2010
+From: TShort at epri.com (Short, Tom)
+Date: Sat, 8 May 2010 11:17:13 -0700
+Subject: [datatable-help] Access to local variables in "j" expressions
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E30561D13E@uspalex03.epri.com>
+References: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com><72CF3C50F4AF5B4BB678383F11CEF0E30561D134@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D13E@uspalex03.epri.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E30561D14E@uspalex03.epri.com>
+
+I checked in a fix for this bug on R-forge. It should be available for installation tomorrow as follows (R-forge has been a little flakey lately):
+
+install.packages("data.table",repos="http://r-forge.r-project.org")
+
+If you're able to try it, let me know if it works or causes other problems.
+
+- Tom
+
+ 
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Short, Tom
+> Sent: Saturday, May 08, 2010 10:58 AM
+> To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Access to local variables in 
+> "j" expressions
+> 
+> I've got a fix for this. It'll probably be a couple of days 
+> before I can get it up to R-forge.
+> 
+> - Tom
+> 
+> > -----Original Message-----
+> > From: datatable-help-bounces at lists.r-forge.r-project.org
+> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> > On Behalf Of Short, Tom
+> > Sent: Saturday, May 08, 2010 7:35 AM
+> > To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+> > Subject: Re: [datatable-help] Access to local variables in "j" 
+> > expressions
+> > 
+> > I think it's a bug, Johann. I'll dig deeper. Thanks for 
+> reporting it.
+> > 
+> > - Tom
+> >  
+> > 
+> > > -----Original Message-----
+> > > From: datatable-help-bounces at lists.r-forge.r-project.org
+> > > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> > > On Behalf Of Johann Hibschman
+> > > Sent: Friday, May 07, 2010 4:53 PM
+> > > To: datatable-help at lists.r-forge.r-project.org
+> > > Subject: [datatable-help] Access to local variables in "j" 
+> > expressions
+> > > 
+> > > I'm just taking a look at data.table again, now that 
+> 1.4.1 has been 
+> > > released. I tried the following:
+> > > 
+> > >   dt.test <- data.table(n=c("a","a","b"), x=1:3, key="n")
+> > > 
+> > >   global.sum7 <- function (y) {
+> > > ?  sum(y) + 7
+> > >   }
+> > > 
+> > >   test.1 <- function (dt) {
+> > > ?  local.sum7 <- global.sum7
+> > >   ?dt[, list(out=local.sum7(x)), by=n]
+> > >   }
+> > > 
+> > >   test.1(dt.test)
+> > > 
+> > > ?This failed, with 'Error in eval(expr, envir, enclos) : 
+> > > could not find function "local.sum7"'. Looking at the
+> > documentation, I
+> > > see:
+> > > 
+> > >      The j expression 'sees' variables in the calling frame
+> > and above
+> > >      including .GlobalEnv, see the examples. This is base R
+> > >      functionality from eval() and with().
+> > > 
+> > > That led me to think that the above would work. Is this a
+> > bug, or am I
+> > > not understanding something?
+> > > 
+> > > Thanks,
+> > > Johann
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> > atatable-help
+> > > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> atatable-help
+> > 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From jhibschman at gmail.com  Mon May 10 17:41:20 2010
+From: jhibschman at gmail.com (Johann Hibschman)
+Date: Mon, 10 May 2010 11:41:20 -0400
+Subject: [datatable-help] Access to local variables in "j" expressions
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E30561D14E@uspalex03.epri.com>
+References: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D134@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D13E@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D14E@uspalex03.epri.com>
+Message-ID: <AANLkTin1wqVyh3Yrrcnq5D4gejEE7OqULFK4HdwlDWWU@mail.gmail.com>
+
+Hi Tom,
+
+Thanks for taking the time to look into this so promptly. I've
+installed that version, and it fixes my original problem. I'll keep
+testing it and see if I run into any more issues.
+
+I didn't get as much of a speed-up as I was hoping for the
+time-intensive parts of my calculation, so I don't know how much
+additional time I'll invest in it, but I'll keep experimenting for a
+few days at least.
+
+(I'm comparing, in effect, unlist(tapply(x, GroupID, cumsum)) to
+dt[,list(out=cumsum(x)), by=GroupID]; they take more-or-less the same
+time for me.)
+
+-Johann
+
+
+
+On Sat, May 8, 2010 at 2:17 PM, Short, Tom <TShort at epri.com> wrote:
+> I checked in a fix for this bug on R-forge. It should be available for installation tomorrow as follows (R-forge has been a little flakey lately):
+>
+> install.packages("data.table",repos="http://r-forge.r-project.org")
+>
+> If you're able to try it, let me know if it works or causes other problems.
+>
+> - Tom
+>
+>
+>
+>> -----Original Message-----
+>> From: datatable-help-bounces at lists.r-forge.r-project.org
+>> [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>> On Behalf Of Short, Tom
+>> Sent: Saturday, May 08, 2010 10:58 AM
+>> To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+>> Subject: Re: [datatable-help] Access to local variables in
+>> "j" expressions
+>>
+>> I've got a fix for this. It'll probably be a couple of days
+>> before I can get it up to R-forge.
+>>
+>> - Tom
+>>
+>> > -----Original Message-----
+>> > From: datatable-help-bounces at lists.r-forge.r-project.org
+>> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>> > On Behalf Of Short, Tom
+>> > Sent: Saturday, May 08, 2010 7:35 AM
+>> > To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+>> > Subject: Re: [datatable-help] Access to local variables in "j"
+>> > expressions
+>> >
+>> > I think it's a bug, Johann. I'll dig deeper. Thanks for
+>> reporting it.
+>> >
+>> > - Tom
+>> >
+>> >
+>> > > -----Original Message-----
+>> > > From: datatable-help-bounces at lists.r-forge.r-project.org
+>> > > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>> > > On Behalf Of Johann Hibschman
+>> > > Sent: Friday, May 07, 2010 4:53 PM
+>> > > To: datatable-help at lists.r-forge.r-project.org
+>> > > Subject: [datatable-help] Access to local variables in "j"
+>> > expressions
+>> > >
+>> > > I'm just taking a look at data.table again, now that
+>> 1.4.1 has been
+>> > > released. I tried the following:
+>> > >
+>> > > ? dt.test <- data.table(n=c("a","a","b"), x=1:3, key="n")
+>> > >
+>> > > ? global.sum7 <- function (y) {
+>> > > ? ?sum(y) + 7
+>> > > ? }
+>> > >
+>> > > ? test.1 <- function (dt) {
+>> > > ? ?local.sum7 <- global.sum7
+>> > > ? ?dt[, list(out=local.sum7(x)), by=n]
+>> > > ? }
+>> > >
+>> > > ? test.1(dt.test)
+>> > >
+>> > > ?This failed, with 'Error in eval(expr, envir, enclos) :
+>> > > could not find function "local.sum7"'. Looking at the
+>> > documentation, I
+>> > > see:
+>> > >
+>> > > ? ? ?The j expression 'sees' variables in the calling frame
+>> > and above
+>> > > ? ? ?including .GlobalEnv, see the examples. This is base R
+>> > > ? ? ?functionality from eval() and with().
+>> > >
+>> > > That led me to think that the above would work. Is this a
+>> > bug, or am I
+>> > > not understanding something?
+>> > >
+>> > > Thanks,
+>> > > Johann
+>> > > _______________________________________________
+>> > > datatable-help mailing list
+>> > > datatable-help at lists.r-forge.r-project.org
+>> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+>> > atatable-help
+>> > >
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+>> atatable-help
+>> >
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> atatable-help
+>>
+>
+
+From TShort at epri.com  Mon May 10 18:42:46 2010
+From: TShort at epri.com (Short, Tom)
+Date: Mon, 10 May 2010 09:42:46 -0700
+Subject: [datatable-help] Access to local variables in "j" expressions
+In-Reply-To: <AANLkTin1wqVyh3Yrrcnq5D4gejEE7OqULFK4HdwlDWWU@mail.gmail.com>
+References: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D134@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D13E@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D14E@uspalex03.epri.com>
+	<AANLkTin1wqVyh3Yrrcnq5D4gejEE7OqULFK4HdwlDWWU@mail.gmail.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E30561D29B@uspalex03.epri.com>
+
+Johann, 
+
+I did some timing tests to compare tapply to data.table and couldn't find a case where tapply was close. See here for the timing code:
+
+n <- 1e7
+groupsizes <- c(100,1000,1e4,1e5,1e6)
+res <- data.frame(groupsize = groupsizes, tapply.runtime = 0, dt.runtime = 0)
+for (i in seq(along=groupsizes)) {
+    df <- data.frame(x = rnorm(n), grp = as.integer(runif(n,1,groupsizes[i])))
+    dt <- as.data.table(df)
+    res$tapply.runtime[i] <- system.time(  with(df, unlist(tapply(x, grp, cumsum)))  )[1]
+    res$dt.runtime[i]     <- system.time(  dt[,list(x=cumsum(x)), by=grp]            )[1]
+}
+res    
+
+This gives these results (the runtimes are in seconds):
+
+  groupsize tapply.runtime dt.runtime
+1     1e+02          49.42       1.89
+2     1e+03          43.20       2.10
+3     1e+04          45.82       2.18
+4     1e+05          59.77       2.49
+5     1e+06         113.01      22.23
+
+If the grouping variable is negative or has a range of more than 100000, you could get slowdowns. One workaround for this is to convert the grouping variable to a factor if you have less than 100000 unique id's.
+
+- Tom
+ 
+
+> -----Original Message-----
+> From: Johann Hibschman [mailto:jhibschman at gmail.com] 
+> Sent: Monday, May 10, 2010 11:41 AM
+> To: Short, Tom
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Access to local variables in 
+> "j" expressions
+> 
+> Hi Tom,
+> 
+> Thanks for taking the time to look into this so promptly. 
+> I've installed that version, and it fixes my original 
+> problem. I'll keep testing it and see if I run into any more issues.
+> 
+> I didn't get as much of a speed-up as I was hoping for the 
+> time-intensive parts of my calculation, so I don't know how 
+> much additional time I'll invest in it, but I'll keep 
+> experimenting for a few days at least.
+> 
+> (I'm comparing, in effect, unlist(tapply(x, GroupID, cumsum)) 
+> to dt[,list(out=cumsum(x)), by=GroupID]; they take 
+> more-or-less the same time for me.)
+> 
+> -Johann
+> 
+> 
+> 
+> On Sat, May 8, 2010 at 2:17 PM, Short, Tom <TShort at epri.com> wrote:
+> > I checked in a fix for this bug on R-forge. It should be 
+> available for installation tomorrow as follows (R-forge has 
+> been a little flakey lately):
+> >
+> > install.packages("data.table",repos="http://r-forge.r-project.org")
+> >
+> > If you're able to try it, let me know if it works or causes 
+> other problems.
+> >
+> > - Tom
+> >
+> >
+> >
+> >> -----Original Message-----
+> >> From: datatable-help-bounces at lists.r-forge.r-project.org
+> >> [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> >> On Behalf Of Short, Tom
+> >> Sent: Saturday, May 08, 2010 10:58 AM
+> >> To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+> >> Subject: Re: [datatable-help] Access to local variables in "j" 
+> >> expressions
+> >>
+> >> I've got a fix for this. It'll probably be a couple of 
+> days before I 
+> >> can get it up to R-forge.
+> >>
+> >> - Tom
+> >>
+> >> > -----Original Message-----
+> >> > From: datatable-help-bounces at lists.r-forge.r-project.org
+> >> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> >> > On Behalf Of Short, Tom
+> >> > Sent: Saturday, May 08, 2010 7:35 AM
+> >> > To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+> >> > Subject: Re: [datatable-help] Access to local variables in "j"
+> >> > expressions
+> >> >
+> >> > I think it's a bug, Johann. I'll dig deeper. Thanks for
+> >> reporting it.
+> >> >
+> >> > - Tom
+> >> >
+> >> >
+> >> > > -----Original Message-----
+> >> > > From: datatable-help-bounces at lists.r-forge.r-project.org
+> >> > > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> >> > > On Behalf Of Johann Hibschman
+> >> > > Sent: Friday, May 07, 2010 4:53 PM
+> >> > > To: datatable-help at lists.r-forge.r-project.org
+> >> > > Subject: [datatable-help] Access to local variables in "j"
+> >> > expressions
+> >> > >
+> >> > > I'm just taking a look at data.table again, now that
+> >> 1.4.1 has been
+> >> > > released. I tried the following:
+> >> > >
+> >> > > ? dt.test <- data.table(n=c("a","a","b"), x=1:3, key="n")
+> >> > >
+> >> > > ? global.sum7 <- function (y) {
+> >> > > ? ?sum(y) + 7
+> >> > > ? }
+> >> > >
+> >> > > ? test.1 <- function (dt) {
+> >> > > ? ?local.sum7 <- global.sum7
+> >> > > ? ?dt[, list(out=local.sum7(x)), by=n]
+> >> > > ? }
+> >> > >
+> >> > > ? test.1(dt.test)
+> >> > >
+> >> > > ?This failed, with 'Error in eval(expr, envir, enclos) :
+> >> > > could not find function "local.sum7"'. Looking at the
+> >> > documentation, I
+> >> > > see:
+> >> > >
+> >> > > ? ? ?The j expression 'sees' variables in the calling frame
+> >> > and above
+> >> > > ? ? ?including .GlobalEnv, see the examples. This is base R
+> >> > > ? ? ?functionality from eval() and with().
+> >> > >
+> >> > > That led me to think that the above would work. Is this a
+> >> > bug, or am I
+> >> > > not understanding something?
+> >> > >
+> >> > > Thanks,
+> >> > > Johann
+> >> > > _______________________________________________
+> >> > > datatable-help mailing list
+> >> > > datatable-help at lists.r-forge.r-project.org
+> >> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> >> > atatable-help
+> >> > >
+> >> > _______________________________________________
+> >> > datatable-help mailing list
+> >> > datatable-help at lists.r-forge.r-project.org
+> >> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> >> atatable-help
+> >> >
+> >> _______________________________________________
+> >> datatable-help mailing list
+> >> datatable-help at lists.r-forge.r-project.org
+> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> > atatable-help
+> >>
+> >
+> 
+
+From jhibschman at gmail.com  Mon May 10 22:16:07 2010
+From: jhibschman at gmail.com (Johann Hibschman)
+Date: Mon, 10 May 2010 16:16:07 -0400
+Subject: [datatable-help] Access to local variables in "j" expressions
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E30561D29B@uspalex03.epri.com>
+References: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D134@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D13E@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D14E@uspalex03.epri.com>
+	<AANLkTin1wqVyh3Yrrcnq5D4gejEE7OqULFK4HdwlDWWU@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D29B@uspalex03.epri.com>
+Message-ID: <AANLkTimHf7Sr3AHLMn61VLJibhpGPENglmpdO2pLyu8l@mail.gmail.com>
+
+After thinking about this some, I realized I was having data.table do
+extra work by not pre-calculating as much as possible. After I
+followed the example of "calc.fake.dt.2", below, I wound up with
+data.table being about 2.5 times faster than the data.frame version.
+
+So, yes, data.table is faster, but I have to introduce a few more
+temporary columns in order to make it work efficiently.
+
+Here's the example code I ran:
+
+## Try fake data experiments, to see if I can duplicate the results.
+mk.fake.df <- function (n.groups=10000, n.per.group=70) {
+  data.frame(grp=rep(1:n.groups, each=n.per.group),
+             age=rep(0:(n.per.group-1), n.groups),
+             x=rnorm(n.groups * n.per.group),
+             ## These don't do anything, but only exist to give
+             ## the table a similar size to the real data.
+             y1=rnorm(n.groups * n.per.group),
+             y2=rnorm(n.groups * n.per.group),
+             y3=rnorm(n.groups * n.per.group),
+             y4=rnorm(n.groups * n.per.group))
+}
+
+mk.fake.dt <- function (fake.df) {
+  fake.dt <- as.data.table(fake.df)
+  setkey(fake.dt, grp, age)
+  fake.dt
+}
+
+cumsum.lag <- function (x) {
+  x.prev <- c(0, x[-length(x)])
+  cumsum(x.prev)
+}
+
+calc.fake.df <- function (df) {
+  calc.lst <- with(df, within(list(), {
+    sum   <- unlist(tapply(pmax(x, 0), grp, cumsum.lag))
+    sum6  <- unlist(tapply(pmax((age <  6) * x, 0), grp, cumsum.lag))
+    sum12 <- unlist(tapply(pmax((age < 12) * x, 0), grp, cumsum.lag))
+    sum18 <- unlist(tapply(pmax((age < 18) * x, 0), grp, cumsum.lag))
+    sum24 <- unlist(tapply(pmax((age < 24) * x, 0), grp, cumsum.lag))
+    sum36 <- unlist(tapply(pmax((age < 36) * x, 0), grp, cumsum.lag))
+    sum48 <- unlist(tapply(pmax((age < 48) * x, 0), grp, cumsum.lag))
+    sum60 <- unlist(tapply(pmax((age < 60) * x, 0), grp, cumsum.lag))
+  }))
+  calc.lst
+}
+
+calc.fake.dt <- function (dt) {
+  dt[, list(sum  =cumsum.lag(pmax(x, 0)),
+            sum6 =cumsum.lag(pmax((age <  6) * x, 0)),
+            sum12=cumsum.lag(pmax((age < 12) * x, 0)),
+            sum18=cumsum.lag(pmax((age < 18) * x, 0)),
+            sum24=cumsum.lag(pmax((age < 24) * x, 0)),
+            sum36=cumsum.lag(pmax((age < 36) * x, 0)),
+            sum48=cumsum.lag(pmax((age < 48) * x, 0)),
+            sum60=cumsum.lag(pmax((age < 60) * x, 0))),
+     by=grp]
+}
+
+calc.fake.dt.2 <- function (dt) {
+  dt$tmp.0  <- pmax(dt$x, 0)
+  dt$tmp.6  <- pmax((dt$age <  6) * dt$x, 0)
+  dt$tmp.12 <- pmax((dt$age < 12) * dt$x, 0)
+  dt$tmp.18 <- pmax((dt$age < 18) * dt$x, 0)
+  dt$tmp.24 <- pmax((dt$age < 24) * dt$x, 0)
+  dt$tmp.36 <- pmax((dt$age < 36) * dt$x, 0)
+  dt$tmp.48 <- pmax((dt$age < 48) * dt$x, 0)
+  dt$tmp.60 <- pmax((dt$age < 60) * dt$x, 0)
+  dt[, list(sum  =cumsum.lag(tmp.0),
+            sum6 =cumsum.lag(tmp.6),
+            sum12=cumsum.lag(tmp.12),
+            sum18=cumsum.lag(tmp.18),
+            sum24=cumsum.lag(tmp.24),
+            sum36=cumsum.lag(tmp.36),
+            sum48=cumsum.lag(tmp.48),
+            sum60=cumsum.lag(tmp.60)),
+     by=grp]
+}
+
+
+On Mon, May 10, 2010 at 12:42 PM, Short, Tom <TShort at epri.com> wrote:
+> Johann,
+>
+> I did some timing tests to compare tapply to data.table and couldn't find a case where tapply was close. See here for the timing code:
+>
+> n <- 1e7
+> groupsizes <- c(100,1000,1e4,1e5,1e6)
+> res <- data.frame(groupsize = groupsizes, tapply.runtime = 0, dt.runtime = 0)
+> for (i in seq(along=groupsizes)) {
+> ? ?df <- data.frame(x = rnorm(n), grp = as.integer(runif(n,1,groupsizes[i])))
+> ? ?dt <- as.data.table(df)
+> ? ?res$tapply.runtime[i] <- system.time( ?with(df, unlist(tapply(x, grp, cumsum))) ?)[1]
+> ? ?res$dt.runtime[i] ? ? <- system.time( ?dt[,list(x=cumsum(x)), by=grp] ? ? ? ? ? ?)[1]
+> }
+> res
+>
+> This gives these results (the runtimes are in seconds):
+>
+> ?groupsize tapply.runtime dt.runtime
+> 1 ? ? 1e+02 ? ? ? ? ?49.42 ? ? ? 1.89
+> 2 ? ? 1e+03 ? ? ? ? ?43.20 ? ? ? 2.10
+> 3 ? ? 1e+04 ? ? ? ? ?45.82 ? ? ? 2.18
+> 4 ? ? 1e+05 ? ? ? ? ?59.77 ? ? ? 2.49
+> 5 ? ? 1e+06 ? ? ? ? 113.01 ? ? ?22.23
+>
+> If the grouping variable is negative or has a range of more than 100000, you could get slowdowns. One workaround for this is to convert the grouping variable to a factor if you have less than 100000 unique id's.
+>
+> - Tom
+>
+>
+>> -----Original Message-----
+>> From: Johann Hibschman [mailto:jhibschman at gmail.com]
+>> Sent: Monday, May 10, 2010 11:41 AM
+>> To: Short, Tom
+>> Cc: datatable-help at lists.r-forge.r-project.org
+>> Subject: Re: [datatable-help] Access to local variables in
+>> "j" expressions
+>>
+>> Hi Tom,
+>>
+>> Thanks for taking the time to look into this so promptly.
+>> I've installed that version, and it fixes my original
+>> problem. I'll keep testing it and see if I run into any more issues.
+>>
+>> I didn't get as much of a speed-up as I was hoping for the
+>> time-intensive parts of my calculation, so I don't know how
+>> much additional time I'll invest in it, but I'll keep
+>> experimenting for a few days at least.
+>>
+>> (I'm comparing, in effect, unlist(tapply(x, GroupID, cumsum))
+>> to dt[,list(out=cumsum(x)), by=GroupID]; they take
+>> more-or-less the same time for me.)
+>>
+>> -Johann
+>>
+>>
+>>
+>> On Sat, May 8, 2010 at 2:17 PM, Short, Tom <TShort at epri.com> wrote:
+>> > I checked in a fix for this bug on R-forge. It should be
+>> available for installation tomorrow as follows (R-forge has
+>> been a little flakey lately):
+>> >
+>> > install.packages("data.table",repos="http://r-forge.r-project.org")
+>> >
+>> > If you're able to try it, let me know if it works or causes
+>> other problems.
+>> >
+>> > - Tom
+>> >
+>> >
+>> >
+>> >> -----Original Message-----
+>> >> From: datatable-help-bounces at lists.r-forge.r-project.org
+>> >> [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>> >> On Behalf Of Short, Tom
+>> >> Sent: Saturday, May 08, 2010 10:58 AM
+>> >> To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+>> >> Subject: Re: [datatable-help] Access to local variables in "j"
+>> >> expressions
+>> >>
+>> >> I've got a fix for this. It'll probably be a couple of
+>> days before I
+>> >> can get it up to R-forge.
+>> >>
+>> >> - Tom
+>> >>
+>> >> > -----Original Message-----
+>> >> > From: datatable-help-bounces at lists.r-forge.r-project.org
+>> >> > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>> >> > On Behalf Of Short, Tom
+>> >> > Sent: Saturday, May 08, 2010 7:35 AM
+>> >> > To: Johann Hibschman; datatable-help at lists.r-forge.r-project.org
+>> >> > Subject: Re: [datatable-help] Access to local variables in "j"
+>> >> > expressions
+>> >> >
+>> >> > I think it's a bug, Johann. I'll dig deeper. Thanks for
+>> >> reporting it.
+>> >> >
+>> >> > - Tom
+>> >> >
+>> >> >
+>> >> > > -----Original Message-----
+>> >> > > From: datatable-help-bounces at lists.r-forge.r-project.org
+>> >> > > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>> >> > > On Behalf Of Johann Hibschman
+>> >> > > Sent: Friday, May 07, 2010 4:53 PM
+>> >> > > To: datatable-help at lists.r-forge.r-project.org
+>> >> > > Subject: [datatable-help] Access to local variables in "j"
+>> >> > expressions
+>> >> > >
+>> >> > > I'm just taking a look at data.table again, now that
+>> >> 1.4.1 has been
+>> >> > > released. I tried the following:
+>> >> > >
+>> >> > > ? dt.test <- data.table(n=c("a","a","b"), x=1:3, key="n")
+>> >> > >
+>> >> > > ? global.sum7 <- function (y) {
+>> >> > > ? ?sum(y) + 7
+>> >> > > ? }
+>> >> > >
+>> >> > > ? test.1 <- function (dt) {
+>> >> > > ? ?local.sum7 <- global.sum7
+>> >> > > ? ?dt[, list(out=local.sum7(x)), by=n]
+>> >> > > ? }
+>> >> > >
+>> >> > > ? test.1(dt.test)
+>> >> > >
+>> >> > > ?This failed, with 'Error in eval(expr, envir, enclos) :
+>> >> > > could not find function "local.sum7"'. Looking at the
+>> >> > documentation, I
+>> >> > > see:
+>> >> > >
+>> >> > > ? ? ?The j expression 'sees' variables in the calling frame
+>> >> > and above
+>> >> > > ? ? ?including .GlobalEnv, see the examples. This is base R
+>> >> > > ? ? ?functionality from eval() and with().
+>> >> > >
+>> >> > > That led me to think that the above would work. Is this a
+>> >> > bug, or am I
+>> >> > > not understanding something?
+>> >> > >
+>> >> > > Thanks,
+>> >> > > Johann
+>> >> > > _______________________________________________
+>> >> > > datatable-help mailing list
+>> >> > > datatable-help at lists.r-forge.r-project.org
+>> >> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+>> >> > atatable-help
+>> >> > >
+>> >> > _______________________________________________
+>> >> > datatable-help mailing list
+>> >> > datatable-help at lists.r-forge.r-project.org
+>> >> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+>> >> atatable-help
+>> >> >
+>> >> _______________________________________________
+>> >> datatable-help mailing list
+>> >> datatable-help at lists.r-forge.r-project.org
+>> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+>> > atatable-help
+>> >>
+>> >
+>>
+>
+
+From TShort at epri.com  Tue May 11 20:23:24 2010
+From: TShort at epri.com (Short, Tom)
+Date: Tue, 11 May 2010 11:23:24 -0700
+Subject: [datatable-help] Access to local variables in "j" expressions
+In-Reply-To: <AANLkTimHf7Sr3AHLMn61VLJibhpGPENglmpdO2pLyu8l@mail.gmail.com>
+References: <p2wf926ca8a1005071353p2e6c74cds67b8d56bb466b114@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D134@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D13E@uspalex03.epri.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D14E@uspalex03.epri.com>
+	<AANLkTin1wqVyh3Yrrcnq5D4gejEE7OqULFK4HdwlDWWU@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E30561D29B@uspalex03.epri.com>
+	<AANLkTimHf7Sr3AHLMn61VLJibhpGPENglmpdO2pLyu8l@mail.gmail.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E30561D622@uspalex03.epri.com>
+
+Johann, see below.
+
+> -----Original Message-----
+> From: Johann Hibschman [mailto:jhibschman at gmail.com] 
+> Sent: Monday, May 10, 2010 4:16 PM
+> To: Short, Tom
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Access to local variables in 
+> "j" expressions
+> 
+> After thinking about this some, I realized I was having 
+> data.table do extra work by not pre-calculating as much as 
+> possible. After I followed the example of "calc.fake.dt.2", 
+> below, I wound up with data.table being about 2.5 times 
+> faster than the data.frame version.
+> 
+> So, yes, data.table is faster, but I have to introduce a few 
+> more temporary columns in order to make it work efficiently.
+> 
+> Here's the example code I ran:
+> 
+> ## Try fake data experiments, to see if I can duplicate the results.
+> mk.fake.df <- function (n.groups=10000, n.per.group=70) {
+>   data.frame(grp=rep(1:n.groups, each=n.per.group),
+>              age=rep(0:(n.per.group-1), n.groups),
+>              x=rnorm(n.groups * n.per.group),
+>              ## These don't do anything, but only exist to give
+>              ## the table a similar size to the real data.
+>              y1=rnorm(n.groups * n.per.group),
+>              y2=rnorm(n.groups * n.per.group),
+>              y3=rnorm(n.groups * n.per.group),
+>              y4=rnorm(n.groups * n.per.group)) }
+> 
+> mk.fake.dt <- function (fake.df) {
+>   fake.dt <- as.data.table(fake.df)
+>   setkey(fake.dt, grp, age)
+>   fake.dt
+> }
+> 
+> cumsum.lag <- function (x) {
+>   x.prev <- c(0, x[-length(x)])
+>   cumsum(x.prev)
+> }
+> 
+> calc.fake.df <- function (df) {
+>   calc.lst <- with(df, within(list(), {
+>     sum   <- unlist(tapply(pmax(x, 0), grp, cumsum.lag))
+>     sum6  <- unlist(tapply(pmax((age <  6) * x, 0), grp, cumsum.lag))
+>     sum12 <- unlist(tapply(pmax((age < 12) * x, 0), grp, cumsum.lag))
+>     sum18 <- unlist(tapply(pmax((age < 18) * x, 0), grp, cumsum.lag))
+>     sum24 <- unlist(tapply(pmax((age < 24) * x, 0), grp, cumsum.lag))
+>     sum36 <- unlist(tapply(pmax((age < 36) * x, 0), grp, cumsum.lag))
+>     sum48 <- unlist(tapply(pmax((age < 48) * x, 0), grp, cumsum.lag))
+>     sum60 <- unlist(tapply(pmax((age < 60) * x, 0), grp, cumsum.lag))
+>   }))
+>   calc.lst
+> }
+> 
+> calc.fake.dt <- function (dt) {
+>   dt[, list(sum  =cumsum.lag(pmax(x, 0)),
+>             sum6 =cumsum.lag(pmax((age <  6) * x, 0)),
+>             sum12=cumsum.lag(pmax((age < 12) * x, 0)),
+>             sum18=cumsum.lag(pmax((age < 18) * x, 0)),
+>             sum24=cumsum.lag(pmax((age < 24) * x, 0)),
+>             sum36=cumsum.lag(pmax((age < 36) * x, 0)),
+>             sum48=cumsum.lag(pmax((age < 48) * x, 0)),
+>             sum60=cumsum.lag(pmax((age < 60) * x, 0))),
+>      by=grp]
+> }
+> 
+> calc.fake.dt.2 <- function (dt) {
+>   dt$tmp.0  <- pmax(dt$x, 0)
+>   dt$tmp.6  <- pmax((dt$age <  6) * dt$x, 0)
+>   dt$tmp.12 <- pmax((dt$age < 12) * dt$x, 0)
+>   dt$tmp.18 <- pmax((dt$age < 18) * dt$x, 0)
+>   dt$tmp.24 <- pmax((dt$age < 24) * dt$x, 0)
+>   dt$tmp.36 <- pmax((dt$age < 36) * dt$x, 0)
+>   dt$tmp.48 <- pmax((dt$age < 48) * dt$x, 0)
+>   dt$tmp.60 <- pmax((dt$age < 60) * dt$x, 0)
+>   dt[, list(sum  =cumsum.lag(tmp.0),
+>             sum6 =cumsum.lag(tmp.6),
+>             sum12=cumsum.lag(tmp.12),
+>             sum18=cumsum.lag(tmp.18),
+>             sum24=cumsum.lag(tmp.24),
+>             sum36=cumsum.lag(tmp.36),
+>             sum48=cumsum.lag(tmp.48),
+>             sum60=cumsum.lag(tmp.60)),
+>      by=grp]
+> }
+> 
+
+If you do more and more in the loop, the speed difference between tapply
+and data.table decreases. One way to reduce the runtime is to run things
+in parallel. For this case, it's easy to run the column calculations in
+parallel. Using Simon Urbanek's multicore package, I get some speedup,
+but it's not much because of the overhead of running things in parallel.
+Here's some code for testing:
+
+calc.fake.dt.lapply <- function (dt) { # use base lapply for testing
+    lapply(6*c(1000,1:4,6,8,10),
+           function(critical.age) {
+               dt$tmp <-  pmax((dt$age <  critical.age) * dt$x, 0)
+               dt[, cumsum.lag(tmp), by = grp]$V1})
+}
+
+require(multicore)
+calc.fake.dt.mclapply <- function (dt) {
+    mclapply(6*c(1000,1:4,6,8,10),
+             function(critical.age) {
+                 dt$tmp <-  pmax((dt$age <  critical.age) * dt$x, 0)
+                 dt[, cumsum.lag(tmp), by = grp]$V1})
+}
+
+# set up the data
+df <- mk.fake.df()
+dt <- mk.fake.dt(df)
+
+Now, here are some timings on a relatively fast workstation.
+
+
+> system.time(res.df          <- calc.fake.df(df))
+   user  system elapsed
+  6.556   0.019   6.578
+> system.time(res.dt          <- calc.fake.dt(dt))
+   user  system elapsed
+  5.744   0.009   5.756
+> system.time(res.dt.2        <- calc.fake.dt.2(dt))
+   user  system elapsed
+  1.234   0.007   1.241
+> system.time(res.dt.lapply   <- calc.fake.dt.lapply(dt))
+   user  system elapsed
+  1.111   0.025   1.137
+> system.time(res.dt.mclapply <- calc.fake.dt.mclapply(dt))
+   user  system elapsed
+  2.751   2.746   0.828  -- note the elapsed time difference
+
+For many other cases, you could "parallelize" by dividing up the
+grouping variable. That's not hard with keyed data tables because
+they're already sorted.
+
+- Tom
+
+From TShort at epri.com  Tue May 18 04:11:49 2010
+From: TShort at epri.com (Short, Tom)
+Date: Mon, 17 May 2010 19:11:49 -0700
+Subject: [datatable-help] data.table indexing approaches
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E305676AB3@uspalex03.epri.com>
+
+This email discusses ways to index data tables for more complicated
+queries. I'm interested in feedback, especially on how to implement
+"AND" for multiple columns. Consider the following data table:
+
+    N <- 1e2
+    dt <- data.table(l = letters[rep(1:10, each = N/10)],
+                     L = LETTERS[rep(1:5, N/5)],
+                     key = "l")
+
+***** Binary search using secondary keys
+
+One thing I've found useful is using a data table as a secondary key
+to index on columns other than "l". This is especially helpful for
+cases where I may want to pull out data by different keys, and I don't
+have the memory to hold separate copies of the data table for each
+sorting option. Here's how to set up the keying data table:
+
+    i.L <- data.table(k = dt$L, .i = 1:nrow(dt), key = "k")
+
+This is a data table that's indexed on "L" from my original data table,
+and it returns indices to the original data table in the ".i" column.
+To query on column "L", use:
+
+    # query dt on L
+    dt[ i.L[c("A","C"), mult = "all"]$.i ]
+
+You can wrap these operations in a couple of helper functions:
+
+    idt <- function(x, i)
+        x[i, mult = "all"]$.i
+     
+    secondarykey <- function(dt, column) 
+        data.table(.k = dt[[column]], .i = 1:nrow(dt), key = ".k")
+
+    # query dt on L using idt()
+    i.L <- secondarykey(dt, "L")
+    dt[ idt(i.L, c("A","C")) ]
+
+This is relatively efficient. You do have to be careful to keep your
+secondary keys in sync with your original data.
+
+***** Combining queries (AND)
+
+Now, I'd like a more efficient version of the following:
+
+    dt[l %in% c("a","b") & L == "C"]
+
+If dt is key'd by both "l" and "L", it's easy:
+
+    dt[J(c("a","b"), "C"), mult = "all"]
+
+Sometimes, that's not feasable with several columns where you may have
+different combinations. One option is to use a binary search on the
+primary key followed by a vector scan:
+
+    # binary search on key'd term followed by vector scan
+    dt[c("b","a"), mult = "all"][L == "C"]
+
+Another option is to find indices for each of the queries, and then
+find the intersection for AND (and union for OR). 
+
+    # intersecting indices
+    dt[ intersect(dt[c("a","b"), mult = "all", which = TRUE],
+                  idt(i.L, "C")) ] # idt is from above
+
+If some of the indices are quite long, finding the intersection may be
+time consuming. One option is to cascade queries and re-sort at each
+step.
+
+    # cascading queries with re-sorting
+    tmp <- dt[c("b","a"), mult = "all"]
+    setkey(tmp, L)
+    tmp["C", mult = "all"]
+
+In a few timing tests, I didn't find much difference between these
+methods. None are as lightning fast as directly searching via keys.
+
+Comments welcome, especially any insights on doing faster AND's.
+
+- Tom
+
+Tom Short
+
+From obakis at gsu-giam.net  Mon May 24 16:11:57 2010
+From: obakis at gsu-giam.net (Ozan Bakis)
+Date: Mon, 24 May 2010 17:11:57 +0300
+Subject: [datatable-help] data.table question: ave like behavior
+Message-ID: <AANLkTilzwydAG4RUl2R-h-fZZzUOZ_fuMztuOoslWhAS@mail.gmail.com>
+
+Hi,
+
+I have just noticed and installed your package and am trying to understand
+how it works.
+The commented part in the following example from the reference manual (p.
+20) gives an error.
+
+dt <- data.table(a=rep(1:5, 1), b=1:10)
+transform(dt, c = a^2)
+within(dt, {
+b <- rev(b)
+c <- a^2
+rm(a)
+})
+dt[, transform, c = max(b), by="a"] # like "ave
+
+It is the last line that gives the following error:
+Error in `[.data.table`(dt, , transform, c = max(b), by = "a") :
+  unused argument(s) (c = max(b))
+
+Actually, I have a large data set where I use ave function. Unfortunately,
+it is time consuming. This is why I want to try data.table. I have the
+following
+data frame:
+
+set.seed(1)
+v1 <- c(rep(10, 3), rep(11, 2),rep(12, 2))
+v2 <- sample(5:10, 7, replace = T)
+v3 <- c(0, 1, 2, 0, 2,2,1)
+df <- data.frame(v1, v2, v3)
+df
+  v1 v2 v3
+1 10  6  0
+2 10  7  1
+3 10  8  2
+4 11 10  0
+5 11  6  2
+6 12 10  2
+7 12 10  1
+I want to add a new column v4 such that its values are equal to the value
+of v2 if v3=0 and NA if v3=0 does not in each subgroup of v1. In the above
+example,
+the final result should be like
+   v1 v2 v3 v4
+1 10  6  0 6
+2 10  7  1 6
+3 10  8  2 6
+4 11 10 0 7
+5 11  6  2 7
+6 12 10 2 NA
+7 12 10 1 NA
+
+Thank you very much,
+
+ozan bakis
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20100524/55c6ed4b/attachment.htm>
+
+From TShort at epri.com  Mon May 24 16:38:14 2010
+From: TShort at epri.com (Short, Tom)
+Date: Mon, 24 May 2010 07:38:14 -0700
+Subject: [datatable-help] data.table question: ave like behavior
+In-Reply-To: <AANLkTilzwydAG4RUl2R-h-fZZzUOZ_fuMztuOoslWhAS@mail.gmail.com>
+References: <AANLkTilzwydAG4RUl2R-h-fZZzUOZ_fuMztuOoslWhAS@mail.gmail.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E3056CEE44@uspalex03.epri.com>
+
+> From: datatable-help-bounces at lists.r-forge.r-project.org
+[mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of
+Ozan Bakis
+> Sent: Monday, May 24, 2010 10:12
+> To: datatable-help at lists.r-forge.r-project.org
+> Subject: [datatable-help] data.table question: ave like behavior
+>  
+>  
+> Hi,
+>  
+> I have just noticed and installed your package and am trying to
+understand how it works.
+> The commented part in the following example from the reference manual
+(p. 20) gives an error. 
+>  
+> dt <- data.table(a=rep(1:5, 1), b=1:10)
+> transform(dt, c = a^2)
+> within(dt, {
+> b <- rev(b)
+> c <- a^2
+> rm(a)
+> })
+> dt[, transform, c = max(b), by="a"] # like "ave
+>  
+
+Ozan, we experimented with that syntax for a while, but it was
+slow, so we took it out. The new syntax is as follows:
+
+dt[, transform(.SD, c = max(b)), by = a]
+
+.SD is a datatable of the subset, so you can manipulate that, in
+this case with transform.
+
+Another way to get ave functionality is:
+
+dt$c <- dt[, rep(max(b), length(a)), by = a]$V1
+
+This may be a little faster and more memory friendly (and maybe
+harder to read).
+
+You should be able to adapt either approach to the second part of 
+your email.
+
+- Tom
+
+From obakis at gsu-giam.net  Mon May 24 22:03:29 2010
+From: obakis at gsu-giam.net (Ozan Bakis)
+Date: Mon, 24 May 2010 23:03:29 +0300
+Subject: [datatable-help] data.table question: ave like behavior
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E3056CEE44@uspalex03.epri.com>
+References: <AANLkTilzwydAG4RUl2R-h-fZZzUOZ_fuMztuOoslWhAS@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CEE44@uspalex03.epri.com>
+Message-ID: <AANLkTilGlNYV6mYBhAjLvnNU_mKw1nx7W73tFScSouAF@mail.gmail.com>
+
+Thank you very much...
+ozan
+
+On 24 May 2010 17:38, Short, Tom <TShort at epri.com> wrote:
+
+> > From: datatable-help-bounces at lists.r-forge.r-project.org
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of
+> Ozan Bakis
+> > Sent: Monday, May 24, 2010 10:12
+> > To: datatable-help at lists.r-forge.r-project.org
+> > Subject: [datatable-help] data.table question: ave like behavior
+> >
+> >
+> > Hi,
+> >
+> > I have just noticed and installed your package and am trying to
+> understand how it works.
+> > The commented part in the following example from the reference manual
+> (p. 20) gives an error.
+> >
+> > dt <- data.table(a=rep(1:5, 1), b=1:10)
+> > transform(dt, c = a^2)
+> > within(dt, {
+> > b <- rev(b)
+> > c <- a^2
+> > rm(a)
+> > })
+> > dt[, transform, c = max(b), by="a"] # like "ave
+> >
+>
+> Ozan, we experimented with that syntax for a while, but it was
+> slow, so we took it out. The new syntax is as follows:
+>
+> dt[, transform(.SD, c = max(b)), by = a]
+>
+> .SD is a datatable of the subset, so you can manipulate that, in
+> this case with transform.
+>
+> Another way to get ave functionality is:
+>
+> dt$c <- dt[, rep(max(b), length(a)), by = a]$V1
+>
+> This may be a little faster and more memory friendly (and maybe
+> harder to read).
+>
+> You should be able to adapt either approach to the second part of
+> your email.
+>
+> - Tom
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20100524/78c63997/attachment.htm>
+
+From mailinglist.honeypot at gmail.com  Mon May 24 22:32:50 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 24 May 2010 16:32:50 -0400
+Subject: [datatable-help] Auto-convert characters to factors when settings
+	keys?
+Message-ID: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+
+Hi all,
+
+Would it make sense to autoconvert characters to factors when setting
+a character column as a key?
+
+For example, when converting a data.frame to a data.table, picking a
+character column as a key throws an error:
+
+R> df <- data.frame(a=as.character(sample(LETTERS[1:10])), b=1:10,
+stringsAsFactors=F)
+R> dt <- as.data.table(df)
+R> key(dt) <- 'a'
+Error in setkey("x", value) :
+  All keyed columns must be storage mode integer
+
+Converting dt$a to a factor before setting the key works fine, as expected:
+
+R> dt$a <- factor(dt$a)
+R> key(dt) <- 'a'
+
+So, I'm wondering if it would make sense to auto convert character
+columns to factors when calling `key` on these columns ... maybe with
+a warning, perhaps ... ?
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+ | Memorial Sloan-Kettering Cancer Center
+ | Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Tue May 25 10:46:11 2010
+From: mdowle at mdowle.plus.com (mdowle at mdowle.plus.com)
+Date: Tue, 25 May 2010 09:46:11 +0100
+Subject: [datatable-help] Auto-convert characters to factors when
+ settings keys?
+In-Reply-To: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+Message-ID: <3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+
+Steve,
+
+Try data.table(df) rather than as.data.table(df). In the vignettes and
+examples I think data.table(df) is used but let us know otherwise.
+as.data.table() is a raw convert of the class only, currently.
+
+Agreed something needs to be tidied up here. Thanks for reporting it.
+
+All,
+
+Any preferences on the following options ? :
+
+1. Change as.data.table to use data.table. It already does when
+keep.rownames=TRUE but not when FALSE.  If a user really wants a raw class
+change they can use class(x)="data.table" directly. No change to
+data.table or setkey.  Since ?as.data.table is an alias to ?data.table
+this would be consistent.
+
+2. Change data.table and setkey. Only convert character to factor at the
+point of setkey.  That may prevent radix being used for an ad hoc by on
+character columns that are not in the key. Would we then want to do
+auto-conversion in ad hoc by too?  No change to as.data.table.
+
+3. Steve's suggestion. Change setkey. Catch character columns in setkey
+and auto convert them to factor at that point. No change to data.table or
+as.data.table.
+
+4. Change ?as.data.table to say its a class change only, and to use
+data.table() if checks and auto-conversion of character to factor is
+required. No code changes.
+
+5. Another solution.
+
+Any views?  I currently lean towards option 1.
+
+Matthew
+
+
+> Hi all,
+>
+> Would it make sense to autoconvert characters to factors when setting
+> a character column as a key?
+>
+> For example, when converting a data.frame to a data.table, picking a
+> character column as a key throws an error:
+>
+> R> df <- data.frame(a=as.character(sample(LETTERS[1:10])), b=1:10,
+> stringsAsFactors=F)
+> R> dt <- as.data.table(df)
+> R> key(dt) <- 'a'
+> Error in setkey("x", value) :
+>   All keyed columns must be storage mode integer
+>
+> Converting dt$a to a factor before setting the key works fine, as
+> expected:
+>
+> R> dt$a <- factor(dt$a)
+> R> key(dt) <- 'a'
+>
+> So, I'm wondering if it would make sense to auto convert character
+> columns to factors when calling `key` on these columns ... maybe with
+> a warning, perhaps ... ?
+>
+> Thanks,
+> -steve
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+>  | Memorial Sloan-Kettering Cancer Center
+>  | Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From rforler at uchicago.edu  Tue May 25 15:00:51 2010
+From: rforler at uchicago.edu (Rob Forler)
+Date: Tue, 25 May 2010 08:00:51 -0500
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+	<3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+Message-ID: <AANLkTikZlvHyIAwCfnIr3ZcWXkCpbIKpoViZnFQLiCuO@mail.gmail.com>
+
+What is the big value to having a class change anyways? I would generally
+say that since the use case is that people want to be able to use
+characters/dates as factors it should automatically convert these as
+data.table does. As.data.table is confusing if it doesn't have consistent
+behavior to data.table.
+
+Thanks,
+Rob
+
+On Tue, May 25, 2010 at 3:46 AM, <mdowle at mdowle.plus.com> wrote:
+
+> Steve,
+>
+> Try data.table(df) rather than as.data.table(df). In the vignettes and
+> examples I think data.table(df) is used but let us know otherwise.
+> as.data.table() is a raw convert of the class only, currently.
+>
+> Agreed something needs to be tidied up here. Thanks for reporting it.
+>
+> All,
+>
+> Any preferences on the following options ? :
+>
+> 1. Change as.data.table to use data.table. It already does when
+> keep.rownames=TRUE but not when FALSE.  If a user really wants a raw class
+> change they can use class(x)="data.table" directly. No change to
+> data.table or setkey.  Since ?as.data.table is an alias to ?data.table
+> this would be consistent.
+>
+> 2. Change data.table and setkey. Only convert character to factor at the
+> point of setkey.  That may prevent radix being used for an ad hoc by on
+> character columns that are not in the key. Would we then want to do
+> auto-conversion in ad hoc by too?  No change to as.data.table.
+>
+> 3. Steve's suggestion. Change setkey. Catch character columns in setkey
+> and auto convert them to factor at that point. No change to data.table or
+> as.data.table.
+>
+> 4. Change ?as.data.table to say its a class change only, and to use
+> data.table() if checks and auto-conversion of character to factor is
+> required. No code changes.
+>
+> 5. Another solution.
+>
+> Any views?  I currently lean towards option 1.
+>
+> Matthew
+>
+>
+> > Hi all,
+> >
+> > Would it make sense to autoconvert characters to factors when setting
+> > a character column as a key?
+> >
+> > For example, when converting a data.frame to a data.table, picking a
+> > character column as a key throws an error:
+> >
+> > R> df <- data.frame(a=as.character(sample(LETTERS[1:10])), b=1:10,
+> > stringsAsFactors=F)
+> > R> dt <- as.data.table(df)
+> > R> key(dt) <- 'a'
+> > Error in setkey("x", value) :
+> >   All keyed columns must be storage mode integer
+> >
+> > Converting dt$a to a factor before setting the key works fine, as
+> > expected:
+> >
+> > R> dt$a <- factor(dt$a)
+> > R> key(dt) <- 'a'
+> >
+> > So, I'm wondering if it would make sense to auto convert character
+> > columns to factors when calling `key` on these columns ... maybe with
+> > a warning, perhaps ... ?
+> >
+> > Thanks,
+> > -steve
+> >
+> > --
+> > Steve Lianoglou
+> > Graduate Student: Computational Systems Biology
+> >  | Memorial Sloan-Kettering Cancer Center
+> >  | Weill Medical College of Cornell University
+> > Contact Info: http://cbio.mskcc.org/~lianos/contact<http://cbio.mskcc.org/%7Elianos/contact>
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20100525/d18277d9/attachment.htm>
+
+From TShort at epri.com  Tue May 25 15:15:45 2010
+From: TShort at epri.com (Short, Tom)
+Date: Tue, 25 May 2010 06:15:45 -0700
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+	<3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com>
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of mdowle at mdowle.plus.com
+> Sent: Tuesday, May 25, 2010 04:46
+> To: Steve Lianoglou
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Auto-convert characters to 
+> factors when settings keys?
+> 
+> Steve,
+> 
+> Try data.table(df) rather than as.data.table(df). In the 
+> vignettes and examples I think data.table(df) is used but let 
+> us know otherwise.
+> as.data.table() is a raw convert of the class only, currently.
+> 
+> Agreed something needs to be tidied up here. Thanks for reporting it.
+> 
+> All,
+> 
+> Any preferences on the following options ? :
+> 
+> 1. Change as.data.table to use data.table. It already does 
+> when keep.rownames=TRUE but not when FALSE.  If a user really 
+> wants a raw class change they can use class(x)="data.table" 
+> directly. No change to data.table or setkey.  Since 
+> ?as.data.table is an alias to ?data.table this would be consistent.
+> 
+> 2. Change data.table and setkey. Only convert character to 
+> factor at the point of setkey.  That may prevent radix being 
+> used for an ad hoc by on character columns that are not in 
+> the key. Would we then want to do auto-conversion in ad hoc 
+> by too?  No change to as.data.table.
+> 
+> 3. Steve's suggestion. Change setkey. Catch character columns 
+> in setkey and auto convert them to factor at that point. No 
+> change to data.table or as.data.table.
+> 
+> 4. Change ?as.data.table to say its a class change only, and to use
+> data.table() if checks and auto-conversion of character to 
+> factor is required. No code changes.
+> 
+> 5. Another solution.
+> 
+
+I lean towards #4 and also maybe #3. It's nice to be able to "raw"
+convert back and forth between data tables and data frames, and
+as.data.table seems useful for that. A direct class assignment is okay,
+but a data frame also needs a row.names attribute. I tend not to like
+autoconversions.
+
+A couple of utility functions to do in-place raw conversions would be
+useful:
+
+setdf(d) # changes class to "data.frame", creates the "row.names"
+attribute
+         # possibly removes the "sorted" attribute
+setdt(d) # changes class to "data.table", possibly deletes "row.names"
+
+This avoids a copy. I haven't needed them enough to write them, yet.
+This might be something to consider if we're making a change related to
+conversions.
+
+- Tom
+
+
+From mailinglist.honeypot at gmail.com  Tue May 25 15:33:24 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 25 May 2010 09:33:24 -0400
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+	<3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com>
+Message-ID: <AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com>
+
+Hi,
+
+On Tue, May 25, 2010 at 9:15 AM, Short, Tom <TShort at epri.com> wrote:
+
+>> Any preferences on the following options ? :
+>>
+>> 1. Change as.data.table to use data.table. It already does
+>> when keep.rownames=TRUE but not when FALSE. ?If a user really
+>> wants a raw class change they can use class(x)="data.table"
+>> directly. No change to data.table or setkey. ?Since
+>> ?as.data.table is an alias to ?data.table this would be consistent.
+>>
+>> 2. Change data.table and setkey. Only convert character to
+>> factor at the point of setkey. ?That may prevent radix being
+>> used for an ad hoc by on character columns that are not in
+>> the key. Would we then want to do auto-conversion in ad hoc
+>> by too? ?No change to as.data.table.
+>>
+>> 3. Steve's suggestion. Change setkey. Catch character columns
+>> in setkey and auto convert them to factor at that point. No
+>> change to data.table or as.data.table.
+>>
+>> 4. Change ?as.data.table to say its a class change only, and to use
+>> data.table() if checks and auto-conversion of character to
+>> factor is required. No code changes.
+>>
+>> 5. Another solution.
+>>
+>
+> I lean towards #4 and also maybe #3. It's nice to be able to "raw"
+> convert back and forth between data tables and data frames, and
+> as.data.table seems useful for that. A direct class assignment is okay,
+> but a data frame also needs a row.names attribute. I tend not to like
+> autoconversions.
+>
+> A couple of utility functions to do in-place raw conversions would be
+> useful:
+>
+> setdf(d) # changes class to "data.frame", creates the "row.names"
+> attribute
+> ? ? ? ? # possibly removes the "sorted" attribute
+> setdt(d) # changes class to "data.table", possibly deletes "row.names"
+>
+> This avoids a copy. I haven't needed them enough to write them, yet.
+> This might be something to consider if we're making a change related to
+> conversions.
+
+I guess I don't understand why you'd want to make setdf and setdt
+instead of using the as.data.frame/as.data.table functions?
+
+Isn't the as.* more idiomatic S3-OOized R?
+
+Also, if we're taking a vote, I think I'd still go with #3 because I
+don't think I always want to convert my strings to factors w/o my say
+so. I think it's ok for this to happen:
+
+* explicitly: by replacing the character column with its `factor(...)`
+* implicitly: when asking to make it use the column as a key (still
+firing off a warning here might be useful -- if not annoying. perahps
+it could be turned off w/ a no.warn=TRUE argument, or something).
+
+I might vote for #2 also, but I can't appreciate any real differences
+between #2 and #3 -- maybe because I don't use data.table enough.
+
+Also, you suggested to try data.table(df) instead of
+as.data.table(df), but this doesn't change anything with respect to
+the behavior of setting key on a character column:
+
+R> df <- data.frame(a=LETTERS[1:10], b=1:10, stringsAsFactors=F)
+R> dt <- data.table(df)
+R> key(dt) <- 'a'
+  All keyed columns must be storage mode integer
+
+Or
+
+R> dt <- data.table(df, key='a')
+Error in setkey(value, a) :
+  All keyed columns must be storage mode integer
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+ | Memorial Sloan-Kettering Cancer Center
+ | Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From TShort at epri.com  Tue May 25 15:39:47 2010
+From: TShort at epri.com (Short, Tom)
+Date: Tue, 25 May 2010 06:39:47 -0700
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+	<3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com>
+	<AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E3056CF241@uspalex03.epri.com>
+
+> -----Original Message-----
+> From: Steve Lianoglou [mailto:mailinglist.honeypot at gmail.com] 
+> Sent: Tuesday, May 25, 2010 09:33
+> To: Short, Tom
+> Cc: mdowle at mdowle.plus.com; datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Auto-convert characters to 
+> factors when settings keys?
+> > A couple of utility functions to do in-place raw 
+> conversions would be
+> > useful:
+> >
+> > setdf(d) # changes class to "data.frame", creates the "row.names"
+> > attribute
+> > ? ? ? ? # possibly removes the "sorted" attribute
+> > setdt(d) # changes class to "data.table", possibly deletes 
+> "row.names"
+> >
+> > This avoids a copy. I haven't needed them enough to write them, yet.
+> > This might be something to consider if we're making a 
+> change related 
+> > to conversions.
+> 
+> I guess I don't understand why you'd want to make setdf and 
+> setdt instead of using the as.data.frame/as.data.table functions?
+> 
+> Isn't the as.* more idiomatic S3-OOized R?
+
+You're right, it's not very standard for R, but if I have a 9-GB data table, I may not want the memory consumption of keeping both copies around. Because it's nonstandard, maybe it shouldn't be in data.table, but it's worth discussing.
+
+- Tom
+
+From mailinglist.honeypot at gmail.com  Tue May 25 15:55:03 2010
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 25 May 2010 09:55:03 -0400
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E3056CF241@uspalex03.epri.com>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+	<3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com>
+	<AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF241@uspalex03.epri.com>
+Message-ID: <AANLkTiknWGaCr7CGt6s13FGCz2V6yJrI0mwrtmuvzRHL@mail.gmail.com>
+
+On Tue, May 25, 2010 at 9:39 AM, Short, Tom <TShort at epri.com> wrote:
+
+>> I guess I don't understand why you'd want to make setdf and
+>> setdt instead of using the as.data.frame/as.data.table functions?
+>>
+>> Isn't the as.* more idiomatic S3-OOized R?
+>
+> You're right, it's not very standard for R, but if I have a 9-GB data table, I may not want the memory consumption of keeping both copies around. Because it's nonstandard, maybe it shouldn't be in data.table, but it's worth discussing.
+
+Ahh ... good point.
+
+I see their use case now ;-)
+
++1 for having something like these so people who know what they're
+doing can use them.
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+ | Memorial Sloan-Kettering Cancer Center
+ | Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Tue May 25 17:22:58 2010
+From: mdowle at mdowle.plus.com (mdowle at mdowle.plus.com)
+Date: Tue, 25 May 2010 16:22:58 +0100
+Subject: [datatable-help] Auto-convert characters to factors when
+ settings keys?
+In-Reply-To: <AANLkTiknWGaCr7CGt6s13FGCz2V6yJrI0mwrtmuvzRHL@mail.gmail.com>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com>
+	<3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com>
+	<AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF241@uspalex03.epri.com>
+	<AANLkTiknWGaCr7CGt6s13FGCz2V6yJrI0mwrtmuvzRHL@mail.gmail.com>
+Message-ID: <00d0a5e3af9e747004fd2639e552b536.squirrel@webmail.plus.net>
+
+Perhaps radical suggestion ... should/could we move to S4? Only user code,
+or packages that call data.table would see the [.data.table signature,
+otherwise the object would appear to be a data.frame to packages that
+require data.frame.  Not sure if this is possible or not - I did try once.
+
+Also tried to inherit data.table from data.frame in S3 using
+class(df)=c("data.table","data.frame"). As long as the package that only
+works with data.frame uses is.data.frame() or inherits(), and not
+class(x)=="data.frame", then it gets past that point but then [.data.table
+is still dispatched rather than [.data.frame.  I'm thinking S4 signatures
+might another option if they can be local. Advantage being that no class
+conversion would then be needed.
+
+Above is from memory a few years back so may well be wrong. Plus R has
+moved on in the meantime.
+
+Tom,  do you have a good example to hand where the data.table<=>data.frame
+conversion causes grief (syntax as well as speed) that we could use for
+testing ?
+
+This also links to the not yet implemented .SDF object. The way I was
+thinking to do that wouldn't allow use of both .SD and .SDF in the same j,
+but it would be fast. Would be nicer not to need .SDF though if S4 works.
+
+
+> On Tue, May 25, 2010 at 9:39 AM, Short, Tom <TShort at epri.com> wrote:
+>
+>>> I guess I don't understand why you'd want to make setdf and
+>>> setdt instead of using the as.data.frame/as.data.table functions?
+>>>
+>>> Isn't the as.* more idiomatic S3-OOized R?
+>>
+>> You're right, it's not very standard for R, but if I have a 9-GB data
+>> table, I may not want the memory consumption of keeping both copies
+>> around. Because it's nonstandard, maybe it shouldn't be in data.table,
+>> but it's worth discussing.
+>
+> Ahh ... good point.
+>
+> I see their use case now ;-)
+>
+> +1 for having something like these so people who know what they're
+> doing can use them.
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+>  | Memorial Sloan-Kettering Cancer Center
+>  | Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+
+
+
+From TShort at epri.com  Tue May 25 18:24:06 2010
+From: TShort at epri.com (Short, Tom)
+Date: Tue, 25 May 2010 09:24:06 -0700
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <00d0a5e3af9e747004fd2639e552b536.squirrel@webmail.plus.net>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com><3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net><72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com><AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com><72CF3C50F4AF5B4BB678383F11CEF0E3056CF241@uspalex03.epri.com><AANLkTiknWGaCr7CGt6s13FGCz2V6yJrI0mwrtmuvzRHL@mail.gmail.com>
+	<00d0a5e3af9e747004fd2639e552b536.squirrel@webmail.plus.net>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E3056CF31D@uspalex03.epri.com>
+
+I don't know much about S4, but I think it'd be tough in practice to
+make it work. If a package didn't have a namespace or the user loads
+functions with "source", those functions would end up dispatching on
+[.data.table, and you'd probably have confusing errors. 
+
+I've thought about a lite verson of data.table that operated on data
+frames. You'd have to get rid of [.data.table and use some alias to
+[.data.table (pick dtbl which acts like a twisted combination of "with"
+and "subset"), so instead of:
+
+  dt[, sum(x), by = a]
+
+It'd be:
+
+  dtbl(dt, j = sum(x), by = a)
+
+An advantage of this approach is that it helps newcomers and eases folks
+into more complicated indexing/merging/subsetting possible with data
+tables.
+
+You could still have setkey operate on data frames. A big downside is
+that it'd be hard to keep the key in sync if the user re-orders the data
+frame. One option is to have a very light [.data.table that just does
+[.data.frame and zaps the key.
+
+- Tom
+
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of mdowle at mdowle.plus.com
+> Sent: Tuesday, May 25, 2010 11:23
+> To: Steve Lianoglou
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Auto-convert characters to 
+> factors when settings keys?
+> 
+> Perhaps radical suggestion ... should/could we move to S4? 
+> Only user code, or packages that call data.table would see 
+> the [.data.table signature, otherwise the object would appear 
+> to be a data.frame to packages that require data.frame.  Not 
+> sure if this is possible or not - I did try once.
+> 
+> Also tried to inherit data.table from data.frame in S3 using 
+> class(df)=c("data.table","data.frame"). As long as the 
+> package that only works with data.frame uses is.data.frame() 
+> or inherits(), and not class(x)=="data.frame", then it gets 
+> past that point but then [.data.table is still dispatched 
+> rather than [.data.frame.  I'm thinking S4 signatures might 
+> another option if they can be local. Advantage being that no 
+> class conversion would then be needed.
+> 
+> Above is from memory a few years back so may well be wrong. 
+> Plus R has moved on in the meantime.
+> 
+> Tom,  do you have a good example to hand where the 
+> data.table<=>data.frame conversion causes grief (syntax as 
+> well as speed) that we could use for testing ?
+> 
+> This also links to the not yet implemented .SDF object. The 
+> way I was thinking to do that wouldn't allow use of both .SD 
+> and .SDF in the same j, but it would be fast. Would be nicer 
+> not to need .SDF though if S4 works.
+> 
+> 
+> > On Tue, May 25, 2010 at 9:39 AM, Short, Tom <TShort at epri.com> wrote:
+> >
+> >>> I guess I don't understand why you'd want to make setdf and setdt 
+> >>> instead of using the as.data.frame/as.data.table functions?
+> >>>
+> >>> Isn't the as.* more idiomatic S3-OOized R?
+> >>
+> >> You're right, it's not very standard for R, but if I have 
+> a 9-GB data 
+> >> table, I may not want the memory consumption of keeping 
+> both copies 
+> >> around. Because it's nonstandard, maybe it shouldn't be in 
+> >> data.table, but it's worth discussing.
+> >
+> > Ahh ... good point.
+> >
+> > I see their use case now ;-)
+> >
+> > +1 for having something like these so people who know what they're
+> > doing can use them.
+> >
+> > --
+> > Steve Lianoglou
+> > Graduate Student: Computational Systems Biology  | Memorial 
+> > Sloan-Kettering Cancer Center  | Weill Medical College of Cornell 
+> > University Contact Info: http://cbio.mskcc.org/~lianos/contact
+> >
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From mdowle at mdowle.plus.com  Tue May 25 19:10:00 2010
+From: mdowle at mdowle.plus.com (mdowle at mdowle.plus.com)
+Date: Tue, 25 May 2010 18:10:00 +0100
+Subject: [datatable-help] Auto-convert characters to factors when
+ settings keys?
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E3056CF31D@uspalex03.epri.com>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com><3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net><72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com><AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com><72CF3C50F4AF5B4BB678383F11CEF0E3056CF241@uspalex03.epri.com><AANLkTiknWGaCr7CGt6s13FGCz2V6yJrI0mwrtmuvzRHL@mail.gmail.com>
+	<00d0a5e3af9e747004fd2639e552b536.squirrel@webmail.plus.net>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3056CF31D@uspalex03.epri.com>
+Message-ID: <b862418b9085cec31d900def19579975.squirrel@webmail.plus.net>
+
+
+I'm not up to speed with S4 either. Hm.
+
+I don't mind the dtbl approach other than it gets ugly when compounding
+statements :
+
+   dt[where,select,by][having][join,...][where][join,...]...
+
+translates to
+
+   dtbl(dtbl(dtbl(dtbl(dtbl(dt,where,select,by),having),join),where),join)
+
+Wouldn't be a problem if we could allow both and let the user chose.
+
+
+> I don't know much about S4, but I think it'd be tough in practice to
+> make it work. If a package didn't have a namespace or the user loads
+> functions with "source", those functions would end up dispatching on
+> [.data.table, and you'd probably have confusing errors.
+>
+> I've thought about a lite verson of data.table that operated on data
+> frames. You'd have to get rid of [.data.table and use some alias to
+> [.data.table (pick dtbl which acts like a twisted combination of "with"
+> and "subset"), so instead of:
+>
+>   dt[, sum(x), by = a]
+>
+> It'd be:
+>
+>   dtbl(dt, j = sum(x), by = a)
+>
+> An advantage of this approach is that it helps newcomers and eases folks
+> into more complicated indexing/merging/subsetting possible with data
+> tables.
+>
+> You could still have setkey operate on data frames. A big downside is
+> that it'd be hard to keep the key in sync if the user re-orders the data
+> frame. One option is to have a very light [.data.table that just does
+> [.data.frame and zaps the key.
+>
+> - Tom
+>
+>
+>> -----Original Message-----
+>> From: datatable-help-bounces at lists.r-forge.r-project.org
+>> [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+>> On Behalf Of mdowle at mdowle.plus.com
+>> Sent: Tuesday, May 25, 2010 11:23
+>> To: Steve Lianoglou
+>> Cc: datatable-help at lists.r-forge.r-project.org
+>> Subject: Re: [datatable-help] Auto-convert characters to
+>> factors when settings keys?
+>>
+>> Perhaps radical suggestion ... should/could we move to S4?
+>> Only user code, or packages that call data.table would see
+>> the [.data.table signature, otherwise the object would appear
+>> to be a data.frame to packages that require data.frame.  Not
+>> sure if this is possible or not - I did try once.
+>>
+>> Also tried to inherit data.table from data.frame in S3 using
+>> class(df)=c("data.table","data.frame"). As long as the
+>> package that only works with data.frame uses is.data.frame()
+>> or inherits(), and not class(x)=="data.frame", then it gets
+>> past that point but then [.data.table is still dispatched
+>> rather than [.data.frame.  I'm thinking S4 signatures might
+>> another option if they can be local. Advantage being that no
+>> class conversion would then be needed.
+>>
+>> Above is from memory a few years back so may well be wrong.
+>> Plus R has moved on in the meantime.
+>>
+>> Tom,  do you have a good example to hand where the
+>> data.table<=>data.frame conversion causes grief (syntax as
+>> well as speed) that we could use for testing ?
+>>
+>> This also links to the not yet implemented .SDF object. The
+>> way I was thinking to do that wouldn't allow use of both .SD
+>> and .SDF in the same j, but it would be fast. Would be nicer
+>> not to need .SDF though if S4 works.
+>>
+>>
+>> > On Tue, May 25, 2010 at 9:39 AM, Short, Tom <TShort at epri.com> wrote:
+>> >
+>> >>> I guess I don't understand why you'd want to make setdf and setdt
+>> >>> instead of using the as.data.frame/as.data.table functions?
+>> >>>
+>> >>> Isn't the as.* more idiomatic S3-OOized R?
+>> >>
+>> >> You're right, it's not very standard for R, but if I have
+>> a 9-GB data
+>> >> table, I may not want the memory consumption of keeping
+>> both copies
+>> >> around. Because it's nonstandard, maybe it shouldn't be in
+>> >> data.table, but it's worth discussing.
+>> >
+>> > Ahh ... good point.
+>> >
+>> > I see their use case now ;-)
+>> >
+>> > +1 for having something like these so people who know what they're
+>> > doing can use them.
+>> >
+>> > --
+>> > Steve Lianoglou
+>> > Graduate Student: Computational Systems Biology  | Memorial
+>> > Sloan-Kettering Cancer Center  | Weill Medical College of Cornell
+>> > University Contact Info: http://cbio.mskcc.org/~lianos/contact
+>> >
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> atatable-help
+>>
+>
+
+
+
+From TShort at epri.com  Tue May 25 21:12:45 2010
+From: TShort at epri.com (Short, Tom)
+Date: Tue, 25 May 2010 12:12:45 -0700
+Subject: [datatable-help] Auto-convert characters to factors when
+	settings keys?
+In-Reply-To: <b862418b9085cec31d900def19579975.squirrel@webmail.plus.net>
+References: <AANLkTinVubp4ZqVAAdNHwwDOuxTvZUreNPqAetzFsdvv@mail.gmail.com><3b328082052982befc6cd837d2ae81f5.squirrel@webmail.plus.net><72CF3C50F4AF5B4BB678383F11CEF0E3056CF22D@uspalex03.epri.com><AANLkTinroPkAWQ-3n3RyJSqQ6VtYoZxf5VnBgHgeO4ri@mail.gmail.com><72CF3C50F4AF5B4BB678383F11CEF0E3056CF241@uspalex03.epri.com><AANLkTiknWGaCr7CGt6s13FGCz2V6yJrI0mwrtmuvzRHL@mail.gmail.com><00d0a5e3af9e747004fd2639e552b536.squirrel@webmail.plus.net><72CF3C50F4AF5B4BB678383F11CEF0E3056CF31D@uspalex03.epri.com>
+	<b862418b9085cec31d900def19579975.squirrel@webmail.plus.net>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E3056CF418@uspalex03.epri.com>
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of mdowle at mdowle.plus.com
+> Sent: Tuesday, May 25, 2010 13:10
+> To: Short, Tom
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Auto-convert characters to 
+> factors when settings keys?
+> 
+> 
+> I'm not up to speed with S4 either. Hm.
+> 
+> I don't mind the dtbl approach other than it gets ugly when 
+> compounding statements :
+> 
+>    dt[where,select,by][having][join,...][where][join,...]...
+> 
+> translates to
+> 
+>    
+> dtbl(dtbl(dtbl(dtbl(dtbl(dt,where,select,by),having),join),whe
+> re),join)
+> 
+> Wouldn't be a problem if we could allow both and let the user chose.
+
+Good point. That's messy. We could have a dtbl that worked on either
+data tables or data frames and a [.data.table that worked just with
+data.tables. Or, we could skip the whole idea:)
+
+- Tom
+
+From sashag at stanford.edu  Thu May 27 00:04:23 2010
+From: sashag at stanford.edu (Sasha Goodman)
+Date: Wed, 26 May 2010 15:04:23 -0700
+Subject: [datatable-help] convenience function for transforming variables,
+	and adding them to 	the table
+Message-ID: <AANLkTikUIFmQlvWF7nVOxZvFBUm7MPuaN7hOR2luM9Ff@mail.gmail.com>
+
+I'm trying to make a simple convenience function for the following common
+procedure, where one variable is transformed with an arbitrary function and
+merged as a variable to the table:
+
+dt <- data.table(A = rep(1:3, each=4), B = rep(1:4, each=3), C = rep(1:2,
+6))
+dt[, transform(.SD,D=mean(A)), by="B"]
+
+Here is my first attempt, but it won't run because of scoping issues.
+
+dt.groupby <- function(data,grouping, ...) {
+data[, transform(.SD,expr=...), by=grouping]
+}
+
+Any suggestions?
+It would also be nice if duplicate columns were not created, such as the
+"B.1" the first procedure adds.
+
+
+-- 
+Sasha Goodman
+Doctoral Candidate, Organizational Behavior
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20100526/9afdc361/attachment.htm>
+
+From TShort at epri.com  Thu May 27 21:02:01 2010
+From: TShort at epri.com (Short, Tom)
+Date: Thu, 27 May 2010 12:02:01 -0700
+Subject: [datatable-help] convenience function for transforming
+	variables, and adding them to 	the table
+In-Reply-To: <AANLkTikUIFmQlvWF7nVOxZvFBUm7MPuaN7hOR2luM9Ff@mail.gmail.com>
+References: <AANLkTikUIFmQlvWF7nVOxZvFBUm7MPuaN7hOR2luM9Ff@mail.gmail.com>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E305721C2A@uspalex03.epri.com>
+
+> Sasha Goodman wrote:
+>
+> I'm trying to make a simple convenience function for the
+> following common procedure, where one variable is transformed
+> with an arbitrary function and merged as a variable to the table:
+>  
+> dt <- data.table(A = rep(1:3, each=4), B = rep(1:4, each=3), C =
+rep(1:2, 6))
+> dt[, transform(.SD,D=mean(A)), by="B"]
+>  
+> Here is my first attempt, but it won't run because of scoping issues. 
+>  
+> dt.groupby <- function(data,grouping, ...) {
+> data[, transform(.SD,expr=...), by=grouping]
+> }
+>  
+
+Tough problem. The best I could do was:
+
+dt.groupby <- function(data,grouping, ...) {
+    eval(bquote(data[, transform(.SD, ...),
+                     by = .(substitute(grouping))]))
+}
+
+It relies on some funky language manipulation that I always have
+a tough time with. It also fails for multiple groupings:
+
+dt.groupby(dt, B, D = mean(A), E = median(A))
+dt.groupby(dt, "B", D = mean(A), E = median(A))
+dt.groupby(dt, list(B,C), D = mean(A), E = median(A)) # fails
+
+
+
+> Any suggestions? It would also be nice if duplicate columns were
+> not created, such as the "B.1" the first procedure adds.
+
+Yes, it would. We probably don't want to take those columns out of
+.SD because they might be useful. I'm not sure how to get transform
+to ignore them. 
+
+- Tom
+
+ 
+
+From mdowle at mdowle.plus.com  Fri May 28 11:38:07 2010
+From: mdowle at mdowle.plus.com (mdowle at mdowle.plus.com)
+Date: Fri, 28 May 2010 10:38:07 +0100
+Subject: [datatable-help] convenience function for transforming
+ variables, and adding them to 	the table
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E305721C2A@uspalex03.epri.com>
+References: <AANLkTikUIFmQlvWF7nVOxZvFBUm7MPuaN7hOR2luM9Ff@mail.gmail.com>
+	<72CF3C50F4AF5B4BB678383F11CEF0E305721C2A@uspalex03.epri.com>
+Message-ID: <b8a9db509cf25d285d7637299eb78d05.squirrel@webmail.plus.net>
+
+
+There used to be an incbycols argument which would prevent the B.1 :
+
+   dt[,transform(.SD,D=mean(A)),by=B,incbycols=FALSE]
+
+Shall we bring it back ?  incbycols was removed to simplify the number of
+arguments since the orginal reason for it went away.  Seems like we do
+have a good reason for it.
+
+Also see feature request #200 (raised in Aug 08) :
+
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=200&group_id=240&atid=978
+
+Seems like back then I was thinking that syntax like :
+
+   DT[J(2),{b=3;c=a+5}]
+
+would allow fast update by binary search if the assignments to b and c
+were updates to the table rather than local scope. NA would be added in
+columns for b and c for the non matching rows.  But those are local scope
+assignments currently as you know.
+
+So maybe a switch ?
+
+   DT[,{D=mean(A)},by=B,update=TRUE]
+
+or just remove local scope (?) so that :
+
+   DT[,{D=mean(A)},by=B]
+
+would do the transform. That syntax is more natural in my mind. A local
+temporary assignment could be more difficult syntax (as rarer to need) :
+
+   DT[,{T(E)=A+2;F=E*2},by=B]
+
+or something like that where T (temporary) could be named L (local) in the
+spirit of I(). The above would create a new F column but not an E,
+although the F used E along the way.
+
+Thanks for raising it. Will give it some more thought too.
+
+Matthew
+
+
+>> Sasha Goodman wrote:
+>>
+>> I'm trying to make a simple convenience function for the
+>> following common procedure, where one variable is transformed
+>> with an arbitrary function and merged as a variable to the table:
+>>
+>> dt <- data.table(A = rep(1:3, each=4), B = rep(1:4, each=3), C =
+> rep(1:2, 6))
+>> dt[, transform(.SD,D=mean(A)), by="B"]
+>>
+>> Here is my first attempt, but it won't run because of scoping issues.
+>>
+>> dt.groupby <- function(data,grouping, ...) {
+>> data[, transform(.SD,expr=...), by=grouping]
+>> }
+>>
+>
+> Tough problem. The best I could do was:
+>
+> dt.groupby <- function(data,grouping, ...) {
+>     eval(bquote(data[, transform(.SD, ...),
+>                      by = .(substitute(grouping))]))
+> }
+>
+> It relies on some funky language manipulation that I always have
+> a tough time with. It also fails for multiple groupings:
+>
+> dt.groupby(dt, B, D = mean(A), E = median(A))
+> dt.groupby(dt, "B", D = mean(A), E = median(A))
+> dt.groupby(dt, list(B,C), D = mean(A), E = median(A)) # fails
+>
+>
+>
+>> Any suggestions? It would also be nice if duplicate columns were
+>> not created, such as the "B.1" the first procedure adds.
+>
+> Yes, it would. We probably don't want to take those columns out of
+> .SD because they might be useful. I'm not sure how to get transform
+> to ignore them.
+>
+> - Tom
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+

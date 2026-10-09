@@ -1,0 +1,148 @@
+From B.J.Janssen at tue.nl  Thu Jul 22 17:42:37 2010
+From: B.J.Janssen at tue.nl (Janssen, B.J.)
+Date: Thu, 22 Jul 2010 17:42:37 +0200
+Subject: [Roxygen-devel] setReplaceMethod problems
+Message-ID: <A732E03E-4F5A-46C3-AACE-F33F464B2D3C@tue.nl>
+
+Hello,
+
+I am writing a package in R using S4 classes and had problems with roxygen when I tried to include a setReplaceMethod for one of my classes.  Roxygen 0.1-2 revision 245 crashed whenever a setReplaceMethod declaration was encountered. Searching the net got me to <https://r-forge.r-project.org/tracker/index.php?func=detail&aid=842&group_id=183&atid=1500> which confirms it is not (yet) supported by roxygen.
+
+Installing the latest revision from svn (248) solved the crashing problem for me. It still produced a warning because "setReplaceMethod" was not recognized. This can be resolved by the patch included below. It just applies the same method as setMethod does to any setReplaceMethod encountered. The disadvantage is that it cannot handle duplicate naming. For example, it overwrites "[.Rd" if  both  a setMethod and a setReplaceMethod are declared for "[". These filenames should get renamed to something more sensible?
+
+Regards,
+Bart
+
+> svn diff Rd2.R 
+Index: Rd2.R
+===================================================================
+--- Rd2.R	(revision 248)
++++ Rd2.R	(working copy)
+@@ -55,6 +55,14 @@
+                               formals=S4formals$definition)
+                        })
+ 
++register.srcref.parser('setReplaceMethod',
++                       function(pivot, expression) {
++                         S4formals <- parseS4.method(cdr(expression))
++                         list(S4method=car(expression),
++                              S4formals=S4formals,
++                              formals=S4formals$definition)
++                       })
++
+ #' New implementation of the Rd roclet; same functionality as the original
+ #' implementation plus basic S4 handling.
+ #'
+
+
+From Manuel.Eugster at stat.uni-muenchen.de  Thu Jul 22 20:23:38 2010
+From: Manuel.Eugster at stat.uni-muenchen.de (Manuel J. A. Eugster)
+Date: Thu, 22 Jul 2010 14:23:38 -0400
+Subject: [Roxygen-devel] setReplaceMethod problems
+In-Reply-To: <A732E03E-4F5A-46C3-AACE-F33F464B2D3C@tue.nl>
+References: <A732E03E-4F5A-46C3-AACE-F33F464B2D3C@tue.nl>
+Message-ID: <4C488CAA.9010601@stat.uni-muenchen.de>
+
+Thank you for the patch, Bart! It will be added to R-Forge soon,
+and then will in the next CRAN release! Best, Manuel.
+
+
+
+On 7/22/10 11:42 AM, Janssen, B.J. wrote:
+> Hello,
+>
+> I am writing a package in R using S4 classes and had problems with
+> roxygen when I tried to include a setReplaceMethod for one of my
+> classes.  Roxygen 0.1-2 revision 245 crashed whenever a
+> setReplaceMethod declaration was encountered. Searching the net got
+> me
+> to<https://r-forge.r-project.org/tracker/index.php?func=detail&aid=842&group_id=183&atid=1500>
+> which confirms it is not (yet) supported by roxygen.
+>
+> Installing the latest revision from svn (248) solved the crashing
+> problem for me. It still produced a warning because
+> "setReplaceMethod" was not recognized. This can be resolved by the
+> patch included below. It just applies the same method as setMethod
+> does to any setReplaceMethod encountered. The disadvantage is that it
+> cannot handle duplicate naming. For example, it overwrites "[.Rd" if
+> both  a setMethod and a setReplaceMethod are declared for "[". These
+> filenames should get renamed to something more sensible?
+>
+> Regards, Bart
+>
+>> svn diff Rd2.R
+> Index: Rd2.R
+> ===================================================================
+> --- Rd2.R	(revision 248) +++ Rd2.R	(working copy) @@ -55,6 +55,14 @@
+> formals=S4formals$definition) })
+>
+> +register.srcref.parser('setReplaceMethod', +
+> function(pivot, expression) { +                         S4formals<-
+> parseS4.method(cdr(expression)) +
+> list(S4method=car(expression), +
+> S4formals=S4formals, +
+> formals=S4formals$definition) +                       }) + #' New
+> implementation of the Rd roclet; same functionality as the original
+> #' implementation plus basic S4 handling. #'
+>
+> _______________________________________________ Roxygen-devel mailing
+> list Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+
+From jeffrey.arnold at gmail.com  Mon Jul 26 04:52:51 2010
+From: jeffrey.arnold at gmail.com (Jeffrey Arnold)
+Date: Sun, 25 Jul 2010 22:52:51 -0400
+Subject: [Roxygen-devel] Bug and patch for the collate roclet
+Message-ID: <AANLkTi=h-GLSs9q3Z7jpfOwi_e1850ubeNacV9ZpeBnS@mail.gmail.com>
+
+The collate doclet was including all the files in the R directory, even
+temporary files ending in *~, in the collate
+line of the DESCRIPTION file. This was giving errors with R CMD check.
+
+The following tiny patch to make.collate.roclet() alters the parse function
+to only include *.R or *.r files in the directory.
+
+
+Index: pkg/R/collate.R
+===================================================================
+@@ -160,7 +160,9 @@ make.collate.roclet <- function(merge.file=NULL,
+     do.call(roclet$parse,
+             as.list(list.files('.',
+                                recursive=TRUE,
+-                               full.names=FALSE)))
++                               full.names=FALSE,
++                               pattern="\\.[Rr]$"
++                               )))
+   }
+
+   roclet
+
+
+-------------
+
+Jeffrey Arnold
+Political Science Department
+University of Rochester
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20100725/03ac1abb/attachment.htm>
+
+From bogus@does.not.exist.com  Fri Jul 23 15:04:05 2010
+From: bogus@does.not.exist.com ()
+Date: Fri, 23 Jul 2010 13:04:05 -0000
+Subject: No subject
+Message-ID: <mailman.0.1280991126.1384.roxygen-devel@lists.r-forge.r-project.org>
+
+make.Rd2.roclet New implementation of the Rd roclet; same functionality as =
+the original=85
+If this statement is true then there is no need for an option since it only=
+ extends Rd. In that case I agree with Tobias.
+
+The way I understood this is that the use.Rd2 option is a temporary fix unt=
+il Rd2 is fully functional and able to replace Rd. Probably I am missing so=
+mething here :).
+
+Regards,
+Bart
+
+

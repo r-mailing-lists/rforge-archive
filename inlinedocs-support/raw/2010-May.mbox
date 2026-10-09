@@ -1,0 +1,811 @@
+From twutz at bgc-jena.mpg.de  Mon May  3 08:37:48 2010
+From: twutz at bgc-jena.mpg.de (Thomas Wutzler)
+Date: Mon, 03 May 2010 08:37:48 +0200
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <4BDAD934.30001@bgc-jena.mpg.de>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+	<0368DB7855FE094FBFF313BE6BC5A810026B922F@BE02.exg3.exghost.com>
+	<0368DB7855FE094FBFF313BE6BC5A81002762805@BE02.exg3.exghost.com>
+	<4BDAD934.30001@bgc-jena.mpg.de>
+Message-ID: <4BDE6F3C.7070005@bgc-jena.mpg.de>
+
+This was not a good suggestion. It has the same merit as the other
+pattern. It does not capture things like "myfunction.data.frame"
+
+Is it possible to use the information from the parsed file also in the
+inspection of the source code?
+The information of the two parts is already extracted.
+
+Thomas
+
+Thomas Wutzler wrote:
+> Dear Keith,
+> 
+>> 1) automatically generates \method{}{} markup which should be correct if
+>> and only if the generic name is everything up to but not including the
+>> first period in the function name. Thus this will not work properly if a
+>> generic function has a name like "my.generic" so that the specific
+>> function
+>> is "my.generic.my_type".
+> How about the following pattern?
+> "^(.*)\\.([^\\.]+)$"
+> 
+> This allows generics including a dot . e.g. "as.data.frame" (I
+> encountered exactly this case)
+> But it does not allow for objects names with a dot.
+> 
+> Thomas
+> 
+> 
+
+From Toby.Hocking at inria.fr  Mon May  3 20:48:18 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Mon, 03 May 2010 20:48:18 +0200 (CEST)
+Subject: [inlinedocs] code reorganization
+In-Reply-To: <4BDE6F3C.7070005@bgc-jena.mpg.de>
+References: <0368DB7855FE094FBFF313BE6BC5A81002762805@BE02.exg3.exghost.com>
+	<4BDAD934.30001@bgc-jena.mpg.de> <4BDE6F3C.7070005@bgc-jena.mpg.de>
+Message-ID: <20100503.204818.102940176.Toby.Hocking@inria.fr>
+
+Thomas, you asked...
+>Is it possible to use the information from the parsed file also in the
+>inspection of the source code?
+>The information of the two parts is already extracted.
+
+I added some features to inlinedocs this weekend, which should make it
+a lot easier to add new features. Essentially I modularized the
+process of constructing the "docs" list in package.skeleton.dx, so
+that instead of using extract.docs.fun and friends directly, I provide
+a new "parsers" argument to package.skeleton.dx that is a list of
+functions that will be sequentially applied to the code to generate
+the list of docs. It seems to be working, but please test to see if
+this has introduced any bugs. I have also tried to explain the new
+features on the website, so please have a look and feel free to
+clarify yourself or ask if something seems unclear.
+
+So to answer your question, yes, it should be possible, if you write a
+new parser function like this:
+
+object.parser <- forfun(function(o,name,src,...){
+  ... o is the R function, name is its name, 
+  ... src is its source code from the "source" attribute
+  list(examples="foo",author="bar")
+})
+
+and more generally...
+
+package.parser <- function(objs,code,...){
+  docs <- list()
+  for(N in names(objs)){
+    .. search for N in code, which is all the source code of the package.
+    .. do something with the code you found
+    docs[[N]] <- list(title=N,value="bar")
+  }
+  docs
+}
+
+From k.ponting at aurix.com  Tue May  4 12:03:13 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Tue, 4 May 2010 06:03:13 -0400
+Subject: [inlinedocs] inlinedocs
+In-Reply-To: <1272640485.24619.25.camel@mp-1246>
+References: <20100429163825.72F879C2BE@r-forge.r-project.org>
+	<0368DB7855FE094FBFF313BE6BC5A810028038F7@BE02.exg3.exghost.com>
+	<1272640485.24619.25.camel@mp-1246>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A81002886245@BE02.exg3.exghost.com>
+
+Hi Jim,
+
+I like the idea of always overwriting - keeps things simple, but someone is sure to ask for the option not to sometime. Maybe we anticipate by documenting and telling them to keep the master as something else or just not use namespace=TRUE.
+
+If you were able to put together a small package of use cases that would be a big help. When I have some time I will have a look and see how easy it is to work it in with what I did for setMethodS3. We should also add it to the inlinedocs tests...
+
+With regard to new generics, I think we are in the territory of one of the options from the end of help("Documentation", package = "methods"), but I am not quite clear which... I think it would be good to take a look at what package.skeleton generates from your test package and kick around a bit what documentation should end up where. Looking closely both mypackage-class and show-methods end up with \alias{show,mypackage-method}, and only one will be accessed. 
+
+Trying to understand this from the standard packages, I observe that method?show("signature") brings up the documentation for signature-class, which does not mention a show method, although one exists!!!
+
+As a straw man, how about the following:
+1) When a class is defined within the package, the "-class.Rd" file takes priority - remove the corresponding alias(es) from the "-methods.Rd" file, but put the method documentation in both files for completeness, so that someone studying "getAlignments" methods can see the details of all such methods (within one package) at one go, but someone studying a particular class sees the documentation of methods for that class.
+2) When a new generic is defined within the package, the documentation for that generic has to live within the "-methods.Rd" file -- compare method?initialize("environment")
+3) All other cases, such as a new generic within the package for a class defined somewhere else, also have to live within "-methods.Rd"
+
+Note that my concept of "linked documentation" intended to inherit documentation of arguments from generic functions (_within_ the package) to more specific ones, so you do not have to repeat yourself for arguments which match the generic or even which match "earlier" specific ones. I am not totally convinced I have that right yet, as the concept of "earlier" is IIRC only defined within one source file.
+
+Regards,
+
+Keith
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+
+
+> -----Original Message-----
+> From: James Bullard [mailto:JBullard at pacificbiosciences.com]
+> Sent: 30 April 2010 16:15
+> To: Keith Ponting
+> Cc: inlinedocs-support at r-forge.wu-wien.ac.at; toby.hocking at inria.fr
+> Subject: RE: inlinedocs
+> 
+> Hi Keith,
+> 
+> Thanks for the response. I make heavy use of NAMESPACES and S4 and I
+> have been actively looking for something to use for auto-doc generation.
+> I like the simplicity of inlinedocs.
+> 
+> In my opinion, no one should ever modify the generated files; similar to
+> javadoc and pydoc - once you can modify the generated versions then
+> you've lost one of the main benefits of the tool - consistency. I think
+> that you should just copy a NAMESPACE file over if it exists.
+> 
+> As for the S4 handling. The documentation scheme within R is nearly
+> unmanageable so a tool to facilitate this is great. In response to your
+> point below, I tend to define the method directly in the setMethod call,
+> or at least I hide it behind the NAMESPACE.
+> 
+> Another thing that I do is create new generics. Currently, the
+> documentation engine dies because it doesn't know where the generic is.
+> The work around is to actually load the package which you are trying to
+> generate documentation for - not exactly appealing, but in most cases
+> this is probably okay - indeed R CMD check does this same thing.
+> 
+>  Error in methods::promptMethods(item, filename = file.path(docs_dir,
+> sprintf("%s-methods.Rd",  :
+>   No generic function found corresponding to "getAlignments"
+> 
+> 
+> Let me know how I can help, one thing I could easily do is put together
+> a small package with these use-cases and that might facilitate the
+> construction of these things -- if these are issues that you don't care
+> about then let me know and I'll try to see if there is something else,
+> or if I can roll this into your tool.
+> 
+> thanks again, jim
+> 
+> 
+> On Fri, 2010-04-30 at 04:37 -0400, Keith Ponting wrote:
+> > Hi Jim, welcome to inlinedocs!
+> >
+> > All packages must have a DESCRIPTION, so package.skeleton.dx generates
+> a DESCRIPTION file if one does not exist. Otherwise IIRC everything
+> package.skeleton.dx does goes into the "man" subdirectory.
+> >
+> > NAMESPACE is different - not all packages have to have namespaces,
+> although I am tending to use them more and more. Therefore we cannot
+> high-handedly insist on generating one.
+> >
+> > It would be useful and relatively trivial to add a "namespace" option
+> to package.skeleton.dx, pass it to the embedded package.skeleton call
+> and then copy the generated file into the correct place in the package
+> source if it does not exist.
+> >
+> > The question is what to do about maintenance -- suppose I add a new
+> class - it would be nice to automatically update the NAMESPACE file, but
+> then what if I have separately edited the generated NAMESPACE file?
+> Should we try and merge automatically, or warn the user and print a
+> diff? I think my preferred route would be something like:
+> > 1) copy the generated NAMESPACE file to both <package>/NAMESPACE and
+> > <package>/NAMESPACE.autogenerated;
+> > 2) if those two files are still identical next time
+> > package.skeleton.dx is run with namespace=TRUE, then overwrite again;
+> > 3) otherwise print a warning message to the user showing the
+> differences between autogenerated and existing NAMESPACE file.
+> >
+> > There is also an incompleteness in the current handling of S4 class
+> methods - I implemented something to cover the basic class definitions,
+> but for each generic method the documentation might need to go in at
+> least two places. For example, if I have a "show" method on class
+> "results", then that is referred to both in "results-class.Rd" and in
+> "show-methods.Rd". Both of these are generated by package.skeleton, so
+> it might be useful to tuck the documentation into both places. However
+> in my migration from S3 to S4 I have tended to write functions with S3-
+> class-like names (e.g.) "show.results" then call
+> setMethod("show","results",show.results) as opposed to writing the
+> function definition inside that setMethod call, so that my documentation
+> happily ends up under show.results. Therefore I am not sure which of the
+> various options documented at the end of help("Documentation", package =
+> "methods") are likely to be most sensible/useful...
+> >
+> > Keith
+> >
+> > Keith Ponting
+> > Aurix Ltd, Malvern WR14 3SZ  UK
+> >
+> >
+> > > -----Original Message-----
+> > > From: Jim [mailto:jbullard at pacificbiosciences.com]
+> > > Sent: 29 April 2010 17:38
+> > > To: toby.hocking at inria.fr
+> > > Subject: inlinedocs
+> > >
+> > > Hi, I have started using your package inlinedocs and am having
+> > > problems with S4 classes and generics. One thing I noticed is that
+> > > in the auto- generated directory under pkgname/R/pkgname there is no
+> NAMESPACE file.
+> > > Is there a reason why this is not included?
+> > >
+> > >
+> > >
+> > > I am the developer of the h5r package.
+> > >
+> > >
+> > >
+> > > thanks, jim
+
+
+From k.ponting at aurix.com  Tue May  4 12:44:38 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Tue, 4 May 2010 06:44:38 -0400
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <4BDAD0BC.5030809@bgc-jena.mpg.de>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+	<0368DB7855FE094FBFF313BE6BC5A810026B922F@BE02.exg3.exghost.com>
+	<0368DB7855FE094FBFF313BE6BC5A81002762805@BE02.exg3.exghost.com>
+	<4BDAD0BC.5030809@bgc-jena.mpg.de>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A8100288624F@BE02.exg3.exghost.com>
+
+Hi Thomas,
+
+Thankyou for this - I have just got back from leave and will have a look
+when I have some time.
+
+The point about generics is that:
+1) They may be "local" - defined purely within the package, as in
+"getAlignment" referred to by Jim Bullard in another e-mail, or "global"
+- defined elsewhere as with the "show" method for example.
+2) They usually have common (sets of) arguments, and on the "don't
+repeat yourself" principle, I would like to document such arguments once
+only and automatically copy the documentation to other versions of the
+same generic function.
+3) They can be defined as an un-named function entirely within the
+setMethod(S3) call or as the name of a previously defined function. The
+latter is where the concept of linked documentation came from - the
+documentation for the previously defined function (parent) gets
+automatically copied into documentation for the generic.
+
+Therefore, what is currently in place does the following when a generic
+is encountered while processing a file (this could be package, but then
+first time is not particularly well defined):
+A) If there are no previous methods for that generic, (the generic is
+previously unseen), that instance is taken to be the "defining instance"
+on the (probably invalid) assumption that one would define the most
+generic version first, then more specific implementations for particular
+classes.
+B) Documentation for subsequent (assumed more specific) versions of the
+generic links back to that first instance and will inherit any
+components of the documentation unless overridden. (Component of
+documentation= function argument or other documentation section, such as
+note or value)
+
+To give a concrete example, I wanted a generic "getSettings" for a class
+hierarchy, so wrote the following:
+
+setMethodS3("getSettings","HitSelector",function # HitSelector parameter
+settings
+### Returns a list describing the parameter settings of the
+### \code{\link{HitSelector}} object. For the base class this list is
+"not
+### very interesting" (empty).  Derived \code{\link{HitSelector}}
+classes
+### should "roll their own".
+(x, ##<< inherits from \code{\link{R.oo}} class
+\code{\link{HitSelector}}
+ ...)  ##<< ignored - required by \code{\link{setMethodS3}}
+{
+  ##note<< This may also be accessed as \code{object$settings}.
+  invisible(list())
+### Returns a named list describing class parameter settings.
+})
+setMethodS3("getSettings","HitThresh",function # HitThresh parameter
+settings
+### Returns a list describing the parameter settings of the
+### \code{\link{HitThresh}} object.
+(x, ##<< inherits from \code{\link{R.oo}} class \code{\link{HitThresh}}
+ ...)  ##<< ignored - required by \code{\link{setMethodS3}}
+{
+  invisible(list(maxdist=x$threshold))
+})
+setMethodS3("getSettings","HitCeiling",function # HitCeiling parameter
+settings
+(x, ##<< inherits from \code{\link{R.oo}} class \code{\link{HitCeiling}}
+ ...)  ##<< ignored - required by \code{\link{setMethodS3}}
+{
+  res <- list(ceiling=x$threshold)
+  if ( is.finite(x$tail) ) res$tail <- x$tail
+  invisible(res)
+})
+
+The base class "HitSelector" comes first, so is the "defining instance"
+of the previously unseen generic "getSettings". Subsequent getSettings
+do not have "note" and "value" sections and inherit those via "linked
+documentation" from the previous (or parent) instance. (I should also
+have inherited the repetitive "ignored" lines.) Parent is transitive, so
+had I written:
+
+baseSettings <- function # HitSelector parameter settings
+### Returns a list describing the parameter settings of the
+### \code{\link{HitSelector}} object. For the base class this list is
+"not
+### very interesting" (empty).  Derived \code{\link{HitSelector}}
+classes
+### should "roll their own".
+(x, ##<< inherits from \code{\link{R.oo}} class
+\code{\link{HitSelector}}
+ ...)  ##<< ignored - required by \code{\link{setMethodS3}}
+{
+  ##note<< This may also be accessed as \code{object$settings}.
+  invisible(list())
+### Returns a named list describing class parameter settings.
+}
+setMethodS3("getSettings","HitSelector",baseSettings)
+
+The effect would have been pretty much the same, except there would now
+also be documentation for the baseSettings function and all the
+components of "baseSettings" documentation would magically appear as the
+documentation for getSettings.HitSelector.
+
+HTH,
+
+Keith
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+
+
+> -----Original Message-----
+> From: Thomas Wutzler [mailto:twutz at bgc-jena.mpg.de]
+> Sent: 30 April 2010 13:45
+> To: Keith Ponting
+> Cc: inlinedocs-support at r-forge.wu-wien.ac.at
+> Subject: Re: [inlinedocs] tabs before comments and symbols, S3 methods
+> 
+> Dear Keith,
+> 
+> thanks to you for implementing the setMethodS3 support.
+> 
+> I tried to understand how it is applied and added a test project
+sillyS3
+> to the test directory, which discussion can be based upon.
+> 
+> In the code of extract.file.parse you comment
+>       ##details<< The \code{setMethodS3} calls introduce additional
+>       ## complexity: they will define an additional S3 generic (which
+>       ## needs documentation to avoid warnings at package build time)
+>       ## unless one already exists. This also is handled by "linking"
+>       ## documentation. A previously unseen generic is linked to the
+>       ## first defining instances, subsequent definitions of that gen.
+>       ## also link back to the first defining instance.
+> 
+> I do not quite understand.
+> What is an "linking documentation", "unseen generic", and what an
+"first
+> defining instance"?
+> 
+> In the sillyS3 toy example, I see that the parse result includes an
+> entry for the generic function. However, it does not (yet?) effect the
+> generated documentation. Hence R CMD check complains about an
+> undocumented function.
+> 
+> I would be glad about some guidance.
+> 
+> Best regards
+> Thomas
+> 
+> 
+> 
+> 
+> 
+> 
+
+
+From phgrosjean at sciviews.org  Fri May 14 17:25:28 2010
+From: phgrosjean at sciviews.org (Philippe Grosjean)
+Date: Fri, 14 May 2010 17:25:28 +0200
+Subject: [inlinedocs] A bug and a suggestion for S3 methods support
+Message-ID: <4BED6B68.2040805@sciviews.org>
+
+Hello,
+
+Thanks for the inlinedocs package. I have hit a bug. In the test file 
+attached to this email, if I use:
+
+return(x)
+
+instead of:
+
+x
+
+in the last instruction of the combine.list() function, 
+package.skeleton.dx() fails with the following message:
+
+:> package.skeleton.dx("~/Desktop/pkg/inlinedocs2")
+extract.docs.file parsefun author.from.description erase.format 
+title.from.name examples.from.testfile examples.after.return Error in  
+l[[2]] : subscript out of bounds
+
+Also, a little suggestion: in the usage section of Rd files, S3 methods 
+are supposed to be written:
+
+\method{print}{object}(....)
+
+instead of:
+
+print.object(....)
+
+It is not possible to detect easily if a function is a S3 method, but 
+may be could you use a special indication to flag this, and then, write 
+usage section correctly? This could be something like:
+
+print.object <- function (
+##<<method<<print<<object
+x,   ##<< the object to print
+...  ##<< further arguments
+) {
+<code here>
+}
+
+Best,
+
+Philippe
+
+-- 
+..............................................<?}))><........
+  ) ) ) ) )
+( ( ( ( (    Prof. Philippe Grosjean
+  ) ) ) ) )
+( ( ( ( (    Numerical Ecology of Aquatic Systems
+  ) ) ) ) )   Mons University, Belgium
+( ( ( ( (
+..............................................................
+
+
+
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: Test.R
+URL: <http://lists.r-forge.r-project.org/pipermail/inlinedocs-support/attachments/20100514/d7df6c5b/attachment.asc>
+
+From Toby.Hocking at inria.fr  Fri May 14 21:00:16 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Fri, 14 May 2010 21:00:16 +0200 (CEST)
+Subject: [inlinedocs] A bug and a suggestion for S3 methods support
+In-Reply-To: <4BED6B68.2040805@sciviews.org>
+References: <4BED6B68.2040805@sciviews.org>
+Message-ID: <20100514.210016.98417593.Toby.Hocking@inria.fr>
+
+Hi, thanks for the helpful comments, and I'm glad to hear you like
+using inlinedocs.
+
+I was not able to reproduce the exact same error you had, but I see
+what was happening, and I think I fixed it. The bugfix has been
+checked in to SVN, rev 102, if you'd like to test it and make sure it
+works on your end. 
+
+Thanks for the insightful point about S3 methods. We have talked about
+generating proper \method markup for S3 methods on the list before,
+but I haven't got around to it yet since it doesn't generate a warning
+in R CMD check. Keith wrote some support for setMethodS3()
+definitions, but I don't really use it, so maybe Keith would have a
+better idea of if it would be feasible anytime soon. It would be nice
+if we could automatically detect methods and avoid having to write
+something like ##<<method<<print<<object. In any case, if you manage
+to write some code (maybe a new parser function?) that makes correct
+S3 method markup for the usage section, please tell us about it.
+
+From k.ponting at aurix.com  Mon May 17 11:00:18 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Mon, 17 May 2010 05:00:18 -0400
+Subject: [inlinedocs] A bug and a suggestion for S3 methods support
+In-Reply-To: <20100514.210016.98417593.Toby.Hocking@inria.fr>
+References: <4BED6B68.2040805@sciviews.org>
+	<20100514.210016.98417593.Toby.Hocking@inria.fr>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A810029BC0C6@BE02.exg3.exghost.com>
+
+The main issue is detecting whether a given function is an S3 method. Is
+x.y an instance of method x for class y or just a function which happens
+to be called x.y? I have some ideas as to how this could be done -
+essentially look for a method x and examine its contents - but I would
+rather find something more reliable and ideally supported by the core R
+packages. However I am rather tied up at present, so it may be a few
+weeks before I can spend much time on this...
+
+Keith
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+> -----Original Message-----
+> From: inlinedocs-support-bounces at lists.r-forge.r-project.org
+> [mailto:inlinedocs-support-bounces at lists.r-forge.r-project.org] On
+> Behalf Of Toby Dylan Hocking
+> Sent: 14 May 2010 20:00
+> To: phgrosjean at sciviews.org
+> Cc: inlinedocs-support at r-forge.wu-wien.ac.at
+> Subject: Re: [inlinedocs] A bug and a suggestion for S3 methods
+support
+> 
+> Hi, thanks for the helpful comments, and I'm glad to hear you like
+using
+> inlinedocs.
+> 
+> I was not able to reproduce the exact same error you had, but I see
+what
+> was happening, and I think I fixed it. The bugfix has been checked in
+to
+> SVN, rev 102, if you'd like to test it and make sure it works on your
+> end.
+> 
+> Thanks for the insightful point about S3 methods. We have talked about
+> generating proper \method markup for S3 methods on the list before,
+but
+> I haven't got around to it yet since it doesn't generate a warning in
+R
+> CMD check. Keith wrote some support for setMethodS3() definitions, but
+I
+> don't really use it, so maybe Keith would have a better idea of if it
+> would be feasible anytime soon. It would be nice if we could
+> automatically detect methods and avoid having to write something like
+> ##<<method<<print<<object. In any case, if you manage to write some
+code
+> (maybe a new parser function?) that makes correct
+> S3 method markup for the usage section, please tell us about it.
+> _______________________________________________
+> Inlinedocs-support mailing list
+> Inlinedocs-support at lists.r-forge.r-project.org
+>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/inlinedocs-
+> support
+
+From phgrosjean at sciviews.org  Mon May 17 01:14:18 2010
+From: phgrosjean at sciviews.org (Philippe Grosjean)
+Date: Mon, 17 May 2010 01:14:18 +0200
+Subject: [inlinedocs] A bug and a suggestion for S3 methods support
+In-Reply-To: <20100514.210016.98417593.Toby.Hocking@inria.fr>
+References: <4BED6B68.2040805@sciviews.org>
+	<20100514.210016.98417593.Toby.Hocking@inria.fr>
+Message-ID: <4BF07C4A.4060704@sciviews.org>
+
+Hello,
+
+I played a little bit with inlinedocs, and found a couple of bugs. I 
+propose corrections in the attached files (look for PhG in comments).
+
+I propose also to add an argument in package.skeleton.dx() to create a 
+name space, and the code for managing that. By the way, wouldn't you 
+like to add a NAMESPACE to the inlinedocs package? It is much better 
+when developing functions that depends on inlinedocs to rely on a name 
+space!
+
+The solution for S3 methods is not easy, because it is not obvious what 
+is part of the generic and what is the object. The code in inlinedocs to 
+automatically detect S3methods in the case of R.oo objects will fail if 
+the generic has one or more dots, like in as.data.frame.matrix(), where 
+the generic is 'as.data.frame', and the object is 'matrix'. Your current 
+code will calculate 'as' as the generic and 'data.frame.matrix' as the 
+object. Although it is not automatic, I think that a simple tag like:
+##S3method<<as.data.frame
+somewhere inside the body of the function makes the job. It is also used 
+to create S3method(generic, object) statements in NAMESPACE file, if 
+that one is requested (see hereover). It should be possible to detect 
+automatically S3 methods, but that is tricky, and the proposed method is 
+much simpler!
+
+You patch for 'examples.after.return' does not solve the problem 
+completely. Indeed, it is hard (if not impossible) to have a good 
+detection of the end of the function code and the beginning of the 
+example code. Think that you may have multiple return() statements in a 
+function (you code will split after the first one, sic!). And, in case 
+you decide to split after the last return(), think that you could also 
+have return() statement in some 'examples' code! Gasp!
+
+I propose a very different method to embed 'examples' code in a 
+function: to use an 'ex' attribute for the object. I have written a 
+parser 'examples.in.attr' which makes 4 lines of code only. It works 
+well. The way you define examples for your functions is a little bit 
+more tricky, but one should survive... What do you think of this?
+
+It has also two benefits over your approach to be usable to attach 
+'examples' to any objects, including datasets (in case inlinedocs 
+bacomes capable of documenting datasets in the future).
+
+- External examples should be located in /tests/fun.R, but I argue that 
+it is perhaps not optimal in all cases (see comments in the code). So, 
+for not breaking current behavior but to allow for another location of 
+these files, too, I propose to use the option(inlinedocs.exdir = ...). 
+Code is written in the attached files to deal with that option.
+
+
+Among the bugs corrected:
+- Wrong .Rd file names for functions like 'obj<-', and others (now, it 
+uses exactly the same code as package.skeleton() to determine the name 
+of the .Rd files),
+
+- Wrong treatment of platform-specific code in /R/unix, or /R/windows. I 
+propose code that detects the presence of these subdirectories and 
+stop() with an explicit message in such a case,
+
+- Bad formatted error message with
+stop("Need ",names(f)[f]," in ",descfile)
+in case there are several items, one should use something like:
+stop("Need ", paste(names(f)[f], collapse = ", "), " in ", descfile)
+(corrected in two places),
+
+- inlinedocs failed to use information in 'Imports' field (corrected),
+
+- wrong extraction of package names form 'Depends' field in case where 
+packages contain one or more dots in their names (corrected),
+
+- It is necessary to eliminate 'R' from the list of packages to load 
+from 'Depends' field (corrected),
+
+- It is not useful to try to load packages that are already loaded 
+(corrected),
+
+- inlinedocs did not detach packages that were not loaded before its 
+call when it returns (corrected, including unloading of their 
+namespaces, if possible),
+
+- A possible 'Encoding' field in DESCRIPTION also means the default 
+encoding of .R files... and this was not taken into account by 
+inlinedocs (corrected),
+
+- in \usage, generic<-.obj(x, ..., value) must be rewritten 
+\method{generic}{obj}(x, ...) <- value  (done),
+
+- in \usage, fun<-(x, ..., value), must be rewritten fun(x, ...) <- 
+value (done),
+
+- in \usage, %...%(x, y) must be rewritten x %...% y. Code is there, but 
+I end up with an empty \usage section => ???
+
+I have asked on R-Forge to participate to the development of inlinedocs. 
+If you think it is fine, and you would prefer I submit these patches (or 
+some of them) directly in the SVN on R-Forge, I could do that... just 
+add me as a developer on the project ;-)
+
+Best,
+
+Philippe
+
+..............................................<?}))><........
+  ) ) ) ) )
+( ( ( ( (    Prof. Philippe Grosjean
+  ) ) ) ) )
+( ( ( ( (    Numerical Ecology of Aquatic Systems
+  ) ) ) ) )   Mons University, Belgium
+( ( ( ( (
+..............................................................
+
+On 14/05/10 21:00, Toby Dylan Hocking wrote:
+> Hi, thanks for the helpful comments, and I'm glad to hear you like
+> using inlinedocs.
+>
+> I was not able to reproduce the exact same error you had, but I see
+> what was happening, and I think I fixed it. The bugfix has been
+> checked in to SVN, rev 102, if you'd like to test it and make sure it
+> works on your end.
+>
+> Thanks for the insightful point about S3 methods. We have talked about
+> generating proper \method markup for S3 methods on the list before,
+> but I haven't got around to it yet since it doesn't generate a warning
+> in R CMD check. Keith wrote some support for setMethodS3()
+> definitions, but I don't really use it, so maybe Keith would have a
+> better idea of if it would be feasible anytime soon. It would be nice
+> if we could automatically detect methods and avoid having to write
+> something like ##<<method<<print<<object. In any case, if you manage
+> to write some code (maybe a new parser function?) that makes correct
+> S3 method markup for the usage section, please tell us about it.
+>
+>
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: package.skeleton.dx.R
+URL: <http://lists.r-forge.r-project.org/pipermail/inlinedocs-support/attachments/20100517/bf2406b3/attachment-0001.txt>
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: parsers.R
+URL: <http://lists.r-forge.r-project.org/pipermail/inlinedocs-support/attachments/20100517/bf2406b3/attachment-0001.asc>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: inlinedocsTest.zip
+Type: application/zip
+Size: 12301 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/inlinedocs-support/attachments/20100517/bf2406b3/attachment-0001.zip>
+
+From Toby.Hocking at inria.fr  Mon May 17 12:11:18 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Mon, 17 May 2010 12:11:18 +0200 (CEST)
+Subject: [inlinedocs] A bug and a suggestion for S3 methods support
+In-Reply-To: <4BF07C4A.4060704@sciviews.org>
+References: <4BED6B68.2040805@sciviews.org>
+	<20100514.210016.98417593.Toby.Hocking@inria.fr>
+	<4BF07C4A.4060704@sciviews.org>
+Message-ID: <20100517.121118.157248777.Toby.Hocking@inria.fr>
+
+Thanks for your contributions, Philippe! It seems you have given this
+a lot of thought, so I have added you to the R-Forge project.  Please
+add your code contributions to SVN.
+
+Your idea to put examples in the "ex" attribute is nice since you can
+define the examples right below the function definition, but there are
+2 problems that I can see.
+
+1. you have to repeat yourself when you name the function twice: once
+in the definition (FUN <- function) and once in the example definition
+(attr(FUN,"ex") <-)
+
+2. the code is actually encoded as a text string, which makes it more
+difficult to read (it is highlighted like text). Why not make it a
+function instead of a text string?
+
+attr(FUN,"ex") <- function(){
+ some example code
+}
+
+I guess for the time being you can use the ##S3method<< tag, go ahead
+and add that!
+
+Your idea for adding option(inlinedocs.exdir=...) is good, add that!
+
+All these bugfixes are great, please add them!
+
+From phgrosjean at sciviews.org  Wed May 26 14:12:54 2010
+From: phgrosjean at sciviews.org (phgrosjean at sciviews.org)
+Date: Wed, 26 May 2010 14:12:54 +0200
+Subject: [inlinedocs] Changes to inlinedocs committed (version 108)
+Message-ID: <05408e702ca5e30fa2daa163e0b1e5ba.squirrel@squirrelmail2.trusttelecom.fr>
+
+Hello,
+
+I committed all the changes we discussed previously at once. Sorry for
+that, but since I was not using SVN when I explorer all these changes, it
+was too difficult to commit them one by one afterwards.
+
+Changes are logged in the NEWS file. A couple of comments:
+
+1) I managed to detect S3 methods automatically. So the ##method<< trick
+is not need, and was a bad idea, I agree.
+
+2) I did not managed to find a solution in the example.after.return()
+parser, only by using a clear mark to separate function code and example
+code (using either ##examples<< or #{{{examples).
+
+3) A dataset with several cases that failed in the previous inlinedocs is
+put in /scratch/inlinedocsTest. Feel free to migrate it into /tests if you
+like.
+
+4) I made comments in the code, starting with # PhG...
+
+5) I tool the liberty to upgrade version to 1.3, given the numerous changes.
+
+6) inlinedocs does not pass R CMD check on my machine, and it was already
+the case with version 1.2 (revision 107).
+
+Sorry again for the lot of changes at once, and I hope you will appreciate
+the contribution.
+
+Best,
+
+Philippe
+-- 
+..............................................<?}))><........
+ ) ) ) ) )
+( ( ( ( (    Prof. Philippe Grosjean
+ ) ) ) ) )
+( ( ( ( (    Numerical Ecology of Aquatic Systems
+ ) ) ) ) )   Mons University, Belgium
+( ( ( ( (
+..............................................................
+
+
+
+From Toby.Hocking at inria.fr  Thu May 27 08:58:12 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Thu, 27 May 2010 08:58:12 +0200 (CEST)
+Subject: [inlinedocs] Changes to inlinedocs committed (version 108)
+In-Reply-To: <05408e702ca5e30fa2daa163e0b1e5ba.squirrel@squirrelmail2.trusttelecom.fr>
+References: <05408e702ca5e30fa2daa163e0b1e5ba.squirrel@squirrelmail2.trusttelecom.fr>
+Message-ID: <20100527.085812.48814803.Toby.Hocking@inria.fr>
+
+great, thanks a lot, Philippe! No problem about committing lots at
+once. I'll try out the new code as soon as possible!
+

@@ -1,0 +1,554 @@
+From pcd at roxygen.org  Sat Sep  8 20:52:33 2012
+From: pcd at roxygen.org (Peter Danenberg)
+Date: Sat, 8 Sep 2012 13:52:33 -0500
+Subject: [Roxygen-devel] roxygen3
+In-Reply-To: <CABdHhvG9SHwjMhUL3w4z-tHH=L6ase8HsAqHMGzfDtPseu1jOw@mail.gmail.com>
+References: <CABdHhvG9SHwjMhUL3w4z-tHH=L6ase8HsAqHMGzfDtPseu1jOw@mail.gmail.com>
+Message-ID: <20120908185233.GA5377@klutometis.wikitex.org>
+
+There's no way we could develop this as a branch in the pre?xisting
+Roxygen repo, is there?
+
+> Hi all,
+> 
+> I thought I should mention I've started working on roxygen3 at
+> https://github.com/hadley/roxygen3.  It's a ground up rewrite of
+> roxygen2, aiming to produce the same results as roxygen3, but without
+> a completely different backend.  Currently the roxygen2 code is hard
+> to extend - the idea of roclets was good, but I think they were too
+> big - you want to be able to work at the tag level so it's easier to
+> add new features.
+> 
+> The new roccers in roxygen3 look something like this:
+> 
+> parse_dev <- function(roc, ...) {
+>   if (is.null(roc$dev)) return()
+>   list(
+>     title = str_c("[DEV] ", roc$title),
+>     description = c("This function is useful only for developers",
+>       roc$description),
+>     dev = NULL)
+> }
+> 
+> add_roccer("dev", roc_parser(one = parse_dev))
+> base_prereqs[["dev"]] <- c("_intro", "title", "details")
+> 
+> That defines @dev which adds a note to the title and the description
+> that the function is more suitable for developers than end-users.
+> 
+> The interface is likely to change a lot, and I doubt the package
+> currently installs (although it does work with devtools::load_all),
+> but if you're interested please take a look. I'm hoping a stronger
+> foundation will make it easier to keep on top of the bugs and to
+> flexibly implement new features.
+> 
+> Hadley
+> 
+> -- 
+> Assistant Professor
+> Department of Statistics / Rice University
+> http://had.co.nz/
+> 
+
+
+From hadley at rice.edu  Mon Sep 10 23:17:23 2012
+From: hadley at rice.edu (Hadley Wickham)
+Date: Mon, 10 Sep 2012 16:17:23 -0500
+Subject: [Roxygen-devel] roxygen3
+In-Reply-To: <20120908185233.GA5377@klutometis.wikitex.org>
+References: <CABdHhvG9SHwjMhUL3w4z-tHH=L6ase8HsAqHMGzfDtPseu1jOw@mail.gmail.com>
+ <20120908185233.GA5377@klutometis.wikitex.org>
+Message-ID: <CABdHhvFRVTJFPs9hGR4v-Jy0Qtfm-O7-M1ErEJBDaSOawZqM2g@mail.gmail.com>
+
+> There's no way we could develop this as a branch in the pre?xisting
+> Roxygen repo, is there?
+
+Yes, probably.  I'm becoming more certain that this won't break any
+existing roxygen code, so I'll move back over in the not too distant
+future.
+
+Hadley
+
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From h.wickham at gmail.com  Wed Sep 12 18:47:08 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Wed, 12 Sep 2012 11:47:08 -0500
+Subject: [Roxygen-devel] Autodocumentation for S4 classes,
+	methods and generics
+Message-ID: <CABdHhvHb7RqbzbRPRVubZLnhQF=7DUPdXwdTiKzf=BGtgep2NQ@mail.gmail.com>
+
+Hi all,
+
+I'm starting to think more about S4 documentation, and wondered what
+people thought about automatically adding:
+
+* a list of all subclasses and superclasses to class documentation
+* a picture showing the class graph to the class documentation
+* a list of all methods to the generic documentation
+* a list of all methods to the class documentation
+* a list of "nearby" methods to method documentation
+
+Should these be things that you have to turn on or turn off?
+
+Hadley
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From brian at braverock.com  Wed Sep 12 19:01:55 2012
+From: brian at braverock.com (Brian G. Peterson)
+Date: Wed, 12 Sep 2012 12:01:55 -0500
+Subject: [Roxygen-devel] Autodocumentation for S4 classes,
+ methods and generics
+In-Reply-To: <CABdHhvHb7RqbzbRPRVubZLnhQF=7DUPdXwdTiKzf=BGtgep2NQ@mail.gmail.com>
+References: <CABdHhvHb7RqbzbRPRVubZLnhQF=7DUPdXwdTiKzf=BGtgep2NQ@mail.gmail.com>
+Message-ID: <5050C003.9050604@braverock.com>
+
+On 09/12/2012 11:47 AM, Hadley Wickham wrote:
+> * a picture showing the class graph to the class documentation
+> * a list of "nearby" methods to method documentation
+
+I miss the old CallGraph functionality from the original roxygen, so I'd 
+like to hope that any graphing capability would include this , and 
+support S3 and Reference Classes as well as S4.
+
+-- 
+Brian
+
+From h.wickham at gmail.com  Wed Sep 12 19:05:18 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Wed, 12 Sep 2012 12:05:18 -0500
+Subject: [Roxygen-devel] Documenting S4 methods
+Message-ID: <CABdHhvHraVMSWx5BFT2UX+qSd2bYaKxzjLnoyORKm6i3e8Rdvg@mail.gmail.com>
+
+Hi all,
+
+After a survey of packages that use S4 and talking to a few people who
+use S4 a lot, here are my thoughts on how method documentation would
+work.
+
+Methods need to be documented in three places:
+
+* individually, for complex methods
+* in the class (briefly)
+* in the generic (briefly)
+
+This distinction arises in part because there seem to be two main classes of
+generic functions:
+
+* Generics with many simple methods, like `length` and many of the methods in
+  the `Matrix package`. There is little use of `...`. They often dispatch on
+  multiple arguments. Typically, the individual methods don't need much
+  documentation (i.e. it's usually obvious what `length` does)
+
+* Generics with few complex methods, like `predict`, `anova`. These
+  methods often use ..., to pass in additional information needed for a
+  specific method. The individual methods need substantial documentation to
+  (e.g.) explain the details of statistical operation.
+
+So some methods need to document their parameters and provide
+examples, others need a sentence or two, and quite a few no
+documentation at all (like methods for `show`).
+
+To deal with this variation, I propose that all documentation be
+method based, and roxygen then deals with assembling summaries into
+the class and generic documentation. Class and generics would always
+list all applicable methods, and include title and description if
+present. If the method has a title, it will also get its own
+documentation page, and the class/generic list would link to the full
+information.
+
+Here are a few examples:
+
+* Does not have own topic, but presence noted on class/generic page:
+
+  setMethod("show", "MyClass", ...)
+
+* Does not have own topic, but brief description included on class/generic
+  page:
+
+  #' @description A statistical summary of \code{\link{MyClass}} which
+  #'   computes a five number summary for element in the list.
+  setMethod("summary", "MyClass", ...)
+
+* Has own own topic, and brief description + link included on class/generic
+  page:
+
+  #' Complex method for my object
+  #'
+  #' This complex method implements the Cramer-Rao lower bound estimator
+  #' for MyObject objects.  The statistical methodology is described in
+  #' ...
+  #'
+  #' @examples
+  #' # Here are some examples using it in practice...
+  setMethod("complexMethod", "MyClass", ...)
+
+What do you think?
+
+Thanks!
+
+Hadley
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From h.wickham at gmail.com  Wed Sep 12 19:21:11 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Wed, 12 Sep 2012 12:21:11 -0500
+Subject: [Roxygen-devel] Autodocumentation for S4 classes,
+	methods and generics
+In-Reply-To: <5050C003.9050604@braverock.com>
+References: <CABdHhvHb7RqbzbRPRVubZLnhQF=7DUPdXwdTiKzf=BGtgep2NQ@mail.gmail.com>
+ <5050C003.9050604@braverock.com>
+Message-ID: <CABdHhvGyvnN+4EEatOPV82=-O2sTnAaQ=5AnYv8NBXbhcz4Lug@mail.gmail.com>
+
+>> * a picture showing the class graph to the class documentation
+>> * a list of "nearby" methods to method documentation
+>
+> I miss the old CallGraph functionality from the original roxygen, so I'd
+> like to hope that any graphing capability would include this , and support
+
+Do you have any particularly good examples where this is useful?
+
+> S3 and Reference Classes as well as S4.
+
+S3 is already supported - although there's no formal notion of an S3
+class so there's only so much we can do.
+
+I'm not sure what supporting reference classes would entail (esp. with
+the alternative doc system built into ref classes).  Do you have any
+hand written Rd files you could share?
+
+Hadley
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From lawrence.michael at gene.com  Wed Sep 12 19:29:52 2012
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 12 Sep 2012 10:29:52 -0700
+Subject: [Roxygen-devel] Autodocumentation for S4 classes,
+	methods and generics
+In-Reply-To: <CABdHhvGyvnN+4EEatOPV82=-O2sTnAaQ=5AnYv8NBXbhcz4Lug@mail.gmail.com>
+References: <CABdHhvHb7RqbzbRPRVubZLnhQF=7DUPdXwdTiKzf=BGtgep2NQ@mail.gmail.com>
+ <5050C003.9050604@braverock.com>
+ <CABdHhvGyvnN+4EEatOPV82=-O2sTnAaQ=5AnYv8NBXbhcz4Lug@mail.gmail.com>
+Message-ID: <CAOQ5Nyf5igE_BLgr6A4ABirtZXX2xagRQVAWw0LcY7oUBE7rLg@mail.gmail.com>
+
+On Wed, Sep 12, 2012 at 10:21 AM, Hadley Wickham <h.wickham at gmail.com>wrote:
+
+> >> * a picture showing the class graph to the class documentation
+> >> * a list of "nearby" methods to method documentation
+> >
+> > I miss the old CallGraph functionality from the original roxygen, so I'd
+> > like to hope that any graphing capability would include this , and
+> support
+>
+> Do you have any particularly good examples where this is useful?
+>
+> > S3 and Reference Classes as well as S4.
+>
+> S3 is already supported - although there's no formal notion of an S3
+> class so there's only so much we can do.
+>
+> I'm not sure what supporting reference classes would entail (esp. with
+> the alternative doc system built into ref classes).  Do you have any
+> hand written Rd files you could share?
+>
+>
+Reference classes basically are S4 classes, so it would be nice to the same
+basic features for both.  Reference classes of course have some additional
+notions, like class-based methods and fields that are potentially
+encapsulated via active bindings and thus suitable for public access. Not
+sure how one would rectify roxygen with the docstring feature.
+
+Hadley
+>
+> --
+> RStudio / Rice University
+> http://had.co.nz/
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20120912/f79f1cc6/attachment.html>
+
+From h.wickham at gmail.com  Wed Sep 12 19:37:40 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Wed, 12 Sep 2012 12:37:40 -0500
+Subject: [Roxygen-devel] Autodocumentation for S4 classes,
+	methods and generics
+In-Reply-To: <CAOQ5Nyf5igE_BLgr6A4ABirtZXX2xagRQVAWw0LcY7oUBE7rLg@mail.gmail.com>
+References: <CABdHhvHb7RqbzbRPRVubZLnhQF=7DUPdXwdTiKzf=BGtgep2NQ@mail.gmail.com>
+ <5050C003.9050604@braverock.com>
+ <CABdHhvGyvnN+4EEatOPV82=-O2sTnAaQ=5AnYv8NBXbhcz4Lug@mail.gmail.com>
+ <CAOQ5Nyf5igE_BLgr6A4ABirtZXX2xagRQVAWw0LcY7oUBE7rLg@mail.gmail.com>
+Message-ID: <CABdHhvEd-EH_Bad_=ZYW8SMxMh5meYkiwmpWhQXNhgjN-O+kLg@mail.gmail.com>
+
+> Reference classes basically are S4 classes, so it would be nice to the same
+> basic features for both.
+
+I think that should just work.  I have:
+
+setClass("R5ClassObject", contains = "S4ClassObject")
+
+so reference classes will inherit all S4 class behaviour by default.
+
+> Reference classes of course have some additional
+> notions, like class-based methods and fields that are potentially
+> encapsulated via active bindings and thus suitable for public access. Not
+> sure how one would rectify roxygen with the docstring feature.
+
+As a first pass, the class documentation could just include a list of
+all methods and their docstrings.
+
+Hadley
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From h.wickham at gmail.com  Thu Sep 13 02:44:19 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Wed, 12 Sep 2012 19:44:19 -0500
+Subject: [Roxygen-devel] Usage for S4 classes
+Message-ID: <CABdHhvGt94T4GajbLdbyUtWczvLzJZXOvs2MOpinJE68M78Juw@mail.gmail.com>
+
+Hi all,
+
+Do you think it makes sense to add usage statement to S4 classes? i.e.
+
+new("MyClass", a, b, c, d = 1)
+
+where a, b, c, d are taken from the representation and prototype.
+
+Hadley
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From h.wickham at gmail.com  Thu Sep 13 02:45:55 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Wed, 12 Sep 2012 19:45:55 -0500
+Subject: [Roxygen-devel] Usage for S4 classes
+In-Reply-To: <CABdHhvGt94T4GajbLdbyUtWczvLzJZXOvs2MOpinJE68M78Juw@mail.gmail.com>
+References: <CABdHhvGt94T4GajbLdbyUtWczvLzJZXOvs2MOpinJE68M78Juw@mail.gmail.com>
+Message-ID: <CABdHhvEPTJUFYxE2TU-oVQ1yEWogAvX3fq-yBgRVizG3kE+Q4Q@mail.gmail.com>
+
+Or should that just come from documenting the constructor and class in
+the same file?
+
+Hadley
+
+On Wed, Sep 12, 2012 at 7:44 PM, Hadley Wickham <h.wickham at gmail.com> wrote:
+> Hi all,
+>
+> Do you think it makes sense to add usage statement to S4 classes? i.e.
+>
+> new("MyClass", a, b, c, d = 1)
+>
+> where a, b, c, d are taken from the representation and prototype.
+>
+> Hadley
+>
+> --
+> RStudio / Rice University
+> http://had.co.nz/
+
+
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From lawrence.michael at gene.com  Thu Sep 13 05:20:39 2012
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 12 Sep 2012 20:20:39 -0700
+Subject: [Roxygen-devel] Usage for S4 classes
+In-Reply-To: <CABdHhvEPTJUFYxE2TU-oVQ1yEWogAvX3fq-yBgRVizG3kE+Q4Q@mail.gmail.com>
+References: <CABdHhvGt94T4GajbLdbyUtWczvLzJZXOvs2MOpinJE68M78Juw@mail.gmail.com>
+ <CABdHhvEPTJUFYxE2TU-oVQ1yEWogAvX3fq-yBgRVizG3kE+Q4Q@mail.gmail.com>
+Message-ID: <CAOQ5Nyc0Y9CTHUiLwFFT4no-QcBvbB1RNb7EvWt2-Dod_Gmb-w@mail.gmail.com>
+
+I'd personally prefer that if there is such functionality, it is disabled
+by default, since we tend to like to hide new(). Since overriding
+initialize is problematic, using new() would expose the slots, which are
+normally considered implementation details. Others may differ.
+
+Michael
+
+On Wed, Sep 12, 2012 at 5:45 PM, Hadley Wickham <h.wickham at gmail.com> wrote:
+
+> Or should that just come from documenting the constructor and class in
+> the same file?
+>
+> Hadley
+>
+> On Wed, Sep 12, 2012 at 7:44 PM, Hadley Wickham <h.wickham at gmail.com>
+> wrote:
+> > Hi all,
+> >
+> > Do you think it makes sense to add usage statement to S4 classes? i.e.
+> >
+> > new("MyClass", a, b, c, d = 1)
+> >
+> > where a, b, c, d are taken from the representation and prototype.
+> >
+> > Hadley
+> >
+> > --
+> > RStudio / Rice University
+> > http://had.co.nz/
+>
+>
+>
+> --
+> RStudio / Rice University
+> http://had.co.nz/
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20120912/5d03485c/attachment-0001.html>
+
+From h.wickham at gmail.com  Thu Sep 13 12:53:03 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Thu, 13 Sep 2012 05:53:03 -0500
+Subject: [Roxygen-devel] Usage for S4 classes
+In-Reply-To: <CAOQ5Nyc0Y9CTHUiLwFFT4no-QcBvbB1RNb7EvWt2-Dod_Gmb-w@mail.gmail.com>
+References: <CABdHhvGt94T4GajbLdbyUtWczvLzJZXOvs2MOpinJE68M78Juw@mail.gmail.com>
+ <CABdHhvEPTJUFYxE2TU-oVQ1yEWogAvX3fq-yBgRVizG3kE+Q4Q@mail.gmail.com>
+ <CAOQ5Nyc0Y9CTHUiLwFFT4no-QcBvbB1RNb7EvWt2-Dod_Gmb-w@mail.gmail.com>
+Message-ID: <CABdHhvE3zVB3oNJiNGAT7yg4gbpdym8E6VgyZkvDwGBqG2whYQ@mail.gmail.com>
+
+> I'd personally prefer that if there is such functionality, it is disabled by
+> default, since we tend to like to hide new(). Since overriding initialize is
+> problematic, using new() would expose the slots, which are normally
+> considered implementation details. Others may differ.
+
+Ah ok, so slots should generally be considered private unless
+documentation is explicitly requested for them.
+
+Hadley
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From h.wickham at gmail.com  Mon Sep 17 19:08:42 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Mon, 17 Sep 2012 12:08:42 -0500
+Subject: [Roxygen-devel] Roxygen3 ready for review
+Message-ID: <CABdHhvHpKPNQruMqTuAsmt3N2sHHcG5vn9smoqvyYjFpcJz=WA@mail.gmail.com>
+
+Hi all,
+
+Roxygen3 (which will eventually get merged back into roxygen2) is at a
+state where your comments on the design and implementation would be
+appreciated. The code is at https://github.com/hadley/roxygen3/, and
+there's a brief introduction to the structure in the readme.
+
+The code is fairly complete - the code gives the same output as
+roxygen2 (except for whitespace and that I haven't implemented
+templates yet) on devtools, plyr and ggplot2.  It's about 50% slower
+than roxygen2.
+
+Hadley
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+
+From cboettig at gmail.com  Tue Sep 25 01:43:41 2012
+From: cboettig at gmail.com (Carl Boettiger)
+Date: Mon, 24 Sep 2012 16:43:41 -0700
+Subject: [Roxygen-devel] Roxygen3 ready for review
+In-Reply-To: <CABdHhvHpKPNQruMqTuAsmt3N2sHHcG5vn9smoqvyYjFpcJz=WA@mail.gmail.com>
+References: <CABdHhvHpKPNQruMqTuAsmt3N2sHHcG5vn9smoqvyYjFpcJz=WA@mail.gmail.com>
+Message-ID: <CAN_1p9ykuFP7pHnof6TOS2Ch1HpPz_sFdhSRi07oSnP047YcJA@mail.gmail.com>
+
+Hi All,
+
+Is there any chance Roxygen3 could support a bit of markdown syntax?
+
+Being a literate programming technique, Roxygen syntax is clearly designed
+to be easily readable in raw format.  As such, having to add \code\link,
+\item and other approximately LaTeX syntax of the .Rd files feels wrong.
+ I'd love to be able to add links or lists (explaining parameter arguments,
+return objects) with the markdown-style syntax instead.  Do others think
+this would be useful, or am I missing something?
+
+Just a thought,
+
+Carl
+
+On Mon, Sep 17, 2012 at 10:08 AM, Hadley Wickham <h.wickham at gmail.com>wrote:
+
+> Hi all,
+>
+> Roxygen3 (which will eventually get merged back into roxygen2) is at a
+> state where your comments on the design and implementation would be
+> appreciated. The code is at https://github.com/hadley/roxygen3/, and
+> there's a brief introduction to the structure in the readme.
+>
+> The code is fairly complete - the code gives the same output as
+> roxygen2 (except for whitespace and that I haven't implemented
+> templates yet) on devtools, plyr and ggplot2.  It's about 50% slower
+> than roxygen2.
+>
+> Hadley
+>
+> --
+> RStudio / Rice University
+> http://had.co.nz/
+> _______________________________________________
+> Roxygen-devel mailing list
+> Roxygen-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/roxygen-devel
+>
+
+
+
+-- 
+Carl Boettiger
+UC Davis
+http://www.carlboettiger.info/
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20120924/0b6f2088/attachment.html>
+
+From h.wickham at gmail.com  Tue Sep 25 07:41:45 2012
+From: h.wickham at gmail.com (Hadley Wickham)
+Date: Tue, 25 Sep 2012 07:41:45 +0200
+Subject: [Roxygen-devel] Roxygen3 ready for review
+In-Reply-To: <CAN_1p9ykuFP7pHnof6TOS2Ch1HpPz_sFdhSRi07oSnP047YcJA@mail.gmail.com>
+References: <CABdHhvHpKPNQruMqTuAsmt3N2sHHcG5vn9smoqvyYjFpcJz=WA@mail.gmail.com>
+ <CAN_1p9ykuFP7pHnof6TOS2Ch1HpPz_sFdhSRi07oSnP047YcJA@mail.gmail.com>
+Message-ID: <CABdHhvGL7KQFD1vOCihGXx7zE3o5H64FFrn5tPL2smAttP1muA@mail.gmail.com>
+
+> Is there any chance Roxygen3 could support a bit of markdown syntax?
+
+Yes, that's definitely on the to do list - but I'm waiting on support
+from the RMarkdown package.
+
+Hadley
+
+-- 
+RStudio / Rice University
+http://had.co.nz/
+

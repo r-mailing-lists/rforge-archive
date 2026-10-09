@@ -1,0 +1,1272 @@
+From lawrence.michael at gene.com  Fri Apr  8 14:47:31 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 8 Apr 2011 05:47:31 -0700
+Subject: [RQt-devel] performance of Qt's bsp tree
+Message-ID: <BANLkTin7XBrTsYs-f6KJr7P2MFRTnhnKhA@mail.gmail.com>
+
+Just a follow-up to some some concerns from the cranvas group about the poor
+performance of the BSP indexing of QGraphicsScene. It looks like the index
+was pretty much rewritten between Qt 4.5 (what I showed at DSC 09) and Qt
+4.6. In fact, it was being rewritten during the DSC. This has resulted in
+apparently much poorer performance. It now takes 4-5 seconds to index only
+100,000 points. Don't even think about indexing a million.
+
+Whatever they changed, it's now really slow to add a point one at a time to
+the index. I think they might be sorting something each time. They're using
+quick sort, but a binary tree would be a better idea for efficient updating.
+Thus, I changed qtpaint to disable the index while populating the scene and
+then re-enable the index after all objects have been added. This is
+considerably faster. Now 100,000 points take 0.2 seconds and a million takes
+2 seconds. Nice and linear. Not as fast as before though, because there is
+still a sort.
+
+Michael
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110408/13eeebfa/attachment.htm>
+
+From xieyihui at gmail.com  Sun Apr 10 05:18:51 2011
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Sat, 9 Apr 2011 22:18:51 -0500
+Subject: [RQt-devel] performance of Qt's bsp tree
+In-Reply-To: <BANLkTin7XBrTsYs-f6KJr7P2MFRTnhnKhA@mail.gmail.com>
+References: <BANLkTin7XBrTsYs-f6KJr7P2MFRTnhnKhA@mail.gmail.com>
+Message-ID: <BANLkTinASZOhxbjtn1rOKAqM8XO1H5Mwhg@mail.gmail.com>
+
+Sounds great. Thanks! It seems it's still difficult to get around the
+memory issue: it is almost impossible to index 1 million points on my
+laptop (R will not respond for several minutes if I try to brush the
+points).
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Fri, Apr 8, 2011 at 7:47 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Just a follow-up to some some concerns from the cranvas group about the poor
+> performance of the BSP indexing of QGraphicsScene. It looks like the index
+> was pretty much rewritten between Qt 4.5 (what I showed at DSC 09) and Qt
+> 4.6. In fact, it was being rewritten during the DSC. This has resulted in
+> apparently much poorer performance. It now takes 4-5 seconds to index only
+> 100,000 points. Don't even think about indexing a million.
+>
+> Whatever they changed, it's now really slow to add a point one at a time to
+> the index. I think they might be sorting something each time. They're using
+> quick sort, but a binary tree would be a better idea for efficient updating.
+> Thus, I changed qtpaint to disable the index while populating the scene and
+> then re-enable the index after all objects have been added. This is
+> considerably faster. Now 100,000 points take 0.2 seconds and a million takes
+> 2 seconds. Nice and linear. Not as fast as before though, because there is
+> still a sort.
+>
+> Michael
+>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+From lawrence.michael at gene.com  Sun Apr 10 05:33:41 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sat, 9 Apr 2011 20:33:41 -0700
+Subject: [RQt-devel] performance of Qt's bsp tree
+In-Reply-To: <BANLkTinASZOhxbjtn1rOKAqM8XO1H5Mwhg@mail.gmail.com>
+References: <BANLkTin7XBrTsYs-f6KJr7P2MFRTnhnKhA@mail.gmail.com>
+	<BANLkTinASZOhxbjtn1rOKAqM8XO1H5Mwhg@mail.gmail.com>
+Message-ID: <BANLkTikivQYJTiyhZF0u3wUzR99WJvccyg@mail.gmail.com>
+
+How much memory is being consumed? Calling ensureIndex() didn't cause a
+problem on my laptop, which just has 2GB of memory. Is ensureIndex() now
+fast for you? I'd be surprised if the query itself consumed a lot of memory.
+
+Thanks,
+Michael
+
+On Sat, Apr 9, 2011 at 8:18 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> Sounds great. Thanks! It seems it's still difficult to get around the
+> memory issue: it is almost impossible to index 1 million points on my
+> laptop (R will not respond for several minutes if I try to brush the
+> points).
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Fri, Apr 8, 2011 at 7:47 AM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > Just a follow-up to some some concerns from the cranvas group about the
+> poor
+> > performance of the BSP indexing of QGraphicsScene. It looks like the
+> index
+> > was pretty much rewritten between Qt 4.5 (what I showed at DSC 09) and Qt
+> > 4.6. In fact, it was being rewritten during the DSC. This has resulted in
+> > apparently much poorer performance. It now takes 4-5 seconds to index
+> only
+> > 100,000 points. Don't even think about indexing a million.
+> >
+> > Whatever they changed, it's now really slow to add a point one at a time
+> to
+> > the index. I think they might be sorting something each time. They're
+> using
+> > quick sort, but a binary tree would be a better idea for efficient
+> updating.
+> > Thus, I changed qtpaint to disable the index while populating the scene
+> and
+> > then re-enable the index after all objects have been added. This is
+> > considerably faster. Now 100,000 points take 0.2 seconds and a million
+> takes
+> > 2 seconds. Nice and linear. Not as fast as before though, because there
+> is
+> > still a sort.
+> >
+> > Michael
+> >
+> >
+> >
+> > _______________________________________________
+> > Qtinterfaces-devel mailing list
+> > Qtinterfaces-devel at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+> >
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110409/4727658b/attachment.htm>
+
+From yintengfei at gmail.com  Tue Apr 12 06:57:42 2011
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Mon, 11 Apr 2011 23:57:42 -0500
+Subject: [RQt-devel] How to delete a layout in an existing widget?
+Message-ID: <BANLkTi=YNT4eFpL5J6ZuNovQtnu3_Ujpew@mail.gmail.com>
+
+Hi
+
+I hope to delete and create a new layout without destroying a widget, based
+on Qt documentation,
+
+If there already is a layout manager installed on this widget,
+QWidget<http://doc.qt.nokia.com/4.7/qwidget.html> won't
+> let you install another. You must first delete the existing layout manager
+> (returned by layout <http://doc.qt.nokia.com/4.7/qwidget.html#layout>())
+> before you can call setLayout() with the new layout.
+
+
+to add a layout to an existing widgets,  I find something like
+
+void myWidget::makeLayout()
+{
+  // Delete old layout (if any)
+  delete layout();  // This is QWidget::layout()
+
+  // Perhaps you have to remove, add, hide or show some childwidgets.
+
+ .....
+  ...
+}
+
+So how to do that in R, I cannot find something like close() or delete() for
+QWidget$layout().
+
+Thanks
+
+Tengfei
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110411/fd58352a/attachment.htm>
+
+From yintengfei at gmail.com  Tue Apr 12 07:03:29 2011
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Tue, 12 Apr 2011 00:03:29 -0500
+Subject: [RQt-devel] How to control a scroll bar from command line?
+Message-ID: <BANLkTi=rbT5vfWBDnuPO_VSGjq0sut-7gA@mail.gmail.com>
+
+Hi
+
+I came across a problem, when I zoom in a view by using view$scale(), it end
+up with a vertical or horizontal scroll bar, so my question is that, how to
+move this viewport to a specific spot on the view without using the mouse
+and keep the same scale. I mean is there a convenient way to control the
+scroll view directly from command line, I tried centenOn() on the view
+object, it doesn't work, looks like the center of the view never moved and
+only the viewport visible window is changed.
+
+Thanks
+
+Tengfei
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110412/412370cf/attachment.htm>
+
+From lawrence.michael at gene.com  Tue Apr 12 07:15:13 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Mon, 11 Apr 2011 22:15:13 -0700
+Subject: [RQt-devel] How to delete a layout in an existing widget?
+In-Reply-To: <BANLkTi=YNT4eFpL5J6ZuNovQtnu3_Ujpew@mail.gmail.com>
+References: <BANLkTi=YNT4eFpL5J6ZuNovQtnu3_Ujpew@mail.gmail.com>
+Message-ID: <BANLkTind7WX_knN6hSm5DOHbpgbGWXNT0w@mail.gmail.com>
+
+The memory management is such that the memory will be deleted if there are
+no references to it from R or a Qt object. The "Qt object" part depends on
+the type of object being considered for deletion. In this case, a QLayout is
+a QObject, so it is owned by its parent. The parent is the widget (unless
+this is a sub-layout). So to delete the layout, you need to set NULL for the
+layout of the widget and rm() any references from R. And then run gc(). Let
+me know if that works.
+
+Changing the layout of a widget is a bit strange though -- what are you
+trying to do?
+
+On Mon, Apr 11, 2011 at 9:57 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+> Hi
+>
+> I hope to delete and create a new layout without destroying a widget, based
+> on Qt documentation,
+>
+> If there already is a layout manager installed on this widget, QWidget<http://doc.qt.nokia.com/4.7/qwidget.html> won't
+>> let you install another. You must first delete the existing layout manager
+>> (returned by layout <http://doc.qt.nokia.com/4.7/qwidget.html#layout>())
+>> before you can call setLayout() with the new layout.
+>
+>
+> to add a layout to an existing widgets,  I find something like
+>
+> void myWidget::makeLayout()
+> {
+>   // Delete old layout (if any)
+>   delete layout();  // This is QWidget::layout()
+>
+>   // Perhaps you have to remove, add, hide or show some childwidgets.
+>
+>  .....
+>   ...
+> }
+>
+> So how to do that in R, I cannot find something like close() or delete()
+> for QWidget$layout().
+>
+> Thanks
+>
+> Tengfei
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110411/3c7ded5b/attachment.htm>
+
+From lawrence.michael at gene.com  Tue Apr 12 07:22:14 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Mon, 11 Apr 2011 22:22:14 -0700
+Subject: [RQt-devel] How to control a scroll bar from command line?
+In-Reply-To: <BANLkTi=rbT5vfWBDnuPO_VSGjq0sut-7gA@mail.gmail.com>
+References: <BANLkTi=rbT5vfWBDnuPO_VSGjq0sut-7gA@mail.gmail.com>
+Message-ID: <BANLkTinynZU2Df-tyodJtBn9VnK21+TTyw@mail.gmail.com>
+
+On Mon, Apr 11, 2011 at 10:03 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+> Hi
+>
+> I came across a problem, when I zoom in a view by using view$scale(), it
+> end up with a vertical or horizontal scroll bar, so my question is that, how
+> to move this viewport to a specific spot on the view without using the mouse
+> and keep the same scale. I mean is there a convenient way to control the
+> scroll view directly from command line, I tried centenOn() on the view
+> object, it doesn't work, looks like the center of the view never moved and
+> only the viewport visible window is changed.
+>
+>
+Could you please say this another way? centerOn() should scroll the viewport
+so that the given point is centered, if possible. Note that it takes scene
+coordinates.
+
+
+
+> Thanks
+>
+> Tengfei
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110411/d74ac06a/attachment.htm>
+
+From yintengfei at gmail.com  Tue Apr 12 07:54:22 2011
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Tue, 12 Apr 2011 00:54:22 -0500
+Subject: [RQt-devel] How to delete a layout in an existing widget?
+In-Reply-To: <BANLkTind7WX_knN6hSm5DOHbpgbGWXNT0w@mail.gmail.com>
+References: <BANLkTi=YNT4eFpL5J6ZuNovQtnu3_Ujpew@mail.gmail.com>
+	<BANLkTind7WX_knN6hSm5DOHbpgbGWXNT0w@mail.gmail.com>
+Message-ID: <BANLkTim-Lf_pkE0SmsCn2VrYO9taYnWizg@mail.gmail.com>
+
+Hi Michael,
+
+Thanks,
+
+I am not sure which object should be set to NULL.
+
+> trackWidget <- Qt$QWidget()
+> trackLayout <- Qt$QGridLayout()
+> trackWidget$setLayout(trackLayout)
+NULL
+> trackWidget$layout()
+QGridLayout instance
+> trackWidget$layout() <- NULL
+Error in trackWidget$layout() <- NULL :
+  invalid (NULL) left side of assignment
+
+The layout() return a instance and it looks like it cannot be set to NULL.
+
+My case may sounds weird, I changed view object to referecne class, say obj
+is a view object, obj$pars$seqname <- "chr3", will change the visualized
+chromosome and emit a signal to re-create multiple tracks for chr3 , I
+actually recreate the scene and view, but only keep the top widget which
+contains all tracks, so it looks like the windows is there, and only the
+view is updated, I am using a widget to embed two scenes in TracksView, this
+design is pretty much like USCSgenome browser, top scene shows a single
+chromosome, never be zoomed, and bottom scene contains multiple tracks,
+which zoom in/out at the same ratio.
+
+To update this widget to visualize a new chromosome, I run the following
+command without creating a new Qwidget
+.....
+ if(is.null(trackWidget)){
+    trackWidget <<- Qt$QWidget()
+  }
+trackLayout <- Qt$QGridLayout()
+trackWidget$setLayout(trackLayout)
+......
+
+This will give me a error saying the layout exists. it looks like it cannot
+be simply over created.
+
+I just solved the problem by keeping the layout with QWidget, so I simply
+keep the top widget and layout at the same time, only create all scene and
+view and layers, now it works, I am still wondering how to delete that
+layout through, in case there is a use case in the future, such as update a
+layout design of one specific GUI without destroying it.
+
+Thanks
+
+Tengfei
+On Tue, Apr 12, 2011 at 12:15 AM, Michael Lawrence <
+lawrence.michael at gene.com> wrote:
+
+> The memory management is such that the memory will be deleted if there are
+> no references to it from R or a Qt object. The "Qt object" part depends on
+> the type of object being considered for deletion. In this case, a QLayout is
+> a QObject, so it is owned by its parent. The parent is the widget (unless
+> this is a sub-layout). So to delete the layout, you need to set NULL for the
+> layout of the widget and rm() any references from R. And then run gc(). Let
+> me know if that works.
+>
+> Changing the layout of a widget is a bit strange though -- what are you
+> trying to do?
+>
+> On Mon, Apr 11, 2011 at 9:57 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>
+>> Hi
+>>
+>> I hope to delete and create a new layout without destroying a widget,
+>> based on Qt documentation,
+>>
+>> If there already is a layout manager installed on this widget, QWidget<http://doc.qt.nokia.com/4.7/qwidget.html> won't
+>>> let you install another. You must first delete the existing layout manager
+>>> (returned by layout <http://doc.qt.nokia.com/4.7/qwidget.html#layout>())
+>>> before you can call setLayout() with the new layout.
+>>
+>>
+>> to add a layout to an existing widgets,  I find something like
+>>
+>> void myWidget::makeLayout()
+>> {
+>>   // Delete old layout (if any)
+>>   delete layout();  // This is QWidget::layout()
+>>
+>>   // Perhaps you have to remove, add, hide or show some childwidgets.
+>>
+>>  .....
+>>   ...
+>> }
+>>
+>> So how to do that in R, I cannot find something like close() or delete()
+>> for QWidget$layout().
+>>
+>> Thanks
+>>
+>> Tengfei
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>>
+>
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110412/91711d83/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Tue Apr 12 13:44:21 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 12 Apr 2011 04:44:21 -0700
+Subject: [RQt-devel] How to delete a layout in an existing widget?
+In-Reply-To: <BANLkTim-Lf_pkE0SmsCn2VrYO9taYnWizg@mail.gmail.com>
+References: <BANLkTi=YNT4eFpL5J6ZuNovQtnu3_Ujpew@mail.gmail.com>
+	<BANLkTind7WX_knN6hSm5DOHbpgbGWXNT0w@mail.gmail.com>
+	<BANLkTim-Lf_pkE0SmsCn2VrYO9taYnWizg@mail.gmail.com>
+Message-ID: <BANLkTikjVKFN=mY6D6ua9qLFq4VsdoAz6A@mail.gmail.com>
+
+On Mon, Apr 11, 2011 at 10:54 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+> Hi Michael,
+>
+> Thanks,
+>
+> I am not sure which object should be set to NULL.
+>
+> > trackWidget <- Qt$QWidget()
+> > trackLayout <- Qt$QGridLayout()
+> > trackWidget$setLayout(trackLayout)
+> NULL
+> > trackWidget$layout()
+> QGridLayout instance
+> > trackWidget$layout() <- NULL
+> Error in trackWidget$layout() <- NULL :
+>   invalid (NULL) left side of assignment
+>
+>
+I just meant set the layout reference of the widget to NULL.
+
+trackWidget$setLayout(NULL)
+
+
+> The layout() return a instance and it looks like it cannot be set to NULL.
+>
+> My case may sounds weird, I changed view object to referecne class, say obj
+> is a view object, obj$pars$seqname <- "chr3", will change the visualized
+> chromosome and emit a signal to re-create multiple tracks for chr3 , I
+> actually recreate the scene and view, but only keep the top widget which
+> contains all tracks, so it looks like the windows is there, and only the
+> view is updated, I am using a widget to embed two scenes in TracksView, this
+> design is pretty much like USCSgenome browser, top scene shows a single
+> chromosome, never be zoomed, and bottom scene contains multiple tracks,
+> which zoom in/out at the same ratio.
+>
+> To update this widget to visualize a new chromosome, I run the following
+> command without creating a new Qwidget
+> .....
+>  if(is.null(trackWidget)){
+>     trackWidget <<- Qt$QWidget()
+>   }
+> trackLayout <- Qt$QGridLayout()
+> trackWidget$setLayout(trackLayout)
+> ......
+>
+> This will give me a error saying the layout exists. it looks like it cannot
+> be simply over created.
+>
+> I just solved the problem by keeping the layout with QWidget, so I simply
+> keep the top widget and layout at the same time, only create all scene and
+> view and layers, now it works,
+>
+
+I think you're saying that you're repopulating the layout. That makes more
+sense here. Another option would be to just switch the existing layers to
+look at a new chromosome. Why recreate everything?
+
+
+> I am still wondering how to delete that layout through, in case there is a
+> use case in the future, such as update a layout design of one specific GUI
+> without destroying it.
+>
+> Thanks
+>
+> Tengfei
+>
+> On Tue, Apr 12, 2011 at 12:15 AM, Michael Lawrence <
+> lawrence.michael at gene.com> wrote:
+>
+>> The memory management is such that the memory will be deleted if there are
+>> no references to it from R or a Qt object. The "Qt object" part depends on
+>> the type of object being considered for deletion. In this case, a QLayout is
+>> a QObject, so it is owned by its parent. The parent is the widget (unless
+>> this is a sub-layout). So to delete the layout, you need to set NULL for the
+>> layout of the widget and rm() any references from R. And then run gc(). Let
+>> me know if that works.
+>>
+>> Changing the layout of a widget is a bit strange though -- what are you
+>> trying to do?
+>>
+>> On Mon, Apr 11, 2011 at 9:57 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>
+>>> Hi
+>>>
+>>> I hope to delete and create a new layout without destroying a widget,
+>>> based on Qt documentation,
+>>>
+>>> If there already is a layout manager installed on this widget, QWidget<http://doc.qt.nokia.com/4.7/qwidget.html> won't
+>>>> let you install another. You must first delete the existing layout manager
+>>>> (returned by layout <http://doc.qt.nokia.com/4.7/qwidget.html#layout>())
+>>>> before you can call setLayout() with the new layout.
+>>>
+>>>
+>>> to add a layout to an existing widgets,  I find something like
+>>>
+>>> void myWidget::makeLayout()
+>>> {
+>>>   // Delete old layout (if any)
+>>>   delete layout();  // This is QWidget::layout()
+>>>
+>>>   // Perhaps you have to remove, add, hide or show some childwidgets.
+>>>
+>>>  .....
+>>>   ...
+>>> }
+>>>
+>>> So how to do that in R, I cannot find something like close() or delete()
+>>> for QWidget$layout().
+>>>
+>>> Thanks
+>>>
+>>> Tengfei
+>>>
+>>>
+>>> --
+>>> Tengfei Yin
+>>> MCDB PhD student
+>>> 1620 Howe Hall, 2274,
+>>> Iowa State University
+>>> Ames, IA,50011-2274
+>>> Homepage: www.tengfei.name
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> Qtinterfaces-devel mailing list
+>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>
+>>>
+>>
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110412/2dacd58e/attachment.htm>
+
+From yintengfei at gmail.com  Tue Apr 12 18:03:21 2011
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Tue, 12 Apr 2011 11:03:21 -0500
+Subject: [RQt-devel] How to delete a layout in an existing widget?
+In-Reply-To: <BANLkTikjVKFN=mY6D6ua9qLFq4VsdoAz6A@mail.gmail.com>
+References: <BANLkTi=YNT4eFpL5J6ZuNovQtnu3_Ujpew@mail.gmail.com>
+	<BANLkTind7WX_knN6hSm5DOHbpgbGWXNT0w@mail.gmail.com>
+	<BANLkTim-Lf_pkE0SmsCn2VrYO9taYnWizg@mail.gmail.com>
+	<BANLkTikjVKFN=mY6D6ua9qLFq4VsdoAz6A@mail.gmail.com>
+Message-ID: <BANLkTikFwUHMff_DRvz2mWxGO6V1w2yxHg@mail.gmail.com>
+
+On Tue, Apr 12, 2011 at 6:44 AM, Michael Lawrence <lawrence.michael at gene.com
+> wrote:
+
+>
+>
+> On Mon, Apr 11, 2011 at 10:54 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>
+>> Hi Michael,
+>>
+>> Thanks,
+>>
+>> I am not sure which object should be set to NULL.
+>>
+>> > trackWidget <- Qt$QWidget()
+>> > trackLayout <- Qt$QGridLayout()
+>> > trackWidget$setLayout(trackLayout)
+>> NULL
+>> > trackWidget$layout()
+>> QGridLayout instance
+>> > trackWidget$layout() <- NULL
+>> Error in trackWidget$layout() <- NULL :
+>>   invalid (NULL) left side of assignment
+>>
+>>
+> I just meant set the layout reference of the widget to NULL.
+>
+> trackWidget$setLayout(NULL)
+>
+>
+>> The layout() return a instance and it looks like it cannot be set to NULL.
+>>
+>> My case may sounds weird, I changed view object to referecne class, say
+>> obj is a view object, obj$pars$seqname <- "chr3", will change the visualized
+>> chromosome and emit a signal to re-create multiple tracks for chr3 , I
+>> actually recreate the scene and view, but only keep the top widget which
+>> contains all tracks, so it looks like the windows is there, and only the
+>> view is updated, I am using a widget to embed two scenes in TracksView, this
+>> design is pretty much like USCSgenome browser, top scene shows a single
+>> chromosome, never be zoomed, and bottom scene contains multiple tracks,
+>> which zoom in/out at the same ratio.
+>>
+>> To update this widget to visualize a new chromosome, I run the following
+>> command without creating a new Qwidget
+>> .....
+>>  if(is.null(trackWidget)){
+>>     trackWidget <<- Qt$QWidget()
+>>   }
+>> trackLayout <- Qt$QGridLayout()
+>> trackWidget$setLayout(trackLayout)
+>> ......
+>>
+>> This will give me a error saying the layout exists. it looks like it
+>> cannot be simply over created.
+>>
+>> I just solved the problem by keeping the layout with QWidget, so I simply
+>> keep the top widget and layout at the same time, only create all scene and
+>> view and layers, now it works,
+>>
+>
+> I think you're saying that you're repopulating the layout. That makes more
+> sense here. Another option would be to just switch the existing layers to
+> look at a new chromosome. Why recreate everything?
+>
+
+This is open to discussion and not settle yet, current strategy is to
+recalculate and process the data again if we switch to a new chromosome, if
+we hope simply qudpate() a layer or scene to switch the chromosome, I have
+to put the calculation into
+the paintFun directly, this may cause a speed issue if this layer contains
+other frequently changed drawing, like highlighted region.  Maybe another
+way is to process everything (for all the chromosome) in advance for all
+tracks so that the view and layer could be switched more quickly without any
+computation, I am not sure if it's a good idea or not, the downside is that
+you may store more information in the memory, unless we are thinking about
+some advanced caching technique, maybe a data base or simply Rdata file? Any
+suggestion?
+
+"Recreate everything" sounds creepy, actually it only recalculate new
+information(like SNP or overlapped bin) we need for new chromosome and
+redraw the TracksView, it's a simple way though, since
+obj$createView(seqname=NULL) method in the package does the job, I just
+simply call this function and set it as the listener to some other event
+which may switch the selected chromosome from other view(e.g StackedView)
+
+Regards
+
+Tengfei
+
+
+ I am still wondering how to delete that layout through, in case there is a
+>> use case in the future, such as update a layout design of one specific GUI
+>> without destroying it.
+>>
+>> Thanks
+>>
+>> Tengfei
+>>
+>> On Tue, Apr 12, 2011 at 12:15 AM, Michael Lawrence <
+>> lawrence.michael at gene.com> wrote:
+>>
+>>> The memory management is such that the memory will be deleted if there
+>>> are no references to it from R or a Qt object. The "Qt object" part depends
+>>> on the type of object being considered for deletion. In this case, a QLayout
+>>> is a QObject, so it is owned by its parent. The parent is the widget (unless
+>>> this is a sub-layout). So to delete the layout, you need to set NULL for the
+>>> layout of the widget and rm() any references from R. And then run gc(). Let
+>>> me know if that works.
+>>>
+>>> Changing the layout of a widget is a bit strange though -- what are you
+>>> trying to do?
+>>>
+>>> On Mon, Apr 11, 2011 at 9:57 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>
+>>>> Hi
+>>>>
+>>>> I hope to delete and create a new layout without destroying a widget,
+>>>> based on Qt documentation,
+>>>>
+>>>> If there already is a layout manager installed on this widget, QWidget<http://doc.qt.nokia.com/4.7/qwidget.html> won't
+>>>>> let you install another. You must first delete the existing layout manager
+>>>>> (returned by layout <http://doc.qt.nokia.com/4.7/qwidget.html#layout>())
+>>>>> before you can call setLayout() with the new layout.
+>>>>
+>>>>
+>>>> to add a layout to an existing widgets,  I find something like
+>>>>
+>>>> void myWidget::makeLayout()
+>>>> {
+>>>>   // Delete old layout (if any)
+>>>>   delete layout();  // This is QWidget::layout()
+>>>>
+>>>>   // Perhaps you have to remove, add, hide or show some childwidgets.
+>>>>
+>>>>  .....
+>>>>   ...
+>>>> }
+>>>>
+>>>> So how to do that in R, I cannot find something like close() or delete()
+>>>> for QWidget$layout().
+>>>>
+>>>> Thanks
+>>>>
+>>>> Tengfei
+>>>>
+>>>>
+>>>> --
+>>>> Tengfei Yin
+>>>> MCDB PhD student
+>>>> 1620 Howe Hall, 2274,
+>>>> Iowa State University
+>>>> Ames, IA,50011-2274
+>>>> Homepage: www.tengfei.name
+>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> Qtinterfaces-devel mailing list
+>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>
+>>>>
+>>>
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110412/572b911f/attachment-0001.htm>
+
+From xieyihui at gmail.com  Thu Apr 28 00:00:12 2011
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Wed, 27 Apr 2011 17:00:12 -0500
+Subject: [RQt-devel] unable to draw lines/segments with width>1
+Message-ID: <BANLkTi=+bx3VRMznauU6zQu4WTNm0w_dbQ@mail.gmail.com>
+
+Hi,
+
+I'm not sure if this is a problem related to R 2.13.0 or my hardware,
+but I just cannot draw thicker lines or segments now. They do not
+appear on the screen but they are actually there, because brushing
+still works. It worked when I was using R 2.12. Other graphical
+elements are still OK with 2.13.
+
+s = qscene()
+root = qlayer(s)
+n = 10
+x = rnorm(n, 50, 15)
+y = runif(n, 20, 80)
+test_layer = qlayer(root, function(layer, painter) {
+    qdrawCircle(painter, x, y, r = 20, fill = "black")
+    qlineWidth(painter) = 3  # only 1 works
+    qdrawSegment(painter, 10, 10, 90, 90)
+}, limits = qrect(0, 0, 100, 100))
+qplotView(s)
+
+
+> sessionInfo()
+R version 2.13.0 (2011-04-13)
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+locale:
+[1] en_US.utf8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] qtbase_0.8-13  qtpaint_0.7.22
+
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+From lawrence.michael at gene.com  Thu Apr 28 00:06:55 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 27 Apr 2011 15:06:55 -0700
+Subject: [RQt-devel] unable to draw lines/segments with width>1
+In-Reply-To: <BANLkTi=+bx3VRMznauU6zQu4WTNm0w_dbQ@mail.gmail.com>
+References: <BANLkTi=+bx3VRMznauU6zQu4WTNm0w_dbQ@mail.gmail.com>
+Message-ID: <BANLkTimbu5xoJ3N-eJkz0w9dEFeVs6sFBA@mail.gmail.com>
+
+Are you sure that you are not using a new version of qtpaint now vs. before?
+That would be helpful to know, if true.
+
+Thanks,
+Michael
+
+On Wed, Apr 27, 2011 at 3:00 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> Hi,
+>
+> I'm not sure if this is a problem related to R 2.13.0 or my hardware,
+> but I just cannot draw thicker lines or segments now. They do not
+> appear on the screen but they are actually there, because brushing
+> still works. It worked when I was using R 2.12. Other graphical
+> elements are still OK with 2.13.
+>
+> s = qscene()
+> root = qlayer(s)
+> n = 10
+> x = rnorm(n, 50, 15)
+> y = runif(n, 20, 80)
+> test_layer = qlayer(root, function(layer, painter) {
+>    qdrawCircle(painter, x, y, r = 20, fill = "black")
+>    qlineWidth(painter) = 3  # only 1 works
+>    qdrawSegment(painter, 10, 10, 90, 90)
+> }, limits = qrect(0, 0, 100, 100))
+> qplotView(s)
+>
+>
+> > sessionInfo()
+> R version 2.13.0 (2011-04-13)
+> Platform: x86_64-pc-linux-gnu (64-bit)
+>
+> locale:
+> [1] en_US.utf8
+>
+> attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods   base
+>
+> other attached packages:
+> [1] qtbase_0.8-13  qtpaint_0.7.22
+>
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110427/25bb4c46/attachment.htm>
+
+From xieyihui at gmail.com  Thu Apr 28 01:59:31 2011
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Wed, 27 Apr 2011 18:59:31 -0500
+Subject: [RQt-devel] unable to draw lines/segments with width>1
+In-Reply-To: <BANLkTimbu5xoJ3N-eJkz0w9dEFeVs6sFBA@mail.gmail.com>
+References: <BANLkTi=+bx3VRMznauU6zQu4WTNm0w_dbQ@mail.gmail.com>
+	<BANLkTimbu5xoJ3N-eJkz0w9dEFeVs6sFBA@mail.gmail.com>
+Message-ID: <BANLkTik5fbYtwYfj2axS8xx+u_bSrgaKAw@mail.gmail.com>
+
+I'm using the latest version of qtpaint from the github repository.
+
+Just now I tested on my home laptop and the line width still works. I
+know it also works on Di's Macbook.
+
+I will reinstall R 2.12 tomorrow on the school laptop and see what happens.
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Apr 27, 2011 at 5:06 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Are you sure that you are not using a new version of qtpaint now vs. before?
+> That would be helpful to know, if true.
+>
+> Thanks,
+> Michael
+>
+> On Wed, Apr 27, 2011 at 3:00 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>>
+>> Hi,
+>>
+>> I'm not sure if this is a problem related to R 2.13.0 or my hardware,
+>> but I just cannot draw thicker lines or segments now. They do not
+>> appear on the screen but they are actually there, because brushing
+>> still works. It worked when I was using R 2.12. Other graphical
+>> elements are still OK with 2.13.
+>>
+>> s = qscene()
+>> root = qlayer(s)
+>> n = 10
+>> x = rnorm(n, 50, 15)
+>> y = runif(n, 20, 80)
+>> test_layer = qlayer(root, function(layer, painter) {
+>> ? ?qdrawCircle(painter, x, y, r = 20, fill = "black")
+>> ? ?qlineWidth(painter) = 3 ?# only 1 works
+>> ? ?qdrawSegment(painter, 10, 10, 90, 90)
+>> }, limits = qrect(0, 0, 100, 100))
+>> qplotView(s)
+>>
+>>
+>> > sessionInfo()
+>> R version 2.13.0 (2011-04-13)
+>> Platform: x86_64-pc-linux-gnu (64-bit)
+>>
+>> locale:
+>> [1] en_US.utf8
+>>
+>> attached base packages:
+>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>
+>> other attached packages:
+>> [1] qtbase_0.8-13 ?qtpaint_0.7.22
+>>
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+From lawrence.michael at gene.com  Thu Apr 28 05:51:44 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 27 Apr 2011 20:51:44 -0700
+Subject: [RQt-devel] unable to draw lines/segments with width>1
+In-Reply-To: <BANLkTik5fbYtwYfj2axS8xx+u_bSrgaKAw@mail.gmail.com>
+References: <BANLkTi=+bx3VRMznauU6zQu4WTNm0w_dbQ@mail.gmail.com>
+	<BANLkTimbu5xoJ3N-eJkz0w9dEFeVs6sFBA@mail.gmail.com>
+	<BANLkTik5fbYtwYfj2axS8xx+u_bSrgaKAw@mail.gmail.com>
+Message-ID: <BANLkTinJoAQU4B-TFvG=km4W232gSNAsTQ@mail.gmail.com>
+
+On Apr 27, 2011 4:59 PM, "Yihui Xie" <xieyihui at gmail.com> wrote:
+>
+> I'm using the latest version of qtpaint from the github repository.
+>
+> Just now I tested on my home laptop and the line width still works. I
+> know it also works on Di's Macbook.
+>
+
+Which version of R?
+
+> I will reinstall R 2.12 tomorrow on the school laptop and see what
+happens.
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Wed, Apr 27, 2011 at 5:06 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > Are you sure that you are not using a new version of qtpaint now vs.
+before?
+> > That would be helpful to know, if true.
+> >
+> > Thanks,
+> > Michael
+> >
+> > On Wed, Apr 27, 2011 at 3:00 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+> >>
+> >> Hi,
+> >>
+> >> I'm not sure if this is a problem related to R 2.13.0 or my hardware,
+> >> but I just cannot draw thicker lines or segments now. They do not
+> >> appear on the screen but they are actually there, because brushing
+> >> still works. It worked when I was using R 2.12. Other graphical
+> >> elements are still OK with 2.13.
+> >>
+> >> s = qscene()
+> >> root = qlayer(s)
+> >> n = 10
+> >> x = rnorm(n, 50, 15)
+> >> y = runif(n, 20, 80)
+> >> test_layer = qlayer(root, function(layer, painter) {
+> >>    qdrawCircle(painter, x, y, r = 20, fill = "black")
+> >>    qlineWidth(painter) = 3  # only 1 works
+> >>    qdrawSegment(painter, 10, 10, 90, 90)
+> >> }, limits = qrect(0, 0, 100, 100))
+> >> qplotView(s)
+> >>
+> >>
+> >> > sessionInfo()
+> >> R version 2.13.0 (2011-04-13)
+> >> Platform: x86_64-pc-linux-gnu (64-bit)
+> >>
+> >> locale:
+> >> [1] en_US.utf8
+> >>
+> >> attached base packages:
+> >> [1] stats     graphics  grDevices utils     datasets  methods   base
+> >>
+> >> other attached packages:
+> >> [1] qtbase_0.8-13  qtpaint_0.7.22
+> >>
+> >>
+> >> Regards,
+> >> Yihui
+> >> --
+> >> Yihui Xie <xieyihui at gmail.com>
+> >> Phone: 515-294-2465 Web: http://yihui.name
+> >> Department of Statistics, Iowa State University
+> >> 2215 Snedecor Hall, Ames, IA
+> >> _______________________________________________
+> >> Qtinterfaces-devel mailing list
+> >> Qtinterfaces-devel at lists.r-forge.r-project.org
+> >>
+> >>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+> >
+> >
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110427/0e092aed/attachment.htm>
+
+From xieyihui at gmail.com  Thu Apr 28 05:54:47 2011
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Wed, 27 Apr 2011 22:54:47 -0500
+Subject: [RQt-devel] unable to draw lines/segments with width>1
+In-Reply-To: <BANLkTinJoAQU4B-TFvG=km4W232gSNAsTQ@mail.gmail.com>
+References: <BANLkTi=+bx3VRMznauU6zQu4WTNm0w_dbQ@mail.gmail.com>
+	<BANLkTimbu5xoJ3N-eJkz0w9dEFeVs6sFBA@mail.gmail.com>
+	<BANLkTik5fbYtwYfj2axS8xx+u_bSrgaKAw@mail.gmail.com>
+	<BANLkTinJoAQU4B-TFvG=km4W232gSNAsTQ@mail.gmail.com>
+Message-ID: <BANLkTikB-SXk03twTY76W9TJkXOiMEivAA@mail.gmail.com>
+
+My home laptop is using 2.13.0. Di must be working with 2.12.x or lower.
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Apr 27, 2011 at 10:51 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+> On Apr 27, 2011 4:59 PM, "Yihui Xie" <xieyihui at gmail.com> wrote:
+>>
+>> I'm using the latest version of qtpaint from the github repository.
+>>
+>> Just now I tested on my home laptop and the line width still works. I
+>> know it also works on Di's Macbook.
+>>
+>
+> Which version of R?
+>
+>> I will reinstall R 2.12 tomorrow on the school laptop and see what
+>> happens.
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>>
+>>
+>>
+>> On Wed, Apr 27, 2011 at 5:06 PM, Michael Lawrence
+>> <lawrence.michael at gene.com> wrote:
+>> > Are you sure that you are not using a new version of qtpaint now vs.
+>> > before?
+>> > That would be helpful to know, if true.
+>> >
+>> > Thanks,
+>> > Michael
+>> >
+>> > On Wed, Apr 27, 2011 at 3:00 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>> >>
+>> >> Hi,
+>> >>
+>> >> I'm not sure if this is a problem related to R 2.13.0 or my hardware,
+>> >> but I just cannot draw thicker lines or segments now. They do not
+>> >> appear on the screen but they are actually there, because brushing
+>> >> still works. It worked when I was using R 2.12. Other graphical
+>> >> elements are still OK with 2.13.
+>> >>
+>> >> s = qscene()
+>> >> root = qlayer(s)
+>> >> n = 10
+>> >> x = rnorm(n, 50, 15)
+>> >> y = runif(n, 20, 80)
+>> >> test_layer = qlayer(root, function(layer, painter) {
+>> >> ? ?qdrawCircle(painter, x, y, r = 20, fill = "black")
+>> >> ? ?qlineWidth(painter) = 3 ?# only 1 works
+>> >> ? ?qdrawSegment(painter, 10, 10, 90, 90)
+>> >> }, limits = qrect(0, 0, 100, 100))
+>> >> qplotView(s)
+>> >>
+>> >>
+>> >> > sessionInfo()
+>> >> R version 2.13.0 (2011-04-13)
+>> >> Platform: x86_64-pc-linux-gnu (64-bit)
+>> >>
+>> >> locale:
+>> >> [1] en_US.utf8
+>> >>
+>> >> attached base packages:
+>> >> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>> >>
+>> >> other attached packages:
+>> >> [1] qtbase_0.8-13 ?qtpaint_0.7.22
+>> >>
+>> >>
+>> >> Regards,
+>> >> Yihui
+>> >> --
+>> >> Yihui Xie <xieyihui at gmail.com>
+>> >> Phone: 515-294-2465 Web: http://yihui.name
+>> >> Department of Statistics, Iowa State University
+>> >> 2215 Snedecor Hall, Ames, IA
+>> >> _______________________________________________
+>> >> Qtinterfaces-devel mailing list
+>> >> Qtinterfaces-devel at lists.r-forge.r-project.org
+>> >>
+>> >>
+>> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>> >
+>> >
+>
+

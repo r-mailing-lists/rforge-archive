@@ -1,0 +1,2833 @@
+From xie at yihui.name  Wed Sep  1 07:11:46 2010
+From: xie at yihui.name (Yihui Xie)
+Date: Wed, 1 Sep 2010 00:11:46 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+Message-ID: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+
+Hi all,
+
+I'm wondering if there are any approaches to completely show the
+graphical elements on the boundaries under a layout containing several
+layers. This is like the functionality par(xpd=NA) in base R graphics.
+See the example below that the texts for the origin (0,0) on the axes
+are partially hidden.
+
+My another problem is, I don't really understand the layout approach,
+although I've been reading the qtpaint vignette and digging the Nokia
+Qt documentations. Specifically, how should we define the coordinate
+system in each layer in a layout? (I experimented with mouse clicking
+to get locations but got even more confused) With a single layer, I
+can plot the data using its range to define the limits and everything
+is fine. Besides, does anyone have a working demo to draw a simplest
+plot with the layout approach? I struggled with
+set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+set(Column|Row)StretchFactor, but they do not behave as we expect them
+to, e.g. the stretch factor being 0 will not restrict the height/width
+of a layer to be a fixed value -- they change as we resize the window.
+
+Below is the R code:
+
+# I need hints on how to split the root layer into several regions
+# and what are their coordinate systems
+library(qtpaint)
+scene = qscene()
+figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+titlePainter = function(item, painter) {
+    qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+    tmp=as.matrix(titleLayer$boundingRect())
+    qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+}
+yAxisPainter = function(item, painter) {
+    qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+}
+plotPainter = function(item, painter) {
+    qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+    qdrawRect(painter, 1, 1, 600-1, 400-1)
+}
+xAxisPainter = function(item, painter) {
+    qdrawText(painter, as.character(pretty(1:600)), pretty(1:600), 37.5)
+}
+mouseLocator = function(item, event){
+    print(as.numeric(event$pos()))
+}
+titleLayer = qlayer(figLayer, titlePainter,
+mousePressFun=mouseLocator, row=2,col=1)
+yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row = 1,col=0)
+plotLayer = qlayer(figLayer, plotPainter,
+mousePressFun=mouseLocator,row = 1, col = 1)
+xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+= 0, col = 1)
+
+layout = figLayer$gridLayout()
+
+layout$setRowMaximumHeight(0, 75)
+layout$setRowMinimumHeight(0, 60)
+# main plot region: 400x600
+layout$setRowPreferredHeight(1, 400)
+layout$setRowMaximumHeight(2, 75)
+layout$setRowMinimumHeight(2, 60)
+
+layout$setColumnMaximumWidth(0, 75)
+layout$setColumnMinimumWidth(0, 60)
+layout$setColumnPreferredWidth(1, 600)
+layout$setRowStretchFactor(0, 0)
+layout$setRowStretchFactor(1, 1)
+layout$setRowStretchFactor(2, 0)
+layout$setColumnStretchFactor(0, 0)
+layout$setColumnStretchFactor(1, 1)
+
+print(view<-qplotView(scene = scene))
+
+
+#################################################
+
+> sessionInfo()
+R version 2.11.1 (2010-05-31)
+x86_64-pc-linux-gnu
+
+locale:
+[1] en_US.utf8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] qtpaint_0.7.9
+
+loaded via a namespace (and not attached):
+[1] qtbase_0.8-4 tools_2.11.1
+
+
+Thanks a lot!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-6609 Web: http://yihui.name
+Department of Statistics, Iowa State University
+3211 Snedecor Hall, Ames, IA
+
+From yintengfei at gmail.com  Wed Sep  1 08:13:32 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Wed, 1 Sep 2010 01:13:32 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+Message-ID: <AANLkTinDBVmeE-Z29qykRvGwvSpkubEpTJ58+xcvxJue@mail.gmail.com>
+
+Hi
+
+I just made a simple demo below, I hope it could help a little bit.
+
+1. I don't set limits on root layer. so you can put every thing in order,
+like title the row 0, (I don't always put labels and axis in the different
+layer, because I think they use the same coordinate with data ),but I set
+limits to each layer above root layer, reverse y-axis, like usual.
+2. you can use location function to see the system capture the right
+coordinates, in these two layer.
+3. I only use gridLayout()$setRowStretchFactor()
+4. I guess the text in your code is not shown because the place
+row=0,column=0, has a blank layer. and there is no extra space for showing
+the text in that layer, you can set limits to that layer to make the text
+shown.
+
+Regards
+
+Tengfei
+
+###
+library(qtpaint)
+s <- qscene()
+mypainter1 <- function(layer,painter){
+  qdrawCircle(painter,rnorm(100,50,20),rnorm(100,50,20),r=5,fill='black')
+}
+mypainter2 <- function(layer,painter){
+  qdrawCircle(painter,rnorm(100,750,100),rnorm(100,750,100),r=5,fill='red')
+}
+mouseLocator <- function(layer,event){
+  print(as.numeric(event$pos()))
+}
+rootLayer <- qlayer(s)
+l1 <-
+qlayer(rootLayer,mypainter1,limits=qrect(0,0,100,100),mouseDoubleClickFun=mouseLocator)
+l2 <-
+qlayer(rootLayer,mypainter2,row=1,limits=qrect(500,500,1000,1000),mouseDoubleClickFun=mouseLocator)
+rootLayer$gridLayout()$setRowStretchFactor(0,1)
+rootLayer$gridLayout()$setRowStretchFactor(1,5)
+qplotView(s)$show()
+
+###
+
+On Wed, Sep 1, 2010 at 12:11 AM, Yihui Xie <xie at yihui.name> wrote:
+
+> Hi all,
+>
+> I'm wondering if there are any approaches to completely show the
+> graphical elements on the boundaries under a layout containing several
+> layers. This is like the functionality par(xpd=NA) in base R graphics.
+> See the example below that the texts for the origin (0,0) on the axes
+> are partially hidden.
+>
+> My another problem is, I don't really understand the layout approach,
+> although I've been reading the qtpaint vignette and digging the Nokia
+> Qt documentations. Specifically, how should we define the coordinate
+> system in each layer in a layout? (I experimented with mouse clicking
+> to get locations but got even more confused) With a single layer, I
+> can plot the data using its range to define the limits and everything
+> is fine. Besides, does anyone have a working demo to draw a simplest
+> plot with the layout approach? I struggled with
+> set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+> set(Column|Row)StretchFactor, but they do not behave as we expect them
+> to, e.g. the stretch factor being 0 will not restrict the height/width
+> of a layer to be a fixed value -- they change as we resize the window.
+>
+> Below is the R code:
+>
+> # I need hints on how to split the root layer into several regions
+> # and what are their coordinate systems
+> library(qtpaint)
+> scene = qscene()
+> figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+> titlePainter = function(item, painter) {
+>    qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+>    tmp=as.matrix(titleLayer$boundingRect())
+>    qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+> }
+> yAxisPainter = function(item, painter) {
+>    qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+> }
+> plotPainter = function(item, painter) {
+>    qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>    qdrawRect(painter, 1, 1, 600-1, 400-1)
+> }
+> xAxisPainter = function(item, painter) {
+>    qdrawText(painter, as.character(pretty(1:600)), pretty(1:600), 37.5)
+> }
+> mouseLocator = function(item, event){
+>    print(as.numeric(event$pos()))
+> }
+> titleLayer = qlayer(figLayer, titlePainter,
+> mousePressFun=mouseLocator, row=2,col=1)
+> yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row =
+> 1,col=0)
+> plotLayer = qlayer(figLayer, plotPainter,
+> mousePressFun=mouseLocator,row = 1, col = 1)
+> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+> = 0, col = 1)
+>
+> layout = figLayer$gridLayout()
+>
+> layout$setRowMaximumHeight(0, 75)
+> layout$setRowMinimumHeight(0, 60)
+> # main plot region: 400x600
+> layout$setRowPreferredHeight(1, 400)
+> layout$setRowMaximumHeight(2, 75)
+> layout$setRowMinimumHeight(2, 60)
+>
+> layout$setColumnMaximumWidth(0, 75)
+> layout$setColumnMinimumWidth(0, 60)
+> layout$setColumnPreferredWidth(1, 600)
+> layout$setRowStretchFactor(0, 0)
+> layout$setRowStretchFactor(1, 1)
+> layout$setRowStretchFactor(2, 0)
+> layout$setColumnStretchFactor(0, 0)
+> layout$setColumnStretchFactor(1, 1)
+>
+> print(view<-qplotView(scene = scene))
+>
+>
+> #################################################
+>
+> > sessionInfo()
+> R version 2.11.1 (2010-05-31)
+> x86_64-pc-linux-gnu
+>
+> locale:
+> [1] en_US.utf8
+>
+> attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods   base
+>
+> other attached packages:
+> [1] qtpaint_0.7.9
+>
+> loaded via a namespace (and not attached):
+> [1] qtbase_0.8-4 tools_2.11.1
+>
+>
+> Thanks a lot!
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-6609 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 3211 Snedecor Hall, Ames, IA
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100901/3c9faf03/attachment.htm>
+
+From xie at yihui.name  Wed Sep  1 08:31:23 2010
+From: xie at yihui.name (Yihui Xie)
+Date: Wed, 1 Sep 2010 01:31:23 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTinDBVmeE-Z29qykRvGwvSpkubEpTJ58+xcvxJue@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+	<AANLkTinDBVmeE-Z29qykRvGwvSpkubEpTJ58+xcvxJue@mail.gmail.com>
+Message-ID: <AANLkTinCx6wRcnfr9uKA5cTptj98v4o90Tns5+5ZiC1w@mail.gmail.com>
+
+That's great and it helped me a lot! Thanks!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-6609 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Sep 1, 2010 at 1:13 AM, Tengfei Yin <yintengfei at gmail.com> wrote:
+> Hi
+>
+> I just made a simple demo below, I hope it could help a little bit.
+>
+> 1. I don't set limits on root layer. so you can put every thing in order,
+> like title the row 0, (I don't always put labels and axis in the different
+> layer, because I think they use the same coordinate with data ),but I set
+> limits to each layer above root layer, reverse y-axis, like usual.
+> 2. you can use location function to see the system capture the right
+> coordinates, in these two layer.
+> 3. I only use gridLayout()$setRowStretchFactor()
+> 4. I guess the text in your code is not shown because the place
+> row=0,column=0, has a blank layer. and there is no extra space for showing
+> the text in that layer, you can set limits to that layer to make the text
+> shown.
+>
+> Regards
+>
+> Tengfei
+>
+> ###
+> library(qtpaint)
+> s <- qscene()
+> mypainter1 <- function(layer,painter){
+> ? qdrawCircle(painter,rnorm(100,50,20),rnorm(100,50,20),r=5,fill='black')
+> }
+> mypainter2 <- function(layer,painter){
+> ? qdrawCircle(painter,rnorm(100,750,100),rnorm(100,750,100),r=5,fill='red')
+> }
+> mouseLocator <- function(layer,event){
+> ? print(as.numeric(event$pos()))
+> }
+> rootLayer <- qlayer(s)
+> l1 <-
+> qlayer(rootLayer,mypainter1,limits=qrect(0,0,100,100),mouseDoubleClickFun=mouseLocator)
+> l2 <-
+> qlayer(rootLayer,mypainter2,row=1,limits=qrect(500,500,1000,1000),mouseDoubleClickFun=mouseLocator)
+> rootLayer$gridLayout()$setRowStretchFactor(0,1)
+> rootLayer$gridLayout()$setRowStretchFactor(1,5)
+> qplotView(s)$show()
+>
+> ###
+>
+> On Wed, Sep 1, 2010 at 12:11 AM, Yihui Xie <xie at yihui.name> wrote:
+>>
+>> Hi all,
+>>
+>> I'm wondering if there are any approaches to completely show the
+>> graphical elements on the boundaries under a layout containing several
+>> layers. This is like the functionality par(xpd=NA) in base R graphics.
+>> See the example below that the texts for the origin (0,0) on the axes
+>> are partially hidden.
+>>
+>> My another problem is, I don't really understand the layout approach,
+>> although I've been reading the qtpaint vignette and digging the Nokia
+>> Qt documentations. Specifically, how should we define the coordinate
+>> system in each layer in a layout? (I experimented with mouse clicking
+>> to get locations but got even more confused) With a single layer, I
+>> can plot the data using its range to define the limits and everything
+>> is fine. Besides, does anyone have a working demo to draw a simplest
+>> plot with the layout approach? I struggled with
+>> set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+>> set(Column|Row)StretchFactor, but they do not behave as we expect them
+>> to, e.g. the stretch factor being 0 will not restrict the height/width
+>> of a layer to be a fixed value -- they change as we resize the window.
+>>
+>> Below is the R code:
+>>
+>> # I need hints on how to split the root layer into several regions
+>> # and what are their coordinate systems
+>> library(qtpaint)
+>> scene = qscene()
+>> figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+>> titlePainter = function(item, painter) {
+>> ? ?qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+>> ? ?tmp=as.matrix(titleLayer$boundingRect())
+>> ? ?qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+>> }
+>> yAxisPainter = function(item, painter) {
+>> ? ?qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+>> }
+>> plotPainter = function(item, painter) {
+>> ? ?qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>> ? ?qdrawRect(painter, 1, 1, 600-1, 400-1)
+>> }
+>> xAxisPainter = function(item, painter) {
+>> ? ?qdrawText(painter, as.character(pretty(1:600)), pretty(1:600), 37.5)
+>> }
+>> mouseLocator = function(item, event){
+>> ? ?print(as.numeric(event$pos()))
+>> }
+>> titleLayer = qlayer(figLayer, titlePainter,
+>> mousePressFun=mouseLocator, row=2,col=1)
+>> yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row =
+>> 1,col=0)
+>> plotLayer = qlayer(figLayer, plotPainter,
+>> mousePressFun=mouseLocator,row = 1, col = 1)
+>> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+>> = 0, col = 1)
+>>
+>> layout = figLayer$gridLayout()
+>>
+>> layout$setRowMaximumHeight(0, 75)
+>> layout$setRowMinimumHeight(0, 60)
+>> # main plot region: 400x600
+>> layout$setRowPreferredHeight(1, 400)
+>> layout$setRowMaximumHeight(2, 75)
+>> layout$setRowMinimumHeight(2, 60)
+>>
+>> layout$setColumnMaximumWidth(0, 75)
+>> layout$setColumnMinimumWidth(0, 60)
+>> layout$setColumnPreferredWidth(1, 600)
+>> layout$setRowStretchFactor(0, 0)
+>> layout$setRowStretchFactor(1, 1)
+>> layout$setRowStretchFactor(2, 0)
+>> layout$setColumnStretchFactor(0, 0)
+>> layout$setColumnStretchFactor(1, 1)
+>>
+>> print(view<-qplotView(scene = scene))
+>>
+>>
+>> #################################################
+>>
+>> > sessionInfo()
+>> R version 2.11.1 (2010-05-31)
+>> x86_64-pc-linux-gnu
+>>
+>> locale:
+>> [1] en_US.utf8
+>>
+>> attached base packages:
+>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>
+>> other attached packages:
+>> [1] qtpaint_0.7.9
+>>
+>> loaded via a namespace (and not attached):
+>> [1] qtbase_0.8-4 tools_2.11.1
+>>
+>>
+>> Thanks a lot!
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-6609 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 3211 Snedecor Hall, Ames, IA
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+
+From hadley at rice.edu  Wed Sep  1 14:26:01 2010
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 1 Sep 2010 07:26:01 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+Message-ID: <AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+
+For the answer to your first question, turning clipping off for that layer.
+
+Hadley
+
+On Wednesday, September 1, 2010, Yihui Xie <xie at yihui.name> wrote:
+> Hi all,
+>
+> I'm wondering if there are any approaches to completely show the
+> graphical elements on the boundaries under a layout containing several
+> layers. This is like the functionality par(xpd=NA) in base R graphics.
+> See the example below that the texts for the origin (0,0) on the axes
+> are partially hidden.
+>
+> My another problem is, I don't really understand the layout approach,
+> although I've been reading the qtpaint vignette and digging the Nokia
+> Qt documentations. Specifically, how should we define the coordinate
+> system in each layer in a layout? (I experimented with mouse clicking
+> to get locations but got even more confused) With a single layer, I
+> can plot the data using its range to define the limits and everything
+> is fine. Besides, does anyone have a working demo to draw a simplest
+> plot with the layout approach? I struggled with
+> set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+> set(Column|Row)StretchFactor, but they do not behave as we expect them
+> to, e.g. the stretch factor being 0 will not restrict the height/width
+> of a layer to be a fixed value -- they change as we resize the window.
+>
+> Below is the R code:
+>
+> # I need hints on how to split the root layer into several regions
+> # and what are their coordinate systems
+> library(qtpaint)
+> scene = qscene()
+> figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+> titlePainter = function(item, painter) {
+>  ? ?qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+>  ? ?tmp=as.matrix(titleLayer$boundingRect())
+>  ? ?qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+> }
+> yAxisPainter = function(item, painter) {
+>  ? ?qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+> }
+> plotPainter = function(item, painter) {
+>  ? ?qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>  ? ?qdrawRect(painter, 1, 1, 600-1, 400-1)
+> }
+> xAxisPainter = function(item, painter) {
+>  ? ?qdrawText(painter, as.character(pretty(1:600)), pretty(1:600), 37.5)
+> }
+> mouseLocator = function(item, event){
+>  ? ?print(as.numeric(event$pos()))
+> }
+> titleLayer = qlayer(figLayer, titlePainter,
+> mousePressFun=mouseLocator, row=2,col=1)
+> yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row = 1,col=0)
+> plotLayer = qlayer(figLayer, plotPainter,
+> mousePressFun=mouseLocator,row = 1, col = 1)
+> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+> = 0, col = 1)
+>
+> layout = figLayer$gridLayout()
+>
+> layout$setRowMaximumHeight(0, 75)
+> layout$setRowMinimumHeight(0, 60)
+> # main plot region: 400x600
+> layout$setRowPreferredHeight(1, 400)
+> layout$setRowMaximumHeight(2, 75)
+> layout$setRowMinimumHeight(2, 60)
+>
+> layout$setColumnMaximumWidth(0, 75)
+> layout$setColumnMinimumWidth(0, 60)
+> layout$setColumnPreferredWidth(1, 600)
+> layout$setRowStretchFactor(0, 0)
+> layout$setRowStretchFactor(1, 1)
+> layout$setRowStretchFactor(2, 0)
+> layout$setColumnStretchFactor(0, 0)
+> layout$setColumnStretchFactor(1, 1)
+>
+> print(view<-qplotView(scene = scene))
+>
+>
+> #################################################
+>
+>> sessionInfo()
+> R version 2.11.1 (2010-05-31)
+> x86_64-pc-linux-gnu
+>
+> locale:
+> [1] en_US.utf8
+>
+> attached base packages:
+> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>
+> other attached packages:
+> [1] qtpaint_0.7.9
+>
+> loaded via a namespace (and not attached):
+> [1] qtbase_0.8-4 tools_2.11.1
+>
+>
+> Thanks a lot!
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-6609 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 3211 Snedecor Hall, Ames, IA
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From xie at yihui.name  Wed Sep  1 15:54:55 2010
+From: xie at yihui.name (Yihui Xie)
+Date: Wed, 1 Sep 2010 08:54:55 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+	<AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+Message-ID: <AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+
+Thanks! That was my guess, but it does not seem to work, e.g.:
+
+# all layers with clip=FALSE but still get clipped
+library(qtpaint)
+scene = qscene()
+figLayer = qlayer(scene, clip = FALSE)
+titlePainter = function(item, painter) {
+    qdrawText(painter, paste(rep("The Useless Title", 5), collapse = " - "),
+        300, 10, "center", "center")
+}
+yAxisPainter = function(item, painter) {
+    qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+}
+plotPainter = function(item, painter) {
+    qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+    qdrawRect(painter, 1, 1, 600 - 1, 400 - 1)
+}
+xAxisPainter = function(item, painter) {
+    qdrawText(painter, as.character(pretty(1:600)), pretty(1:600),
+        37.5)
+}
+mouseLocator = function(item, event) {
+    print(as.numeric(event$pos()))
+}
+titleLayer = qlayer(figLayer, titlePainter, mousePressFun = mouseLocator,
+    limits = qrect(0, 0, 600, 20), clip = FALSE, row = 0, col = 1)
+yaxis = qlayer(figLayer, yAxisPainter, mousePressFun = mouseLocator,
+    limits = qrect(0, 0, 75, 400), clip = FALSE, row = 1, col = 0)
+plotLayer = qlayer(figLayer, plotPainter, mousePressFun = mouseLocator,
+    limits = qrect(0, 0, 600, 400), clip = FALSE, row = 1, col = 1)
+xaxis = qlayer(figLayer, xAxisPainter, mousePressFun = mouseLocator,
+    limits = qrect(0, 0, 600, 75), clip = FALSE, row = 2, col = 1)
+
+layout = figLayer$gridLayout()
+
+layout$setRowStretchFactor(0, 1)
+layout$setRowStretchFactor(1, 5)
+layout$setRowStretchFactor(2, 1)
+layout$setColumnStretchFactor(0, 1)
+layout$setColumnStretchFactor(1, 5)
+
+print(view <- qplotView(scene = scene))
+
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-6609 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Sep 1, 2010 at 7:26 AM, Hadley Wickham <hadley at rice.edu> wrote:
+> For the answer to your first question, turning clipping off for that layer.
+>
+> Hadley
+>
+> On Wednesday, September 1, 2010, Yihui Xie <xie at yihui.name> wrote:
+>> Hi all,
+>>
+>> I'm wondering if there are any approaches to completely show the
+>> graphical elements on the boundaries under a layout containing several
+>> layers. This is like the functionality par(xpd=NA) in base R graphics.
+>> See the example below that the texts for the origin (0,0) on the axes
+>> are partially hidden.
+>>
+>> My another problem is, I don't really understand the layout approach,
+>> although I've been reading the qtpaint vignette and digging the Nokia
+>> Qt documentations. Specifically, how should we define the coordinate
+>> system in each layer in a layout? (I experimented with mouse clicking
+>> to get locations but got even more confused) With a single layer, I
+>> can plot the data using its range to define the limits and everything
+>> is fine. Besides, does anyone have a working demo to draw a simplest
+>> plot with the layout approach? I struggled with
+>> set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+>> set(Column|Row)StretchFactor, but they do not behave as we expect them
+>> to, e.g. the stretch factor being 0 will not restrict the height/width
+>> of a layer to be a fixed value -- they change as we resize the window.
+>>
+>> Below is the R code:
+>>
+>> # I need hints on how to split the root layer into several regions
+>> # and what are their coordinate systems
+>> library(qtpaint)
+>> scene = qscene()
+>> figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+>> titlePainter = function(item, painter) {
+>> ?? ?qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+>> ?? ?tmp=as.matrix(titleLayer$boundingRect())
+>> ?? ?qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+>> }
+>> yAxisPainter = function(item, painter) {
+>> ?? ?qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+>> }
+>> plotPainter = function(item, painter) {
+>> ?? ?qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>> ?? ?qdrawRect(painter, 1, 1, 600-1, 400-1)
+>> }
+>> xAxisPainter = function(item, painter) {
+>> ?? ?qdrawText(painter, as.character(pretty(1:600)), pretty(1:600), 37.5)
+>> }
+>> mouseLocator = function(item, event){
+>> ?? ?print(as.numeric(event$pos()))
+>> }
+>> titleLayer = qlayer(figLayer, titlePainter,
+>> mousePressFun=mouseLocator, row=2,col=1)
+>> yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row = 1,col=0)
+>> plotLayer = qlayer(figLayer, plotPainter,
+>> mousePressFun=mouseLocator,row = 1, col = 1)
+>> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+>> = 0, col = 1)
+>>
+>> layout = figLayer$gridLayout()
+>>
+>> layout$setRowMaximumHeight(0, 75)
+>> layout$setRowMinimumHeight(0, 60)
+>> # main plot region: 400x600
+>> layout$setRowPreferredHeight(1, 400)
+>> layout$setRowMaximumHeight(2, 75)
+>> layout$setRowMinimumHeight(2, 60)
+>>
+>> layout$setColumnMaximumWidth(0, 75)
+>> layout$setColumnMinimumWidth(0, 60)
+>> layout$setColumnPreferredWidth(1, 600)
+>> layout$setRowStretchFactor(0, 0)
+>> layout$setRowStretchFactor(1, 1)
+>> layout$setRowStretchFactor(2, 0)
+>> layout$setColumnStretchFactor(0, 0)
+>> layout$setColumnStretchFactor(1, 1)
+>>
+>> print(view<-qplotView(scene = scene))
+>>
+>>
+>> #################################################
+>>
+>>> sessionInfo()
+>> R version 2.11.1 (2010-05-31)
+>> x86_64-pc-linux-gnu
+>>
+>> locale:
+>> [1] en_US.utf8
+>>
+>> attached base packages:
+>> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>>
+>> other attached packages:
+>> [1] qtpaint_0.7.9
+>>
+>> loaded via a namespace (and not attached):
+>> [1] qtbase_0.8-4 tools_2.11.1
+>>
+>>
+>> Thanks a lot!
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-6609 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 3211 Snedecor Hall, Ames, IA
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>
+> --
+> Assistant Professor / Dobelman Family Junior Chair
+> Department of Statistics / Rice University
+> http://had.co.nz/
+>
+
+From lawrence.michael at gene.com  Wed Sep  1 16:07:04 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 1 Sep 2010 07:07:04 -0700
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+Message-ID: <AANLkTi=dyDTF3tT7=7doRsv9JOVs9T6+AN=6jj3-_rbW@mail.gmail.com>
+
+On Tue, Aug 31, 2010 at 10:11 PM, Yihui Xie <xie at yihui.name> wrote:
+
+> Hi all,
+>
+> I'm wondering if there are any approaches to completely show the
+> graphical elements on the boundaries under a layout containing several
+> layers. This is like the functionality par(xpd=NA) in base R graphics.
+> See the example below that the texts for the origin (0,0) on the axes
+> are partially hidden.
+>
+> My another problem is, I don't really understand the layout approach,
+> although I've been reading the qtpaint vignette and digging the Nokia
+> Qt documentations.
+
+
+Me neither. I'll try to find some time to look into it. The QGraphicsLayout
+stuff is even worse than QLayout. You're correct that stretch factory set to
+zero does not work. I inferred that from the QGridLayout, but it must be
+different for QGraphicsGridLayout.
+
+I'd like to move to an approach where each layer has a size and sizing
+policy, rather than doing things by rows and columns in the grid layout. I
+haven't figured out that yet though either.
+
+Michael
+
+
+> Specifically, how should we define the coordinate
+> system in each layer in a layout? (I experimented with mouse clicking
+> to get locations but got even more confused) With a single layer, I
+> can plot the data using its range to define the limits and everything
+> is fine. Besides, does anyone have a working demo to draw a simplest
+> plot with the layout approach? I struggled with
+> set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+> set(Column|Row)StretchFactor, but they do not behave as we expect them
+> to, e.g. the stretch factor being 0 will not restrict the height/width
+> of a layer to be a fixed value -- they change as we resize the window.
+>
+> Below is the R code:
+>
+> # I need hints on how to split the root layer into several regions
+> # and what are their coordinate systems
+> library(qtpaint)
+> scene = qscene()
+> figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+> titlePainter = function(item, painter) {
+>    qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+>    tmp=as.matrix(titleLayer$boundingRect())
+>    qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+> }
+> yAxisPainter = function(item, painter) {
+>    qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+> }
+> plotPainter = function(item, painter) {
+>    qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>    qdrawRect(painter, 1, 1, 600-1, 400-1)
+> }
+> xAxisPainter = function(item, painter) {
+>    qdrawText(painter, as.character(pretty(1:600)), pretty(1:600), 37.5)
+> }
+> mouseLocator = function(item, event){
+>    print(as.numeric(event$pos()))
+> }
+> titleLayer = qlayer(figLayer, titlePainter,
+> mousePressFun=mouseLocator, row=2,col=1)
+> yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row =
+> 1,col=0)
+> plotLayer = qlayer(figLayer, plotPainter,
+> mousePressFun=mouseLocator,row = 1, col = 1)
+> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+> = 0, col = 1)
+>
+> layout = figLayer$gridLayout()
+>
+> layout$setRowMaximumHeight(0, 75)
+> layout$setRowMinimumHeight(0, 60)
+> # main plot region: 400x600
+> layout$setRowPreferredHeight(1, 400)
+> layout$setRowMaximumHeight(2, 75)
+> layout$setRowMinimumHeight(2, 60)
+>
+> layout$setColumnMaximumWidth(0, 75)
+> layout$setColumnMinimumWidth(0, 60)
+> layout$setColumnPreferredWidth(1, 600)
+> layout$setRowStretchFactor(0, 0)
+> layout$setRowStretchFactor(1, 1)
+> layout$setRowStretchFactor(2, 0)
+> layout$setColumnStretchFactor(0, 0)
+> layout$setColumnStretchFactor(1, 1)
+>
+> print(view<-qplotView(scene = scene))
+>
+>
+> #################################################
+>
+> > sessionInfo()
+> R version 2.11.1 (2010-05-31)
+> x86_64-pc-linux-gnu
+>
+> locale:
+> [1] en_US.utf8
+>
+> attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods   base
+>
+> other attached packages:
+> [1] qtpaint_0.7.9
+>
+> loaded via a namespace (and not attached):
+> [1] qtbase_0.8-4 tools_2.11.1
+>
+>
+> Thanks a lot!
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-6609 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 3211 Snedecor Hall, Ames, IA
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100901/8cc7368a/attachment.htm>
+
+From yintengfei at gmail.com  Wed Sep  1 16:42:10 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Wed, 1 Sep 2010 09:42:10 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+	<AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+	<AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+Message-ID: <AANLkTin8zuvF9GtCsNJdQR2u_93nPW1+9+Vxm94hm=8j@mail.gmail.com>
+
+Hi
+
+If you want to use layout to control data and axis and label, you can set
+the limits a little bit wide enough to show the stuff on the boundary. But I
+always put axis and label in the same overlapped layer with data, all the
+layer share the same limits, we have to make sure to leave enough space for
+showing labels (I don't know if it's a better way??), so as to avoid this
+inconvenience.
+
+# a little change on limits, just to demonstrate..I didn't ajust
+titleLayer = qlayer(figLayer, titlePainter, mousePressFun = mouseLocator,
+   limits = qrect(0, 0, 700, 20), row = 0, col = 1)
+yaxis = qlayer(figLayer, yAxisPainter, mousePressFun = mouseLocator,
+   limits = qrect(-10,-10, 75, 500), row = 1, col = 0)
+plotLayer = qlayer(figLayer, plotPainter, mousePressFun = mouseLocator,
+   limits = qrect(0, 0, 700, 500), row = 1, col = 1)
+xaxis = qlayer(figLayer, xAxisPainter, mousePressFun = mouseLocator,
+   limits = qrect(-10, -10, 700, 95), row = 2, col = 1)
+
+Regards
+
+Tengfei
+
+
+On Wed, Sep 1, 2010 at 8:54 AM, Yihui Xie <xie at yihui.name> wrote:
+
+> Thanks! That was my guess, but it does not seem to work, e.g.:
+>
+> # all layers with clip=FALSE but still get clipped
+> library(qtpaint)
+> scene = qscene()
+> figLayer = qlayer(scene, clip = FALSE)
+> titlePainter = function(item, painter) {
+>    qdrawText(painter, paste(rep("The Useless Title", 5), collapse = " - "),
+>        300, 10, "center", "center")
+> }
+> yAxisPainter = function(item, painter) {
+>    qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+> }
+> plotPainter = function(item, painter) {
+>    qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>    qdrawRect(painter, 1, 1, 600 - 1, 400 - 1)
+> }
+> xAxisPainter = function(item, painter) {
+>    qdrawText(painter, as.character(pretty(1:600)), pretty(1:600),
+>        37.5)
+> }
+> mouseLocator = function(item, event) {
+>    print(as.numeric(event$pos()))
+> }
+> titleLayer = qlayer(figLayer, titlePainter, mousePressFun = mouseLocator,
+>     limits = qrect(0, 0, 600, 20), clip = FALSE, row = 0, col = 1)
+> yaxis = qlayer(figLayer, yAxisPainter, mousePressFun = mouseLocator,
+>     limits = qrect(0, 0, 75, 400), clip = FALSE, row = 1, col = 0)
+> plotLayer = qlayer(figLayer, plotPainter, mousePressFun = mouseLocator,
+>     limits = qrect(0, 0, 600, 400), clip = FALSE, row = 1, col = 1)
+> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun = mouseLocator,
+>     limits = qrect(0, 0, 600, 75), clip = FALSE, row = 2, col = 1)
+>
+> layout = figLayer$gridLayout()
+>
+> layout$setRowStretchFactor(0, 1)
+> layout$setRowStretchFactor(1, 5)
+> layout$setRowStretchFactor(2, 1)
+> layout$setColumnStretchFactor(0, 1)
+> layout$setColumnStretchFactor(1, 5)
+>
+> print(view <- qplotView(scene = scene))
+>
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-6609 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Wed, Sep 1, 2010 at 7:26 AM, Hadley Wickham <hadley at rice.edu> wrote:
+> > For the answer to your first question, turning clipping off for that
+> layer.
+> >
+> > Hadley
+> >
+> > On Wednesday, September 1, 2010, Yihui Xie <xie at yihui.name> wrote:
+> >> Hi all,
+> >>
+> >> I'm wondering if there are any approaches to completely show the
+> >> graphical elements on the boundaries under a layout containing several
+> >> layers. This is like the functionality par(xpd=NA) in base R graphics.
+> >> See the example below that the texts for the origin (0,0) on the axes
+> >> are partially hidden.
+> >>
+> >> My another problem is, I don't really understand the layout approach,
+> >> although I've been reading the qtpaint vignette and digging the Nokia
+> >> Qt documentations. Specifically, how should we define the coordinate
+> >> system in each layer in a layout? (I experimented with mouse clicking
+> >> to get locations but got even more confused) With a single layer, I
+> >> can plot the data using its range to define the limits and everything
+> >> is fine. Besides, does anyone have a working demo to draw a simplest
+> >> plot with the layout approach? I struggled with
+> >> set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+> >> set(Column|Row)StretchFactor, but they do not behave as we expect them
+> >> to, e.g. the stretch factor being 0 will not restrict the height/width
+> >> of a layer to be a fixed value -- they change as we resize the window.
+> >>
+> >> Below is the R code:
+> >>
+> >> # I need hints on how to split the root layer into several regions
+> >> # and what are their coordinate systems
+> >> library(qtpaint)
+> >> scene = qscene()
+> >> figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+> >> titlePainter = function(item, painter) {
+> >>     qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+> >>     tmp=as.matrix(titleLayer$boundingRect())
+> >>     qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+> >> }
+> >> yAxisPainter = function(item, painter) {
+> >>     qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+> >> }
+> >> plotPainter = function(item, painter) {
+> >>     qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+> >>     qdrawRect(painter, 1, 1, 600-1, 400-1)
+> >> }
+> >> xAxisPainter = function(item, painter) {
+> >>     qdrawText(painter, as.character(pretty(1:600)), pretty(1:600), 37.5)
+> >> }
+> >> mouseLocator = function(item, event){
+> >>     print(as.numeric(event$pos()))
+> >> }
+> >> titleLayer = qlayer(figLayer, titlePainter,
+> >> mousePressFun=mouseLocator, row=2,col=1)
+> >> yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row =
+> 1,col=0)
+> >> plotLayer = qlayer(figLayer, plotPainter,
+> >> mousePressFun=mouseLocator,row = 1, col = 1)
+> >> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+> >> = 0, col = 1)
+> >>
+> >> layout = figLayer$gridLayout()
+> >>
+> >> layout$setRowMaximumHeight(0, 75)
+> >> layout$setRowMinimumHeight(0, 60)
+> >> # main plot region: 400x600
+> >> layout$setRowPreferredHeight(1, 400)
+> >> layout$setRowMaximumHeight(2, 75)
+> >> layout$setRowMinimumHeight(2, 60)
+> >>
+> >> layout$setColumnMaximumWidth(0, 75)
+> >> layout$setColumnMinimumWidth(0, 60)
+> >> layout$setColumnPreferredWidth(1, 600)
+> >> layout$setRowStretchFactor(0, 0)
+> >> layout$setRowStretchFactor(1, 1)
+> >> layout$setRowStretchFactor(2, 0)
+> >> layout$setColumnStretchFactor(0, 0)
+> >> layout$setColumnStretchFactor(1, 1)
+> >>
+> >> print(view<-qplotView(scene = scene))
+> >>
+> >>
+> >> #################################################
+> >>
+> >>> sessionInfo()
+> >> R version 2.11.1 (2010-05-31)
+> >> x86_64-pc-linux-gnu
+> >>
+> >> locale:
+> >> [1] en_US.utf8
+> >>
+> >> attached base packages:
+> >> [1] stats     graphics  grDevices utils     datasets  methods   base
+> >>
+> >> other attached packages:
+> >> [1] qtpaint_0.7.9
+> >>
+> >> loaded via a namespace (and not attached):
+> >> [1] qtbase_0.8-4 tools_2.11.1
+> >>
+> >>
+> >> Thanks a lot!
+> >>
+> >> Regards,
+> >> Yihui
+> >> --
+> >> Yihui Xie <xieyihui at gmail.com>
+> >> Phone: 515-294-6609 Web: http://yihui.name
+> >> Department of Statistics, Iowa State University
+> >> 3211 Snedecor Hall, Ames, IA
+> >> _______________________________________________
+> >> Qtinterfaces-devel mailing list
+> >> Qtinterfaces-devel at lists.r-forge.r-project.org
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+> >>
+> >
+> > --
+> > Assistant Professor / Dobelman Family Junior Chair
+> > Department of Statistics / Rice University
+> > http://had.co.nz/
+> >
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100901/2a9a289c/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Wed Sep  1 17:31:50 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 1 Sep 2010 08:31:50 -0700
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+	<AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+	<AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+Message-ID: <AANLkTinEeU9+eWeP2SL2+wAL05Bx235Ez+QbHNqHRRF_@mail.gmail.com>
+
+On Wed, Sep 1, 2010 at 6:54 AM, Yihui Xie <xie at yihui.name> wrote:
+
+> Thanks! That was my guess, but it does not seem to work, e.g.:
+>
+>
+I would suggest turning off caching, i.e., pass cache=FALSE to qlayer, at
+least for the two axes. The issue, I think, is that Qt will only allocate a
+buffer large enough for the layer. You're then drawing outside of the cache,
+and it never makes it to the screen. I might make clip and cache both
+default to FALSE.  Caching usually only makes sense when there is a dynamic
+overlay on the layer. This is usually not the case for axes.
+
+Michael
+
+
+> # all layers with clip=FALSE but still get clipped
+> library(qtpaint)
+> scene = qscene()
+> figLayer = qlayer(scene, clip = FALSE)
+> titlePainter = function(item, painter) {
+>    qdrawText(painter, paste(rep("The Useless Title", 5), collapse = " - "),
+>        300, 10, "center", "center")
+> }
+> yAxisPainter = function(item, painter) {
+>    qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+> }
+> plotPainter = function(item, painter) {
+>    qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>    qdrawRect(painter, 1, 1, 600 - 1, 400 - 1)
+> }
+> xAxisPainter = function(item, painter) {
+>    qdrawText(painter, as.character(pretty(1:600)), pretty(1:600),
+>        37.5)
+> }
+> mouseLocator = function(item, event) {
+>    print(as.numeric(event$pos()))
+> }
+> titleLayer = qlayer(figLayer, titlePainter, mousePressFun = mouseLocator,
+>     limits = qrect(0, 0, 600, 20), clip = FALSE, row = 0, col = 1)
+> yaxis = qlayer(figLayer, yAxisPainter, mousePressFun = mouseLocator,
+>     limits = qrect(0, 0, 75, 400), clip = FALSE, row = 1, col = 0)
+> plotLayer = qlayer(figLayer, plotPainter, mousePressFun = mouseLocator,
+>     limits = qrect(0, 0, 600, 400), clip = FALSE, row = 1, col = 1)
+> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun = mouseLocator,
+>     limits = qrect(0, 0, 600, 75), clip = FALSE, row = 2, col = 1)
+>
+> layout = figLayer$gridLayout()
+>
+> layout$setRowStretchFactor(0, 1)
+> layout$setRowStretchFactor(1, 5)
+> layout$setRowStretchFactor(2, 1)
+> layout$setColumnStretchFactor(0, 1)
+> layout$setColumnStretchFactor(1, 5)
+>
+> print(view <- qplotView(scene = scene))
+>
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-6609 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Wed, Sep 1, 2010 at 7:26 AM, Hadley Wickham <hadley at rice.edu> wrote:
+> > For the answer to your first question, turning clipping off for that
+> layer.
+> >
+> > Hadley
+> >
+> > On Wednesday, September 1, 2010, Yihui Xie <xie at yihui.name> wrote:
+> >> Hi all,
+> >>
+> >> I'm wondering if there are any approaches to completely show the
+> >> graphical elements on the boundaries under a layout containing several
+> >> layers. This is like the functionality par(xpd=NA) in base R graphics.
+> >> See the example below that the texts for the origin (0,0) on the axes
+> >> are partially hidden.
+> >>
+> >> My another problem is, I don't really understand the layout approach,
+> >> although I've been reading the qtpaint vignette and digging the Nokia
+> >> Qt documentations. Specifically, how should we define the coordinate
+> >> system in each layer in a layout? (I experimented with mouse clicking
+> >> to get locations but got even more confused) With a single layer, I
+> >> can plot the data using its range to define the limits and everything
+> >> is fine. Besides, does anyone have a working demo to draw a simplest
+> >> plot with the layout approach? I struggled with
+> >> set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+> >> set(Column|Row)StretchFactor, but they do not behave as we expect them
+> >> to, e.g. the stretch factor being 0 will not restrict the height/width
+> >> of a layer to be a fixed value -- they change as we resize the window.
+> >>
+> >> Below is the R code:
+> >>
+> >> # I need hints on how to split the root layer into several regions
+> >> # and what are their coordinate systems
+> >> library(qtpaint)
+> >> scene = qscene()
+> >> figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+> >> titlePainter = function(item, painter) {
+> >>     qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+> >>     tmp=as.matrix(titleLayer$boundingRect())
+> >>     qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+> >> }
+> >> yAxisPainter = function(item, painter) {
+> >>     qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+> >> }
+> >> plotPainter = function(item, painter) {
+> >>     qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+> >>     qdrawRect(painter, 1, 1, 600-1, 400-1)
+> >> }
+> >> xAxisPainter = function(item, painter) {
+> >>     qdrawText(painter, as.character(pretty(1:600)), pretty(1:600), 37.5)
+> >> }
+> >> mouseLocator = function(item, event){
+> >>     print(as.numeric(event$pos()))
+> >> }
+> >> titleLayer = qlayer(figLayer, titlePainter,
+> >> mousePressFun=mouseLocator, row=2,col=1)
+> >> yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row =
+> 1,col=0)
+> >> plotLayer = qlayer(figLayer, plotPainter,
+> >> mousePressFun=mouseLocator,row = 1, col = 1)
+> >> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+> >> = 0, col = 1)
+> >>
+> >> layout = figLayer$gridLayout()
+> >>
+> >> layout$setRowMaximumHeight(0, 75)
+> >> layout$setRowMinimumHeight(0, 60)
+> >> # main plot region: 400x600
+> >> layout$setRowPreferredHeight(1, 400)
+> >> layout$setRowMaximumHeight(2, 75)
+> >> layout$setRowMinimumHeight(2, 60)
+> >>
+> >> layout$setColumnMaximumWidth(0, 75)
+> >> layout$setColumnMinimumWidth(0, 60)
+> >> layout$setColumnPreferredWidth(1, 600)
+> >> layout$setRowStretchFactor(0, 0)
+> >> layout$setRowStretchFactor(1, 1)
+> >> layout$setRowStretchFactor(2, 0)
+> >> layout$setColumnStretchFactor(0, 0)
+> >> layout$setColumnStretchFactor(1, 1)
+> >>
+> >> print(view<-qplotView(scene = scene))
+> >>
+> >>
+> >> #################################################
+> >>
+> >>> sessionInfo()
+> >> R version 2.11.1 (2010-05-31)
+> >> x86_64-pc-linux-gnu
+> >>
+> >> locale:
+> >> [1] en_US.utf8
+> >>
+> >> attached base packages:
+> >> [1] stats     graphics  grDevices utils     datasets  methods   base
+> >>
+> >> other attached packages:
+> >> [1] qtpaint_0.7.9
+> >>
+> >> loaded via a namespace (and not attached):
+> >> [1] qtbase_0.8-4 tools_2.11.1
+> >>
+> >>
+> >> Thanks a lot!
+> >>
+> >> Regards,
+> >> Yihui
+> >> --
+> >> Yihui Xie <xieyihui at gmail.com>
+> >> Phone: 515-294-6609 Web: http://yihui.name
+> >> Department of Statistics, Iowa State University
+> >> 3211 Snedecor Hall, Ames, IA
+> >> _______________________________________________
+> >> Qtinterfaces-devel mailing list
+> >> Qtinterfaces-devel at lists.r-forge.r-project.org
+> >>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+> >>
+> >
+> > --
+> > Assistant Professor / Dobelman Family Junior Chair
+> > Department of Statistics / Rice University
+> > http://had.co.nz/
+> >
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100901/a3d0f531/attachment.htm>
+
+From xie at yihui.name  Wed Sep  1 17:49:05 2010
+From: xie at yihui.name (Yihui Xie)
+Date: Wed, 1 Sep 2010 10:49:05 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTinEeU9+eWeP2SL2+wAL05Bx235Ez+QbHNqHRRF_@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+	<AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+	<AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+	<AANLkTinEeU9+eWeP2SL2+wAL05Bx235Ez+QbHNqHRRF_@mail.gmail.com>
+Message-ID: <AANLkTimviuDqCB6G=Kw9jomtKXQLvS9mA35zULMe2VYe@mail.gmail.com>
+
+Ahhh! cache!!! again! It brought me a problem that I could not solve
+for months... sigh... I've been wondering why I'm not able to draw a
+gray background with grid like ggplot2 exactly at the locations I
+specified (near the margins) -- some parts of the gray rectangles just
+do not show up no matter how large a limit I designate to the layer,
+as Tengfei suggested to me in the last email (I know that approach,
+but it just does not work).
+
+Thanks a lot! The pain that I was unable to explain to Di has finally gone...
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Sep 1, 2010 at 10:31 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Wed, Sep 1, 2010 at 6:54 AM, Yihui Xie <xie at yihui.name> wrote:
+>>
+>> Thanks! That was my guess, but it does not seem to work, e.g.:
+>>
+>
+> I would suggest turning off caching, i.e., pass cache=FALSE to qlayer, at
+> least for the two axes. The issue, I think, is that Qt will only allocate a
+> buffer large enough for the layer. You're then drawing outside of the cache,
+> and it never makes it to the screen. I might make clip and cache both
+> default to FALSE.? Caching usually only makes sense when there is a dynamic
+> overlay on the layer. This is usually not the case for axes.
+>
+> Michael
+>
+>>
+>> # all layers with clip=FALSE but still get clipped
+>> library(qtpaint)
+>> scene = qscene()
+>> figLayer = qlayer(scene, clip = FALSE)
+>> titlePainter = function(item, painter) {
+>> ? ?qdrawText(painter, paste(rep("The Useless Title", 5), collapse = " -
+>> "),
+>> ? ? ? ?300, 10, "center", "center")
+>> }
+>> yAxisPainter = function(item, painter) {
+>> ? ?qdrawText(painter, as.character(pretty(1:400)), 37.5, pretty(1:400))
+>> }
+>> plotPainter = function(item, painter) {
+>> ? ?qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>> ? ?qdrawRect(painter, 1, 1, 600 - 1, 400 - 1)
+>> }
+>> xAxisPainter = function(item, painter) {
+>> ? ?qdrawText(painter, as.character(pretty(1:600)), pretty(1:600),
+>> ? ? ? ?37.5)
+>> }
+>> mouseLocator = function(item, event) {
+>> ? ?print(as.numeric(event$pos()))
+>> }
+>> titleLayer = qlayer(figLayer, titlePainter, mousePressFun = mouseLocator,
+>> ? ?limits = qrect(0, 0, 600, 20), clip = FALSE, row = 0, col = 1)
+>> yaxis = qlayer(figLayer, yAxisPainter, mousePressFun = mouseLocator,
+>> ? ?limits = qrect(0, 0, 75, 400), clip = FALSE, row = 1, col = 0)
+>> plotLayer = qlayer(figLayer, plotPainter, mousePressFun = mouseLocator,
+>> ? ?limits = qrect(0, 0, 600, 400), clip = FALSE, row = 1, col = 1)
+>> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun = mouseLocator,
+>> ? ?limits = qrect(0, 0, 600, 75), clip = FALSE, row = 2, col = 1)
+>>
+>> layout = figLayer$gridLayout()
+>>
+>> layout$setRowStretchFactor(0, 1)
+>> layout$setRowStretchFactor(1, 5)
+>> layout$setRowStretchFactor(2, 1)
+>> layout$setColumnStretchFactor(0, 1)
+>> layout$setColumnStretchFactor(1, 5)
+>>
+>> print(view <- qplotView(scene = scene))
+>>
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-6609 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>>
+>>
+>>
+>> On Wed, Sep 1, 2010 at 7:26 AM, Hadley Wickham <hadley at rice.edu> wrote:
+>> > For the answer to your first question, turning clipping off for that
+>> > layer.
+>> >
+>> > Hadley
+>> >
+>> > On Wednesday, September 1, 2010, Yihui Xie <xie at yihui.name> wrote:
+>> >> Hi all,
+>> >>
+>> >> I'm wondering if there are any approaches to completely show the
+>> >> graphical elements on the boundaries under a layout containing several
+>> >> layers. This is like the functionality par(xpd=NA) in base R graphics.
+>> >> See the example below that the texts for the origin (0,0) on the axes
+>> >> are partially hidden.
+>> >>
+>> >> My another problem is, I don't really understand the layout approach,
+>> >> although I've been reading the qtpaint vignette and digging the Nokia
+>> >> Qt documentations. Specifically, how should we define the coordinate
+>> >> system in each layer in a layout? (I experimented with mouse clicking
+>> >> to get locations but got even more confused) With a single layer, I
+>> >> can plot the data using its range to define the limits and everything
+>> >> is fine. Besides, does anyone have a working demo to draw a simplest
+>> >> plot with the layout approach? I struggled with
+>> >> set(Column|Row)(Maximum|Minimum|Preferred)(Width|Height) and
+>> >> set(Column|Row)StretchFactor, but they do not behave as we expect them
+>> >> to, e.g. the stretch factor being 0 will not restrict the height/width
+>> >> of a layer to be a fixed value -- they change as we resize the window.
+>> >>
+>> >> Below is the R code:
+>> >>
+>> >> # I need hints on how to split the root layer into several regions
+>> >> # and what are their coordinate systems
+>> >> library(qtpaint)
+>> >> scene = qscene()
+>> >> figLayer = qlayer(scene,limits=qrect(0,0,675,550))
+>> >> titlePainter = function(item, painter) {
+>> >> ?? ?qdrawText(painter, 'The Useless Title', 300, 0,'center','bottom')
+>> >> ?? ?tmp=as.matrix(titleLayer$boundingRect())
+>> >> ?? ?qdrawRect(painter, tmp[1,1],tmp[1,2],tmp[2,1],tmp[2,2])
+>> >> }
+>> >> yAxisPainter = function(item, painter) {
+>> >> ?? ?qdrawText(painter, as.character(pretty(1:400)), 37.5,
+>> >> pretty(1:400))
+>> >> }
+>> >> plotPainter = function(item, painter) {
+>> >> ?? ?qdrawPoint(painter, runif(1000, 0, 600), runif(1000, 0, 400))
+>> >> ?? ?qdrawRect(painter, 1, 1, 600-1, 400-1)
+>> >> }
+>> >> xAxisPainter = function(item, painter) {
+>> >> ?? ?qdrawText(painter, as.character(pretty(1:600)), pretty(1:600),
+>> >> 37.5)
+>> >> }
+>> >> mouseLocator = function(item, event){
+>> >> ?? ?print(as.numeric(event$pos()))
+>> >> }
+>> >> titleLayer = qlayer(figLayer, titlePainter,
+>> >> mousePressFun=mouseLocator, row=2,col=1)
+>> >> yaxis = qlayer(figLayer, yAxisPainter,mousePressFun=mouseLocator,row =
+>> >> 1,col=0)
+>> >> plotLayer = qlayer(figLayer, plotPainter,
+>> >> mousePressFun=mouseLocator,row = 1, col = 1)
+>> >> xaxis = qlayer(figLayer, xAxisPainter, mousePressFun=mouseLocator,row
+>> >> = 0, col = 1)
+>> >>
+>> >> layout = figLayer$gridLayout()
+>> >>
+>> >> layout$setRowMaximumHeight(0, 75)
+>> >> layout$setRowMinimumHeight(0, 60)
+>> >> # main plot region: 400x600
+>> >> layout$setRowPreferredHeight(1, 400)
+>> >> layout$setRowMaximumHeight(2, 75)
+>> >> layout$setRowMinimumHeight(2, 60)
+>> >>
+>> >> layout$setColumnMaximumWidth(0, 75)
+>> >> layout$setColumnMinimumWidth(0, 60)
+>> >> layout$setColumnPreferredWidth(1, 600)
+>> >> layout$setRowStretchFactor(0, 0)
+>> >> layout$setRowStretchFactor(1, 1)
+>> >> layout$setRowStretchFactor(2, 0)
+>> >> layout$setColumnStretchFactor(0, 0)
+>> >> layout$setColumnStretchFactor(1, 1)
+>> >>
+>> >> print(view<-qplotView(scene = scene))
+>> >>
+>> >>
+>> >> #################################################
+>> >>
+>> >>> sessionInfo()
+>> >> R version 2.11.1 (2010-05-31)
+>> >> x86_64-pc-linux-gnu
+>> >>
+>> >> locale:
+>> >> [1] en_US.utf8
+>> >>
+>> >> attached base packages:
+>> >> [1] stats ? ? graphics ?grDevices utils ? ? datasets ?methods ? base
+>> >>
+>> >> other attached packages:
+>> >> [1] qtpaint_0.7.9
+>> >>
+>> >> loaded via a namespace (and not attached):
+>> >> [1] qtbase_0.8-4 tools_2.11.1
+>> >>
+>> >>
+>> >> Thanks a lot!
+>> >>
+>> >> Regards,
+>> >> Yihui
+>> >> --
+>> >> Yihui Xie <xieyihui at gmail.com>
+>> >> Phone: 515-294-6609 Web: http://yihui.name
+>> >> Department of Statistics, Iowa State University
+>> >> 3211 Snedecor Hall, Ames, IA
+>> >> _______________________________________________
+>> >> Qtinterfaces-devel mailing list
+>> >> Qtinterfaces-devel at lists.r-forge.r-project.org
+>> >>
+>> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>> >>
+>> >
+>> > --
+>> > Assistant Professor / Dobelman Family Junior Chair
+>> > Department of Statistics / Rice University
+>> > http://had.co.nz/
+>> >
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+From hadley at rice.edu  Wed Sep  1 17:55:55 2010
+From: hadley at rice.edu (Hadley Wickham)
+Date: Wed, 1 Sep 2010 10:55:55 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTinEeU9+eWeP2SL2+wAL05Bx235Ez+QbHNqHRRF_@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+	<AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+	<AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+	<AANLkTinEeU9+eWeP2SL2+wAL05Bx235Ez+QbHNqHRRF_@mail.gmail.com>
+Message-ID: <AANLkTi=bdfoYcTLg8+utjwiBTmO1t=ngXbbM8XSzjA61@mail.gmail.com>
+
+> I would suggest turning off caching, i.e., pass cache=FALSE to qlayer, at
+> least for the two axes. The issue, I think, is that Qt will only allocate a
+> buffer large enough for the layer. You're then drawing outside of the cache,
+> and it never makes it to the screen. I might make clip and cache both
+> default to FALSE.? Caching usually only makes sense when there is a dynamic
+> overlay on the layer. This is usually not the case for axes.
+
+This seems counterintuitive - you'd normally expect that cache to be
+most helpful when you're not updating the layer very often?
+
+Hadley
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From xie at yihui.name  Wed Sep  1 19:42:23 2010
+From: xie at yihui.name (Yihui Xie)
+Date: Wed, 1 Sep 2010 12:42:23 -0500
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTi=bdfoYcTLg8+utjwiBTmO1t=ngXbbM8XSzjA61@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+	<AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+	<AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+	<AANLkTinEeU9+eWeP2SL2+wAL05Bx235Ez+QbHNqHRRF_@mail.gmail.com>
+	<AANLkTi=bdfoYcTLg8+utjwiBTmO1t=ngXbbM8XSzjA61@mail.gmail.com>
+Message-ID: <AANLkTinT_K+KXokbJ9xHdn2jG5JuqRkK89HuFy5wAS8p@mail.gmail.com>
+
+I'm in favor of cache=TRUE whereas clip=FALSE; at least we (ISU
+graphics group) use caching very often to develop interactive
+graphics, but clip=TRUE, on the other hand, often has annoying and
+unexpected consequences, e.g. the elements you draw do not show up at
+the expected locations.
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Wed, Sep 1, 2010 at 10:55 AM, Hadley Wickham <hadley at rice.edu> wrote:
+>> I would suggest turning off caching, i.e., pass cache=FALSE to qlayer, at
+>> least for the two axes. The issue, I think, is that Qt will only allocate a
+>> buffer large enough for the layer. You're then drawing outside of the cache,
+>> and it never makes it to the screen. I might make clip and cache both
+>> default to FALSE.? Caching usually only makes sense when there is a dynamic
+>> overlay on the layer. This is usually not the case for axes.
+>
+> This seems counterintuitive - you'd normally expect that cache to be
+> most helpful when you're not updating the layer very often?
+>
+> Hadley
+>
+> --
+> Assistant Professor / Dobelman Family Junior Chair
+> Department of Statistics / Rice University
+> http://had.co.nz/
+>
+
+From lawrence.michael at gene.com  Wed Sep  1 23:51:51 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 1 Sep 2010 14:51:51 -0700
+Subject: [RQt-devel] par(xpd=NA) and the layout approach in qtpaint
+In-Reply-To: <AANLkTinT_K+KXokbJ9xHdn2jG5JuqRkK89HuFy5wAS8p@mail.gmail.com>
+References: <AANLkTik13D2bgC6PyFLE1b9m9JRveqERxkfh3H_haefz@mail.gmail.com>
+	<AANLkTi=jh2d0SCvNp225d6MoKHwpj_H9fvapreKPi6wO@mail.gmail.com>
+	<AANLkTi=51dpkUvmREH7LrcewF=vQxKNWWJed7n6QnDKA@mail.gmail.com>
+	<AANLkTinEeU9+eWeP2SL2+wAL05Bx235Ez+QbHNqHRRF_@mail.gmail.com>
+	<AANLkTi=bdfoYcTLg8+utjwiBTmO1t=ngXbbM8XSzjA61@mail.gmail.com>
+	<AANLkTinT_K+KXokbJ9xHdn2jG5JuqRkK89HuFy5wAS8p@mail.gmail.com>
+Message-ID: <AANLkTi=P5YZCQeMpBK0i2+DvfJs_VJUvF8DSOHpMFPsi@mail.gmail.com>
+
+On Wed, Sep 1, 2010 at 10:42 AM, Yihui Xie <xie at yihui.name> wrote:
+
+> I'm in favor of cache=TRUE whereas clip=FALSE; at least we (ISU
+> graphics group) use caching very often to develop interactive
+> graphics, but clip=TRUE, on the other hand, often has annoying and
+> unexpected consequences, e.g. the elements you draw do not show up at
+> the expected locations.
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+>
+>
+>
+> On Wed, Sep 1, 2010 at 10:55 AM, Hadley Wickham <hadley at rice.edu> wrote:
+> >> I would suggest turning off caching, i.e., pass cache=FALSE to qlayer,
+> at
+> >> least for the two axes. The issue, I think, is that Qt will only
+> allocate a
+> >> buffer large enough for the layer. You're then drawing outside of the
+> cache,
+> >> and it never makes it to the screen. I might make clip and cache both
+> >> default to FALSE.  Caching usually only makes sense when there is a
+> dynamic
+> >> overlay on the layer. This is usually not the case for axes.
+> >
+> > This seems counterintuitive - you'd normally expect that cache to be
+> > most helpful when you're not updating the layer very often?
+> >
+>
+
+You want cache when you are not updating a layer often, but you do need to
+redraw it, i.e., it has something dynamic on top of it (or under it, but
+that's less common).
+
+cache=TRUE slows down static rendering. For example, resizing a static plot
+will be slower with caching.
+
+Michael
+
+> Hadley
+> >
+> > --
+> > Assistant Professor / Dobelman Family Junior Chair
+> > Department of Statistics / Rice University
+> > http://had.co.nz/
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100901/031adab6/attachment.htm>
+
+From xie at yihui.name  Fri Sep  3 23:05:40 2010
+From: xie at yihui.name (Yihui Xie)
+Date: Fri, 3 Sep 2010 16:05:40 -0500
+Subject: [RQt-devel] meaning of qstrWidth() in qtpaint
+Message-ID: <AANLkTik-jeOW4WH04ukjy_02KvAEFw0LLUqKj5Cgd6w9@mail.gmail.com>
+
+Hi all,
+
+What is the 'frame of reference' when we calculating the width of a
+string using qstrWidth()? For example, if the string "Hello World" is
+centered at (1,1) with width 2 while the limits of the corresponding
+layer are qrect(0, 0, 20, 10) (I mean the 'limits' argument in
+qlayer(); not geometry), what is the x-coordinate of the point which
+lies exactly on the right edge of that string? Thanks!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+From lawrence.michael at gene.com  Fri Sep  3 23:34:53 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 3 Sep 2010 14:34:53 -0700
+Subject: [RQt-devel] meaning of qstrWidth() in qtpaint
+In-Reply-To: <AANLkTik-jeOW4WH04ukjy_02KvAEFw0LLUqKj5Cgd6w9@mail.gmail.com>
+References: <AANLkTik-jeOW4WH04ukjy_02KvAEFw0LLUqKj5Cgd6w9@mail.gmail.com>
+Message-ID: <AANLkTimd4_wA5qT19B6VjL4i=aSNXXTffMU_SAprbP5u@mail.gmail.com>
+
+On Fri, Sep 3, 2010 at 2:05 PM, Yihui Xie <xie at yihui.name> wrote:
+
+> Hi all,
+>
+> What is the 'frame of reference' when we calculating the width of a
+> string using qstrWidth()?
+
+
+It only returns a width in item (data) coordinates. There is no concept of
+position. But if you did draw it at (1,1) with horizontal centering, then
+the right X boundary would be 2.
+
+
+> For example, if the string "Hello World" is
+> centered at (1,1) with width 2 while the limits of the corresponding
+> layer are qrect(0, 0, 20, 10) (I mean the 'limits' argument in
+> qlayer(); not geometry), what is the x-coordinate of the point which
+> lies exactly on the right edge of that string? Thanks!
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100903/8c1f6136/attachment.htm>
+
+From xie at yihui.name  Fri Sep  3 23:38:24 2010
+From: xie at yihui.name (Yihui Xie)
+Date: Fri, 3 Sep 2010 16:38:24 -0500
+Subject: [RQt-devel] meaning of qstrWidth() in qtpaint
+In-Reply-To: <AANLkTimd4_wA5qT19B6VjL4i=aSNXXTffMU_SAprbP5u@mail.gmail.com>
+References: <AANLkTik-jeOW4WH04ukjy_02KvAEFw0LLUqKj5Cgd6w9@mail.gmail.com>
+	<AANLkTimd4_wA5qT19B6VjL4i=aSNXXTffMU_SAprbP5u@mail.gmail.com>
+Message-ID: <AANLkTikwxtvju4BsxgufTqqLjJ=WcsLmsvxqgOfSgn4W@mail.gmail.com>
+
+That would be perfect. We can focus on data then. Thanks a lot!
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Fri, Sep 3, 2010 at 4:34 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Fri, Sep 3, 2010 at 2:05 PM, Yihui Xie <xie at yihui.name> wrote:
+>>
+>> Hi all,
+>>
+>> What is the 'frame of reference' when we calculating the width of a
+>> string using qstrWidth()?
+>
+> It only returns a width in item (data) coordinates. There is no concept of
+> position. But if you did draw it at (1,1) with horizontal centering, then
+> the right X boundary would be 2.
+>
+>>
+>> For example, if the string "Hello World" is
+>> centered at (1,1) with width 2 while the limits of the corresponding
+>> layer are qrect(0, 0, 20, 10) (I mean the 'limits' argument in
+>> qlayer(); not geometry), what is the x-coordinate of the point which
+>> lies exactly on the right edge of that string? Thanks!
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+
+From verzani at math.csi.cuny.edu  Fri Sep 10 00:07:55 2010
+From: verzani at math.csi.cuny.edu (John Verzani)
+Date: Thu, 9 Sep 2010 18:07:55 -0400
+Subject: [RQt-devel] qdataFrameModel questions comments
+Message-ID: <AANLkTin9Umm+BF0hT7izmq4DBE7bYNNXmK=g3UYL_ALF@mail.gmail.com>
+
+I've been playing around with qdataFrameModel and have the following
+comments:
+
+* NA for integer values prints a crazy string "-21474...". For numeric it
+prints "inf".
+* factors print out as their integer representation
+
+For this, and other reasons,  it might be nice to be able to set the display
+role (rather than it be the default) via .name.display
+
+* names can't have a "." in them
+
+And a question:
+
+How can I subclass this class? I want to add a flags() method and setData()
+method to edit the values.
+
+Thanks for any help. --John
+
+
+-- 
+John Verzani
+Chair, Department of Mathematics
+College of Staten Island, CUNY
+verzani at math.csi.cuny.edu
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100909/0ce17379/attachment.htm>
+
+From lawrence.michael at gene.com  Fri Sep 10 00:45:13 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 9 Sep 2010 15:45:13 -0700
+Subject: [RQt-devel] qdataFrameModel questions comments
+In-Reply-To: <AANLkTin9Umm+BF0hT7izmq4DBE7bYNNXmK=g3UYL_ALF@mail.gmail.com>
+References: <AANLkTin9Umm+BF0hT7izmq4DBE7bYNNXmK=g3UYL_ALF@mail.gmail.com>
+Message-ID: <AANLkTinbhsHdynRwkQUj1rLjVFND=0uaywM=eJdydRR_@mail.gmail.com>
+
+On Thu, Sep 9, 2010 at 3:07 PM, John Verzani <verzani at math.csi.cuny.edu>wrote:
+
+> I've been playing around with qdataFrameModel and have the following
+> comments:
+>
+> * NA for integer values prints a crazy string "-21474...". For numeric it
+> prints "inf".
+> * factors print out as their integer representation
+>
+> For this, and other reasons,  it might be nice to be able to set the
+> display role (rather than it be the default) via .name.display
+>
+>
+The display can be fixed up. I've recently done that for RGtkDataFrame.
+
+
+> * names can't have a "." in them
+>
+>
+Would a different symbol work? Only other option really is '_'. Could take a
+completely different approach of specifying role - column mappings as extra
+parameters to the function. I was not a big fan of that, because it is not
+as self-contained.
+
+
+> And a question:
+>
+> How can I subclass this class? I want to add a flags() method and setData()
+> method to edit the values.
+>
+>
+Perhaps it would have been a better idea to implement this in R. As it
+stands, there's no interface for subclassing it.
+
+
+> Thanks for any help. --John
+>
+>
+> --
+> John Verzani
+> Chair, Department of Mathematics
+> College of Staten Island, CUNY
+> verzani at math.csi.cuny.edu
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100909/6e8aa5bd/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Fri Sep 17 10:06:22 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Fri, 17 Sep 2010 13:36:22 +0530
+Subject: [RQt-devel] "[[" method
+Message-ID: <AANLkTi=VaVgVXzTBVC8KZtyS8m8=WQ3uPzTTdG-PzJdq@mail.gmail.com>
+
+Currently:
+
+> Qt$QPrinter$Letter
+Enum value: Letter (2)
+> Qt$QPrinter[["Letter"]]
+Error in Qt$QPrinter[["Letter"]] :
+  object of type 'closure' is not subsettable
+
+Any reason not to define
+
+`[[.RQtClass` <- function(x, name)
+{
+    attr(x, "env")[[name]]
+}
+
+?
+
+-Deepayan
+
+From lawrence.michael at gene.com  Fri Sep 17 13:12:50 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 17 Sep 2010 04:12:50 -0700
+Subject: [RQt-devel] "[[" method
+In-Reply-To: <AANLkTi=VaVgVXzTBVC8KZtyS8m8=WQ3uPzTTdG-PzJdq@mail.gmail.com>
+References: <AANLkTi=VaVgVXzTBVC8KZtyS8m8=WQ3uPzTTdG-PzJdq@mail.gmail.com>
+Message-ID: <AANLkTikuLixabSnQhenOs5_Xxi9cu9RSFQ=y8b53C_oF@mail.gmail.com>
+
+On Fri, Sep 17, 2010 at 1:06 AM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> Currently:
+>
+> > Qt$QPrinter$Letter
+> Enum value: Letter (2)
+> > Qt$QPrinter[["Letter"]]
+> Error in Qt$QPrinter[["Letter"]] :
+>  object of type 'closure' is not subsettable
+>
+> Any reason not to define
+>
+> `[[.RQtClass` <- function(x, name)
+> {
+>    attr(x, "env")[[name]]
+> }
+>
+>
+Just an oversight. Please go right ahead and add it.
+
+Thanks,
+Michael
+
+
+> ?
+>
+> -Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100917/f166e974/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Fri Sep 17 13:39:26 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Fri, 17 Sep 2010 17:09:26 +0530
+Subject: [RQt-devel] a couple of minor things
+Message-ID: <AANLkTi=yGhU57Rf_YB=MivAWOwVf1HibD4=s1=iMb3g4@mail.gmail.com>
+
+Hi,
+
+A couple of low-priority things that might be nice to have:
+
+(1) In dealing with images, Qt used unsigned int for colors.
+
+> qimg <- Qt$QImage(100, 100, Qt$QImage$Format_ARGB32_Premultiplied)
+> qimg$fill(0L)
+> qimg$pixel(40, 50)
+[1] 0
+
+Is there an easy way to implement conversion to/from R colors? (Maybe
+through R color <-> R integer <-> unsigned int.)
+
+(2) QByteArrays are almost like strings, and used in various places. E.g.,
+
+> Qt$QImageReader$supportedImageFormats()
+Error in qinvokeStatic(cl, name, ...) :
+  Attempt to create SmokeObject with NULL class
+> Qt$QByteArray()
+NULL
+
+Is there a risk in allowing the conversion?
+
+-Deepayan
+
+From lawrence.michael at gene.com  Fri Sep 17 15:15:11 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 17 Sep 2010 06:15:11 -0700
+Subject: [RQt-devel] a couple of minor things
+In-Reply-To: <AANLkTi=yGhU57Rf_YB=MivAWOwVf1HibD4=s1=iMb3g4@mail.gmail.com>
+References: <AANLkTi=yGhU57Rf_YB=MivAWOwVf1HibD4=s1=iMb3g4@mail.gmail.com>
+Message-ID: <AANLkTim1bOsiraDbe+DjcLjkJcHPkShJ=WKAOBzkRq86@mail.gmail.com>
+
+On Fri, Sep 17, 2010 at 4:39 AM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> Hi,
+>
+> A couple of low-priority things that might be nice to have:
+>
+> (1) In dealing with images, Qt used unsigned int for colors.
+>
+> > qimg <- Qt$QImage(100, 100, Qt$QImage$Format_ARGB32_Premultiplied)
+> > qimg$fill(0L)
+> > qimg$pixel(40, 50)
+> [1] 0
+>
+> Is there an easy way to implement conversion to/from R colors? (Maybe
+> through R color <-> R integer <-> unsigned int.)
+>
+>
+For images, I was thinking we could have a converter between QImage and R
+images stored as matrices (as used by graphics devices in recent versions of
+R). Any pixel-wise manipulation of images from R would be too slow in
+general.
+
+Btw, there is already conversion between QColor and the output of col2rgb(),
+using qcol2rgb() and qcolor().
+
+ (2) QByteArrays are almost like strings, and used in various places. E.g.,
+>
+> > Qt$QImageReader$supportedImageFormats()
+> Error in qinvokeStatic(cl, name, ...) :
+>  Attempt to create SmokeObject with NULL class
+> > Qt$QByteArray()
+> NULL
+>
+> Is there a risk in allowing the conversion?
+>
+
+
+The above looks like a bug. QByteArray is supposed to be converted to a raw
+vector (closest R equivalent in my opinion, as QByteArray has no notion of
+locale, etc), which is then easily converted to a string if necessary with
+rawToChar().
+
+
+> -Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100917/68c3d806/attachment.htm>
+
+From lawrence.michael at gene.com  Mon Sep 20 23:34:58 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Mon, 20 Sep 2010 14:34:58 -0700
+Subject: [RQt-devel] a couple of minor things
+In-Reply-To: <AANLkTim1bOsiraDbe+DjcLjkJcHPkShJ=WKAOBzkRq86@mail.gmail.com>
+References: <AANLkTi=yGhU57Rf_YB=MivAWOwVf1HibD4=s1=iMb3g4@mail.gmail.com>
+	<AANLkTim1bOsiraDbe+DjcLjkJcHPkShJ=WKAOBzkRq86@mail.gmail.com>
+Message-ID: <AANLkTikH8MCffBMr0OJH8k8q3Tmd9PJ899S_A-XDyGVF@mail.gmail.com>
+
+On Fri, Sep 17, 2010 at 6:15 AM, Michael Lawrence <michafla at gene.com> wrote:
+
+>
+>
+> On Fri, Sep 17, 2010 at 4:39 AM, Deepayan Sarkar <
+> deepayan.sarkar at gmail.com> wrote:
+>
+>> Hi,
+>>
+>> A couple of low-priority things that might be nice to have:
+>>
+>> (1) In dealing with images, Qt used unsigned int for colors.
+>>
+>> > qimg <- Qt$QImage(100, 100, Qt$QImage$Format_ARGB32_Premultiplied)
+>> > qimg$fill(0L)
+>> > qimg$pixel(40, 50)
+>> [1] 0
+>>
+>> Is there an easy way to implement conversion to/from R colors? (Maybe
+>> through R color <-> R integer <-> unsigned int.)
+>>
+>>
+> For images, I was thinking we could have a converter between QImage and R
+> images stored as matrices (as used by graphics devices in recent versions of
+> R). Any pixel-wise manipulation of images from R would be too slow in
+> general.
+>
+> Btw, there is already conversion between QColor and the output of
+> col2rgb(), using qcol2rgb() and qcolor().
+>
+>  (2) QByteArrays are almost like strings, and used in various places. E.g.,
+>>
+>> > Qt$QImageReader$supportedImageFormats()
+>> Error in qinvokeStatic(cl, name, ...) :
+>>  Attempt to create SmokeObject with NULL class
+>>
+>
+In latest svn:
+
+> sapply(Qt$QImageReader$supportedImageFormats(), rawToChar)
+ [1] "bmp"  "gif"  "ico"  "jpeg" "jpg"  "pbm"  "pgm"  "png"  "ppm"  "svg"
+[11] "xbm"  "xpm"
+
+
+
+> > Qt$QByteArray()
+>> NULL
+>>
+>>
+> Qt$QByteArray()
+raw(0)
+
+
+
+> Is there a risk in allowing the conversion?
+>>
+>
+>
+> The above looks like a bug. QByteArray is supposed to be converted to a raw
+> vector (closest R equivalent in my opinion, as QByteArray has no notion of
+> locale, etc), which is then easily converted to a string if necessary with
+> rawToChar().
+>
+>
+>> -Deepayan
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100920/0077b8c4/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Tue Sep 21 08:12:32 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Mon, 20 Sep 2010 23:12:32 -0700
+Subject: [RQt-devel] a couple of minor things
+In-Reply-To: <AANLkTikH8MCffBMr0OJH8k8q3Tmd9PJ899S_A-XDyGVF@mail.gmail.com>
+References: <AANLkTi=yGhU57Rf_YB=MivAWOwVf1HibD4=s1=iMb3g4@mail.gmail.com>
+	<AANLkTim1bOsiraDbe+DjcLjkJcHPkShJ=WKAOBzkRq86@mail.gmail.com>
+	<AANLkTikH8MCffBMr0OJH8k8q3Tmd9PJ899S_A-XDyGVF@mail.gmail.com>
+Message-ID: <AANLkTinV1dDJdAvcuy0KTYNcsCiwaJ7P0HnZZ0z1Wm7B@mail.gmail.com>
+
+On Mon, Sep 20, 2010 at 2:34 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Fri, Sep 17, 2010 at 6:15 AM, Michael Lawrence <michafla at gene.com> wrote:
+>>
+>>
+>> On Fri, Sep 17, 2010 at 4:39 AM, Deepayan Sarkar
+>> <deepayan.sarkar at gmail.com> wrote:
+>>>
+>>> Hi,
+>>>
+>>> A couple of low-priority things that might be nice to have:
+>>>
+>>> (1) In dealing with images, Qt used unsigned int for colors.
+>>>
+>>> > qimg <- Qt$QImage(100, 100, Qt$QImage$Format_ARGB32_Premultiplied)
+>>> > qimg$fill(0L)
+>>> > qimg$pixel(40, 50)
+>>> [1] 0
+>>>
+>>> Is there an easy way to implement conversion to/from R colors? (Maybe
+>>> through R color <-> R integer <-> unsigned int.)
+>>>
+>>
+>> For images, I was thinking we could have a converter between QImage and R
+>> images stored as matrices (as used by graphics devices in recent versions of
+>> R). Any pixel-wise manipulation of images from R would be too slow in
+>> general.
+
+True. The $fill() example above is the only realistic use-case.
+Anyway, a one-off converter should be easy enough.
+
+>> Btw, there is already conversion between QColor and the output of
+>> col2rgb(), using qcol2rgb() and qcolor().
+
+Yes, and it would have been nice if QImage methods accepted QColor
+whenever appropriate.
+
+>>> (2) QByteArrays are almost like strings, and used in various places.
+>>> E.g.,
+>>>
+>>> > Qt$QImageReader$supportedImageFormats()
+>>> Error in qinvokeStatic(cl, name, ...) :
+>>> ?Attempt to create SmokeObject with NULL class
+>
+> In latest svn:
+>
+>> sapply(Qt$QImageReader$supportedImageFormats(), rawToChar)
+> ?[1] "bmp"? "gif"? "ico"? "jpeg" "jpg"? "pbm"? "pgm"? "png"? "ppm"? "svg"
+> [11] "xbm"? "xpm"
+
+Thanks. The new QT() screen device in qtutils now uses this to create
+a dynamic "Export As" context menu.
+
+-Deepayan
+
+From deepayan.sarkar at gmail.com  Tue Sep 21 13:14:10 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Tue, 21 Sep 2010 16:44:10 +0530
+Subject: [RQt-devel] Layers and layout
+Message-ID: <AANLkTim7ctnWqRPByKtqe_rSbVHGmQFh6DV-ycBXDv9H@mail.gmail.com>
+
+Hi,
+
+In my efforts to resurrect mosaiq, I have managed to put two "panel"
+layers on the root layer as follows:
+
+-----------
+
+library(qtpaint)
+
+scene <- qscene()
+root <- qlayer(scene)
+
+scatterplotLayer <-
+    function(x = runif(10), y = runif(10),
+             fill = "black", row, col)
+{
+    force(x)
+    force(y)
+    paintFun <- function(item, painter, exposed)
+    {
+        qdrawGlyph(painter, qglyphCircle(), x, y, fill = qcolor(fill))
+    }
+    qlayer(root, paintFun = paintFun, cache = TRUE,
+           limits = qrect(c(0, 1), c(0, 1)),
+           row = row, col = col)
+}
+
+panel1 <- scatterplotLayer(row = 0, col = 0, fill = "red")
+panel2 <- scatterplotLayer(row = 1, col = 1, fill = "green")
+
+(view <- qplotView(scene = scene, opengl = FALSE))
+
+-----------
+
+However, this requires that I specify the position in the layout at
+the time of creating the layer. The old mosaiq created parent-less
+layers first and then put them in the root layer's layout. I have
+tried this in two ways, both have failed:
+
+-----------
+
+library(qtpaint)
+scene <- qscene()
+root <- qlayer(scene)
+
+scatterplotLayer <- function(x = runif(10), y = runif(10), fill = "black")
+{
+    force(x)
+    force(y)
+    paintFun <- function(item, painter, exposed)
+    {
+        qdrawGlyph(painter, qglyphCircle(), x, y, fill = qcolor(fill))
+    }
+    qlayer(NULL, paintFun = paintFun, cache = TRUE,
+           limits = qrect(c(0, 1), c(0, 1)))
+}
+
+panel1 <- scatterplotLayer()
+panel2 <- scatterplotLayer()
+
+## This gives an error: Wrong number or types of arguments passed to
+## 'Qanviz::RLayer::addLayer'
+root[0, 0] <- panel1
+root[1, 1] <- panel2
+
+## This crashes
+layout <- root$gridLayout()
+layout$addItem(panel1, 0, 0)
+layout$addItem(panel2, 1, 1)
+
+-----------
+
+Is there a way to achieve this? How is addLayer supposed to work?
+
+-Deepayan
+
+From lawrence.michael at gene.com  Tue Sep 21 15:33:29 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 21 Sep 2010 06:33:29 -0700
+Subject: [RQt-devel] Layers and layout
+In-Reply-To: <AANLkTim7ctnWqRPByKtqe_rSbVHGmQFh6DV-ycBXDv9H@mail.gmail.com>
+References: <AANLkTim7ctnWqRPByKtqe_rSbVHGmQFh6DV-ycBXDv9H@mail.gmail.com>
+Message-ID: <AANLkTinpA=tAEt1GDU5w7LmKdwVTF6nxr=UjSR7skonb@mail.gmail.com>
+
+On Tue, Sep 21, 2010 at 4:14 AM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> Hi,
+>
+> In my efforts to resurrect mosaiq, I have managed to put two "panel"
+> layers on the root layer as follows:
+>
+> -----------
+>
+> library(qtpaint)
+>
+> scene <- qscene()
+> root <- qlayer(scene)
+>
+> scatterplotLayer <-
+>    function(x = runif(10), y = runif(10),
+>             fill = "black", row, col)
+> {
+>    force(x)
+>    force(y)
+>    paintFun <- function(item, painter, exposed)
+>    {
+>        qdrawGlyph(painter, qglyphCircle(), x, y, fill = qcolor(fill))
+>    }
+>    qlayer(root, paintFun = paintFun, cache = TRUE,
+>           limits = qrect(c(0, 1), c(0, 1)),
+>           row = row, col = col)
+> }
+>
+> panel1 <- scatterplotLayer(row = 0, col = 0, fill = "red")
+> panel2 <- scatterplotLayer(row = 1, col = 1, fill = "green")
+>
+> (view <- qplotView(scene = scene, opengl = FALSE))
+>
+> -----------
+>
+> However, this requires that I specify the position in the layout at
+> the time of creating the layer. The old mosaiq created parent-less
+> layers first and then put them in the root layer's layout. I have
+> tried this in two ways, both have failed:
+>
+> -----------
+>
+> library(qtpaint)
+> scene <- qscene()
+> root <- qlayer(scene)
+>
+> scatterplotLayer <- function(x = runif(10), y = runif(10), fill = "black")
+> {
+>    force(x)
+>    force(y)
+>    paintFun <- function(item, painter, exposed)
+>    {
+>        qdrawGlyph(painter, qglyphCircle(), x, y, fill = qcolor(fill))
+>    }
+>    qlayer(NULL, paintFun = paintFun, cache = TRUE,
+>           limits = qrect(c(0, 1), c(0, 1)))
+> }
+>
+> panel1 <- scatterplotLayer()
+> panel2 <- scatterplotLayer()
+>
+> ## This gives an error: Wrong number or types of arguments passed to
+> ## 'Qanviz::RLayer::addLayer'
+> root[0, 0] <- panel1
+> root[1, 1] <- panel2
+>
+>
+This issue is now fixed in qtpaint svn (0.7.11).
+
+
+> ## This crashes
+> layout <- root$gridLayout()
+> layout$addItem(panel1, 0, 0)
+> layout$addItem(panel2, 1, 1)
+>
+>
+This crash is due to a bug in Smoke. The Smoke guy said he would fix it some
+weekend.
+
+
+> -----------
+>
+> Is there a way to achieve this? How is addLayer supposed to work?
+>
+> -Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100921/202e3e4f/attachment.htm>
+
+From lawrence.michael at gene.com  Tue Sep 21 21:44:58 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 21 Sep 2010 12:44:58 -0700
+Subject: [RQt-devel] a couple of minor things
+In-Reply-To: <AANLkTinV1dDJdAvcuy0KTYNcsCiwaJ7P0HnZZ0z1Wm7B@mail.gmail.com>
+References: <AANLkTi=yGhU57Rf_YB=MivAWOwVf1HibD4=s1=iMb3g4@mail.gmail.com>
+	<AANLkTim1bOsiraDbe+DjcLjkJcHPkShJ=WKAOBzkRq86@mail.gmail.com>
+	<AANLkTikH8MCffBMr0OJH8k8q3Tmd9PJ899S_A-XDyGVF@mail.gmail.com>
+	<AANLkTinV1dDJdAvcuy0KTYNcsCiwaJ7P0HnZZ0z1Wm7B@mail.gmail.com>
+Message-ID: <AANLkTikMEdsq1euY5hVQCE0cF0rBhZQhKsZCukA_5vSE@mail.gmail.com>
+
+On Mon, Sep 20, 2010 at 11:12 PM, Deepayan Sarkar <deepayan.sarkar at gmail.com
+> wrote:
+
+> On Mon, Sep 20, 2010 at 2:34 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> >
+> >
+> > On Fri, Sep 17, 2010 at 6:15 AM, Michael Lawrence <michafla at gene.com>
+> wrote:
+> >>
+> >>
+> >> On Fri, Sep 17, 2010 at 4:39 AM, Deepayan Sarkar
+> >> <deepayan.sarkar at gmail.com> wrote:
+> >>>
+> >>> Hi,
+> >>>
+> >>> A couple of low-priority things that might be nice to have:
+> >>>
+> >>> (1) In dealing with images, Qt used unsigned int for colors.
+> >>>
+> >>> > qimg <- Qt$QImage(100, 100, Qt$QImage$Format_ARGB32_Premultiplied)
+> >>> > qimg$fill(0L)
+> >>> > qimg$pixel(40, 50)
+> >>> [1] 0
+> >>>
+> >>> Is there an easy way to implement conversion to/from R colors? (Maybe
+> >>> through R color <-> R integer <-> unsigned int.)
+> >>>
+> >>
+> >> For images, I was thinking we could have a converter between QImage and
+> R
+> >> images stored as matrices (as used by graphics devices in recent
+> versions of
+> >> R). Any pixel-wise manipulation of images from R would be too slow in
+> >> general.
+>
+> True. The $fill() example above is the only realistic use-case.
+>
+Anyway, a one-off converter should be easy enough.
+>
+>
+I will work on this conversion.
+
+
+> >> Btw, there is already conversion between QColor and the output of
+> >> col2rgb(), using qcol2rgb() and qcolor().
+>
+> Yes, and it would have been nice if QImage methods accepted QColor
+> whenever appropriate.
+>
+>
+Still, it's not hard to move between the two:
+
+image.fill(qcolor("red")$rgb())
+
+>>> (2) QByteArrays are almost like strings, and used in various places.
+> >>> E.g.,
+> >>>
+> >>> > Qt$QImageReader$supportedImageFormats()
+> >>> Error in qinvokeStatic(cl, name, ...) :
+> >>>  Attempt to create SmokeObject with NULL class
+> >
+> > In latest svn:
+> >
+> >> sapply(Qt$QImageReader$supportedImageFormats(), rawToChar)
+> >  [1] "bmp"  "gif"  "ico"  "jpeg" "jpg"  "pbm"  "pgm"  "png"  "ppm"  "svg"
+> > [11] "xbm"  "xpm"
+>
+> Thanks. The new QT() screen device in qtutils now uses this to create
+> a dynamic "Export As" context menu.
+>
+> -Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100921/4176fb61/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Wed Sep 22 11:35:46 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Wed, 22 Sep 2010 15:05:46 +0530
+Subject: [RQt-devel] a couple of minor things
+In-Reply-To: <AANLkTikMEdsq1euY5hVQCE0cF0rBhZQhKsZCukA_5vSE@mail.gmail.com>
+References: <AANLkTi=yGhU57Rf_YB=MivAWOwVf1HibD4=s1=iMb3g4@mail.gmail.com>
+	<AANLkTim1bOsiraDbe+DjcLjkJcHPkShJ=WKAOBzkRq86@mail.gmail.com>
+	<AANLkTikH8MCffBMr0OJH8k8q3Tmd9PJ899S_A-XDyGVF@mail.gmail.com>
+	<AANLkTinV1dDJdAvcuy0KTYNcsCiwaJ7P0HnZZ0z1Wm7B@mail.gmail.com>
+	<AANLkTikMEdsq1euY5hVQCE0cF0rBhZQhKsZCukA_5vSE@mail.gmail.com>
+Message-ID: <AANLkTiniNMeqGaOU=2MAk2d9Em4a43CvWesCU--8KDjQ@mail.gmail.com>
+
+On Wed, Sep 22, 2010 at 1:14 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Mon, Sep 20, 2010 at 11:12 PM, Deepayan Sarkar
+> <deepayan.sarkar at gmail.com> wrote:
+
+[...]
+
+>> True. The $fill() example above is the only realistic use-case.
+>>
+>> Anyway, a one-off converter should be easy enough.
+>>
+>
+> I will work on this conversion.
+>
+>>
+>> >> Btw, there is already conversion between QColor and the output of
+>> >> col2rgb(), using qcol2rgb() and qcolor().
+>>
+>> Yes, and it would have been nice if QImage methods accepted QColor
+>> whenever appropriate.
+>>
+>
+> Still, it's not hard to move between the two:
+>
+> image.fill(qcolor("red")$rgb())
+
+Ah, I didn't realize you could do that. Cool.
+
+-Deepayan
+
+From deepayan.sarkar at gmail.com  Mon Sep 27 20:56:30 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Mon, 27 Sep 2010 11:56:30 -0700
+Subject: [RQt-devel] mosaiq
+Message-ID: <AANLkTinA-crWwvso6F2GOOghJCkbeX5ME5x3eAG4JctP@mail.gmail.com>
+
+Hi,
+
+mosaiq is up and running again, more or less as it was back in DSC 2009.
+
+I will keep working to improve it. The most distracting oddity at the
+moment is that the space allocation for rows / columns in the
+QGraphicsLayout seems to depend on the number of layers (or
+something). E.g.,
+
+tmp <- rlnorm(100)
+df <- data.frame(x = runif(200),
+                 y = c(tmp, 2 * tmp),
+                 g = gl(2, 100))
+
+## No axis on bottom row (OK without the 'alternating' argument)
+library(mosaiq)
+mosaiq.xyplot(x, y, margin = ~g, data = df, layout = c(1, 2),
+              alternating = list(y = c(1, 0)))
+
+
+I have been using QGridLayout::setRowStretchFactor() etc. to control
+the spacing. Any suggestions for alternatives?
+
+
+Another thing I find less than ideal is that there are way too many
+calls to the paintFun. This is a problem when individual panels are
+expensive to draw. A simple demo (using 'df' above):
+
+mosaiq.xyplot(x, y+runif(length(y)), margin = ~g, data = df, layout =
+c(1, 1, 2))
+
+Switching between the tabs cause a repaint each time, which I think
+should be avoided if possible. This is of course a silly example, but
+see the last example in mosaiq/demo/maps.R for a real example where
+redrawing is visibly slow.
+
+Isn't it possible to set up a cache mode where such repaints are
+redrawn from a pixmap rather than causing an R callback? On my (KDE)
+system the redraw really seems to be triggered by a change in focus to
+or from the view (even if the window is completely visible while that
+happens), but not by expose events.
+
+-Deepayan
+
+From lawrence.michael at gene.com  Mon Sep 27 22:48:31 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Mon, 27 Sep 2010 13:48:31 -0700
+Subject: [RQt-devel] mosaiq
+In-Reply-To: <AANLkTinA-crWwvso6F2GOOghJCkbeX5ME5x3eAG4JctP@mail.gmail.com>
+References: <AANLkTinA-crWwvso6F2GOOghJCkbeX5ME5x3eAG4JctP@mail.gmail.com>
+Message-ID: <AANLkTin5D97iB9sKwsfmoqJppJ0UyChqHgu=yUeFAiB_@mail.gmail.com>
+
+On Mon, Sep 27, 2010 at 11:56 AM, Deepayan Sarkar <deepayan.sarkar at gmail.com
+> wrote:
+
+> Hi,
+>
+> mosaiq is up and running again, more or less as it was back in DSC 2009.
+>
+> I will keep working to improve it. The most distracting oddity at the
+> moment is that the space allocation for rows / columns in the
+> QGraphicsLayout seems to depend on the number of layers (or
+> something). E.g.,
+>
+> tmp <- rlnorm(100)
+> df <- data.frame(x = runif(200),
+>                 y = c(tmp, 2 * tmp),
+>                 g = gl(2, 100))
+>
+> ## No axis on bottom row (OK without the 'alternating' argument)
+> library(mosaiq)
+> mosaiq.xyplot(x, y, margin = ~g, data = df, layout = c(1, 2),
+>              alternating = list(y = c(1, 0)))
+>
+>
+> I have been using QGridLayout::setRowStretchFactor() etc. to control
+> the spacing. Any suggestions for alternatives?
+>
+>
+I've not had enough time to play around with the layout. There have been
+many examples from others where the layout behaves strangely, and I don't
+really have an explanation.
+
+The row/col stretch factors are the most obvious way to control the packing
+of the rows and columns. In theory, the grid layout is considering the size
+request of the widget, but in some simple attempts I did not have much luck
+playing with that.
+
+
+
+>
+> Another thing I find less than ideal is that there are way too many
+> calls to the paintFun. This is a problem when individual panels are
+> expensive to draw. A simple demo (using 'df' above):
+>
+> mosaiq.xyplot(x, y+runif(length(y)), margin = ~g, data = df, layout =
+> c(1, 1, 2))
+>
+> Switching between the tabs cause a repaint each time, which I think
+> should be avoided if possible. This is of course a silly example, but
+> see the last example in mosaiq/demo/maps.R for a real example where
+> redrawing is visibly slow.
+>
+> Isn't it possible to set up a cache mode where such repaints are
+> redrawn from a pixmap rather than causing an R callback? On my (KDE)
+> system the redraw really seems to be triggered by a change in focus to
+> or from the view (even if the window is completely visible while that
+> happens), but not by expose events.
+>
+>
+There is a cache mode, just pass cache=TRUE to qlayer(). Note that this will
+basically require clip=TRUE, since the cache surface will be maximally
+allocated to the size of the layer. Clipping can cause issues.
+
+
+
+> -Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100927/1bd93478/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Tue Sep 28 11:37:25 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Tue, 28 Sep 2010 15:07:25 +0530
+Subject: [RQt-devel] mosaiq
+In-Reply-To: <AANLkTin5D97iB9sKwsfmoqJppJ0UyChqHgu=yUeFAiB_@mail.gmail.com>
+References: <AANLkTinA-crWwvso6F2GOOghJCkbeX5ME5x3eAG4JctP@mail.gmail.com>
+	<AANLkTin5D97iB9sKwsfmoqJppJ0UyChqHgu=yUeFAiB_@mail.gmail.com>
+Message-ID: <AANLkTim8CMNSC856SAn1DjWu28hm-LmB0zTdKc5oOsFZ@mail.gmail.com>
+
+On Mon, Sep 27, 2010 at 1:48 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+
+> I've not had enough time to play around with the layout. There have been
+> many examples from others where the layout behaves strangely, and I don't
+> really have an explanation.
+>
+> The row/col stretch factors are the most obvious way to control the packing
+> of the rows and columns. In theory, the grid layout is considering the size
+> request of the widget, but in some simple attempts I did not have much luck
+> playing with that.
+
+OK, I will try to see if I can come up with anything.
+
+[...]
+
+> There is a cache mode, just pass cache=TRUE to qlayer(). Note that this will
+> basically require clip=TRUE, since the cache surface will be maximally
+> allocated to the size of the layer. Clipping can cause issues.
+
+No, I already have cache=TRUE set in qlayer(). Here is a nice simple
+example showing the problem:
+
+-------
+
+library(qtpaint)
+
+scene <- qscene()
+root <- qlayer(scene)
+
+points1 <-
+    qlayer(root,
+           paintFun = function(item, painter, exposed) {
+               qdrawGlyph(painter, qglyphCircle(10),
+                          runif(10), runif(10), stroke = NA,
+                          fill = sample(colors(), 1))
+           },
+           row = 1L, col = 0L,
+           cache = TRUE,
+           limits = qrect(c(0, 1), c(0, 1)))
+
+v <- qplotView(scene, opengl = FALSE)
+
+w <- Qt$QTabWidget()
+w$addTab(v, "view")
+w$addTab((ted <- Qt$QTextEdit()), "text")
+w
+
+-------
+
+If I now switch between the two tabs (either using mouse or keyboard),
+I see the paint function being called every time v becomes visible.
+
+The following is even more interesting. Start this infinite loop:
+
+while (TRUE) {
+    w$currentIndex <- 1
+    w$update()
+    Sys.sleep(0.2)
+    w$currentIndex <- 0
+    w$update()
+    Sys.sleep(0.2)
+}
+
+Then while the window with w
+
+  - does not have focus, there is no repaint,
+
+  - does have focus, there's a repaint on every run.
+
+This is fairly convincing evidence that this is a focus issue, but I
+haven't been able to find anything more specific.
+
+-Deepayan
+

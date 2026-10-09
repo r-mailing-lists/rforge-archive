@@ -1,0 +1,303 @@
+{
+  "list": "rspatial-devel",
+  "description": "",
+  "month": "2011-07",
+  "messages": [
+    {
+      "id": "msg-354716890b95",
+      "message_id": "<4E198CDA.3030305@uni-muenster.de>",
+      "from_name": "Edzer Pebesma",
+      "from_email_hash": "8c6adbfb13cc921a8bb8e1cfb02264929bbf4044d8ad148cd40d1f2dc9c49259",
+      "date": "2011-07-10T11:28:26Z",
+      "subject": "[Rspatial-devel] Fwd: [R-sig-Geo] coercing SpatialGrid to SpatialPoints",
+      "subject_clean": "[Rspatial-devel] Fwd: [R-sig-Geo] coercing SpatialGrid to SpatialPoints",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Regarding the message below, simply adding in sp to\nSpatialGrid-methods.R the coercion function\n\nsetAs(\"SpatialGrid\", \"SpatialPoints\", function(from)\n    as(as(from, \"SpatialPixels\"), \"SpatialPoints\")\n)\n\nwas something we tried earlier (100521) but reverted back (100607), as\nit broke the book code (asdar), at chapter 6,\nhttp://www.asdar-book.org/data.php?chapter=5 .\n\nI now committed it again, and out-commented in csdacm.Rnw the following\nline:\n\nsetIs(\"SpatialTimeGridDataFrame\", \"SpatialTimeGrid\")\n\nso that this code runs again (committed to cvs, which still runs in\ngeo.uu.nl). An errata for ch 6 is then needed.\n\nI cannot explain well why this setIs causes problems later on, but it\nseems somewhere to remove the @data slot on some automatic but unwanted\ncoercion. setIs() has caused me more trouble in the past.\n\nAfter the sp commit, R CMD check failed; some coercion (it turned out, a\nproj4string(obj) = sth inside fullgrid<- ) automatically coerced a\nSpatialGrid into an object of class Spatial which should NEVER happen! I\n\"solved\" this by changing the \"proj4string<-\" definition from an S4\nfunction (SetReplacemethod...) to S3, and modified Spatial-methods.R and\nNAMESPACE accordingly. Why this came up, and why this solution worked,\nis more than the setIs() issue, complete black magic to me.\n\nIn case of no comments, I will continue and release the current sp in svn.\n\nBest wishes,\n\n\n-------- Original Message --------\nSubject: [R-sig-Geo] coercing SpatialGrid to SpatialPoints\nDate: Fri, 8 Jul 2011 11:18:34 -0700\nFrom: David Holstius <david.holstius at berkeley.edu>\nTo: r-sig-geo at r-project.org\n\nHi all,\n\nI'm trying to figure out why coercing a SpatialGrid directly to a\nSpatialPoints doesn't result in the same thing as coercing it via an\nintermediate SpatialPixels. Here's a minimal example:\n\n  require(sp)\n  grd <- SpatialGrid(GridTopology(c(0,0), c(10,10), c(4,4)))\n  as(as(grd, \"SpatialPixels\"), \"SpatialPoints\")\t# result == what I expect\n  as(grd, \"SpatialPoints\")\t# result != expected\n\nIs this behavior as expected? Maybe I am doing it wrong?\n\nMany thanks,\nDavid\n\n--\nDavid Holstius\nPhD Student in Environmental Health Sciences\nUC Berkeley School of Public Health\n\n_______________________________________________\nR-sig-Geo mailing list\nR-sig-Geo at r-project.org\nhttps://stat.ethz.ch/mailman/listinfo/r-sig-geo",
+      "body_snippet": "Regarding the message below, simply adding in sp to\nSpatialGrid-methods.R the coercion function\n\nsetAs(\"SpatialGrid\", \"SpatialPoints\", function(from)\n    as(as(from, \"SpatialPixels\"), \"SpatialPoints\")",
+      "thread_id": "thread-354716890b95",
+      "thread_depth": 0,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-dd52d32e798e",
+      "message_id": "<4E19B0B2.5000509@uni-muenster.de>",
+      "from_name": "Edzer Pebesma",
+      "from_email_hash": "8c6adbfb13cc921a8bb8e1cfb02264929bbf4044d8ad148cd40d1f2dc9c49259",
+      "date": "2011-07-10T14:01:22Z",
+      "subject": "[Rspatial-devel] points2grid",
+      "subject_clean": "[Rspatial-devel] points2grid",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "The following case,\n\nrequire(rgdal)\ngr = GridTopology(c(0,0), c(1,1), c(20,20))\ngriLL = SpatialGrid(gr, proj4string = CRS(\"+init=epsg:4326\"))\ngriMoll = spTransform(griLL, CRS(\"+proj=moll +lon_0+x_0+y_0\"))\ngriLL2 = spTransform(griMoll, CRS(\"+init=epsg:4326\"))\ngridded(griLL2) = TRUE\nError in if (ret at cells.dim[i]>  nr/2) warning(paste(\"grid topology may\nbe corrupt in dimension\",  :\n\nnoted by Jon Skoien, should now also work with sp in svn.  I added the\ncheck:\n\n            if (ru.difx[1] / ru.difx[2] < tolerance) {\n                difx = difx[difx > ru.difx[2] * tolerance]\n                ru.difx = range(unique(difx)) # reset\n            }\n\nit tries to find e.g. x coordinates along a single column that are\nnearly identical, ie the difx contains values VERY close to 0.\n\nOne of the tests in fail.R now passes, but I believe it does so for good\nreasons.\n-- \nEdzer Pebesma\nInstitute for Geoinformatics (ifgi), University of M?nster\nWeseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\nhttp://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": "The following case,\n\nrequire(rgdal)\ngr = GridTopology(c(0,0), c(1,1), c(20,20))\ngriLL = SpatialGrid(gr, proj4string = CRS(\"+init=epsg:4326\"))\ngriMoll = spTransform(griLL, CRS(\"+proj=moll +lon_0+x_0+y_",
+      "thread_id": "thread-dd52d32e798e",
+      "thread_depth": 0,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-c6b02eab9bb5",
+      "message_id": "<4E1B6C65.3030108@uni-muenster.de>",
+      "from_name": "Edzer Pebesma",
+      "from_email_hash": "8c6adbfb13cc921a8bb8e1cfb02264929bbf4044d8ad148cd40d1f2dc9c49259",
+      "date": "2011-07-11T21:34:29Z",
+      "subject": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "subject_clean": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "now submitted to cran; should solve\nhttps://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html\n-- \nEdzer Pebesma\nInstitute for Geoinformatics (ifgi), University of M?nster\nWeseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\nhttp://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": "now submitted to cran; should solve\nhttps://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html\n-- \nEdzer Pebesma\nInstitute for Geoinformatics (ifgi), University of M?nster\nWeseler Stra?e 253, 4815",
+      "thread_id": "thread-c6b02eab9bb5",
+      "thread_depth": 0,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-0339ea7ae2a7",
+      "message_id": "<4E1C3D80.40708@uni-muenster.de>",
+      "from_name": "Edzer Pebesma",
+      "from_email_hash": "8c6adbfb13cc921a8bb8e1cfb02264929bbf4044d8ad148cd40d1f2dc9c49259",
+      "date": "2011-07-12T12:26:40Z",
+      "subject": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "subject_clean": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "I wrote a vignette for package spacetime that explains how massive\nspacetime data sets in a PosgreSQL data base can be proxied by R objects\nin package spacetime; see\nhttps://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw\n\nTo compile it, it needs read/write access to a postgresql data base that\nhas postgis extensions. I assume CRAN doesn't have these. How do I carry\non with this? Can I tell CRAN to not try to compile it, or should I\nupload it somewhere else? Or simply upload & ignore?\n-- \nEdzer Pebesma\nInstitute for Geoinformatics (ifgi), University of M?nster\nWeseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\nhttp://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": "I wrote a vignette for package spacetime that explains how massive\nspacetime data sets in a PosgreSQL data base can be proxied by R objects\nin package spacetime; see\nhttps://svn.52north.org/svn/geosta",
+      "thread_id": "thread-0339ea7ae2a7",
+      "thread_depth": 0,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-818e392e248a",
+      "message_id": "<4E1CA690.7050206@statistik.tu-dortmund.de>",
+      "from_name": "Uwe Ligges",
+      "from_email_hash": "41041d76fae21a8bc18fe19d38def92b3b630abfb7abf4acf41a0734d8851d24",
+      "date": "2011-07-12T19:54:56Z",
+      "subject": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "subject_clean": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "in_reply_to": "<4E1C3D80.40708@uni-muenster.de>",
+      "references": [
+        "<4E1C3D80.40708@uni-muenster.de>"
+      ],
+      "body_plain": "On 12.07.2011 14:26, Edzer Pebesma wrote:\n> I wrote a vignette for package spacetime that explains how massive\n> spacetime data sets in a PosgreSQL data base can be proxied by R objects\n> in package spacetime; see\n> https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw\n>\n> To compile it, it needs read/write access to a postgresql data base that\n> has postgis extensions. I assume CRAN doesn't have these. How do I carry\n> on with this? Can I tell CRAN to not try to compile it, or should I\n> upload it somewhere else? Or simply upload&  ignore?\n\nEdzer,\n\nyou can think about\n\n1. if it is possible to include some objects derived from the data \nrather than the whole data, but that contradicts the aim of the package, \nas far as I understand.\n\n2. just provide the pdf rather than the Rnw and calculate the vignette \nfor yourself only, but this way the users cannot run the code, if that \nis relevant.\n\n3. ask CRAN maintainers not to check the vignettes of your package. This \nis not standard and I am a bit reluctant to suggest exceptions, but \nsince most (if not all) of us have code in place to easily omit vignette \nchecks for particular packages this might be the most appropriate \nsolution here.\n\n\nKurt is on vacations, so it may take a while to get his response on \nthis. CCing Brian Ripley who runs checks for CRAN but does not read CRAN at ...\n\n\nBest wishes,\nUwe",
+      "body_snippet": "On 12.07.2011 14:26, Edzer Pebesma wrote:\n> I wrote a vignette for package spacetime that explains how massive\n> spacetime data sets in a PosgreSQL data base can be proxied by R objects\n> in package s",
+      "thread_id": "thread-0339ea7ae2a7",
+      "thread_depth": 1,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-d3687729aeaa",
+      "message_id": "<4E207AA5.5000408@uni-muenster.de>",
+      "from_name": "Edzer Pebesma",
+      "from_email_hash": "8c6adbfb13cc921a8bb8e1cfb02264929bbf4044d8ad148cd40d1f2dc9c49259",
+      "date": "2011-07-15T17:36:37Z",
+      "subject": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "subject_clean": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "in_reply_to": "<4E1CA690.7050206@statistik.tu-dortmund.de>",
+      "references": [
+        "<4E1C3D80.40708@uni-muenster.de>",
+        "<4E1CA690.7050206@statistik.tu-dortmund.de>"
+      ],
+      "body_plain": "Thanks Uwe! I decided to have the database sections with eval=FALSE, and\nupload a fully evaluated version off-CRAN; it's not a big deal after all.\n\nspacetime 0.5-1 is now on /incoming on CRAN.\n\nBest wishes,\n\nOn 07/12/2011 09:54 PM, Uwe Ligges wrote:\n> \n> \n> On 12.07.2011 14:26, Edzer Pebesma wrote:\n>> I wrote a vignette for package spacetime that explains how massive\n>> spacetime data sets in a PosgreSQL data base can be proxied by R objects\n>> in package spacetime; see\n>> https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw\n>>\n>>\n>> To compile it, it needs read/write access to a postgresql data base that\n>> has postgis extensions. I assume CRAN doesn't have these. How do I carry\n>> on with this? Can I tell CRAN to not try to compile it, or should I\n>> upload it somewhere else? Or simply upload&  ignore?\n> \n> Edzer,\n> \n> you can think about\n> \n> 1. if it is possible to include some objects derived from the data\n> rather than the whole data, but that contradicts the aim of the package,\n> as far as I understand.\n> \n> 2. just provide the pdf rather than the Rnw and calculate the vignette\n> for yourself only, but this way the users cannot run the code, if that\n> is relevant.\n> \n> 3. ask CRAN maintainers not to check the vignettes of your package. This\n> is not standard and I am a bit reluctant to suggest exceptions, but\n> since most (if not all) of us have code in place to easily omit vignette\n> checks for particular packages this might be the most appropriate\n> solution here.\n> \n> \n> Kurt is on vacations, so it may take a while to get his response on\n> this. CCing Brian Ripley who runs checks for CRAN but does not read\n> CRAN at ...\n> \n> \n> Best wishes,\n> Uwe\n\n-- \nEdzer Pebesma\nInstitute for Geoinformatics (ifgi), University of M?nster\nWeseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\nhttp://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": "Thanks Uwe! I decided to have the database sections with eval=FALSE, and\nupload a fully evaluated version off-CRAN; it's not a big deal after all.\n\nspacetime 0.5-1 is now on /incoming on CRAN.\n\nBest w",
+      "thread_id": "thread-0339ea7ae2a7",
+      "thread_depth": 2,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-d908fa65a4fe",
+      "message_id": "<4E2194D3.1060709@statistik.tu-dortmund.de>",
+      "from_name": "Uwe Ligges",
+      "from_email_hash": "41041d76fae21a8bc18fe19d38def92b3b630abfb7abf4acf41a0734d8851d24",
+      "date": "2011-07-16T13:40:35Z",
+      "subject": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "subject_clean": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "in_reply_to": "<4E207AA5.5000408@uni-muenster.de>",
+      "references": [
+        "<4E1C3D80.40708@uni-muenster.de>",
+        "<4E1CA690.7050206@statistik.tu-dortmund.de>",
+        "<4E207AA5.5000408@uni-muenster.de>"
+      ],
+      "body_plain": "On 15.07.2011 19:36, Edzer Pebesma wrote:\n> Thanks Uwe! I decided to have the database sections with eval=FALSE, and\n> upload a fully evaluated version off-CRAN; it's not a big deal after all.\n>\n> spacetime 0.5-1 is now on /incoming on CRAN.\n\n\nGreat, thanks,\nuwe\n\n> Best wishes,\n>\n> On 07/12/2011 09:54 PM, Uwe Ligges wrote:\n>>\n>>\n>> On 12.07.2011 14:26, Edzer Pebesma wrote:\n>>> I wrote a vignette for package spacetime that explains how massive\n>>> spacetime data sets in a PosgreSQL data base can be proxied by R objects\n>>> in package spacetime; see\n>>> https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw\n>>>\n>>>\n>>> To compile it, it needs read/write access to a postgresql data base that\n>>> has postgis extensions. I assume CRAN doesn't have these. How do I carry\n>>> on with this? Can I tell CRAN to not try to compile it, or should I\n>>> upload it somewhere else? Or simply upload&   ignore?\n>>\n>> Edzer,\n>>\n>> you can think about\n>>\n>> 1. if it is possible to include some objects derived from the data\n>> rather than the whole data, but that contradicts the aim of the package,\n>> as far as I understand.\n>>\n>> 2. just provide the pdf rather than the Rnw and calculate the vignette\n>> for yourself only, but this way the users cannot run the code, if that\n>> is relevant.\n>>\n>> 3. ask CRAN maintainers not to check the vignettes of your package. This\n>> is not standard and I am a bit reluctant to suggest exceptions, but\n>> since most (if not all) of us have code in place to easily omit vignette\n>> checks for particular packages this might be the most appropriate\n>> solution here.\n>>\n>>\n>> Kurt is on vacations, so it may take a while to get his response on\n>> this. CCing Brian Ripley who runs checks for CRAN but does not read\n>> CRAN at ...\n>>\n>>\n>> Best wishes,\n>> Uwe\n>",
+      "body_snippet": "On 15.07.2011 19:36, Edzer Pebesma wrote:\n> Thanks Uwe! I decided to have the database sections with eval=FALSE, and\n> upload a fully evaluated version off-CRAN; it's not a big deal after all.\n>\n> spa",
+      "thread_id": "thread-0339ea7ae2a7",
+      "thread_depth": 3,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-3077119bd1b0",
+      "message_id": "<20010.56267.204192.425792@fangorn.hornik.net>",
+      "from_name": "Kurt Hornik",
+      "from_email_hash": "6740dd468a52e648b787a10cae32d1e43b6db87654353fbd95012a5ae5b82a59",
+      "date": "2011-07-23T14:33:47Z",
+      "subject": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "subject_clean": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "in_reply_to": "<4E1B6C65.3030108@uni-muenster.de>",
+      "references": [
+        "<4E1B6C65.3030108@uni-muenster.de>"
+      ],
+      "body_plain": ">>>>> Edzer Pebesma writes:\n\n> now submitted to cran; should solve\n> https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html\n\nI get\n\n* checking Rd cross-references ... WARNING\nMissing link(s) in documentation object ?/home/Hornik/tmp/CRAN/sp.Rcheck/00_pkg_src/sp/man/gridlines.Rd?:\n  ?[rgdal]{llgridlines}?\n\nCan you pls fix?\n\nBest\n-k\n  \n> -- \n> Edzer Pebesma\n> Institute for Geoinformatics (ifgi), University of M?nster\n> Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n> 8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\n> http://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": ">>>>> Edzer Pebesma writes:\n\n> now submitted to cran; should solve\n> https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html\n\nI get\n\n* checking Rd cross-references ... WARNING\nMissing link(s) i",
+      "thread_id": "thread-c6b02eab9bb5",
+      "thread_depth": 1,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-5e72b01935de",
+      "message_id": "<20010.57244.966492.832945@fangorn.hornik.net>",
+      "from_name": "Kurt Hornik",
+      "from_email_hash": "6740dd468a52e648b787a10cae32d1e43b6db87654353fbd95012a5ae5b82a59",
+      "date": "2011-07-23T14:50:04Z",
+      "subject": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "subject_clean": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "in_reply_to": "<4E2194D3.1060709@statistik.tu-dortmund.de>",
+      "references": [
+        "<4E1C3D80.40708@uni-muenster.de>",
+        "<4E1CA690.7050206@statistik.tu-dortmund.de>",
+        "<4E207AA5.5000408@uni-muenster.de>",
+        "<4E2194D3.1060709@statistik.tu-dortmund.de>"
+      ],
+      "body_plain": ">>>>> Uwe Ligges writes:\n\n> On 15.07.2011 19:36, Edzer Pebesma wrote:\n>> Thanks Uwe! I decided to have the database sections with eval=FALSE, and\n>> upload a fully evaluated version off-CRAN; it's not a big deal after all.\n>> \n>> spacetime 0.5-1 is now on /incoming on CRAN.\n\nThanks, on CRAN now.\n\nBest\n-k\n\n\n\n> Great, thanks,\n> uwe\n\n>> Best wishes,\n>> \n>> On 07/12/2011 09:54 PM, Uwe Ligges wrote:\n>>> \n>>> \n>>> On 12.07.2011 14:26, Edzer Pebesma wrote:\n>>>> I wrote a vignette for package spacetime that explains how massive\n>>>> spacetime data sets in a PosgreSQL data base can be proxied by R objects\n>>>> in package spacetime; see\n>>>> https://svn.52north.org/svn/geostatistics/main/spacetime/inst/doc/stpg.Rnw\n>>>> \n>>>> \n>>>> To compile it, it needs read/write access to a postgresql data base that\n>>>> has postgis extensions. I assume CRAN doesn't have these. How do I carry\n>>>> on with this? Can I tell CRAN to not try to compile it, or should I\n>>>> upload it somewhere else? Or simply upload&   ignore?\n>>> \n>>> Edzer,\n>>> \n>>> you can think about\n>>> \n>>> 1. if it is possible to include some objects derived from the data\n>>> rather than the whole data, but that contradicts the aim of the package,\n>>> as far as I understand.\n>>> \n>>> 2. just provide the pdf rather than the Rnw and calculate the vignette\n>>> for yourself only, but this way the users cannot run the code, if that\n>>> is relevant.\n>>> \n>>> 3. ask CRAN maintainers not to check the vignettes of your package. This\n>>> is not standard and I am a bit reluctant to suggest exceptions, but\n>>> since most (if not all) of us have code in place to easily omit vignette\n>>> checks for particular packages this might be the most appropriate\n>>> solution here.\n>>> \n>>> \n>>> Kurt is on vacations, so it may take a while to get his response on\n>>> this. CCing Brian Ripley who runs checks for CRAN but does not read\n>>> CRAN at ...\n>>> \n>>> \n>>> Best wishes,\n>>> Uwe\n>>",
+      "body_snippet": ">>>>> Uwe Ligges writes:\n\n> On 15.07.2011 19:36, Edzer Pebesma wrote:\n>> Thanks Uwe! I decided to have the database sections with eval=FALSE, and\n>> upload a fully evaluated version off-CRAN; it's not",
+      "thread_id": "thread-0339ea7ae2a7",
+      "thread_depth": 4,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-48774e4da206",
+      "message_id": "<4E2AE522.2000600@uni-muenster.de>",
+      "from_name": "Edzer Pebesma",
+      "from_email_hash": "8c6adbfb13cc921a8bb8e1cfb02264929bbf4044d8ad148cd40d1f2dc9c49259",
+      "date": "2011-07-23T15:13:38Z",
+      "subject": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "subject_clean": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "in_reply_to": "<20010.56267.204192.425792@fangorn.hornik.net>",
+      "references": [
+        "<4E1B6C65.3030108@uni-muenster.de>",
+        "<20010.56267.204192.425792@fangorn.hornik.net>"
+      ],
+      "body_plain": "On 07/23/2011 04:33 PM, Kurt Hornik wrote:\n>>>>>> Edzer Pebesma writes:\n> \n>> now submitted to cran; should solve\n>> https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html\n> \n> I get\n> \n> * checking Rd cross-references ... WARNING\n> Missing link(s) in documentation object ?/home/Hornik/tmp/CRAN/sp.Rcheck/00_pkg_src/sp/man/gridlines.Rd?:\n>   ?[rgdal]{llgridlines}?\n> \n> Can you pls fix?\n> \nShould be fixed now.\n\nBests,\n\n> Best\n> -k\n>   \n>> -- \n>> Edzer Pebesma\n>> Institute for Geoinformatics (ifgi), University of M?nster\n>> Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n>> 8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\n>> http://www.52north.org/geostatistics      e.pebesma at wwu.de\n> \n> \n\n-- \nEdzer Pebesma\nInstitute for Geoinformatics (ifgi), University of M?nster\nWeseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\nhttp://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": "On 07/23/2011 04:33 PM, Kurt Hornik wrote:\n>>>>>> Edzer Pebesma writes:\n> \n>> now submitted to cran; should solve\n>> https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html\n> \n> I get\n> \n> * ch",
+      "thread_id": "thread-c6b02eab9bb5",
+      "thread_depth": 2,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-a0d57d558182",
+      "message_id": "<20010.61218.783884.116633@fangorn.hornik.net>",
+      "from_name": "Kurt Hornik",
+      "from_email_hash": "6740dd468a52e648b787a10cae32d1e43b6db87654353fbd95012a5ae5b82a59",
+      "date": "2011-07-23T15:56:18Z",
+      "subject": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "subject_clean": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "in_reply_to": "<4E2AE522.2000600@uni-muenster.de>",
+      "references": [
+        "<4E1B6C65.3030108@uni-muenster.de>",
+        "<20010.56267.204192.425792@fangorn.hornik.net>",
+        "<4E2AE522.2000600@uni-muenster.de>"
+      ],
+      "body_plain": ">>>>> Edzer Pebesma writes:\n\n> On 07/23/2011 04:33 PM, Kurt Hornik wrote:\n>>>>>>> Edzer Pebesma writes:\n>> \n>>> now submitted to cran; should solve\n>>> https://stat.ethz.ch/pipermail/r-sig-geo/2011-July/012176.html\n>> \n>> I get\n>> \n>> * checking Rd cross-references ... WARNING\n>> Missing link(s) in documentation object ?/home/Hornik/tmp/CRAN/sp.Rcheck/00_pkg_src/sp/man/gridlines.Rd?:\n>> ?[rgdal]{llgridlines}?\n>> \n>> Can you pls fix?\n>> \n\n> Should be fixed now.\n\nThanks, on CRAN now.\n\nBest\n-k\n\n\n> Bests,\n\n>> Best\n>> -k\n>> \n>>> -- \n>>> Edzer Pebesma\n>>> Institute for Geoinformatics (ifgi), University of M?nster\n>>> Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n>>> 8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\n>>> http://www.52north.org/geostatistics      e.pebesma at wwu.de\n>> \n>> \n\n> -- \n> Edzer Pebesma\n> Institute for Geoinformatics (ifgi), University of M?nster\n> Weseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n> 8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\n> http://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": ">>>>> Edzer Pebesma writes:\n\n> On 07/23/2011 04:33 PM, Kurt Hornik wrote:\n>>>>>>> Edzer Pebesma writes:\n>> \n>>> now submitted to cran; should solve\n>>> https://stat.ethz.ch/pipermail/r-sig-geo/2011-Ju",
+      "thread_id": "thread-c6b02eab9bb5",
+      "thread_depth": 3,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-944d3c1a4654",
+      "message_id": "<4E2D9E1F.2070609@uni-muenster.de>",
+      "from_name": "Edzer Pebesma",
+      "from_email_hash": "8c6adbfb13cc921a8bb8e1cfb02264929bbf4044d8ad148cd40d1f2dc9c49259",
+      "date": "2011-07-25T16:47:27Z",
+      "subject": "[Rspatial-devel] SpatialLinesDataFrame/match.ID-bug",
+      "subject_clean": "[Rspatial-devel] SpatialLinesDataFrame/match.ID-bug",
+      "in_reply_to": "<CAMbo+YV8QJG9wP2_0HxjZi0Xer_pvfSVi0wx98pDh35X93qGaQ@mail.gmail.com>",
+      "references": [
+        "<CAMbo+YV8QJG9wP2_0HxjZi0Xer_pvfSVi0wx98pDh35X93qGaQ@mail.gmail.com>"
+      ],
+      "body_plain": "I fixed this and committed to svn; it seems the same bug was there for\nPoints and Polygons as well. The line:\n\n        row.names(data) = data[match.ID[1]]\n\ndid not what we hoped it did, as data[match.ID[1]] returns a data.frame\nand not sth that can be coerced to a character vector. I changed this\nfor Lines, Points and Polygons into:\n\n        row.names(data) = data[, match.ID[1]]\n\nwhich does set the row.names properly.\n\nThanks for the clear report,\n\n\nOn 07/25/2011 05:39 PM, Thomas Schlesinger wrote:\n> Hey.\n> \n> My name is thomas Schlesinger and I found a bug in the match.ID paramater in\n> sp:::SpatialLinesDataFrame. I'm writing the problem down:\n> \n> bodSouth<-data.frame(lat=c(8.94,9.49,9.72), lon=c(47.73,47.48,47.50))\n> bodNorth<-data.frame(lat=c(9.05,9.48,9.75), lon=c(47.8,47.65,47.51))\n> bodSouthLine<-Line(bodSouth)\n> bodNorthLine<-Line(bodNorth)\n> bodLines<-Lines(list(bodSouthLine,bodNorthLine), ID=\"Bodensee\")\n> crs<- CRS(\"+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs\")\n> SPBoden<-SpatialLines(list(bodLines), proj4string=crs)\n> bodenData<-data.frame(name=\"Bodensee\", deep=254, height=395)\n> SPDFboden<-SpatialLinesDataFrame(SPBoden, bodenData, match.ID=\"name\")\n> It should match the ID \"Bodensee\" with the Lines-ID \"Bodensee\". but it\n> doesn't.\n> \n> I think the problem is solved if you change the 2nd line in the\n> SpatialLinesDataFrame-function from\n> row.names(data) = data[match.ID[1]]    (this is class data.frame)\n> to\n> row.names(data) = data[match.ID[1]][,1]   (this is class factor)\n> \n> I hope this solves the problem. Please let me know, if it worked.\n> \n> greetings :)\n> Thomas\n> \n\n-- \nEdzer Pebesma\nInstitute for Geoinformatics (ifgi), University of M?nster\nWeseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\nhttp://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": "I fixed this and committed to svn; it seems the same bug was there for\nPoints and Polygons as well. The line:\n\n        row.names(data) = data[match.ID[1]]\n\ndid not what we hoped it did, as data[match.",
+      "thread_id": "thread-944d3c1a4654",
+      "thread_depth": 0,
+      "month": "2011-07"
+    },
+    {
+      "id": "msg-65132868396a",
+      "message_id": "<4E2D9FF4.60200@uni-muenster.de>",
+      "from_name": "Edzer Pebesma",
+      "from_email_hash": "8c6adbfb13cc921a8bb8e1cfb02264929bbf4044d8ad148cd40d1f2dc9c49259",
+      "date": "2011-07-25T16:55:16Z",
+      "subject": "[Rspatial-devel] SpatialLinesDataFrame/match.ID-bug",
+      "subject_clean": "[Rspatial-devel] SpatialLinesDataFrame/match.ID-bug",
+      "in_reply_to": "<4E2D9E1F.2070609@uni-muenster.de>",
+      "references": [
+        "<CAMbo+YV8QJG9wP2_0HxjZi0Xer_pvfSVi0wx98pDh35X93qGaQ@mail.gmail.com>",
+        "<4E2D9E1F.2070609@uni-muenster.de>"
+      ],
+      "body_plain": "Of course, Thomas, your solution also worked, as would have\n\n  row.names(data) = data[[ match.ID[1] ]]\n\nbut mine was shorter ;-) A question remains why this ever worked, or\ndidn't it?\n\nOn 07/25/2011 06:47 PM, Edzer Pebesma wrote:\n> I fixed this and committed to svn; it seems the same bug was there for\n> Points and Polygons as well. The line:\n> \n>         row.names(data) = data[match.ID[1]]\n> \n> did not what we hoped it did, as data[match.ID[1]] returns a data.frame\n> and not sth that can be coerced to a character vector. I changed this\n> for Lines, Points and Polygons into:\n> \n>         row.names(data) = data[, match.ID[1]]\n> \n> which does set the row.names properly.\n> \n> Thanks for the clear report,\n> \n> \n> On 07/25/2011 05:39 PM, Thomas Schlesinger wrote:\n>> Hey.\n>>\n>> My name is thomas Schlesinger and I found a bug in the match.ID paramater in\n>> sp:::SpatialLinesDataFrame. I'm writing the problem down:\n>>\n>> bodSouth<-data.frame(lat=c(8.94,9.49,9.72), lon=c(47.73,47.48,47.50))\n>> bodNorth<-data.frame(lat=c(9.05,9.48,9.75), lon=c(47.8,47.65,47.51))\n>> bodSouthLine<-Line(bodSouth)\n>> bodNorthLine<-Line(bodNorth)\n>> bodLines<-Lines(list(bodSouthLine,bodNorthLine), ID=\"Bodensee\")\n>> crs<- CRS(\"+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs\")\n>> SPBoden<-SpatialLines(list(bodLines), proj4string=crs)\n>> bodenData<-data.frame(name=\"Bodensee\", deep=254, height=395)\n>> SPDFboden<-SpatialLinesDataFrame(SPBoden, bodenData, match.ID=\"name\")\n>> It should match the ID \"Bodensee\" with the Lines-ID \"Bodensee\". but it\n>> doesn't.\n>>\n>> I think the problem is solved if you change the 2nd line in the\n>> SpatialLinesDataFrame-function from\n>> row.names(data) = data[match.ID[1]]    (this is class data.frame)\n>> to\n>> row.names(data) = data[match.ID[1]][,1]   (this is class factor)\n>>\n>> I hope this solves the problem. Please let me know, if it worked.\n>>\n>> greetings :)\n>> Thomas\n>>\n> \n\n-- \nEdzer Pebesma\nInstitute for Geoinformatics (ifgi), University of M?nster\nWeseler Stra?e 253, 48151 M?nster, Germany. Phone: +49 251\n8333081, Fax: +49 251 8339763  http://ifgi.uni-muenster.de\nhttp://www.52north.org/geostatistics      e.pebesma at wwu.de",
+      "body_snippet": "Of course, Thomas, your solution also worked, as would have\n\n  row.names(data) = data[[ match.ID[1] ]]\n\nbut mine was shorter ;-) A question remains why this ever worked, or\ndidn't it?\n\nOn 07/25/2011 0",
+      "thread_id": "thread-944d3c1a4654",
+      "thread_depth": 1,
+      "month": "2011-07"
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-354716890b95",
+      "subject": "[Rspatial-devel] Fwd: [R-sig-Geo] coercing SpatialGrid to SpatialPoints",
+      "message_count": 1,
+      "participants": [
+        "Edzer Pebesma"
+      ],
+      "started": "2011-07-10T11:28:26Z",
+      "last_reply": "2011-07-10T11:28:26Z",
+      "root_message_id": "msg-354716890b95"
+    },
+    {
+      "id": "thread-dd52d32e798e",
+      "subject": "[Rspatial-devel] points2grid",
+      "message_count": 1,
+      "participants": [
+        "Edzer Pebesma"
+      ],
+      "started": "2011-07-10T14:01:22Z",
+      "last_reply": "2011-07-10T14:01:22Z",
+      "root_message_id": "msg-dd52d32e798e"
+    },
+    {
+      "id": "thread-c6b02eab9bb5",
+      "subject": "[Rspatial-devel] sp_0.9-84.tar.gz",
+      "message_count": 4,
+      "participants": [
+        "Edzer Pebesma",
+        "Kurt Hornik"
+      ],
+      "started": "2011-07-11T21:34:29Z",
+      "last_reply": "2011-07-23T15:56:18Z",
+      "root_message_id": "msg-c6b02eab9bb5"
+    },
+    {
+      "id": "thread-0339ea7ae2a7",
+      "subject": "[Rspatial-devel] vignette that depends on PosgreSQL data base access",
+      "message_count": 5,
+      "participants": [
+        "Edzer Pebesma",
+        "Kurt Hornik",
+        "Uwe Ligges"
+      ],
+      "started": "2011-07-12T12:26:40Z",
+      "last_reply": "2011-07-23T14:50:04Z",
+      "root_message_id": "msg-0339ea7ae2a7"
+    },
+    {
+      "id": "thread-944d3c1a4654",
+      "subject": "[Rspatial-devel] SpatialLinesDataFrame/match.ID-bug",
+      "message_count": 2,
+      "participants": [
+        "Edzer Pebesma"
+      ],
+      "started": "2011-07-25T16:47:27Z",
+      "last_reply": "2011-07-25T16:55:16Z",
+      "root_message_id": "msg-944d3c1a4654"
+    }
+  ]
+}

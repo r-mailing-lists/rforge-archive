@@ -1,0 +1,424 @@
+From mgagliol at ulb.ac.be  Mon Oct  8 16:33:23 2012
+From: mgagliol at ulb.ac.be (Matteo Gagliolo)
+Date: Mon, 08 Oct 2012 16:33:23 +0200
+Subject: [Rsiena-help] Effects of covariate similarity on the evolution of a
+	bipartite graph?
+Message-ID: <1751982.7egL71asOx@putnam>
+
+Dear RSiena users,
+
+	I'm trying to analyze a two-mode network representing
+interlocking directorates. I have covariates for the mode 
+corresponding to boards, and I would like to see if there is 
+a tendency of directors to join boards with similar covariates
+(or equivalently, a tendency of boards to form interlocks with 
+similar boards). Sort of an homophily at distance 2.
+
+Taking the boards as mode one, I think this effect could be 
+implemented as an interaction among egoX and altDist2,
+as the latter would represent the average X of boards on which
+a certain director is already sitting.
+
+Here comes my problem: altDist2 is currently "blacklisted" in the 
+code for bipartite nets. Diving into the code (RSienaTest r. 220)
+I found out where it all happens: in file effects.r:773, function 
+covarBipartiteEff (comments are mine, to explain the issue):
+---
+covarBipartiteEff<- function(covarname, poszvar, moreThan2, nodesetNbr,
+                                 name)
+    {
+        covRateEffects  <-  NULL
+        if (nodesetNbr == 1) 
+        {#This is the branch taken as the covariate is on the 1st mode(boards)
+            covObjEffects <-
+                createEffects("covarBipartiteObjective", covarname,
+                              name=varname,
+                              groupName=groupName, group=group,
+                              netType=netType) #This returns "altX"  "altSqX"    
+"egoX"    "altDist2" "simDist2", each replicated as eval/creat/endow
+            covObjEffects <-
+                covObjEffects[covObjEffects$shortName %in%
+                              c("egoX"), ] #Here only "egoX" effects are 
+selected
+ ---          
+
+So, it seems the code is currently allowing only for egoX effects for
+covariates of the 1st mode.
+
+Does anyone have an idea why? As all distance 2 nodes are in the same mode, I 
+don't see why altDist2 and simDist2 should be blacklisted. 
+
+Or maybe there is a more correct way to implement the "distance 2 
+homophily" I am interested in?
+
+Thanks,
+
+Matteo
+
+-- 
+Matteo Gagliolo <mgagliol at ulb.ac.be>
+Group for research on Ethnic Relations, Migration and Equality (GERME),
+Institute of Sociology;
+Machine Learning Group (MLG), Computer Science Department.
+Universit? Libre de Bruxelles (ULB).
+GERME, ULB, CP 124, 44 av. Jeanne
+1050 Brussels, Belgium
+Phone +32 2 650 4798, Fax +32 2 650 4659
+http://homepages.ulb.ac.be/~mgagliol/
+
+
+From Tom.Snijders at nuffield.ox.ac.uk  Mon Oct  8 18:04:06 2012
+From: Tom.Snijders at nuffield.ox.ac.uk (Tom Snijders)
+Date: Mon, 8 Oct 2012 17:04:06 +0100
+Subject: [Rsiena-help] Effects of covariate similarity on the evolution
+ of a	bipartite graph?
+In-Reply-To: <1751982.7egL71asOx@putnam>
+References: <1751982.7egL71asOx@putnam>
+Message-ID: <56E87F0F0FACC14DBFA30EFC8240072602E768559029@nuff-shetland.nuff.ox.ac.uk>
+
+Dear Matteo,
+
+That is an interesting topic. For the moment this effect has been blacklisted only because this distance-2 effect still needs to be checked once more (also in its one-mode version) and because the filtering of effects to allow them in the 2-mode version still is incomplete. You are right that it should be allowed in.
+If you (or anyone) wishes to contribute and speed this up, then the first thing would be to check that the target statistics for this effect in its one-mode version as reported in the output are identical to what one should expect from the definition of the effect in the manual. This will be the first thing I would want to do as a first step to incorporate this effect in the two-mode version.
+Best wishes,
+Tom
+
+================================================================
+Tom A.B. Snijders
+Professor of Statistics in the Social Sciences
+Department of Politics and Department of Statistics
+Nuffield College
+University of Oxford
+tel. +44-01865-278599
+
+
+-----Original Message-----
+From: rsiena-help-bounces at lists.r-forge.r-project.org [mailto:rsiena-help-bounces at lists.r-forge.r-project.org] On Behalf Of Matteo Gagliolo
+Sent: 08 October 2012 15:33
+To: rsiena-help at lists.r-forge.r-project.org
+Subject: [Rsiena-help] Effects of covariate similarity on the evolution of a bipartite graph?
+
+Dear RSiena users,
+
+        I'm trying to analyze a two-mode network representing interlocking directorates. I have covariates for the mode corresponding to boards, and I would like to see if there is a tendency of directors to join boards with similar covariates (or equivalently, a tendency of boards to form interlocks with similar boards). Sort of an homophily at distance 2.
+
+Taking the boards as mode one, I think this effect could be implemented as an interaction among egoX and altDist2, as the latter would represent the average X of boards on which a certain director is already sitting.
+
+Here comes my problem: altDist2 is currently "blacklisted" in the code for bipartite nets. Diving into the code (RSienaTest r. 220) I found out where it all happens: in file effects.r:773, function covarBipartiteEff (comments are mine, to explain the issue):
+---
+covarBipartiteEff<- function(covarname, poszvar, moreThan2, nodesetNbr,
+                                 name)
+    {
+        covRateEffects  <-  NULL
+        if (nodesetNbr == 1)
+        {#This is the branch taken as the covariate is on the 1st mode(boards)
+            covObjEffects <-
+                createEffects("covarBipartiteObjective", covarname,
+                              name=varname,
+                              groupName=groupName, group=group,
+                              netType=netType) #This returns "altX"  "altSqX"
+"egoX"    "altDist2" "simDist2", each replicated as eval/creat/endow
+            covObjEffects <-
+                covObjEffects[covObjEffects$shortName %in%
+                              c("egoX"), ] #Here only "egoX" effects are selected
+ ---
+
+So, it seems the code is currently allowing only for egoX effects for covariates of the 1st mode.
+
+Does anyone have an idea why? As all distance 2 nodes are in the same mode, I don't see why altDist2 and simDist2 should be blacklisted.
+
+Or maybe there is a more correct way to implement the "distance 2 homophily" I am interested in?
+
+Thanks,
+
+Matteo
+
+--
+Matteo Gagliolo <mgagliol at ulb.ac.be>
+Group for research on Ethnic Relations, Migration and Equality (GERME), Institute of Sociology; Machine Learning Group (MLG), Computer Science Department.
+Universit? Libre de Bruxelles (ULB).
+GERME, ULB, CP 124, 44 av. Jeanne
+1050 Brussels, Belgium
+Phone +32 2 650 4798, Fax +32 2 650 4659 http://homepages.ulb.ac.be/~mgagliol/
+
+_______________________________________________
+Rsiena-help mailing list
+Rsiena-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rsiena-help
+
+Nuffield College is a Registered Charity No. 1137506. Registered Office: Nuffield College, New Road, Oxford, OX1 1NF
+
+From mgagliol at ulb.ac.be  Mon Oct  8 19:18:40 2012
+From: mgagliol at ulb.ac.be (Matteo Gagliolo)
+Date: Mon, 08 Oct 2012 19:18:40 +0200
+Subject: [Rsiena-help] Effects of covariate similarity on the evolution
+	of a bipartite graph?
+In-Reply-To: <56E87F0F0FACC14DBFA30EFC8240072602E768559029@nuff-shetland.nuff.ox.ac.uk>
+References: <1751982.7egL71asOx@putnam>
+ <56E87F0F0FACC14DBFA30EFC8240072602E768559029@nuff-shetland.nuff.ox.ac.uk>
+Message-ID: <4178462.fYqlKhtKVd@putnam>
+
+Dear Tom,
+
+       I really need this effect in my research, so I'll see what I can do and 
+keep you posted. Help from other users is obviously more than 
+welcome! 
+
+Best regards,  
+
+Matteo
+
+On Monday 08 October 2012 17:04:06 you wrote:
+> Dear Matteo,
+> 
+> That is an interesting topic. For the moment this effect has been
+> blacklisted only because this distance-2 effect still needs to be checked
+> once more (also in its one-mode version) and because the filtering of
+> effects to allow them in the 2-mode version still is incomplete. You are
+> right that it should be allowed in. If you (or anyone) wishes to contribute
+> and speed this up, then the first thing would be to check that the target
+> statistics for this effect in its one-mode version as reported in the
+> output are identical to what one should expect from the definition of the
+> effect in the manual. This will be the first thing I would want to do as a
+> first step to incorporate this effect in the two-mode version. Best wishes,
+> Tom
+> 
+> ================================================================
+> Tom A.B. Snijders
+> Professor of Statistics in the Social Sciences
+> Department of Politics and Department of Statistics
+> Nuffield College
+> University of Oxford
+> tel. +44-01865-278599
+> 
+> 
+> -----Original Message-----
+> From: rsiena-help-bounces at lists.r-forge.r-project.org
+> [mailto:rsiena-help-bounces at lists.r-forge.r-project.org] On Behalf Of
+> Matteo Gagliolo Sent: 08 October 2012 15:33
+> To: rsiena-help at lists.r-forge.r-project.org
+> Subject: [Rsiena-help] Effects of covariate similarity on the evolution of a
+> bipartite graph?
+> 
+> Dear RSiena users,
+> 
+>         I'm trying to analyze a two-mode network representing interlocking
+> directorates. I have covariates for the mode corresponding to boards, and I
+> would like to see if there is a tendency of directors to join boards with
+> similar covariates (or equivalently, a tendency of boards to form
+> interlocks with similar boards). Sort of an homophily at distance 2.
+> 
+> Taking the boards as mode one, I think this effect could be implemented as
+> an interaction among egoX and altDist2, as the latter would represent the
+> average X of boards on which a certain director is already sitting.
+> 
+> Here comes my problem: altDist2 is currently "blacklisted" in the code for
+> bipartite nets. Diving into the code (RSienaTest r. 220) I found out where
+> it all happens: in file effects.r:773, function covarBipartiteEff (comments
+> are mine, to explain the issue): ---
+> covarBipartiteEff<- function(covarname, poszvar, moreThan2, nodesetNbr,
+>                                  name)
+>     {
+>         covRateEffects  <-  NULL
+>         if (nodesetNbr == 1)
+>         {#This is the branch taken as the covariate is on the 1st
+> mode(boards) covObjEffects <-
+>                 createEffects("covarBipartiteObjective", covarname,
+>                               name=varname,
+>                               groupName=groupName, group=group,
+>                               netType=netType) #This returns "altX" 
+> "altSqX" "egoX"    "altDist2" "simDist2", each replicated as
+> eval/creat/endow covObjEffects <-
+>                 covObjEffects[covObjEffects$shortName %in%
+>                               c("egoX"), ] #Here only "egoX" effects are
+> selected ---
+> 
+> So, it seems the code is currently allowing only for egoX effects for
+> covariates of the 1st mode.
+> 
+> Does anyone have an idea why? As all distance 2 nodes are in the same mode,
+> I don't see why altDist2 and simDist2 should be blacklisted.
+> 
+> Or maybe there is a more correct way to implement the "distance 2 homophily"
+> I am interested in?
+> 
+> Thanks,
+> 
+> Matteo
+> 
+> --
+> Matteo Gagliolo <mgagliol at ulb.ac.be>
+> Group for research on Ethnic Relations, Migration and Equality (GERME),
+> Institute of Sociology; Machine Learning Group (MLG), Computer Science
+> Department. Universit? Libre de Bruxelles (ULB).
+> GERME, ULB, CP 124, 44 av. Jeanne
+> 1050 Brussels, Belgium
+> Phone +32 2 650 4798, Fax +32 2 650 4659
+> http://homepages.ulb.ac.be/~mgagliol/
+> 
+> _______________________________________________
+> Rsiena-help mailing list
+> Rsiena-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rsiena-help
+> 
+> Nuffield College is a Registered Charity No. 1137506. Registered Office:
+> Nuffield College, New Road, Oxford, OX1 1NF
+-- 
+Matteo Gagliolo <mgagliol at ulb.ac.be>
+Group for research on Ethnic Relations, Migration and Equality (GERME),
+Institute of Sociology;
+Machine Learning Group (MLG), Computer Science Department.
+Universit? Libre de Bruxelles (ULB).
+GERME, ULB, CP 124, 44 av. Jeanne
+1050 Brussels, Belgium
+Phone +32 2 650 4798, Fax +32 2 650 4659
+http://homepages.ulb.ac.be/~mgagliol/
+
+
+From Tom.Snijders at nuffield.ox.ac.uk  Wed Oct 10 11:11:52 2012
+From: Tom.Snijders at nuffield.ox.ac.uk (Tom Snijders)
+Date: Wed, 10 Oct 2012 10:11:52 +0100
+Subject: [Rsiena-help] Effects of covariate similarity on the evolution
+ of a bipartite graph?
+In-Reply-To: <4178462.fYqlKhtKVd@putnam>
+References: <1751982.7egL71asOx@putnam>
+ <56E87F0F0FACC14DBFA30EFC8240072602E768559029@nuff-shetland.nuff.ox.ac.uk>
+ <4178462.fYqlKhtKVd@putnam>
+Message-ID: <56E87F0F0FACC14DBFA30EFC8240072602E768559030@nuff-shetland.nuff.ox.ac.uk>
+
+Dear Matteo,
+
+>From your first post and your second affiliation I guess that you are well-experienced in programming, and evidently you are welcome to modify RSiena to include this effect for two-mode networks. If later on you want some confirmation of what you've done I shall be happy to look at it.
+
+Best wishes,
+Tom
+
+================================================================
+Tom A.B. Snijders
+Professor of Statistics in the Social Sciences
+Department of Politics and Department of Statistics
+Nuffield College
+University of Oxford
+tel. +44-01865-278599
+
+
+-----Original Message-----
+From: Matteo Gagliolo [mailto:mgagliol at ulb.ac.be]
+Sent: 08 October 2012 18:19
+To: rsiena-help at lists.r-forge.r-project.org
+Cc: Tom Snijders
+Subject: Re: [Rsiena-help] Effects of covariate similarity on the evolution of a bipartite graph?
+
+Dear Tom,
+
+       I really need this effect in my research, so I'll see what I can do and keep you posted. Help from other users is obviously more than welcome!
+
+Best regards,
+
+Matteo
+
+On Monday 08 October 2012 17:04:06 you wrote:
+> Dear Matteo,
+>
+> That is an interesting topic. For the moment this effect has been
+> blacklisted only because this distance-2 effect still needs to be
+> checked once more (also in its one-mode version) and because the
+> filtering of effects to allow them in the 2-mode version still is
+> incomplete. You are right that it should be allowed in. If you (or
+> anyone) wishes to contribute and speed this up, then the first thing
+> would be to check that the target statistics for this effect in its
+> one-mode version as reported in the output are identical to what one
+> should expect from the definition of the effect in the manual. This
+> will be the first thing I would want to do as a first step to
+> incorporate this effect in the two-mode version. Best wishes, Tom
+>
+> ================================================================
+> Tom A.B. Snijders
+> Professor of Statistics in the Social Sciences Department of Politics
+> and Department of Statistics Nuffield College University of Oxford
+> tel. +44-01865-278599
+>
+>
+> -----Original Message-----
+> From: rsiena-help-bounces at lists.r-forge.r-project.org
+> [mailto:rsiena-help-bounces at lists.r-forge.r-project.org] On Behalf Of
+> Matteo Gagliolo Sent: 08 October 2012 15:33
+> To: rsiena-help at lists.r-forge.r-project.org
+> Subject: [Rsiena-help] Effects of covariate similarity on the
+> evolution of a bipartite graph?
+>
+> Dear RSiena users,
+>
+>         I'm trying to analyze a two-mode network representing
+> interlocking directorates. I have covariates for the mode
+> corresponding to boards, and I would like to see if there is a
+> tendency of directors to join boards with similar covariates (or
+> equivalently, a tendency of boards to form interlocks with similar boards). Sort of an homophily at distance 2.
+>
+> Taking the boards as mode one, I think this effect could be
+> implemented as an interaction among egoX and altDist2, as the latter
+> would represent the average X of boards on which a certain director is already sitting.
+>
+> Here comes my problem: altDist2 is currently "blacklisted" in the code
+> for bipartite nets. Diving into the code (RSienaTest r. 220) I found
+> out where it all happens: in file effects.r:773, function
+> covarBipartiteEff (comments are mine, to explain the issue): ---
+> covarBipartiteEff<- function(covarname, poszvar, moreThan2, nodesetNbr,
+>                                  name)
+>     {
+>         covRateEffects  <-  NULL
+>         if (nodesetNbr == 1)
+>         {#This is the branch taken as the covariate is on the 1st
+> mode(boards) covObjEffects <-
+>                 createEffects("covarBipartiteObjective", covarname,
+>                               name=varname,
+>                               groupName=groupName, group=group,
+>                               netType=netType) #This returns "altX"
+> "altSqX" "egoX"    "altDist2" "simDist2", each replicated as
+> eval/creat/endow covObjEffects <-
+>                 covObjEffects[covObjEffects$shortName %in%
+>                               c("egoX"), ] #Here only "egoX" effects
+> are selected ---
+>
+> So, it seems the code is currently allowing only for egoX effects for
+> covariates of the 1st mode.
+>
+> Does anyone have an idea why? As all distance 2 nodes are in the same
+> mode, I don't see why altDist2 and simDist2 should be blacklisted.
+>
+> Or maybe there is a more correct way to implement the "distance 2 homophily"
+> I am interested in?
+>
+> Thanks,
+>
+> Matteo
+>
+> --
+> Matteo Gagliolo <mgagliol at ulb.ac.be>
+> Group for research on Ethnic Relations, Migration and Equality
+> (GERME), Institute of Sociology; Machine Learning Group (MLG),
+> Computer Science Department. Universit? Libre de Bruxelles (ULB).
+> GERME, ULB, CP 124, 44 av. Jeanne
+> 1050 Brussels, Belgium
+> Phone +32 2 650 4798, Fax +32 2 650 4659
+> http://homepages.ulb.ac.be/~mgagliol/
+>
+> _______________________________________________
+> Rsiena-help mailing list
+> Rsiena-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rsiena-he
+> lp
+>
+> Nuffield College is a Registered Charity No. 1137506. Registered Office:
+> Nuffield College, New Road, Oxford, OX1 1NF
+--
+Matteo Gagliolo <mgagliol at ulb.ac.be>
+Group for research on Ethnic Relations, Migration and Equality (GERME), Institute of Sociology; Machine Learning Group (MLG), Computer Science Department.
+Universit? Libre de Bruxelles (ULB).
+GERME, ULB, CP 124, 44 av. Jeanne
+1050 Brussels, Belgium
+Phone +32 2 650 4798, Fax +32 2 650 4659 http://homepages.ulb.ac.be/~mgagliol/
+
+
+Nuffield College is a Registered Charity No. 1137506. Registered Office: Nuffield College, New Road, Oxford, OX1 1NF
+

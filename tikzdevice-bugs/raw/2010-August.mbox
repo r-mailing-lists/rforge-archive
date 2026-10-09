@@ -1,0 +1,451 @@
+From chuck at sharpsteen.net  Mon Aug  2 16:19:34 2010
+From: chuck at sharpsteen.net (Charlie Sharpsteen)
+Date: Mon, 2 Aug 2010 07:19:34 -0700
+Subject: [Tikzdevice-bugs] Arial and Other Things
+In-Reply-To: <1280492979.20313.5.camel@plutone>
+References: <1280155092.24438.18.camel@plutone>
+	<AANLkTin6dv4Ozf3ewin8MERJZUMgk=j6D4oY1o51mbqK@mail.gmail.com>
+	<1280182365.1837.43.camel@rattlesnake>
+	<AANLkTimsRxoh1xipPmwjFMRnWmkj5zez+MStoB1wELeD@mail.gmail.com>
+	<1280249645.24755.66.camel@plutone>
+	<AANLkTi=JpN3xVGSz3G1WWxvYYShSzmozOc3Ai325ir_5@mail.gmail.com>
+	<1280428856.1842.25.camel@rattlesnake>
+	<AANLkTikU3avmnSin3Hd9KwOSBkUvzERg5vJsxXr8Opvq@mail.gmail.com>
+	<1280492979.20313.5.camel@plutone>
+Message-ID: <AANLkTinxYmnQ+f+xJ3BO-qhOmQRyjvGwKbjcunEiTwZu@mail.gmail.com>
+
+Hi Lorenzo,
+
+Thanks again for submitting this example. ?I actually came?across?this
+bug earlier this year and thought I had solved it:
+
+  http://github.com/Sharpie/RTikZDevice/issues/1
+
+But your example led Cameron and I to re-examine the way string widths
+and metrics are calculated and we discovered a subtle bug that I think
+was the root cause of this issue. ?The problem is that the tikzDevice
+must calculate widths and font metrics for arbitrary strings of LaTeX
+such as:
+
+$\\alpha$
+
+Which is 9 characters long in an R script but only 1 character when
+typeset. ?The solution we use is to compile a small "stub" of a LaTeX
+file which dumps the character metrics to a log file. ?We then scan
+the log file and retrieve the numbers we need. ?This approach came for
+a post Cameron made to comp.text.tex:
+
+  http://groups.google.com/group/comp.text.tex/browse_thread/thread/1846e8c3cb8edb5b/4fbcb097aa22b31b?lnk=gst&q=cameron+bracken#4fbcb097aa22b31b
+
+We have used Heiko Oberdiek's solution with slight modifications. ?The
+problem is that the template provided in that post did not include a
+\begin{document} statement. ?Apparently, there are some font setup
+things related to the?\renewcommand{\rmdefault}{phv} you tried that
+don't happen unless \begin{document} is in the source file. ?We never
+noticed because this issue did not affect Computer Modern or alternate
+font packages like Mathpazo.
+So, \begin{document} has been added to the font metrics stub and it
+appears to be solving the problem. ?I have added it to a build of
+0.5.0 that is now a candidate for being the version that will be
+published to CRAN. ?You should be able to install it from R-Forge in
+the next couple of days once it finishes building:
+
+install.packages( 'tikzDevice', repos = 'http://r-forge.r-project.org' )
+
+Thanks again for taking the time to make this bug report!
+
+
+P.S.
+
+In response to your earlier question about setting fonts in a similar
+fashion to other R graphics devices such as pdf(): we don't allow this
+as Cameron mentioned.  The reason is that we want the fonts used in
+production of graphics to be the exact same fonts that are used to set
+the text in a LaTeX paper.  If we allowed R to choose fonts, the
+graphic would end up being designed using fonts such as Helvetica.
+However, when the user goes to typeset their paper and specifies
+Helvetica, LaTeX may use a Helvetica clone such as Nimbus or Heros.
+These fonts are designed to look the same as Helvetica, but there are
+subtle differences.  The end effect would spoil the typographic
+harmony we are trying to achieve with this device.  See this page for
+more information on the fonts LaTeX uses:
+
+  http://www.tug.dk/FontCatalogue/helvetica/
+
+So- all decisions concerning are left to LaTeX.  I do agree that we
+need to hammer out an easier way of allowing users to specify font
+choices.  This will probably come when we figure out what to do about
+UTF8 support as it ties into issues with LaTeX fonts.
+
+-Charlie
+
+On Fri, Jul 30, 2010 at 5:29 AM, Lorenzo Isella
+<lorenzo.isella at gmail.com> wrote:
+>
+> I see. Would it be possible to find out more about how you fixed the
+> plot (i.e.: is there a patch or something I can use as a temporary quick
+> and dirty solution)?
+> Last but not least: once this glitch has been ironed out, will it be
+> communicated via this mailing list?
+> Cheers and have a nice weekend
+>
+> Lorenzo
+>
+>
+> On Thu, 2010-07-29 at 16:56 -0600, Cameron Bracken wrote:
+> > Hi Lorenzo-
+> >
+> > We specifically don't allow the user to set the font family in the
+> > traditional way because we expect the user to do that though LaTeX or
+> > the document header options. Unfortunately this is directly related to
+> > the previous problem:
+> >
+> > There is definitely a bug in selecting fonts. It seems as though
+> > Computer Modern was always used regardless of the font choice but I
+> > never noticed because I used fonts with very similar metrics to cm.
+> > Anyway, I hacked the code and got it to work (you can see from the
+> > attached plot), but there is no general solution yet. ?We will have to
+> > figure out how we want to approach this problem from a user
+> > perspective since the expected methods do not work.
+> >
+> > -Cameron
+> >
+> >
+> >
+> > On Thu, Jul 29, 2010 at 12:40 PM, Lorenzo Isella
+> > <lorenzo.isella at gmail.com> wrote:
+> > > On Tue, 2010-07-27 at 10:28 -0700, Charlie Sharpsteen wrote:
+> > >> Thanks for taking the time to put together this example Lorenzo, I
+> > >> will play with it and see if I can't figure something out.
+> > >
+> > > Hi,
+> > > In case it matters, please take a look at
+> > >
+> > > http://bit.ly/9ATz9V
+> > >
+> > > where it is explained how to use arial fonts in R. I tried the
+> > > suggestion (BTW, the path is /usr/share/fonts/truetype/msttcorefonts/ on
+> > > my Ubuntu machine).
+> > > The recipe allowed me to use arial fonts in ggplot2 plots (where I was
+> > > using simply pdf() and not tikzDevice to generate the pdf file).
+> > > I do not know if I can specify the font family in a tikzDevice call, but
+> > > you probably do ;-).
+> > > Cheers
+> > >
+> > > Lorenzo
+> > >
+> > > _______________________________________________
+> > > Tikzdevice-bugs mailing list
+> > > Tikzdevice-bugs at lists.r-forge.r-project.org
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tikzdevice-bugs
+> > >
+>
+>
+
+From lorenzo.isella at gmail.com  Mon Aug  2 17:33:29 2010
+From: lorenzo.isella at gmail.com (Lorenzo Isella)
+Date: Mon, 02 Aug 2010 17:33:29 +0200
+Subject: [Tikzdevice-bugs] Arial and Other Things
+In-Reply-To: <AANLkTinxYmnQ+f+xJ3BO-qhOmQRyjvGwKbjcunEiTwZu@mail.gmail.com>
+References: <1280155092.24438.18.camel@plutone>
+	<AANLkTin6dv4Ozf3ewin8MERJZUMgk=j6D4oY1o51mbqK@mail.gmail.com>
+	<1280182365.1837.43.camel@rattlesnake>
+	<AANLkTimsRxoh1xipPmwjFMRnWmkj5zez+MStoB1wELeD@mail.gmail.com>
+	<1280249645.24755.66.camel@plutone>
+	<AANLkTi=JpN3xVGSz3G1WWxvYYShSzmozOc3Ai325ir_5@mail.gmail.com>
+	<1280428856.1842.25.camel@rattlesnake>
+	<AANLkTikU3avmnSin3Hd9KwOSBkUvzERg5vJsxXr8Opvq@mail.gmail.com>
+	<1280492979.20313.5.camel@plutone>
+	<AANLkTinxYmnQ+f+xJ3BO-qhOmQRyjvGwKbjcunEiTwZu@mail.gmail.com>
+Message-ID: <1280763209.3722.16.camel@rattlesnake>
+
+Thanks for the through explanation. Looking forward to downloading and
+installing tikzDevice as soon as it is ready.
+Cheers
+
+Lorenzo
+
+
+On Mon, 2010-08-02 at 07:19 -0700, Charlie Sharpsteen wrote:
+> Hi Lorenzo,
+> 
+> Thanks again for submitting this example.  I actually came across this
+> bug earlier this year and thought I had solved it:
+> 
+>   http://github.com/Sharpie/RTikZDevice/issues/1
+> 
+> But your example led Cameron and I to re-examine the way string widths
+> and metrics are calculated and we discovered a subtle bug that I think
+> was the root cause of this issue.  The problem is that the tikzDevice
+> must calculate widths and font metrics for arbitrary strings of LaTeX
+> such as:
+> 
+> $\\alpha$
+> 
+> Which is 9 characters long in an R script but only 1 character when
+> typeset.  The solution we use is to compile a small "stub" of a LaTeX
+> file which dumps the character metrics to a log file.  We then scan
+> the log file and retrieve the numbers we need.  This approach came for
+> a post Cameron made to comp.text.tex:
+> 
+>   http://groups.google.com/group/comp.text.tex/browse_thread/thread/1846e8c3cb8edb5b/4fbcb097aa22b31b?lnk=gst&q=cameron+bracken#4fbcb097aa22b31b
+> 
+> We have used Heiko Oberdiek's solution with slight modifications.  The
+> problem is that the template provided in that post did not include a
+> \begin{document} statement.  Apparently, there are some font setup
+> things related to the \renewcommand{\rmdefault}{phv} you tried that
+> don't happen unless \begin{document} is in the source file.  We never
+> noticed because this issue did not affect Computer Modern or alternate
+> font packages like Mathpazo.
+> So, \begin{document} has been added to the font metrics stub and it
+> appears to be solving the problem.  I have added it to a build of
+> 0.5.0 that is now a candidate for being the version that will be
+> published to CRAN.  You should be able to install it from R-Forge in
+> the next couple of days once it finishes building:
+> 
+> install.packages( 'tikzDevice', repos = 'http://r-forge.r-project.org' )
+> 
+> Thanks again for taking the time to make this bug report!
+> 
+> 
+> P.S.
+> 
+> In response to your earlier question about setting fonts in a similar
+> fashion to other R graphics devices such as pdf(): we don't allow this
+> as Cameron mentioned.  The reason is that we want the fonts used in
+> production of graphics to be the exact same fonts that are used to set
+> the text in a LaTeX paper.  If we allowed R to choose fonts, the
+> graphic would end up being designed using fonts such as Helvetica.
+> However, when the user goes to typeset their paper and specifies
+> Helvetica, LaTeX may use a Helvetica clone such as Nimbus or Heros.
+> These fonts are designed to look the same as Helvetica, but there are
+> subtle differences.  The end effect would spoil the typographic
+> harmony we are trying to achieve with this device.  See this page for
+> more information on the fonts LaTeX uses:
+> 
+>   http://www.tug.dk/FontCatalogue/helvetica/
+> 
+> So- all decisions concerning are left to LaTeX.  I do agree that we
+> need to hammer out an easier way of allowing users to specify font
+> choices.  This will probably come when we figure out what to do about
+> UTF8 support as it ties into issues with LaTeX fonts.
+> 
+> -Charlie
+> 
+> On Fri, Jul 30, 2010 at 5:29 AM, Lorenzo Isella
+> <lorenzo.isella at gmail.com> wrote:
+> >
+> > I see. Would it be possible to find out more about how you fixed the
+> > plot (i.e.: is there a patch or something I can use as a temporary quick
+> > and dirty solution)?
+> > Last but not least: once this glitch has been ironed out, will it be
+> > communicated via this mailing list?
+> > Cheers and have a nice weekend
+> >
+> > Lorenzo
+> >
+> >
+> > On Thu, 2010-07-29 at 16:56 -0600, Cameron Bracken wrote:
+> > > Hi Lorenzo-
+> > >
+> > > We specifically don't allow the user to set the font family in the
+> > > traditional way because we expect the user to do that though LaTeX or
+> > > the document header options. Unfortunately this is directly related to
+> > > the previous problem:
+> > >
+> > > There is definitely a bug in selecting fonts. It seems as though
+> > > Computer Modern was always used regardless of the font choice but I
+> > > never noticed because I used fonts with very similar metrics to cm.
+> > > Anyway, I hacked the code and got it to work (you can see from the
+> > > attached plot), but there is no general solution yet.  We will have to
+> > > figure out how we want to approach this problem from a user
+> > > perspective since the expected methods do not work.
+> > >
+> > > -Cameron
+> > >
+> > >
+> > >
+> > > On Thu, Jul 29, 2010 at 12:40 PM, Lorenzo Isella
+> > > <lorenzo.isella at gmail.com> wrote:
+> > > > On Tue, 2010-07-27 at 10:28 -0700, Charlie Sharpsteen wrote:
+> > > >> Thanks for taking the time to put together this example Lorenzo, I
+> > > >> will play with it and see if I can't figure something out.
+> > > >
+> > > > Hi,
+> > > > In case it matters, please take a look at
+> > > >
+> > > > http://bit.ly/9ATz9V
+> > > >
+> > > > where it is explained how to use arial fonts in R. I tried the
+> > > > suggestion (BTW, the path is /usr/share/fonts/truetype/msttcorefonts/ on
+> > > > my Ubuntu machine).
+> > > > The recipe allowed me to use arial fonts in ggplot2 plots (where I was
+> > > > using simply pdf() and not tikzDevice to generate the pdf file).
+> > > > I do not know if I can specify the font family in a tikzDevice call, but
+> > > > you probably do ;-).
+> > > > Cheers
+> > > >
+> > > > Lorenzo
+> > > >
+> > > > _______________________________________________
+> > > > Tikzdevice-bugs mailing list
+> > > > Tikzdevice-bugs at lists.r-forge.r-project.org
+> > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tikzdevice-bugs
+> > > >
+> >
+> >
+
+
+
+From Kurt.Hornik at wu.ac.at  Tue Aug 10 16:19:39 2010
+From: Kurt.Hornik at wu.ac.at (Kurt Hornik)
+Date: Tue, 10 Aug 2010 16:19:39 +0200
+Subject: [Tikzdevice-bugs] [R-Forge] tikzDevice 0.5.0
+In-Reply-To: <20100809193403.C48819CE4E@r-forge.r-project.org>
+References: <20100809193403.C48819CE4E@r-forge.r-project.org>
+Message-ID: <19553.24571.469268.280578@fangorn.hornik.net>
+
+>>>>> The tikzDevice team writes:
+
+> [This message was generated by R-Forge]
+> The following package was uploaded to CRAN:
+> ===========================================
+> Package: tikzDevice
+> Version: 0.5.0
+> Description: The TikZ device enables LaTeX-ready output from R graphics 
+> functions. This is done by producing code that can be understood by  the
+> TikZ graphics language. All text in a graphic output with the  tikz()
+> function will can be typeset by LaTeX and therefore will match  whatever
+> fonts are currently used in the document. This also means  that LaTeX
+> mathematics can be typeset directly into labels and  annotations!  Graphics
+> produced this way can also be annotated with  custom TikZ commands.
+> Author(s): Charlie Sharpsteen and Cameron Bracken
+> Maintainer: The tikzDevice team
+> <tikzdevice-bugs at lists.r-forge.r-project.org>
+> License: GPL (>= 2.0)
+
+> Submitter's comment:
+
+
+
+Thanks, on CRAN now.
+
+Best
+-k
+
+From Uwe.Ligges at R-Project.org  Wed Aug 11 01:33:21 2010
+From: Uwe.Ligges at R-Project.org (Uwe.Ligges at R-Project.org)
+Date: Wed, 11 Aug 2010 01:33:21 +0200
+Subject: [Tikzdevice-bugs] Package tikzDevice_0.5.0.tar.gz has been built
+	for Windows
+Message-ID: <01cb38e4$Blat.v2.2.2$6ba0671c@mail.statistik.tu-dortmund.de>
+
+Dear package maintainer,
+ 
+this notification has been generated automatically.
+Your package tikzDevice_0.5.0.tar.gz has been built for Windows and
+will be published within 24 hours in the corresponding CRAN directory
+(CRAN/bin/windows/contrib/2.11/).
+R version 2.11.1 Patched (2010-07-29 r52657) (32-bit)
+ 
+All the best,
+Uwe Ligges
+(Maintainer of binary packages for Windows)
+
+
+From ripley at stats.ox.ac.uk  Thu Aug 26 11:14:14 2010
+From: ripley at stats.ox.ac.uk (Prof Brian Ripley)
+Date: Thu, 26 Aug 2010 10:14:14 +0100 (BST)
+Subject: [Tikzdevice-bugs] Use of Sys.which() map not give "" if the command
+	is not found
+Message-ID: <alpine.LFD.2.00.1008260958470.16989@gannet.stats.ox.ac.uk>
+
+This concerns packages
+
+adimpro cacher gdata gnumeric highlight maptools runjags skmeans 
+tikzDevice
+
+It looks like you have not consulted the Value section of the current 
+help page for Sys.which:
+
+Value:
+
+      A character vector of the same length as ?names?, named by
+      ?names?.  The elements are either the full path to the
+      executable/script or some indication that no executable of that
+      name was found.  Typically the indication is ?""?, but this does
+      depend on the OS (and is a message on Solaris).
+
+So you need an additional check that the result actually is a command 
+(e.g. via file.exists).
+
+Can we please have an update addressing this.
+
+(It is likely that Sys.which will be changed in future to incorporate 
+this check, but package changes are still needed to work with current 
+and earlier versions of R.)
+
+-- 
+Brian D. Ripley,                  ripley at stats.ox.ac.uk
+Professor of Applied Statistics,  http://www.stats.ox.ac.uk/~ripley/
+University of Oxford,             Tel:  +44 1865 272861 (self)
+1 South Parks Road,                     +44 1865 272866 (PA)
+Oxford OX1 3TG, UK                Fax:  +44 1865 272595
+
+From chuck at sharpsteen.net  Thu Aug 26 19:27:54 2010
+From: chuck at sharpsteen.net (Charlie Sharpsteen)
+Date: Thu, 26 Aug 2010 10:27:54 -0700
+Subject: [Tikzdevice-bugs] Use of Sys.which() map not give "" if the
+ command is not found
+In-Reply-To: <alpine.LFD.2.00.1008260958470.16989@gannet.stats.ox.ac.uk>
+References: <alpine.LFD.2.00.1008260958470.16989@gannet.stats.ox.ac.uk>
+Message-ID: <AANLkTikf3TMMXMQHixx9=-PMQN-=vKXOJdPAw0D69NKm@mail.gmail.com>
+
+Thanks for the details Brian,
+
+This has been added to the issue tracker and we will accelerate the release
+of version 0.5.1 which contains fixes to ensure compatibility with the new
+graphics device version in R 12.
+
+-Charlie
+
+2010/8/26 Prof Brian Ripley <ripley at stats.ox.ac.uk>
+
+> This concerns packages
+>
+> adimpro cacher gdata gnumeric highlight maptools runjags skmeans tikzDevice
+>
+> It looks like you have not consulted the Value section of the current help
+> page for Sys.which:
+>
+> Value:
+>
+>     A character vector of the same length as ?names?, named by
+>     ?names?.  The elements are either the full path to the
+>     executable/script or some indication that no executable of that
+>     name was found.  Typically the indication is ?""?, but this does
+>     depend on the OS (and is a message on Solaris).
+>
+> So you need an additional check that the result actually is a command (e.g.
+> via file.exists).
+>
+> Can we please have an update addressing this.
+>
+> (It is likely that Sys.which will be changed in future to incorporate this
+> check, but package changes are still needed to work with current and earlier
+> versions of R.)
+>
+> --
+> Brian D. Ripley,                  ripley at stats.ox.ac.uk
+> Professor of Applied Statistics,  http://www.stats.ox.ac.uk/~ripley/
+> University of Oxford,             Tel:  +44 1865 272861 (self)
+> 1 South Parks Road,                     +44 1865 272866 (PA)
+> Oxford OX1 3TG, UK                Fax:  +44 1865 272595
+> _______________________________________________
+> Tikzdevice-bugs mailing list
+> Tikzdevice-bugs at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tikzdevice-bugs
+>
+>
+

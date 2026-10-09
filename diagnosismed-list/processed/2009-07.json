@@ -1,0 +1,54 @@
+{
+  "list": "diagnosismed-list",
+  "description": "",
+  "month": "2009-07",
+  "messages": [
+    {
+      "id": "msg-7e967ea39b1e",
+      "message_id": "<50e00a40907311501s4d221b9cyeb02c906481adafa@mail.gmail.com>",
+      "from_name": "Pete Meyer",
+      "from_email_hash": "e6d3df6b0f709f08841b4f441879d46b696d71b19fa538c20bee448c89c78d46",
+      "date": "2009-07-31T22:01:09Z",
+      "subject": "[Diagnosismed-list] Segfaults with ROC",
+      "subject_clean": "[Diagnosismed-list] Segfaults with ROC",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "I downloaded DiagnosisMed and have been playing with the ROC function.  My\nversion info is:\n\n> R.Version()\n$platform\n[1] \"x86_64-unknown-linux-gnu\"\n\n$arch\n[1] \"x86_64\"\n\n$os\n[1] \"linux-gnu\"\n\n$system\n[1] \"x86_64, linux-gnu\"\n\n$status\n[1] \"\"\n\n$major\n[1] \"2\"\n\n$minor\n[1] \"9.0\"\n\n$year\n[1] \"2009\"\n\n$month\n[1] \"04\"\n\n$day\n[1] \"17\"\n\n$`svn rev`\n[1] \"48333\"\n\n$language\n[1] \"R\"\n\n$version.string\n[1] \"R version 2.9.0 (2009-04-17)\"\n\nI had perhaps a dozen segfaults and otherwise warnings everytime I ran it.\nA typical complaint was:\n\ndiagnosismed-list at lists.r-forge.r-project.org *** caught segfault ***\naddress 0x100000011, cause 'memory not mapped'\n\nTraceback:\n 1: makeRestartList(...)\n 2: withRestarts({    .Internal(.signalCondition(simpleWarning(msg, call),\nmsg,         call))    .Internal(.dfltWarn(msg, call))}, muffleWarning =\nfunction() NULL)\n 3: .signalSimpleWarning(\"longer object length is not a multiple of shorter\nobject length\",     quote(Y >= Xi))\n 4: FUN(X[[204L]], ...)\n 5: lapply(split(X, group), FUN, ...)\n 6: tapply(X, X, \"D10X\")\n 7: ROC(gold = gold, test = test, Print = Print)\n 8: roc.plot(AC.gold, frm$OldACDiff, label = \"AdCreative - Current scale\")\n\nI took a look at the code where the problem was occurring:\n\n    m <- length(X)\n    n <- length(Y)\n    D10X <- function(Xi) {\n        (1/n) * sum(Y >= Xi)\n    }\n    D01Y <- function(Yi) {\n        (1/m) * sum(Yi >= X)\n    }\n    VAR.AUC <- sum((tapply(X, X, \"D10X\") - AUC)^2)/(m * (m -\n        1)) + sum((tapply(Y, Y, \"D01Y\") - AUC)^2)/(n * (n - 1))\n\nIt looks like the code should run, expanding the Yi to rep(Yi, m) and\nlikewise for Xi.  When I explicitly replaced those two statements with:\n\n        (1/n) * sum(Y >= rep(Xi, n))\n\nand\n\n        (1/m) * sum(rep(Yi, m) >= X)\n\neverything ran just fine.  Thought I'd let you know.  Thanks for making the\npackage available!\n\nPete\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: http://lists.r-forge.r-project.org/pipermail/diagnosismed-list/attachments/20090731/af015906/attachment.htm",
+      "body_snippet": "I downloaded DiagnosisMed and have been playing with the ROC function.  My\nversion info is:\n\n> R.Version()\n$platform\n[1] \"x86_64-unknown-linux-gnu\"\n\n$arch\n[1] \"x86_64\"\n\n$os\n[1] \"linux-gnu\"\n\n$system\n[1",
+      "thread_id": "thread-7e967ea39b1e",
+      "thread_depth": 0,
+      "month": "2009-07"
+    },
+    {
+      "id": "msg-7d4b15293440",
+      "message_id": "<50e00a40907311543r5c5de648m249bab0af8d9621e@mail.gmail.com>",
+      "from_name": "Pete Meyer",
+      "from_email_hash": "e6d3df6b0f709f08841b4f441879d46b696d71b19fa538c20bee448c89c78d46",
+      "date": "2009-07-31T22:43:21Z",
+      "subject": "[Diagnosismed-list] Segfaults with ROC",
+      "subject_clean": "[Diagnosismed-list] Segfaults with ROC",
+      "in_reply_to": "<50e00a40907311501s4d221b9cyeb02c906481adafa@mail.gmail.com>",
+      "references": [
+        "<50e00a40907311501s4d221b9cyeb02c906481adafa@mail.gmail.com>"
+      ],
+      "body_plain": "In looking at this again, it seems that what you want to do is add up how\nmany Y's are greater than each distinct Xi value and vice versa.  There are\nmultiple observations with the same value, so the Xi's that were getting\npassed were sometimes of length greater than 1 and R was complaining that\nthe length of Y was not a multiple of Xi (which is a good thing).  It looks\nthe the following change to the function produces the right result:\n\n    D10X <- function(Xi) {\n        (1/n) * sum(Y >= Xi[1])\n    }\n    D01Y <- function(Yi) {\n        (1/m) * sum(Yi[1] >= X)\n    }\n\nThe earlier change I suggested does the wrong thing.\n\nPete\n\nOn Fri, Jul 31, 2009 at 3:01 PM, Pete Meyer <petemeyer at google.com> wrote:\n\n> I downloaded DiagnosisMed and have been playing with the ROC function.  My\n> version info is:\n>\n> > R.Version()\n> $platform\n> [1] \"x86_64-unknown-linux-gnu\"\n>\n> $arch\n> [1] \"x86_64\"\n>\n> $os\n> [1] \"linux-gnu\"\n>\n> $system\n> [1] \"x86_64, linux-gnu\"\n>\n> $status\n> [1] \"\"\n>\n> $major\n> [1] \"2\"\n>\n> $minor\n> [1] \"9.0\"\n>\n> $year\n> [1] \"2009\"\n>\n> $month\n> [1] \"04\"\n>\n> $day\n> [1] \"17\"\n>\n> $`svn rev`\n> [1] \"48333\"\n>\n> $language\n> [1] \"R\"\n>\n> $version.string\n> [1] \"R version 2.9.0 (2009-04-17)\"\n>\n> I had perhaps a dozen segfaults and otherwise warnings everytime I ran it.\n> A typical complaint was:\n>\n> diagnosismed-list at lists.r-forge.r-project.org *** caught segfault ***\n> address 0x100000011, cause 'memory not mapped'\n>\n> Traceback:\n>  1: makeRestartList(...)\n>  2: withRestarts({    .Internal(.signalCondition(simpleWarning(msg, call),\n> msg,         call))    .Internal(.dfltWarn(msg, call))}, muffleWarning =\n> function() NULL)\n>  3: .signalSimpleWarning(\"longer object length is not a multiple of shorter\n> object length\",     quote(Y >= Xi))\n>  4: FUN(X[[204L]], ...)\n>  5: lapply(split(X, group), FUN, ...)\n>  6: tapply(X, X, \"D10X\")\n>  7: ROC(gold = gold, test = test, Print = Print)\n>  8: roc.plot(AC.gold, frm$OldACDiff, label = \"AdCreative - Current scale\")\n>\n> I took a look at the code where the problem was occurring:\n>\n>     m <- length(X)\n>     n <- length(Y)\n>     D10X <- function(Xi) {\n>         (1/n) * sum(Y >= Xi)\n>     }\n>     D01Y <- function(Yi) {\n>         (1/m) * sum(Yi >= X)\n>     }\n>     VAR.AUC <- sum((tapply(X, X, \"D10X\") - AUC)^2)/(m * (m -\n>         1)) + sum((tapply(Y, Y, \"D01Y\") - AUC)^2)/(n * (n - 1))\n>\n> It looks like the code should run, expanding the Yi to rep(Yi, m) and\n> likewise for Xi.  When I explicitly replaced those two statements with:\n>\n>         (1/n) * sum(Y >= rep(Xi, n))\n>\n> and\n>\n>         (1/m) * sum(rep(Yi, m) >= X)\n>\n> everything ran just fine.  Thought I'd let you know.  Thanks for making the\n> package available!\n>\n> Pete\n>\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: http://lists.r-forge.r-project.org/pipermail/diagnosismed-list/attachments/20090731/541555fc/attachment.htm",
+      "body_snippet": "In looking at this again, it seems that what you want to do is add up how\nmany Y's are greater than each distinct Xi value and vice versa.  There are\nmultiple observations with the same value, so the ",
+      "thread_id": "thread-7e967ea39b1e",
+      "thread_depth": 1,
+      "month": "2009-07"
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-7e967ea39b1e",
+      "subject": "[Diagnosismed-list] Segfaults with ROC",
+      "message_count": 2,
+      "participants": [
+        "Pete Meyer"
+      ],
+      "started": "2009-07-31T22:01:09Z",
+      "last_reply": "2009-07-31T22:43:21Z",
+      "root_message_id": "msg-7e967ea39b1e"
+    }
+  ]
+}

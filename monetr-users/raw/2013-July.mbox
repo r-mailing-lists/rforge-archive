@@ -1,0 +1,274 @@
+From Hannes.Muehleisen at cwi.nl  Thu Jul 11 18:43:32 2013
+From: Hannes.Muehleisen at cwi.nl (=?iso-8859-1?Q?Hannes_M=FChleisen?=)
+Date: Thu, 11 Jul 2013 18:43:32 +0200
+Subject: [Monetr-users] MonetDB.R v. 0.7 now on CRAN
+Message-ID: <B3AB9E6A-3BD1-4CF5-A962-AB16FFFE9536@cwi.nl>
+
+Hello MonetDB.R enthusiasts (Thomas and Anthony),
+
+I just published version 0.7 of the connector on CRAN.
+
+Best,
+
+Hannes
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 4154 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20130711/fd6388d7/attachment.bin>
+
+From noreply at r-forge.r-project.org  Tue Jul 23 14:24:27 2013
+From: noreply at r-forge.r-project.org (noreply at r-forge.r-project.org)
+Date: Tue, 23 Jul 2013 14:24:27 +0200 (CEST)
+Subject: [Monetr-users] r87 - in pkg/MonetDB.R: . R
+Message-ID: <20130723122427.B3C61183B43@r-forge.r-project.org>
+
+Author: hannes
+Date: 2013-07-23 14:24:27 +0200 (Tue, 23 Jul 2013)
+New Revision: 87
+
+Modified:
+   pkg/MonetDB.R/DESCRIPTION
+   pkg/MonetDB.R/NEWS
+   pkg/MonetDB.R/R/monetdb.R
+Log:
+another fetch() bugfix
+
+Modified: pkg/MonetDB.R/DESCRIPTION
+===================================================================
+--- pkg/MonetDB.R/DESCRIPTION	2013-07-23 08:06:42 UTC (rev 86)
++++ pkg/MonetDB.R/DESCRIPTION	2013-07-23 12:24:27 UTC (rev 87)
+@@ -1,5 +1,5 @@
+ Package: MonetDB.R
+-Version: 0.7.4
++Version: 0.7.5
+ Date: 2013-07-23
+ Title: Connect MonetDB to R
+ Authors at R: c(person("Hannes Muehleisen", "Developer", role = c("aut", "cre"),email = "hannes at cwi.nl"),
+
+Modified: pkg/MonetDB.R/NEWS
+===================================================================
+--- pkg/MonetDB.R/NEWS	2013-07-23 08:06:42 UTC (rev 86)
++++ pkg/MonetDB.R/NEWS	2013-07-23 12:24:27 UTC (rev 87)
+@@ -1,3 +1,6 @@
++0.7.5
++- more fetch() fixes
++
+ 0.7.4
+ - string to line splitting to c, NA handling to C as well
+ 
+
+Modified: pkg/MonetDB.R/R/monetdb.R
+===================================================================
+--- pkg/MonetDB.R/R/monetdb.R	2013-07-23 08:06:42 UTC (rev 86)
++++ pkg/MonetDB.R/R/monetdb.R	2013-07-23 12:24:27 UTC (rev 87)
+@@ -382,8 +382,8 @@
+   }
+   
+   # now, if our tuple cache in res at env$data does not contain n rows, we have to fetch from server until it does
+-  while (length(res at env$data) < n) {
+-    cresp <- .mapiParseResponse(.mapiRequest(res at env$conn,paste0("Xexport ",.mapiLongInt(info$id)," ", .mapiLongInt(info$index), " ", .mapiLongInt(max(n,PREFERRED_FETCH_SIZE)))))
++  if (length(res at env$data) < n) {
++    cresp <- .mapiParseResponse(.mapiRequest(res at env$conn,paste0("Xexport ",.mapiLongInt(info$id)," ", .mapiLongInt(info$index), " ", .mapiLongInt(n-length(res at env$data)))))
+ 	stopifnot(cresp$type == Q_BLOCK && cresp$rows > 0)
+ 	
+ 	res at env$data <- c(res at env$data,cresp$tuples)
+@@ -473,8 +473,6 @@
+ PROTOCOL_v9 <- 9
+ MAX_PACKET_SIZE <- 8192 # determined by fair guessing, haha
+ 
+-PREFERRED_FETCH_SIZE <- 100
+-
+ HASH_ALGOS <- c("md5", "sha1", "crc32", "sha256","sha512")
+ 
+ MSG_REDIRECT <- "^"
+@@ -652,9 +650,7 @@
+       env$types	<- env$dbtypes <- toupper(.mapiParseTableHeader(lines[4]))
+       env$lengths	<- .mapiParseTableHeader(lines[5])
+ 
+-	env$tuples <-lines[6:length(lines)]
+-			
+-			  
++	  env$tuples <-lines[6:length(lines)]
+       
+       return(env)
+     }
+@@ -668,10 +664,8 @@
+       env$rows	<- header$rows
+       env$cols	<- header$cols
+       env$index	<- header$index
+-		env$tuples <- lines[2:length(lines)]
+-		
+-			  
+-      
++	  env$tuples <- lines[2:length(lines)]
++
+       return(env)
+     }
+     
+
+
+From noreply at r-forge.r-project.org  Tue Jul 23 16:39:46 2013
+From: noreply at r-forge.r-project.org (noreply at r-forge.r-project.org)
+Date: Tue, 23 Jul 2013 16:39:46 +0200 (CEST)
+Subject: [Monetr-users] r88 - pkg/MonetDB.R/src
+Message-ID: <20130723143946.62688183B35@r-forge.r-project.org>
+
+Author: hannes
+Date: 2013-07-23 16:39:45 +0200 (Tue, 23 Jul 2013)
+New Revision: 88
+
+Modified:
+   pkg/MonetDB.R/src/mapisplit.c
+Log:
+checking if malloc fails
+
+Modified: pkg/MonetDB.R/src/mapisplit.c
+===================================================================
+--- pkg/MonetDB.R/src/mapisplit.c	2013-07-23 12:24:27 UTC (rev 87)
++++ pkg/MonetDB.R/src/mapisplit.c	2013-07-23 14:39:45 UTC (rev 88)
+@@ -2,7 +2,9 @@
+ #include <Rdefines.h>
+ #include <assert.h>
+ #include <string.h>
++#include <errno.h>
+ 
++
+ typedef enum {
+ 	INQUOTES, ESCAPED, NORMAL
+ } chrstate;
+@@ -57,7 +59,9 @@
+ 				if (chr == ',' || curPos == linelen - 2) {
+ 					int tokenLen = curPos - tokenStart + 1 - endQuote;
+ 					char *valPtr = (char*) malloc(tokenLen * sizeof(char));
+-
++					if (valPtr == NULL) {
++						printf("malloc() failed. Are you running out of memory? [%s]\n", strerror(errno));
++					}
+ 					strncpy(valPtr, val + tokenStart, tokenLen);
+ 					valPtr[tokenLen - 1] = '\0';
+ 					SEXP colV = VECTOR_ELT(colVec, cCol);
+@@ -69,8 +73,6 @@
+ 						SET_STRING_ELT(colV, cRow, mkChar(valPtr));
+ 					}
+ 
+-
+-
+ 					free(valPtr);
+ 
+ 					cCol++;
+
+
+From noreply at r-forge.r-project.org  Tue Jul 23 16:56:39 2013
+From: noreply at r-forge.r-project.org (noreply at r-forge.r-project.org)
+Date: Tue, 23 Jul 2013 16:56:39 +0200 (CEST)
+Subject: [Monetr-users] r89 - pkg/MonetDB.R/R
+Message-ID: <20130723145639.31D45185AE1@r-forge.r-project.org>
+
+Author: hannes
+Date: 2013-07-23 16:56:38 +0200 (Tue, 23 Jul 2013)
+New Revision: 89
+
+Modified:
+   pkg/MonetDB.R/R/monetdb.R
+Log:
+revert one of the c moves due to very little effect
+
+Modified: pkg/MonetDB.R/R/monetdb.R
+===================================================================
+--- pkg/MonetDB.R/R/monetdb.R	2013-07-23 14:39:45 UTC (rev 88)
++++ pkg/MonetDB.R/R/monetdb.R	2013-07-23 14:56:38 UTC (rev 89)
+@@ -618,8 +618,8 @@
+ 
+ # determines and partially parses the answer from the server in response to a query
+ .mapiParseResponse <- function(response) {
+-  lines <- .Call("mapiSplitLines", response,PACKAGE="MonetDB.R")
+-  #lines <- strsplit(response,"\n",fixed=TRUE,useBytes=TRUE)[[1]]
++  #lines <- .Call("mapiSplitLines", response,PACKAGE="MonetDB.R")
++  lines <- strsplit(response,"\n",fixed=TRUE,useBytes=TRUE)[[1]]
+ 	
+   
+   typeLine <- lines[[1]]
+
+
+From noreply at r-forge.r-project.org  Tue Jul 23 17:16:10 2013
+From: noreply at r-forge.r-project.org (noreply at r-forge.r-project.org)
+Date: Tue, 23 Jul 2013 17:16:10 +0200 (CEST)
+Subject: [Monetr-users] r90 - in pkg/MonetDB.R: R src
+Message-ID: <20130723151610.D6DFF185692@r-forge.r-project.org>
+
+Author: hannes
+Date: 2013-07-23 17:16:10 +0200 (Tue, 23 Jul 2013)
+New Revision: 90
+
+Modified:
+   pkg/MonetDB.R/R/monetdb.R
+   pkg/MonetDB.R/src/mapisplit.c
+Log:
+mc
+
+Modified: pkg/MonetDB.R/R/monetdb.R
+===================================================================
+--- pkg/MonetDB.R/R/monetdb.R	2013-07-23 14:56:38 UTC (rev 89)
++++ pkg/MonetDB.R/R/monetdb.R	2013-07-23 15:16:10 UTC (rev 90)
+@@ -618,8 +618,8 @@
+ 
+ # determines and partially parses the answer from the server in response to a query
+ .mapiParseResponse <- function(response) {
+-  #lines <- .Call("mapiSplitLines", response,PACKAGE="MonetDB.R")
+-  lines <- strsplit(response,"\n",fixed=TRUE,useBytes=TRUE)[[1]]
++  lines <- .Call("mapiSplitLines", response,PACKAGE="MonetDB.R")
++  #lines <- strsplit(response,"\n",fixed=TRUE,useBytes=TRUE)[[1]]
+ 	
+   
+   typeLine <- lines[[1]]
+
+Modified: pkg/MonetDB.R/src/mapisplit.c
+===================================================================
+--- pkg/MonetDB.R/src/mapisplit.c	2013-07-23 14:56:38 UTC (rev 89)
++++ pkg/MonetDB.R/src/mapisplit.c	2013-07-23 15:16:10 UTC (rev 90)
+@@ -4,14 +4,12 @@
+ #include <string.h>
+ #include <errno.h>
+ 
+-
+ typedef enum {
+ 	INQUOTES, ESCAPED, NORMAL
+ } chrstate;
+ 
+ char nullstr[] = "NULL";
+ 
+-
+ SEXP mapiSplit(SEXP mapiLinesVector, SEXP numCols) {
+ 	PROTECT(mapiLinesVector = AS_CHARACTER(mapiLinesVector));
+ 
+@@ -58,15 +56,22 @@
+ 				}
+ 				if (chr == ',' || curPos == linelen - 2) {
+ 					int tokenLen = curPos - tokenStart + 1 - endQuote;
++					if (tokenLen < 1) {
++						printf("parsing error in '%s'\n", val);
++						return colVec;
++					}
+ 					char *valPtr = (char*) malloc(tokenLen * sizeof(char));
+ 					if (valPtr == NULL) {
+-						printf("malloc() failed. Are you running out of memory? [%s]\n", strerror(errno));
++						printf(
++								"malloc() failed. Are you running out of memory? [%s]\n",
++								strerror(errno));
++						return colVec;
+ 					}
+ 					strncpy(valPtr, val + tokenStart, tokenLen);
+ 					valPtr[tokenLen - 1] = '\0';
+ 					SEXP colV = VECTOR_ELT(colVec, cCol);
+ 
+-					if (strcmp(valPtr,nullstr) == 0) {
++					if (strcmp(valPtr, nullstr) == 0) {
+ 						SET_STRING_ELT(colV, cRow, NA_STRING);
+ 
+ 					} else {
+
+

@@ -1,0 +1,1058 @@
+From hadley at rice.edu  Fri Nov 11 14:58:29 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Fri, 11 Nov 2011 07:58:29 -0600
+Subject: [Roxygen-devel] S4 documentation
+Message-ID: <CABdHhvF_B=cbO6+vyg7yOKSw555T+Y3MF-bD9G2QSsQ8zTJQWA@mail.gmail.com>
+
+Hi all,
+
+I've been spending some time thinking about how to document S4
+methods, and I've included my current thoughts so far.  I'd really
+appreciate your feedback, so we can get roxygen2 working well with S4.
+
+# Methods
+
+Two types of generics:
+
+* Large number of simple methods such as in the Matrix package. All methods
+  have the same arguments with the same meaning and no `...`. Often dispatch
+  on multiple parameters, leading to a combinatorial explosion of methods.
+  This also includes methods like `length` which many classes implement, but
+  are typically intuitive and need little explanation.
+
+  Methods are only listed in the generic so you know what is available.
+
+  Method look up goes directly to the generic.
+
+* Small number of complex methods, where each method needs individual
+  documentation. This includes methods like `print`, where different classes
+  have different arguments. Similarly, model methods like `predict` and
+  `anova` typically need documentation for individual methods because that's
+  where it is most appropriate to describe the statistical operation.
+
+  Methods are listed in the generic along with a brief description and a
+  pointer to more information. They have their own topics and method lookup
+  goes to individual methods.
+
+  This style of method seems to be somewhat more prevalent in S3.
+
+The user should be able to switch between these two types of documentation:
+
+* if method only has description, defaults to including in generic
+* if method has anything more than a description, gets own file.
+
+Question: should all methods get their own file? If yes, then what
+should the name/alias for the topic be because the main alias should
+be in the generic.
+
+# Generics
+
+Generics use `\Sexpr{}` to dynamically list method descriptions from
+other locations at render time. Uses `findMethods()` to find all
+methods corresponding to the generic, then determines the topic name
+for each method, then determines the Rd file name, then extracts the
+description for each Rd file. (Will need to exclude methods already
+documented in the generic). All methods documented in a given topic
+are grouped together.
+
+Methods should be listed in a `Methods` section, sorted by signature.
+
+# Classes
+
+Similarly, class uses `\Sexpr{}` to pull in minimal method description
+for all class methods. Also need `\Sexpr{}` macro to list all
+subclasses of the class.  See `class?diagonalMatrix` for a good
+example.  Class should have slots, which by default is a list of slot
+names and their known prototypes. Optionally overridden by the user
+with `@slot` tag.
+
+Hadley
+
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From colin at colinsmith.org  Fri Nov 11 17:07:44 2011
+From: colin at colinsmith.org (Colin A. Smith)
+Date: Fri, 11 Nov 2011 17:07:44 +0100
+Subject: [Roxygen-devel] S4 documentation
+Message-ID: <0DD739B1-0CBD-4746-A136-6DEB5EAB5EC5@colinsmith.org>
+
+I'm developing a new, relatively complex, R package right now. It's been a while since I've done so and had more recently been doing a lot of C++ programming with Doxygen. I've found manually maintaining Rd files to be a real pain, and was really happy to find Roxygen.
+
+For the most part, packages that I've written (and am currently writing) have complex classes that store and process a large amount of data. There are usually many generics with only a single method each. The xcms package has several such classes:
+
+http://www.bioconductor.org/packages/release/bioc/html/xcms.html
+
+For that package, some of of the methods were so simple that the method/generic documentation was kept in the class itself, which would add a type of documentation to the list below. More complex methods got their own page.
+
+I have some code written for class documentation which pulls method descriptions in during the roxygenize() call. I haven't pushed that out to Github yet because I'm waiting on how my other pull request goes. :-)
+
+Cheers.
+
+-Colin
+
+> Hi all,
+> 
+> I've been spending some time thinking about how to document S4
+> methods, and I've included my current thoughts so far.  I'd really
+> appreciate your feedback, so we can get roxygen2 working well with S4.
+> 
+> # Methods
+> 
+> Two types of generics:
+> 
+> * Large number of simple methods such as in the Matrix package. All methods
+>   have the same arguments with the same meaning and no `...`. Often dispatch
+>   on multiple parameters, leading to a combinatorial explosion of methods.
+>   This also includes methods like `length` which many classes implement, but
+>   are typically intuitive and need little explanation.
+> 
+>   Methods are only listed in the generic so you know what is available.
+> 
+>   Method look up goes directly to the generic.
+> 
+> * Small number of complex methods, where each method needs individual
+>   documentation. This includes methods like `print`, where different classes
+>   have different arguments. Similarly, model methods like `predict` and
+>   `anova` typically need documentation for individual methods because that's
+>   where it is most appropriate to describe the statistical operation.
+> 
+>   Methods are listed in the generic along with a brief description and a
+>   pointer to more information. They have their own topics and method lookup
+>   goes to individual methods.
+> 
+>   This style of method seems to be somewhat more prevalent in S3.
+> 
+> The user should be able to switch between these two types of documentation:
+> 
+> * if method only has description, defaults to including in generic
+> * if method has anything more than a description, gets own file.
+> 
+> Question: should all methods get their own file? If yes, then what
+> should the name/alias for the topic be because the main alias should
+> be in the generic.
+> 
+> # Generics
+> 
+> Generics use `\Sexpr{}` to dynamically list method descriptions from
+> other locations at render time. Uses `findMethods()` to find all
+> methods corresponding to the generic, then determines the topic name
+> for each method, then determines the Rd file name, then extracts the
+> description for each Rd file. (Will need to exclude methods already
+> documented in the generic). All methods documented in a given topic
+> are grouped together.
+> 
+> Methods should be listed in a `Methods` section, sorted by signature.
+> 
+> # Classes
+> 
+> Similarly, class uses `\Sexpr{}` to pull in minimal method description
+> for all class methods. Also need `\Sexpr{}` macro to list all
+> subclasses of the class.  See `class?diagonalMatrix` for a good
+> example.  Class should have slots, which by default is a list of slot
+> names and their known prototypes. Optionally overridden by the user
+> with `@slot` tag.
+> 
+> Hadley
+
+From hadley at rice.edu  Fri Nov 11 17:51:34 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Fri, 11 Nov 2011 10:51:34 -0600
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <0DD739B1-0CBD-4746-A136-6DEB5EAB5EC5@colinsmith.org>
+References: <0DD739B1-0CBD-4746-A136-6DEB5EAB5EC5@colinsmith.org>
+Message-ID: <CABdHhvGeVODzBk=Y6sD-pT5tsjk1qNgCM1Yk9ghd6kQnCfAw3w@mail.gmail.com>
+
+> For the most part, packages that I've written (and am currently writing) have complex classes that store and process a large amount of data. There are usually many generics with only a single method each. The xcms package has several such classes:
+>
+> http://www.bioconductor.org/packages/release/bioc/html/xcms.html
+>
+> For that package, some of of the methods were so simple that the method/generic documentation was kept in the class itself, which would add a type of documentation to the list below. More complex methods got their own page.
+
+In that case, why both creating a generic at all?  Why not just use a
+regular function?
+
+Regardless, I think that case doesn't need any underlying changes. So
+long as @rdname works, you can combine any arbitrary
+functions/classes/methods into a single documentation file.
+
+Hadley
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From lawrence.michael at gene.com  Sat Nov 12 14:55:44 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sat, 12 Nov 2011 05:55:44 -0800
+Subject: [Roxygen-devel] S4 documentation
+Message-ID: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+
+Hey guys,
+
+These are the two basic design approaches when it comes to S4 programming:
+
+1) Generic-centric: This corresponds to Hadley's first classification and
+is the "functional OOP" style, where there is a function that is "extended"
+with methods.
+
+2) Class-centric: This is the conventional class-based OOP approach, where
+generics are sort of abused into providing methods "belonging" to classes.
+Generally, these only have a single argument in their signature. I think
+this is more along the lines of Colin's use-case. This also matches up with
+R5 classes.
+
+<sidenote>Although in many cases one could create such class-based methods
+with simple functions, if someone wants to override one in a subclass, they
+will need to create a method (which would create an implicit generic,
+defaulting to the original function). Usually though, that implicit generic
+is undesirable, because it does not a well-defined signature. In
+particular, it might not have "..." in its signature. This is often
+desirable, because methods can add formal arguments to that "...", separate
+from their signature, and this needs to be handled. Anyway, the generic
+should probably be defined in the first package; otherwise, we might end up
+with multiple generics across packages that would need to have consistent
+signatures.</sidenote>
+
+Every project is usually some mix of the above styles. A reasonable object
+model for this would have classes, generics and methods, with methods
+pointing to their generic and all of the classes in their signature (these
+generics and classes could be defined in other packages). The
+implementation could simply use the methods package for keeping track of
+this.
+
+It is clear that the user wants multiple views of the documentation. As
+Hadley brought up, it is desirable to have dynamic class-centric,
+generic-centric and method-centric views. The Rd is one type of view. How
+to store the data?  Adding the documentation in a formal structure to each
+class, generic and method object would be awesome. Not sure how to
+implement it (maybe extend them? RoxygenStandardGeneric, etc?).  Anyway,
+that would allow all sorts of complex views. It would also allow packages
+that employ meta-programming, i.e., writing a function that defines one
+type of class (like setPropertySet and setEnum in objectProperties),
+because that function could auto-generate and transform the documentation,
+as well. It would also allow language bindings to derive/R-ify
+documentation from external libraries. R5 already has the "doc string", but
+we would want a formal object of some sort. To support the R help() view,
+we would need files in the Rd that would be largely generated with \Sexpr{}.
+
+If the above is too far fetched, then we could serialize that documentation
+to a database, probably Rd in the 'man' directory, with liberal use of
+\Sexpr{}, as Hadley suggests. Every object would get its own file.
+
+As far as the views of generics and classes, Hadley's plan is a good start.
+In addition, we would want more cross-references between classes, generics
+and methods. The methods are the edges in a bipartite graph of classes and
+generics. In other words, the generic document would have a \seealso{} or
+something that links to the classes included in one of the method
+signatures for the generic, as a summary. Similarly, the class document
+would have a summary section linking to all generics that have it in a
+method signature.
+
+For consistency, every method should have a view, and it should be richer
+than simply documenting the method like a function. It could, for example,
+have a \seealso{} to all methods on that generic with signatures that match
+at least one class in its signature. Here "match" would mean not always the
+same class, but a subclass or superclass, as well.
+
+For classes, displaying the slots should be optional. Often, that would
+just be an implementation detail. I would say always hide a slot unless
+explicitly asked to make it public. Up for discussion. The class document
+would want to group its methods by generic and collapse them somehow. If
+there is a single method matching the class, briefly list its documentation
+(which somehow includes the generic description). This satisfies the
+class-centric case. If there are multiple methods, list the generic
+description, and available method signatures, with links.
+
+One last thing: documentation for classes can get pretty long. Is there a
+way to @include extra files? Steve Lianoglou had this idea.
+
+Michael
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20111112/38abd506/attachment.htm>
+
+From hadley at rice.edu  Sun Nov 13 16:36:33 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Sun, 13 Nov 2011 09:36:33 -0600
+Subject: [Roxygen-devel] Roxygen2: version 2.2
+Message-ID: <CABdHhvHf44Af1p-uoQAPPi3sK+xmV3CXMQdw6zYCgwUp8_5Vgw@mail.gmail.com>
+
+# Roxygen2
+
+The premise of `roxygen2` is simple: describe your functions in
+comments next to where their definitions and `roxygen2` will process
+your source code and comments to produce R compatible Rd files.
+Here's a simple example from the `stringr` package:
+? ? #' The length of a string (in characters).? ? #'? ? #' @param
+string input character vector? ? #' @return numeric vector giving
+number of characters in each element of the?? ? #' ? character vector.
+?Missing string have missing length.? ? #' @keywords character? ? #'
+@seealso \code{\link{nchar}} which this function wraps? ? #' @export
+ #' @examples? ? #' str_length(letters)? ? #' str_length(c("i",
+"like", "programming", NA))? ? str_length <- function(string) {
+string <- check_string(string)
+? ? ? nc <- nchar(string, allowNA = TRUE)? ? ? is.na(nc) <-
+is.na(string)? ? ? nc? ? }
+When you `roxygenise` your package these comments will be
+automatically transformed to the Rd file you need to pass `R CMD
+check`:
+? ? \name{str_length}? ? \alias{str_length}? ? \title{The length of a
+string (in characters).}? ? \usage{str_length(string)}? ? \arguments{
+? ? \item{string}{input character vector}? ? }? ? \description{
+The length of a string (in characters).? ? }
+\seealso{\code{\link{nchar}} which this function wraps}
+\value{numeric vector giving number of characters in each element of
+the? ? character vector. ?Missing string have missing length.}
+\keyword{character}? ? \examples{? ? ? str_length(letters)
+str_length(c("i", "like", "programming", NA))? ? }
+roxygen2 2.2
+------------
+
+NEW FEATURES
+
+* Package docType will automatically add package alias, if needed. (Fixes #4)
+
+* Data docType will automatically add `datasets` keyword, default usage, and
+  default format. (Fixes #5). Data docType automatically added to data
+  objects.
+
+* New `@encoding` tag for manually setting non-ASCII encodings when needed.
+  (Fixes #7)
+
+
+BUG FIXES
+
+* `write.description()` now tries much harder to respect
+  users' original DESCRIPTION field formatting instead of forcibly
+  re-wrapping certain fields at 60 characters.
+
+* `@details` and `@description` now work correctly
+
+* `@useDynLib` now works correctly:
+
+       @useDynLib packageName routine1 routine2
+
+   produces
+
+       useDynLib(packageName, routine1)
+       useDynLib(packageName, routine2)
+
+   in the NAMESPACE file, instead of separate (wrong) useDynLib statements as
+   before.
+
+* All namespace import directives now behave in the same way as the export
+  directives, producing multiple single directives instead one multiple
+  directive: `@importClassesFrom pkg a b` now produces
+  `importClassesFrom(pkg, a)` and `importClassesFrom(pkg, b)`
+
+* In example files included with `@example` you can now use infix operators
+  (e.g. %*%) or other things with %, because they will be preceded by a
+  backslash in the Rd file. This behaviour was already in place for examples
+  directly included with `@examples`.
+
+* Aliases are no longer quoted, and % is escaped with a backslash (Fixes #24).
+  Names also have % escaped (Fixes #50)
+
+* Replacement functions (e.g. `foo<-`) now get correct usage statements:
+  `foo() <- value` instead of `foo()<-value`. (Fixes #38)
+
+* Functions with no arguments now correctly get usage statements (Fixes #35)
+
+* Indentation in examples now preserved (Fixes #27)
+
+* roxygen2 will replace characters that are not valid in filenames with a
+  character substitute, e.g. `[]` becomes `sub`, `<-` becomes `set` (Fixes #6)
+
+* Usage strings use non-breaking spaces to prevent string default values
+  containing whitespace to be split across multiple lines. This may cause
+  problems in the unlikely event that you have default value containing a
+  non-breaking space (`"\uA0"')  (Fixes #21)
+
+* Functions with quoted names now get correct usage statements (Fixes #41)
+
+* Objects that no longer exist are not documented (Fixes #42)
+
+* Errors now display file name and line number of roxygen block to help you
+  find the problem. Thanks to code contributions from Renaud Gaujoux. (Fixes
+  #13)
+
+* Documentation with no untagged text but with `@title`, `@description` and
+  `@details` tags now produces correct output.
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From hadley at rice.edu  Mon Nov 14 16:08:27 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Mon, 14 Nov 2011 09:08:27 -0600
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+Message-ID: <CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+
+> <sidenote>Although in many cases one could create such class-based methods
+> with simple functions, if someone wants to override one in a subclass, they
+> will need to create a method (which would create an implicit generic,
+> defaulting to the original function). Usually though, that implicit generic
+> is undesirable, because it does not a well-defined signature. In particular,
+> it might not have "..." in its signature. This is often desirable, because
+> methods can add formal arguments to that "...", separate from their
+> signature, and this needs to be handled. Anyway, the generic should probably
+> be defined in the first package; otherwise, we might end up with multiple
+> generics across packages that would need to have consistent
+> signatures.</sidenote>
+
+Thanks for the explanation!
+
+> Every project is usually some mix of the above styles. A reasonable object
+> model for this would have classes, generics and methods, with methods
+> pointing to their generic and all of the classes in their signature (these
+> generics and classes could be defined in other packages). The implementation
+> could simply use the methods package for keeping track of this.
+
+A similarly, classes should point to all parent and child classes.
+
+> It is clear that the user wants multiple views of the documentation. As
+> Hadley brought up, it is desirable to have dynamic class-centric,
+> generic-centric and method-centric views. The Rd is one type of view. How to
+> store the data?? Adding the documentation in a formal structure to each
+> class, generic and method object would be awesome.
+
+I think the first step is to develop an object representation of R
+documentation, backed by Rd files.  Once we have that working (which
+already would be very useful for roxygen2), it would be possible to
+explore different backing systems: xml, mallard, sqlite etc.
+
+> Not sure how to implement
+> it (maybe extend them? RoxygenStandardGeneric, etc?).? Anyway, that would
+> allow all sorts of complex views. It would also allow packages that employ
+> meta-programming, i.e., writing a function that defines one type of class
+> (like setPropertySet and setEnum in objectProperties), because that function
+> could auto-generate and transform the documentation, as well.
+
+Yes, user specifiable sub-classes would be cool.  How this interacts
+with the compilation process that turns roxygen comments in to
+documentation objects might be complex, however.
+
+>  It would also
+> allow language bindings to derive/R-ify documentation from external
+> libraries. R5 already has the "doc string", but we would want a formal
+> object of some sort. To support the R help() view, we would need files in
+> the Rd that would be largely generated with \Sexpr{}.
+
+Ah, yes, that's a cool idea.  In principle, the Rd file could just be
+\Sexpr{generateRd("topicname")}.  But in practice, you'd probably want
+some stuff statically generated like the name and aliases.
+
+> As far as the views of generics and classes, Hadley's plan is a good start.
+> In addition, we would want more cross-references between classes, generics
+> and methods. The methods are the edges in a bipartite graph of classes and
+> generics. In other words, the generic document would have a \seealso{} or
+> something that links to the classes included in one of the method signatures
+> for the generic, as a summary. Similarly, the class document would have a
+> summary section linking to all generics that have it in a method signature.
+
+Ooh, I like that idea.
+
+> For consistency, every method should have a view, and it should be richer
+> than simply documenting the method like a function. It could, for example,
+> have a \seealso{} to all methods on that generic with signatures that match
+> at least one class in its signature. Here "match" would mean not always the
+> same class, but a subclass or superclass, as well.
+
+I like that idea too.
+
+> For classes, displaying the slots should be optional. Often, that would just
+> be an implementation detail. I would say always hide a slot unless
+> explicitly asked to make it public. Up for discussion. The class document
+> would want to group its methods by generic and collapse them somehow. If
+> there is a single method matching the class, briefly list its documentation
+> (which somehow includes the generic description). This satisfies the
+> class-centric case. If there are multiple methods, list the generic
+> description, and available method signatures, with links.
+
+You mean hiding in the documentation sense, right?  Sort of privacy by
+convention?
+
+> One last thing: documentation for classes can get pretty long. Is there a
+> way to @include extra files? Steve Lianoglou had this idea.
+
+That's another interesting idea.  We currently have @template, which
+is a superset of @include, but it might be worthwhile differentiating
+them semantically.  Where would you imagine such include files living?
+ Would they be R files or plain text to be interpreted as roxygen
+comments?  (We decided on R files for templates so that existing
+syntax highlighting code would work)
+
+Hadley
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From lawrence.michael at gene.com  Mon Nov 14 16:51:59 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Mon, 14 Nov 2011 07:51:59 -0800
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+	<CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+Message-ID: <CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+
+On Mon, Nov 14, 2011 at 7:08 AM, Hadley Wickham <hadley at rice.edu> wrote:
+
+> > <sidenote>Although in many cases one could create such class-based
+> methods
+> > with simple functions, if someone wants to override one in a subclass,
+> they
+> > will need to create a method (which would create an implicit generic,
+> > defaulting to the original function). Usually though, that implicit
+> generic
+> > is undesirable, because it does not a well-defined signature. In
+> particular,
+> > it might not have "..." in its signature. This is often desirable,
+> because
+> > methods can add formal arguments to that "...", separate from their
+> > signature, and this needs to be handled. Anyway, the generic should
+> probably
+> > be defined in the first package; otherwise, we might end up with multiple
+> > generics across packages that would need to have consistent
+> > signatures.</sidenote>
+>
+> Thanks for the explanation!
+>
+> > Every project is usually some mix of the above styles. A reasonable
+> object
+> > model for this would have classes, generics and methods, with methods
+> > pointing to their generic and all of the classes in their signature
+> (these
+> > generics and classes could be defined in other packages). The
+> implementation
+> > could simply use the methods package for keeping track of this.
+>
+> A similarly, classes should point to all parent and child classes.
+>
+> > It is clear that the user wants multiple views of the documentation. As
+> > Hadley brought up, it is desirable to have dynamic class-centric,
+> > generic-centric and method-centric views. The Rd is one type of view.
+> How to
+> > store the data?  Adding the documentation in a formal structure to each
+> > class, generic and method object would be awesome.
+>
+> I think the first step is to develop an object representation of R
+> documentation, backed by Rd files.  Once we have that working (which
+> already would be very useful for roxygen2), it would be possible to
+> explore different backing systems: xml, mallard, sqlite etc.
+>
+>
+Sounds good.
+
+
+> > Not sure how to implement
+> > it (maybe extend them? RoxygenStandardGeneric, etc?).  Anyway, that would
+> > allow all sorts of complex views. It would also allow packages that
+> employ
+> > meta-programming, i.e., writing a function that defines one type of class
+> > (like setPropertySet and setEnum in objectProperties), because that
+> function
+> > could auto-generate and transform the documentation, as well.
+>
+> Yes, user specifiable sub-classes would be cool.  How this interacts
+> with the compilation process that turns roxygen comments in to
+> documentation objects might be complex, however.
+>
+> >  It would also
+> > allow language bindings to derive/R-ify documentation from external
+> > libraries. R5 already has the "doc string", but we would want a formal
+> > object of some sort. To support the R help() view, we would need files in
+> > the Rd that would be largely generated with \Sexpr{}.
+>
+> Ah, yes, that's a cool idea.  In principle, the Rd file could just be
+> \Sexpr{generateRd("topicname")}.  But in practice, you'd probably want
+> some stuff statically generated like the name and aliases.
+>
+> > As far as the views of generics and classes, Hadley's plan is a good
+> start.
+> > In addition, we would want more cross-references between classes,
+> generics
+> > and methods. The methods are the edges in a bipartite graph of classes
+> and
+> > generics. In other words, the generic document would have a \seealso{} or
+> > something that links to the classes included in one of the method
+> signatures
+> > for the generic, as a summary. Similarly, the class document would have a
+> > summary section linking to all generics that have it in a method
+> signature.
+>
+> Ooh, I like that idea.
+>
+> > For consistency, every method should have a view, and it should be richer
+> > than simply documenting the method like a function. It could, for
+> example,
+> > have a \seealso{} to all methods on that generic with signatures that
+> match
+> > at least one class in its signature. Here "match" would mean not always
+> the
+> > same class, but a subclass or superclass, as well.
+>
+> I like that idea too.
+>
+> > For classes, displaying the slots should be optional. Often, that would
+> just
+> > be an implementation detail. I would say always hide a slot unless
+> > explicitly asked to make it public. Up for discussion. The class document
+> > would want to group its methods by generic and collapse them somehow. If
+> > there is a single method matching the class, briefly list its
+> documentation
+> > (which somehow includes the generic description). This satisfies the
+> > class-centric case. If there are multiple methods, list the generic
+> > description, and available method signatures, with links.
+>
+> You mean hiding in the documentation sense, right?  Sort of privacy by
+> convention?
+>
+>
+Yes.
+
+
+> > One last thing: documentation for classes can get pretty long. Is there a
+> > way to @include extra files? Steve Lianoglou had this idea.
+>
+> That's another interesting idea.  We currently have @template, which
+> is a superset of @include, but it might be worthwhile differentiating
+> them semantically.  Where would you imagine such include files living?
+>  Would they be R files or plain text to be interpreted as roxygen
+> comments?  (We decided on R files for templates so that existing
+> syntax highlighting code would work)
+>
+>
+There may be a use-case for @including Roxygen comments, but I think my
+use-case would benefit more from pure Rd that would just be concatenated
+into the resulting Rd file. These would be things like extra \section{}s.
+Maybe make that more explicit with a @section that refers to a file?
+
+
+
+> Hadley
+>
+> --
+> Assistant Professor / Dobelman Family Junior Chair
+> Department of Statistics / Rice University
+> http://had.co.nz/
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20111114/5f0ca7e6/attachment.htm>
+
+From mailinglist.honeypot at gmail.com  Mon Nov 14 16:55:12 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 14 Nov 2011 10:55:12 -0500
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+	<CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+Message-ID: <CAHA9McPkfi3U+76yKhRxh_Af3NdZrm5TQvyBjkGkvOd3ydj6Jg@mail.gmail.com>
+
+Hi,
+
+Lots of great ideas there.
+
+Just to comment on this one:
+
+On Mon, Nov 14, 2011 at 10:08 AM, Hadley Wickham <hadley at rice.edu> wrote:
+
+>> One last thing: documentation for classes can get pretty long. Is there a
+>> way to @include extra files? Steve Lianoglou had this idea.
+>
+> That's another interesting idea. ?We currently have @template, which
+> is a superset of @include, but it might be worthwhile differentiating
+> them semantically. ?Where would you imagine such include files living?
+> ?Would they be R files or plain text to be interpreted as roxygen
+> comments? ?(We decided on R files for templates so that existing
+> syntax highlighting code would work)
+
+When I floated it on the bioc-devel list, it was simply suggested as a
+means to avoid having long encyclopedic like documentation  text take
+up the majority of a source file.
+
+That type of documentation is super handy when you actually want to
+fire up the help page to explore what this or that method/class does,
+but as a developer writing S4-style code, I'd be really happy if I can
+just have "the nut" of the documentation there inline w/ the code,
+which in my mind includes:
+
+(1) The banner
+(2) Description
+(3) What each argument is
+(4) What is returned
+
+If the usage/details benefits from some long explanation, then it
+would be nice to just stash that in an @include `somehting`.
+
+I was imagining it would just be simple text file that follows roxygen
+syntax, perhaps w/o having to prefix each line with a #' (or ##' for
+the emacs-en).
+
+And perhaps just have that include some file path in a default folder,
+maybe PKG/rdox?
+
+So an `@include something/somewhere
+
+Might just include the file
+`PKG/rdox/something/somewhere(.rdoxy|.txt|)?` or something ... but
+smarter (and more convenient) include schemes could be "schemed up," I
+reckon.
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From Manuel.Eugster at stat.uni-muenchen.de  Mon Nov 14 16:56:34 2011
+From: Manuel.Eugster at stat.uni-muenchen.de (Manuel J. A. Eugster)
+Date: Mon, 14 Nov 2011 16:56:34 +0100
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>	<CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+	<CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+Message-ID: <4EC13A32.30408@stat.uni-muenchen.de>
+
+>      > One last thing: documentation for classes can get pretty long. Is
+>     there a
+>      > way to @include extra files? Steve Lianoglou had this idea.
+>
+>     That's another interesting idea.  We currently have @template, which
+>     is a superset of @include, but it might be worthwhile differentiating
+>     them semantically.  Where would you imagine such include files living?
+>       Would they be R files or plain text to be interpreted as roxygen
+>     comments?  (We decided on R files for templates so that existing
+>     syntax highlighting code would work)
+>
+>
+> There may be a use-case for @including Roxygen comments, but I think my
+> use-case would benefit more from pure Rd that would just be concatenated
+> into the resulting Rd file. These would be things like extra
+> \section{}s. Maybe make that more explicit with a @section that refers
+> to a file?
+
+In roxygen (v1) existing Rd files in the Rd directory are merged with
+the documentation generated by roxygen based on the file name and
+@rdname.
+
+Maybe we can implement something similar in roxygen2? Would that help?
+
+
+Manuel.
+
+
+
+
+From mailinglist.honeypot at gmail.com  Mon Nov 14 16:58:38 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 14 Nov 2011 10:58:38 -0500
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+	<CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+	<CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+Message-ID: <CAHA9McPb1-pAGKhnPVSE4FbMD7C_CopaXT-=xbNwko-5i=Za0A@mail.gmail.com>
+
+Ah, simultaneous post, perhaps to merge both use cases:
+
+On Mon, Nov 14, 2011 at 10:51 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+
+>> That's another interesting idea. ?We currently have @template, which
+>> is a superset of @include, but it might be worthwhile differentiating
+>> them semantically. ?Where would you imagine such include files living?
+>> ?Would they be R files or plain text to be interpreted as roxygen
+>> comments? ?(We decided on R files for templates so that existing
+>> syntax highlighting code would work)
+>>
+>
+> There may be a use-case for @including Roxygen comments, but I think my
+> use-case would benefit more from pure Rd that would just be concatenated
+> into the resulting Rd file. These would be things like extra \section{}s.
+> Maybe make that more explicit with a @section that refers to a file?
+
+Maybe if the include file has an *.rdox suffix (or whatever), it could
+be normal roxygen formatted, and if it is *.Rd, it's just straight Rd
+text that's inlined into the appropriate place of the final
+roxygen-constructed Rd file.
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From hadley at rice.edu  Mon Nov 14 18:20:38 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Mon, 14 Nov 2011 11:20:38 -0600
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CAHA9McPb1-pAGKhnPVSE4FbMD7C_CopaXT-=xbNwko-5i=Za0A@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+	<CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+	<CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+	<CAHA9McPb1-pAGKhnPVSE4FbMD7C_CopaXT-=xbNwko-5i=Za0A@mail.gmail.com>
+Message-ID: <CABdHhvEmVh3ydq+vg-jS9hQXkPkXg_jN89nRkzuLb8_CV5jg8Q@mail.gmail.com>
+
+>> There may be a use-case for @including Roxygen comments, but I think my
+>> use-case would benefit more from pure Rd that would just be concatenated
+>> into the resulting Rd file. These would be things like extra \section{}s.
+>> Maybe make that more explicit with a @section that refers to a file?
+>
+> Maybe if the include file has an *.rdox suffix (or whatever), it could
+> be normal roxygen formatted, and if it is *.Rd, it's just straight Rd
+> text that's inlined into the appropriate place of the final
+> roxygen-constructed Rd file.
+
+And if it was .R it could be treated as commented roxygen tags.  I
+think that would work well for @templates. There's no way that Rd
+includes/templates can work in the short-term, because they need to be
+parsed and converted in to roxygen's Rd object format, but long-term I
+think it's reasonable.
+
+Where do you think the files should live?  Templates currently live in
+man-roxygen (i.e. that's where the path defaults to), but maybe they
+should default to the root directory so you can specify where they
+live.
+
+Hadley
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From hadley at rice.edu  Mon Nov 14 18:21:19 2011
+From: hadley at rice.edu (Hadley Wickham)
+Date: Mon, 14 Nov 2011 11:21:19 -0600
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <4EC13A32.30408@stat.uni-muenchen.de>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+	<CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+	<CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+	<4EC13A32.30408@stat.uni-muenchen.de>
+Message-ID: <CABdHhvFxvjPyCkP9nwBx8BXCXH8thXWpxC4SXyxfYQc7juARaA@mail.gmail.com>
+
+> In roxygen (v1) existing Rd files in the Rd directory are merged with
+> the documentation generated by roxygen based on the file name and
+> @rdname.
+>
+> Maybe we can implement something similar in roxygen2? Would that help?
+
+I really don't like mixing generated and hand-written files in the
+same directory - it just seems like a recipe for trouble.  (And makes
+source code control just that much more complicated)
+
+Hadley
+
+
+-- 
+Assistant Professor / Dobelman Family Junior Chair
+Department of Statistics / Rice University
+http://had.co.nz/
+
+From lawrence.michael at gene.com  Mon Nov 14 18:57:18 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Mon, 14 Nov 2011 09:57:18 -0800
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CABdHhvFxvjPyCkP9nwBx8BXCXH8thXWpxC4SXyxfYQc7juARaA@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+	<CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+	<CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+	<4EC13A32.30408@stat.uni-muenchen.de>
+	<CABdHhvFxvjPyCkP9nwBx8BXCXH8thXWpxC4SXyxfYQc7juARaA@mail.gmail.com>
+Message-ID: <CAOQ5NyeyLDPigmOL631KyDmoKxex7ZK9QQXcdHW=mDsSbA+nsw@mail.gmail.com>
+
+On Mon, Nov 14, 2011 at 9:21 AM, Hadley Wickham <hadley at rice.edu> wrote:
+
+> > In roxygen (v1) existing Rd files in the Rd directory are merged with
+> > the documentation generated by roxygen based on the file name and
+> > @rdname.
+> >
+> > Maybe we can implement something similar in roxygen2? Would that help?
+>
+> I really don't like mixing generated and hand-written files in the
+> same directory - it just seems like a recipe for trouble.  (And makes
+> source code control just that much more complicated)
+>
+>
+Agreed. It's nice to have the reference along with the other documentation.
+I don't have any opinion on where the templates are located, but I would
+recommend that there is a generic, modular import mechanism that is able to
+parse any type of file into the Rd object model, as long as a driver exists.
+
+
+> Hadley
+>
+>
+> --
+> Assistant Professor / Dobelman Family Junior Chair
+> Department of Statistics / Rice University
+> http://had.co.nz/
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20111114/77bbaea1/attachment.htm>
+
+From Manuel.Eugster at stat.uni-muenchen.de  Mon Nov 14 19:18:41 2011
+From: Manuel.Eugster at stat.uni-muenchen.de (Manuel J. A. Eugster)
+Date: Mon, 14 Nov 2011 19:18:41 +0100
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CABdHhvFxvjPyCkP9nwBx8BXCXH8thXWpxC4SXyxfYQc7juARaA@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+	<CABdHhvHXCOj1_Vz=epa8Pi=Z6c0TGt8GPh5i6mVdx=vEQcwkjA@mail.gmail.com>
+	<CAOQ5NyeYH_sOdhtFs+F2Yhw4+hRwN-a1xxD9_vuLNwFjBYZjLg@mail.gmail.com>
+	<4EC13A32.30408@stat.uni-muenchen.de>
+	<CABdHhvFxvjPyCkP9nwBx8BXCXH8thXWpxC4SXyxfYQc7juARaA@mail.gmail.com>
+Message-ID: <4EC15B81.8080206@stat.uni-muenchen.de>
+
+On 11/14/11 6:21 PM, Hadley Wickham wrote:
+>> In roxygen (v1) existing Rd files in the Rd directory are merged with
+>> the documentation generated by roxygen based on the file name and
+>> @rdname.
+>>
+>> Maybe we can implement something similar in roxygen2? Would that help?
+>
+> I really don't like mixing generated and hand-written files in the
+> same directory - it just seems like a recipe for trouble.  (And makes
+> source code control just that much more complicated)
+
+Yes that's true. BTW: that reminds me that it would be nice to
+have an indicater in Rd files which says that this Rd file is
+generated by roxygen (maybe a comment). Would make a "make clean"
+easier.
+
+
+Manuel.
+
+
+From lawrence.michael at gene.com  Sat Nov 19 12:41:07 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sat, 19 Nov 2011 03:41:07 -0800
+Subject: [Roxygen-devel] S4 documentation
+In-Reply-To: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+References: <CAOQ5NyfpZ-xvx8=Tia7qpjg-znX0U80sBoNg4AY6PqZ92NbMhQ@mail.gmail.com>
+Message-ID: <CAOQ5NycmRS2kGku9egTX-pOdg6agZVkbd9h=P9h4ffVOpHDHZA@mail.gmail.com>
+
+To add on to this a little bit, there needs to be convenient support for
+generating NAMESPACE imports.
+
+If a class is included in a method signature, or is passed in "contains" to
+setClass(), and it is not defined within the package, Roxygen should search
+the dependent packages for a class of the same name and generate an
+importClassesFrom() directive. User should be able to override, just in
+case it picks the wrong package.
+
+When a method is defined for a generic not defined in the package, search
+the dependencies and importFrom() it.
+
+On Sat, Nov 12, 2011 at 5:55 AM, Michael Lawrence <michafla at gene.com> wrote:
+
+> Hey guys,
+>
+> These are the two basic design approaches when it comes to S4 programming:
+>
+> 1) Generic-centric: This corresponds to Hadley's first classification and
+> is the "functional OOP" style, where there is a function that is "extended"
+> with methods.
+>
+> 2) Class-centric: This is the conventional class-based OOP approach, where
+> generics are sort of abused into providing methods "belonging" to classes.
+> Generally, these only have a single argument in their signature. I think
+> this is more along the lines of Colin's use-case. This also matches up with
+> R5 classes.
+>
+> <sidenote>Although in many cases one could create such class-based methods
+> with simple functions, if someone wants to override one in a subclass, they
+> will need to create a method (which would create an implicit generic,
+> defaulting to the original function). Usually though, that implicit generic
+> is undesirable, because it does not a well-defined signature. In
+> particular, it might not have "..." in its signature. This is often
+> desirable, because methods can add formal arguments to that "...", separate
+> from their signature, and this needs to be handled. Anyway, the generic
+> should probably be defined in the first package; otherwise, we might end up
+> with multiple generics across packages that would need to have consistent
+> signatures.</sidenote>
+>
+> Every project is usually some mix of the above styles. A reasonable object
+> model for this would have classes, generics and methods, with methods
+> pointing to their generic and all of the classes in their signature (these
+> generics and classes could be defined in other packages). The
+> implementation could simply use the methods package for keeping track of
+> this.
+>
+> It is clear that the user wants multiple views of the documentation. As
+> Hadley brought up, it is desirable to have dynamic class-centric,
+> generic-centric and method-centric views. The Rd is one type of view. How
+> to store the data?  Adding the documentation in a formal structure to each
+> class, generic and method object would be awesome. Not sure how to
+> implement it (maybe extend them? RoxygenStandardGeneric, etc?).  Anyway,
+> that would allow all sorts of complex views. It would also allow packages
+> that employ meta-programming, i.e., writing a function that defines one
+> type of class (like setPropertySet and setEnum in objectProperties),
+> because that function could auto-generate and transform the documentation,
+> as well. It would also allow language bindings to derive/R-ify
+> documentation from external libraries. R5 already has the "doc string", but
+> we would want a formal object of some sort. To support the R help() view,
+> we would need files in the Rd that would be largely generated with \Sexpr{}.
+>
+> If the above is too far fetched, then we could serialize that
+> documentation to a database, probably Rd in the 'man' directory, with
+> liberal use of \Sexpr{}, as Hadley suggests. Every object would get its own
+> file.
+>
+> As far as the views of generics and classes, Hadley's plan is a good
+> start. In addition, we would want more cross-references between classes,
+> generics and methods. The methods are the edges in a bipartite graph of
+> classes and generics. In other words, the generic document would have a
+> \seealso{} or something that links to the classes included in one of the
+> method signatures for the generic, as a summary. Similarly, the class
+> document would have a summary section linking to all generics that have it
+> in a method signature.
+>
+> For consistency, every method should have a view, and it should be richer
+> than simply documenting the method like a function. It could, for example,
+> have a \seealso{} to all methods on that generic with signatures that match
+> at least one class in its signature. Here "match" would mean not always the
+> same class, but a subclass or superclass, as well.
+>
+> For classes, displaying the slots should be optional. Often, that would
+> just be an implementation detail. I would say always hide a slot unless
+> explicitly asked to make it public. Up for discussion. The class document
+> would want to group its methods by generic and collapse them somehow. If
+> there is a single method matching the class, briefly list its documentation
+> (which somehow includes the generic description). This satisfies the
+> class-centric case. If there are multiple methods, list the generic
+> description, and available method signatures, with links.
+>
+> One last thing: documentation for classes can get pretty long. Is there a
+> way to @include extra files? Steve Lianoglou had this idea.
+>
+> Michael
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20111119/4c5cccd5/attachment.htm>
+

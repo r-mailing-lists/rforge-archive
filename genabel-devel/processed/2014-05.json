@@ -1,0 +1,497 @@
+{
+  "list": "genabel-devel",
+  "description": "",
+  "month": "2014-05",
+  "messages": [
+    {
+      "id": "msg-650dfb723ad3",
+      "message_id": "<53627E8C.2040407@karssen.org>",
+      "from_name": "L.C. Karssen",
+      "from_email_hash": "fcacffa40cf963048cfbbe846220349b5dcd5d1db1f0bd005d24fcde516bbf11",
+      "date": "2014-05-01T17:04:12Z",
+      "subject": "[GenABEL-dev] probabel big endian support",
+      "subject_clean": "[GenABEL-dev] probabel big endian support",
+      "in_reply_to": "<1897-535fc000-21-6a994800@159572789>",
+      "references": [
+        "<1897-535fc000-21-6a994800@159572789>"
+      ],
+      "body_plain": "Dear Jurica,\n\nOn 29-04-14 17:05, Jurica Stanojkovic wrote:\n> Dear Karssen,\n> \n>>> What is the best course of action for supporting probabel on big endian?\n>>> Should *.fvi, *.fvd files allways be in little endian format (than\n>>> DatABEL needs to be changed to always create little endian files)?\n>>> Or can *.fvd, *.fvi files be replaced with big endian files for big\n>>> endian build?\n> \n>>I would say that ideally the files need only to be created once and then\n>>usable on all systems. Especially since these files are usually large\n>>and converting from text format to .fvi/.fvd takes quite a while.\n> \n> If I had to change some values in text format, would I have to generate\n> again fvd/fvi files?\n\nYes. And for that you would either need R + GenABEL and DatABEL, or the\ntools in filevector's fvutil directory [1].\n\n> Does one when working with ProbABEL has to change those files often?\n\nNo. The workflow is as follows:\n\n1) genetic data (let's say 1e5 to 1e6 data points) are 'imputed' to a\nreference set. That means that through statistical inference based on a\nreference set the genetic data is 'interpolated' to ~30e6 data points\n(SNPs).\nThese data points are floating point values between 0.0 and 2.0, so\ncalled 'dosages', usually with ~3 digits after the decimal.\nThis process takes several days on a multi-node cluster for, for\nexample, a sample size of 7000 people.\n\n2) This imputation process results in text files of N_people columns and\nN_SNPs rows. In order to parallelise the imputation process\nfor 30e6 genetic SNPs, the files are usually split into sections of a\nfew million SNPs. Usually these text files are gzipped. In total these\nfiles are a few hundred GB in size.\n\n3) The purpose of converting to filevector format is that with .fv?\nfiles we don't need to load the text files into RAM, but can quickly\naccess a given row (or column). For the analysis performed by ProbABEL\nwe want to read the SNP dosages for all individual for a given SNP.\nBasically ProbABEL is one big for-loop over all 30e6 SNPs.\n\n4) So, in a real life situation a bioinformatician would run the\nimputations, and convert the data to filevector format once for the\nwhole research group (and store them somewhere centrally). For 7000\npeople and 30e6 SNPs the DatABEL files (which are not compressed) can\nget ~ 1TB in size.\nThat is why I don't think people will transfer these files a lot. They\nare stored centrally for all users to use. Transfer to a different\nserver happens, but not often. Transfer to a machine with a different\narchitecture will be even rarer.\n\n\n> If we do byte-swap on the run for every data in the fvd/fvi file would\n> that be also time consuming?\n> I understand that user then do not need to wait files to generate again\n> on big endian,\n> but same task (run) will last longer on big-endian machine than on\n> little-endian one?\n> \n\nDo I understand correctly that you are talking about on-the-fly\nconversion? So while someone runs ProbABEL and we detect a big-endian\nmachine conversion is done while reading the data?\nThat may be a better option than the conversion tool I mentioned below\nfor people who are low on disk space. On the other hand, given that\nuusally several users use the same filevector files, each of those users\npay the penalty and currently ProbABEL is already mostly limited by\nreading the data from disk.\n\nDoes anyone have an idea how much time an endianness conversion would\nadd to the reading of the data?\n\n\n>>This, however, would require diving into the filevector and the DatABEL\n>>code (filevector or libfilevector is the name of the 'backend' code in\n>>which the .fvd/.fvi files are 'defined'; both DatABEL and ProbABEL use\n>>that code when dealing with .fvi/.fvd files). I don't have very much\n>>experience with either code base, but could probably have a look and\n>>give you some pointers.\n> \n> I tried to work around this and got some results, but a I did not manage\n> to find every place in code where endian swap is needed.\n> I am currently busy with other work, but i will soon look at this again.\n> \n>>Jurica, can you tell us a bit more about why you are using a MIPS\n>>machine for your work with ProbABEL? And do you think it would be a\n>>common task to move these files between machines with different\n>>architectures at your site?\n> \n> I work on supporting mips/mipsel for Debian sid.\n> I have access to mips and mipsel boards and can help with bigendian support.\n> But I do not use ProbABEL actively.\n\n\nOK, good to know. Hopefully the explanation of typical usage I gave\nabove will give you an idea of how ProbABEL is used.\n\n> \n>>Maybe a converter from big to little and vice versa would be the easiest\n>>solution? I guess such a conversion can be done rather quick. The\n>>downside would be that it (at least temporarily) requires double the\n>>disk space.\n>>Such a converter could be part of the fvutils and/or of DatABEL, for\n>>example.\n> \n> Maybe this could be a good solution, presuming that this would be faster\n> then just converting from text to fileVector format?\n\nGood point. I don't know what would be faster, but my feeling is that a\nconversion of binary data to binary data is faster than conversion from\nASCII text to binary.\n\n> I will have to look closer how data is converted and writen from text to\n> fvd/fvi in order to be able to convert them to different endian.\n> \n> There is also a option to always create a fvd/fvi in both endian formats,\n> or to create some universal file that have data in both endians inside.\n\nOf course, if we simply confine ourselves to getting ProbABEL to run on\nall Debian architectures, than adding big endian .fv? files is\ndefinitely an option (although we would need some way of determining\nwhich .fv? files to use given an architecture). Then we could instruct\nthe users on how to deal with this in the manual.\n\n\nBest,\n\nLennart.\n\n\n[1]\nhttps://r-forge.r-project.org/scm/viewvc.php/pkg/filevector/?root=genabel\n\n> \n> Regards,\n> Jurica\n> \n> -------- Original Message --------\n> Subject: Re: [GenABEL-dev] probabel big endian support\n> Date: Saturday, April 26, 2014 22:17 CEST\n> From: \"L.C. Karssen\" <lennart at karssen.org>\n> To: genabel-devel at lists.r-forge.r-project.org\n> References: <896-53591700-f-3be4eec0 at 227853676>\n>  \n>> Dear Jurica,\n>>\n>> On 24-04-14 15:52, Jurica Stanojkovic wrote:\n>> > Dear list,\n>> >\n>> > I have tried building package probabel on mips big endian.\n>>\n>> That is great to hear! As far as I know, none of the current developers\n>> have access to such a machine.\n>>\n>> > It looks like that inputfiles/*.fvd and inputfiles/*.fvi are created\n>> on> little endian machine and are not working on big endian ones.\n>>\n>> That is correct, we found out\n>>\n>> >\n>> > I have tried to create them on big endian mips, and replace ones that\n>> > came with source package with the ones that I have created.\n>> > The package was built with new files without an error.\n>>\n>> That is good news. So GenABEL and DatABEL work on big-endian machines.\n>>\n>> >\n>> > I used following command to create files:\n>> > library(GenABEL)\n>> > library(DatABEL)\n>> > fvdose <- mach2databel(imputedg=\"./checks/inputfiles/test.mldose\",\n>> > mlinfo=\"./checks/inputfiles/test.mlinfo\",\n>> > outfile=\"./checks/inputfiles/test.dose\")\n>> > fvprob <- mach2databel(imputedg=\"./checks/inputfiles/test.mlprob\",\n>> > mlinfo=\"./checks/inputfiles/test.mlinfo\",\n>> > outfile=\"./checks/inputfiles/test.prob\", isprob=TRUE)\n>> > mmdose <-\n>> > mach2databel(imputedg=\"./checks/inputfiles/mmscore_gen.mldose\",\n>> > mlinfo=\"./checks/inputfiles/mmscore_gen.mlinfo\",\n>> > outfile=\"./checks/inputfiles/mmscore_gen.dose\")\n>> > mmprob <-\n>> > mach2databel(imputedg=\"./checks/inputfiles/mmscore_gen.mlprob\",\n>> > mlinfo=\"./checks/inputfiles/mmscore_gen.mlinfo\",\n>> > outfile=\"./checks/inputfiles/mmscore_gen.prob\", isprob=TRUE)\n>> >\n>> > I am new to ProbABEL, GenABEL, DatABEL so could someone please help me\n>> > with following questions:\n>> >\n>> > What is the best course of action for supporting probabel on big endian?\n>> > Should *.fvi, *.fvd files allways be in little endian format (than\n>> > DatABEL needs to be changed to always create little endian files)?\n>> > Or can *.fvd, *.fvi files be replaced with big endian files for big\n>> > endian build?\n>>\n>> I would say that ideally the files need only to be created once and then\n>> usable on all systems. Especially since these files are usually large\n>> and converting from text format to .fvi/.fvd takes quite a while.\n>>\n>> This, however, would require diving into the filevector and the DatABEL\n>> code (filevector or libfilevector is the name of the 'backend' code in\n>> which the .fvd/.fvi files are 'defined'; both DatABEL and ProbABEL use\n>> that code when dealing with .fvi/.fvd files). I don't have very much\n>> experience with either code base, but could probably have a look and\n>> give you some pointers.\n>>\n>> >\n>> > Is it necessary to be able to use *.fvd *.fvi files created on a\n>> > different endian system?\n>>\n>> On the other hand, how often will people transfer these files to\n>> machines of different architectures?\n>>\n>> Jurica, can you tell us a bit more about why you are using a MIPS\n>> machine for your work with ProbABEL? And do you think it would be a\n>> common task to move these files between machines with different\n>> architectures at your site?\n>>\n>> Maybe a converter from big to little and vice versa would be the easiest\n>> solution? I guess such a conversion can be done rather quick. The\n>> downside would be that it (at least temporarily) requires double the\n>> disk space.\n>> Such a converter could be part of the fvutils and/or of DatABEL, for\n>> example.\n>>\n>> >\n>> > I am willing to work on adding big endian support and I will\n>> appreciate> any help in determining the right course of action in\n>> resolving this\n>> > problem.\n>>\n>> Thank you for your time and willingness to help! It is very much\n>> appreciated. We're a small group of developers, but we'll try to help as\n>> much as we can.\n>>\n>>\n>> Best,\n>>\n>> Lennart.\n>>\n>> >\n>> > Regards,\n>> > Jurica\n>> >\n>> >\n>> > _______________________________________________\n>> > genabel-devel mailing list\n>> > genabel-devel at lists.r-forge.r-project.org\n>> >\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n>> >\n>>\n>> --\n>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\n>> L.C. Karssen\n>> Utrecht\n>> The Netherlands\n>>\n>> lennart at karssen.org\n>> http://blog.karssen.org\n>> GPG key ID: A88F554A\n>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n>>  \n> \n>  \n\n-- \n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n\n-- \n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: signature.asc\nType: application/pgp-signature\nSize: 213 bytes\nDesc: OpenPGP digital signature\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140501/9368259b/attachment.sig>",
+      "body_snippet": "Dear Jurica,\n\nOn 29-04-14 17:05, Jurica Stanojkovic wrote:\n> Dear Karssen,\n> \n>>> What is the best course of action for supporting probabel on big endian?\n>>> Should *.fvi, *.fvd files allways be in l",
+      "thread_id": "thread-650dfb723ad3",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-6f18ea5caa64",
+      "message_id": "<5362836C.4000105@aices.rwth-aachen.de>",
+      "from_name": "Diego Fabregat",
+      "from_email_hash": "770a5561e7ae66121e56516e7a0ecff321f459bf540c982e2abc5a53156597c6",
+      "date": "2014-05-01T17:25:00Z",
+      "subject": "[GenABEL-dev] Proposal to move to Github",
+      "subject_clean": "[GenABEL-dev] Proposal to move to Github",
+      "in_reply_to": "<535EB58D.6010900@karssen.org>",
+      "references": [
+        "<20140428094937.65E8B186FC6@r-forge.r-project.org>",
+        "<535E2774.6030606@karssen.org>",
+        "<535E422F.4080402@gmail.com>",
+        "<535E69D7.1050005@karssen.org>",
+        "<535E6BDB.3000206@karssen.org>",
+        "<535EA05E.40201@gmail.com>",
+        "<535EB58D.6010900@karssen.org>"
+      ],
+      "body_plain": "I like the idea of moving to git. I have no experience with github, but \nI'm using git on an almost daily basis (we have our own git server in \nour group for code and papers). I would have no problem in uploading \nOmicABEL to a git repo.\n\nDoes dropping R-forge have a (bad) impact on the visibility of the \nproject or on the user experience (e.g., installation of R packages)?\n\nOn 04/28/2014 10:09 PM, L.C. Karssen wrote:\n> Dear Maarten, dear all,\n>\n> Moving to github... Hmm... That is quite a decision, so I've renamed the\n> subject to better reflect the discussion. I've also dropped the older\n> e-mails from the bottom of the thread.\n>\n> First off, are there any people that have experience with git and/or\n> github? I've got some git experience (still learning), but no real\n> experience with github.\n>\n> I agree with Maarten that SVN is showing its age. As he indicates things\n> like branching are much easier in git. Moreover, since I'm travelling\n> regularly being able to work without internet connection is a pro.\n>\n> On the other hand, moving to git (whether github or elsewhere) means\n> leaving R-forge, which is our well-known infrastructure. Furthermore,\n> such a move operation will cost quite some time, I guess. Moving all\n> bugs, features, etc... If we decide to move we should plan well and not\n> rush. And then the current developers will need to learn git if they\n> don't already know how to use it.\n>\n> One thing I think we should definitely do is migrate slowly, package by\n> package. Given that Maarten is positive about such a move and that I am\n> in a bit of limbo but not fully against, it seems logical that ProbABEL\n> is the first package to try such a migration.\n>\n>\n> Looking forward to your comments!\n>\n>\n> Lennart.\n>\n>\n> On 28-04-14 20:39, Maarten Kooyman wrote:\n>> Dear all,\n>>\n>> I think it is easier to use for code review github:\n>>\n>> Please check to get a impression\n>> :https://github.com/jquery/jquery/pull/1241/files\n>>\n>> I think we should reconsider an other the software version system: the\n>> current system is not up to date to current usability. Bug tracking and\n>> branching is quite hard in terms of usability. Please have a look at\n>> github.com to get a impression what is possible.\n>>\n>> Kind regards,\n>>\n>> Maarten\n>>\n>>\n> --\n> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\n> L.C. Karssen\n> Utrecht\n> The Netherlands\n>\n> lennart at karssen.org\n> http://blog.karssen.org\n> GPG key ID: A88F554A\n> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n>\n>\n>\n> _______________________________________________\n> genabel-devel mailing list\n> genabel-devel at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140501/3c6bf282/attachment.html>",
+      "body_snippet": "I like the idea of moving to git. I have no experience with github, but \nI'm using git on an almost daily basis (we have our own git server in \nour group for code and papers). I would have no problem ",
+      "thread_id": "thread-6f18ea5caa64",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-868b94678eba",
+      "message_id": "<53634FBC.6080504@karssen.org>",
+      "from_name": "L.C. Karssen",
+      "from_email_hash": "fcacffa40cf963048cfbbe846220349b5dcd5d1db1f0bd005d24fcde516bbf11",
+      "date": "2014-05-02T07:56:44Z",
+      "subject": "[GenABEL-dev] Proposal to move to Github",
+      "subject_clean": "[GenABEL-dev] Proposal to move to Github",
+      "in_reply_to": "<5362836C.4000105@aices.rwth-aachen.de>",
+      "references": [
+        "<20140428094937.65E8B186FC6@r-forge.r-project.org>",
+        "<535E2774.6030606@karssen.org>",
+        "<535E422F.4080402@gmail.com>",
+        "<535E69D7.1050005@karssen.org>",
+        "<535E6BDB.3000206@karssen.org>",
+        "<535EA05E.40201@gmail.com>",
+        "<535EB58D.6010900@karssen.org>",
+        "<5362836C.4000105@aices.rwth-aachen.de>"
+      ],
+      "body_plain": "Hi Diego,\n\nOn 01-05-14 19:25, Diego Fabregat wrote:\n> I like the idea of moving to git. I have no experience with github, but\n> I'm using git on an almost daily basis (we have our own git server in\n> our group for code and papers). I would have no problem in uploading\n> OmicABEL to a git repo.\n\nThanks. That's good to know.\n\n> \n> Does dropping R-forge have a (bad) impact on the visibility of the\n> project or on the user experience (e.g., installation of R packages)?\n\nIt will not affect R package installation. Even though R-forge (tries\nto) build packages and makes them available, regular users will download\npackages from CRAN. Uploading a package to CRAN is something we do\nmanually.\n\nAs to visibility, yes, I think that will be affected. Maybe not\ndirectly, but many people/potential developers would assume we are on\nR-forge and on the R-forge main page we are regularly listed as one of\nthe most active projects of the week (including this week). This list\nseems to be (partially?) powered by SVN activity.",
+      "body_snippet": "Hi Diego,\n\nOn 01-05-14 19:25, Diego Fabregat wrote:\n> I like the idea of moving to git. I have no experience with github, but\n> I'm using git on an almost daily basis (we have our own git server in\n> ",
+      "thread_id": "thread-6f18ea5caa64",
+      "thread_depth": 1,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-8531eb777567",
+      "message_id": "<CAHX9t6KEpymW3Pd0HtqRhZ4TrXXauTQ2GKKsZYs0rq=1U-20uA@mail.gmail.com>",
+      "from_name": "Yurii Aulchenko",
+      "from_email_hash": "218df96e2c2b9e8a26cd30d6c254caa9c2fc1b1faa7af66fe371a73346f9ae49",
+      "date": "2014-05-02T08:27:34Z",
+      "subject": "[GenABEL-dev] Proposal to move to Github",
+      "subject_clean": "[GenABEL-dev] Proposal to move to Github",
+      "in_reply_to": "<5362836C.4000105@aices.rwth-aachen.de>",
+      "references": [
+        "<20140428094937.65E8B186FC6@r-forge.r-project.org>",
+        "<535E2774.6030606@karssen.org>",
+        "<535E422F.4080402@gmail.com>",
+        "<535E69D7.1050005@karssen.org>",
+        "<535E6BDB.3000206@karssen.org>",
+        "<535EA05E.40201@gmail.com>",
+        "<535EB58D.6010900@karssen.org>",
+        "<5362836C.4000105@aices.rwth-aachen.de>"
+      ],
+      "body_plain": "On Fri, May 2, 2014 at 12:25 AM, Diego Fabregat <\nfabregat at aices.rwth-aachen.de> wrote:\n\n>  I like the idea of moving to git. I have no experience with github, but\n> I'm using git on an almost daily basis (we have our own git server in our\n> group for code and papers). I would have no problem in uploading OmicABEL\n> to a git repo.\n>\n> Does dropping R-forge have a (bad) impact on the visibility of the project\n> or on the user experience (e.g., installation of R packages)?\n>\n\nIn my opinion - not really (visibility: I do not think we get many users\nbecause they've found us at r-forge; also we can keep the account and make\nlinks from there; as for installation, the argument partly holds only for\nR-packages). What we need to think is of course how we keep/move all parts\nsuch as a) code b) trackers c) project docs such as code guidelines\n\nTo me it seems that the idea to migrate few packages first is the most\nreasonable; few are likely to stay at r-forge for long\n\nYurii\n\n\n>\n> On 04/28/2014 10:09 PM, L.C. Karssen wrote:\n>\n> Dear Maarten, dear all,\n>\n> Moving to github... Hmm... That is quite a decision, so I've renamed the\n> subject to better reflect the discussion. I've also dropped the older\n> e-mails from the bottom of the thread.\n>\n> First off, are there any people that have experience with git and/or\n> github? I've got some git experience (still learning), but no real\n> experience with github.\n>\n> I agree with Maarten that SVN is showing its age. As he indicates things\n> like branching are much easier in git. Moreover, since I'm travelling\n> regularly being able to work without internet connection is a pro.\n>\n> On the other hand, moving to git (whether github or elsewhere) means\n> leaving R-forge, which is our well-known infrastructure. Furthermore,\n> such a move operation will cost quite some time, I guess. Moving all\n> bugs, features, etc... If we decide to move we should plan well and not\n> rush. And then the current developers will need to learn git if they\n> don't already know how to use it.\n>\n> One thing I think we should definitely do is migrate slowly, package by\n> package. Given that Maarten is positive about such a move and that I am\n> in a bit of limbo but not fully against, it seems logical that ProbABEL\n> is the first package to try such a migration.\n>\n>\n> Looking forward to your comments!\n>\n>\n> Lennart.\n>\n>\n> On 28-04-14 20:39, Maarten Kooyman wrote:\n>\n>  Dear all,\n>\n> I think it is easier to use for code review github:\n>\n> Please check to get a impression\n> :https://github.com/jquery/jquery/pull/1241/files\n>\n> I think we should reconsider an other the software version system: the\n> current system is not up to date to current usability. Bug tracking and\n> branching is quite hard in terms of usability. Please have a look atgithub.com to get a impression what is possible.\n>\n> Kind regards,\n>\n> Maarten\n>\n>\n>\n>  --\n> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\n> L.C. Karssen\n> Utrecht\n> The Netherlands\n> lennart at karssen.orghttp://blog.karssen.org\n> GPG key ID: A88F554A\n> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n>\n>\n>\n>\n> _______________________________________________\n> genabel-devel mailing listgenabel-devel at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n>\n>\n>\n> _______________________________________________\n> genabel-devel mailing list\n> genabel-devel at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n>\n\n\n\n-- \n-----------------------------------------------------\nYurii S. Aulchenko\n\n[ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [\nTwitter<http://twitter.com/YuriiAulchenko>] [\nBlog <http://yurii-aulchenko.blogspot.nl/> ]\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140502/bf91c976/attachment-0001.html>",
+      "body_snippet": "On Fri, May 2, 2014 at 12:25 AM, Diego Fabregat <\nfabregat at aices.rwth-aachen.de> wrote:\n\n>  I like the idea of moving to git. I have no experience with github, but\n> I'm using git on an almost dail",
+      "thread_id": "thread-6f18ea5caa64",
+      "thread_depth": 1,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-59f612670857",
+      "message_id": "<536CEE5C.3000207@karssen.org>",
+      "from_name": "L.C. Karssen",
+      "from_email_hash": "fcacffa40cf963048cfbbe846220349b5dcd5d1db1f0bd005d24fcde516bbf11",
+      "date": "2014-05-09T15:03:56Z",
+      "subject": "[GenABEL-dev] mmscore_regression() in ProbABEL: code review",
+      "subject_clean": "[GenABEL-dev] mmscore_regression() in ProbABEL: code review",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Dear list (and Maarten in particular),\n\nI've written some Doxygen documentation for the mmscore_regression()\nfunction that Maarten recently created. While doing so I changed some of\nthe variable names to be a bit more understandable and documented what\nthe function does according to Diego's suggestion on this list some time\nago. I also slightly changed the variables that are created in the\nfunction to get rid of one transpose() action.\n\nMy question is: could you have a look at the code (lines 57--62) in the\nattached file and see if this still preservers the vectorisation\npotential as mentioned in Maarten's comment in the code?\n\nThe function can be found in reg1.cpp.\n\n\nThanks a lot,\n\nLennart.\n-- \n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: mmscore.cpp\nType: text/x-c++src\nSize: 2667 bytes\nDesc: not available\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140509/7e426cf5/attachment.cpp>\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: signature.asc\nType: application/pgp-signature\nSize: 213 bytes\nDesc: OpenPGP digital signature\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140509/7e426cf5/attachment.sig>",
+      "body_snippet": "Dear list (and Maarten in particular),\n\nI've written some Doxygen documentation for the mmscore_regression()\nfunction that Maarten recently created. While doing so I changed some of\nthe variable names",
+      "thread_id": "thread-59f612670857",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-51c2f37d0447",
+      "message_id": "<536F47AD.3070603@gmail.com>",
+      "from_name": "Maarten Kooyman",
+      "from_email_hash": "4c3195f884fe6c648f70be05d44c9327dd956aedb7c1f0f49e9ae83292f21779",
+      "date": "2014-05-11T09:49:33Z",
+      "subject": "[GenABEL-dev] mmscore_regression() in ProbABEL: code review",
+      "subject_clean": "[GenABEL-dev] mmscore_regression() in ProbABEL: code review",
+      "in_reply_to": "<536CEE5C.3000207@karssen.org>",
+      "references": [
+        "<536CEE5C.3000207@karssen.org>"
+      ],
+      "body_plain": "Hi Lennart,\n\nThis seems alright to me. The most time consuming step is multiplication \nof the variance-covariance matrix, which I optimised. Since this is the \nsame, I do not expect any big change in performance. With every commit \ndone for ProbABEL my personal Jenkins instance benchmark 3 scenario's:\n\nPalinear with DatABEL  files \n((Npeople=3485,Npredictor=1,Nsnp=33815,correct for sex and age)\nPalinear with mldose files (Npeople=3485,Npredictor=1,Nsnp=33815,correct \nfor sex and age)\nPalinear with DatABEL files and mmscore( \nNpeople=500,Npredictor=1,Nsnp=1000).\n\nWhen there is a slow down (or speed up!) I will inform you.\n\nKind regards,\n\nMaarten\n\n\nOn 09-05-14 17:03, L.C. Karssen wrote:\n> Dear list (and Maarten in particular),\n>\n> I've written some Doxygen documentation for the mmscore_regression()\n> function that Maarten recently created. While doing so I changed some of\n> the variable names to be a bit more understandable and documented what\n> the function does according to Diego's suggestion on this list some time\n> ago. I also slightly changed the variables that are created in the\n> function to get rid of one transpose() action.\n>\n> My question is: could you have a look at the code (lines 57--62) in the\n> attached file and see if this still preservers the vectorisation\n> potential as mentioned in Maarten's comment in the code?\n>\n> The function can be found in reg1.cpp.\n>\n>\n> Thanks a lot,\n>\n> Lennart.\n>\n>\n> _______________________________________________\n> genabel-devel mailing list\n> genabel-devel at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140511/769c1bdc/attachment.html>",
+      "body_snippet": "Hi Lennart,\n\nThis seems alright to me. The most time consuming step is multiplication \nof the variance-covariance matrix, which I optimised. Since this is the \nsame, I do not expect any big change in ",
+      "thread_id": "thread-59f612670857",
+      "thread_depth": 1,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-88509a42a985",
+      "message_id": "<536F6910.2010601@karssen.org>",
+      "from_name": "L.C. Karssen",
+      "from_email_hash": "fcacffa40cf963048cfbbe846220349b5dcd5d1db1f0bd005d24fcde516bbf11",
+      "date": "2014-05-11T12:12:00Z",
+      "subject": "[GenABEL-dev] mmscore_regression() in ProbABEL: code review",
+      "subject_clean": "[GenABEL-dev] mmscore_regression() in ProbABEL: code review",
+      "in_reply_to": "<536F47AD.3070603@gmail.com>",
+      "references": [
+        "<536CEE5C.3000207@karssen.org>",
+        "<536F47AD.3070603@gmail.com>"
+      ],
+      "body_plain": "Thanks Maarten!\nI just committed my changes. Let me know if this changes the benchmark\n(for better or worse).\n\n\nBest,\n\nLennart.\n\nOn 11-05-14 11:49, Maarten Kooyman wrote:\n> Hi Lennart,\n> \n> This seems alright to me. The most time consuming step is multiplication\n> of the variance-covariance matrix, which I optimised. Since this is the\n> same, I do not expect any big change in performance. With every commit\n> done for ProbABEL my personal Jenkins instance benchmark 3 scenario's:\n> \n> Palinear with DatABEL  files\n> ((Npeople=3485,Npredictor=1,Nsnp=33815,correct for sex and age)\n> Palinear with mldose files (Npeople=3485,Npredictor=1,Nsnp=33815,correct\n> for sex and age)\n> Palinear with DatABEL files and mmscore(\n> Npeople=500,Npredictor=1,Nsnp=1000).\n> \n> When there is a slow down (or speed up!) I will inform you.\n> \n> Kind regards,\n> \n> Maarten\n> \n> \n> On 09-05-14 17:03, L.C. Karssen wrote:\n>> Dear list (and Maarten in particular),\n>>\n>> I've written some Doxygen documentation for the mmscore_regression()\n>> function that Maarten recently created. While doing so I changed some of\n>> the variable names to be a bit more understandable and documented what\n>> the function does according to Diego's suggestion on this list some time\n>> ago. I also slightly changed the variables that are created in the\n>> function to get rid of one transpose() action.\n>>\n>> My question is: could you have a look at the code (lines 57--62) in the\n>> attached file and see if this still preservers the vectorisation\n>> potential as mentioned in Maarten's comment in the code?\n>>\n>> The function can be found in reg1.cpp.\n>>\n>>\n>> Thanks a lot,\n>>\n>> Lennart.\n>>\n>>\n>> _______________________________________________\n>> genabel-devel mailing list\n>> genabel-devel at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n> \n> \n> \n> _______________________________________________\n> genabel-devel mailing list\n> genabel-devel at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n> \n\n-- \n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: signature.asc\nType: application/pgp-signature\nSize: 213 bytes\nDesc: OpenPGP digital signature\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140511/9352807d/attachment.sig>",
+      "body_snippet": "Thanks Maarten!\nI just committed my changes. Let me know if this changes the benchmark\n(for better or worse).\n\n\nBest,\n\nLennart.\n\nOn 11-05-14 11:49, Maarten Kooyman wrote:\n> Hi Lennart,\n> \n> This seems",
+      "thread_id": "thread-59f612670857",
+      "thread_depth": 2,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-48972dd7069b",
+      "message_id": "<244CF001646FF74FB34F372310A332C57B10BF@MBX2.rwth-ad.de>",
+      "from_name": "Frank, Alvaro Jesus",
+      "from_email_hash": "03b1f82497a45005c9e33286d7b44c4bdeef936783818aaa6c3706ee6669bbf9",
+      "date": "2014-05-13T14:03:02Z",
+      "subject": "[GenABEL-dev] t-statistic, p-values from source data",
+      "subject_clean": "[GenABEL-dev] t-statistic, p-values from source data",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi All,\n\nI apologize for any noise this may produce.\nAdding p-values, std erros and by default t-stests/statistics to omicabelnomm has been more than difficult.\nThe reason for this is that I cannot seem to find a unified consensus of what the user wants in terms of statistics.\nSome do t-stat on X, others on Y, but all expect a p-val from the linear regression that not even them know where it comes from. I have good handling of all formulas needed, but the final-pvalue requires a t-test from a sample data.\nIs that sample data the residual of the Y-XB or just the produced factors B or simply the data X or Y?\nSome of this make sense while others make no sense at all.\n\nAnother concern of mine is that some of the data used may not have enough significant digits beyond the 3rd digit. IF the p-value is supposed to come from the residual, this residual could be good or even bad depending on the conditioning of X. If the residual is very close to machine precision, using it for a pvalue becomes not at all advisable because of significant digits, or am I wrong about this?\n\nI feel I am missing something in terms of workflow or formulas or even purpose/usage of the regression and the p-value.\n\nAny help would be appreciated.\n\n-Alvaro\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140513/0a7b02ba/attachment.html>",
+      "body_snippet": "Hi All,\n\nI apologize for any noise this may produce.\nAdding p-values, std erros and by default t-stests/statistics to omicabelnomm has been more than difficult.\nThe reason for this is that I cannot se",
+      "thread_id": "thread-48972dd7069b",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-62571194b48d",
+      "message_id": "<427D80A8-DB6F-4D8B-B911-4BD61AB2B845@pngu.mgh.harvard.edu>",
+      "from_name": "Erin C. Dunn",
+      "from_email_hash": "3668e2e863f7a24a8f1b1e232b2f8410fd5a41ea9f1cdeb5d5f64bd4bf53c6df",
+      "date": "2014-05-13T23:20:15Z",
+      "subject": "[GenABEL-dev] Question about probABLE",
+      "subject_clean": "[GenABEL-dev] Question about probABLE",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Good Afternoon,\n\nI am interested in possibly using probABLE for some genome-wide GxE analyses I am planning to run.  I was wondering if you could tell me whether probABLE would allow me to: (1) run Pete Kraft's d2f joint test (for the main genetic effect and test for GxE); (2) use dosage data; (3) have a continuous outcome; (4) and obtain robust SE.\n\nIt looks like probABLE would enable me to do all of these things.  I was hoping to have some verification of this before I embark down this path, as I haven't used this software before and would imagine the learning curve would be somewhat steep.\n\nAny insights you might be able to share would be immensely helpful.\n\nThanks,\nErin\n\n____________________________\nErin C. Dunn, ScD, MPH\nPost-Doctoral Research Fellow\nPsychiatric and Neurodevelopmental Genetics Unit\nCenter for Human Genetic Research\nMassachusetts General Hospital\n185 Cambridge Street\nSimches, Room 6.252\nBoston, MA 02114\nerindunn at pngu.mgh.harvard.edu\n617-726-9387 (work phone)\n617-726-0830 (work fax)\n\nTo schedule a meeting, please visit my doodle poll:  http://doodle.com/erindunn\n\n\n\nThe information in this e-mail is intended only for the person to whom it is\naddressed. If you believe this e-mail was sent to you in error and the e-mail\ncontains patient information, please contact the Partners Compliance HelpLine at\nhttp://www.partners.org/complianceline . If the e-mail was sent to you in error\nbut does not contain patient information, please contact the sender and properly\ndispose of the e-mail.\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140513/7322abed/attachment.html>",
+      "body_snippet": "Good Afternoon,\n\nI am interested in possibly using probABLE for some genome-wide GxE analyses I am planning to run.  I was wondering if you could tell me whether probABLE would allow me to: (1) run Pe",
+      "thread_id": "thread-62571194b48d",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-86f12f440697",
+      "message_id": "<6589491268731029869@unknownmsgid>",
+      "from_name": "Yurii Aulchenko",
+      "from_email_hash": "218df96e2c2b9e8a26cd30d6c254caa9c2fc1b1faa7af66fe371a73346f9ae49",
+      "date": "2014-05-14T06:52:24Z",
+      "subject": "[GenABEL-dev] Question about probABLE",
+      "subject_clean": "[GenABEL-dev] Question about probABLE",
+      "in_reply_to": "<427D80A8-DB6F-4D8B-B911-4BD61AB2B845@pngu.mgh.harvard.edu>",
+      "references": [
+        "<427D80A8-DB6F-4D8B-B911-4BD61AB2B845@pngu.mgh.harvard.edu>"
+      ],
+      "body_plain": "Dear Erin,\n\nThis is question for the forum.genabel.org rather then this list.\n\nIt is ProbABEL, not probABLE.\n\nAnswers in short: yes.\n\nYurii\n\n----------------------\nYurii Aulchenko\n(sent from mobile device)\n\nOn May 14, 2014, at 8:46 AM, \"Erin C. Dunn\" <erindunn at pngu.mgh.harvard.edu>\nwrote:\n\nGood Afternoon,\n\nI am interested in possibly using probABLE for some genome-wide GxE\nanalyses I am planning to run.  I was wondering if you could tell\nme whether probABLE would allow me to: (1) run Pete Kraft's d2f joint test\n(for the main genetic effect and test for GxE); (2) use dosage data; (3)\nhave a continuous outcome; (4) and obtain robust SE.\n\nIt looks like probABLE would enable me to do all of these things.  I was\nhoping to have some verification of this before I embark down this path,\nas I haven't used this software before and would imagine the learning curve\nwould be somewhat steep.\n\nAny insights you might be able to share would be immensely helpful.\n\nThanks,\nErin\n\n____________________________\nErin C. Dunn, ScD, MPH\nPost-Doctoral Research Fellow\nPsychiatric and Neurodevelopmental Genetics Unit\nCenter for Human Genetic Research\nMassachusetts General Hospital\n185 Cambridge Street\nSimches, Room 6.252\nBoston, MA 02114\nerindunn at pngu.mgh.harvard.edu\n617-726-9387 (work phone)\n617-726-0830 (work fax)\n\nTo schedule a meeting, please visit my doodle poll:\nhttp://doodle.com/erindunn\n\nThe information in this e-mail is intended only for the person to whom it is\naddressed. If you believe this e-mail was sent to you in error and the\ne-mail\ncontains patient information, please contact the Partners Compliance\nHelpLine at\nhttp://www.partners.org/complianceline . If the e-mail was sent to you in\nerror\nbut does not contain patient information, please contact the sender and\nproperly\ndispose of the e-mail.\n\n_______________________________________________\ngenabel-devel mailing list\ngenabel-devel at lists.r-forge.r-project.org\nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140514/9b323693/attachment.html>",
+      "body_snippet": "Dear Erin,\n\nThis is question for the forum.genabel.org rather then this list.\n\nIt is ProbABEL, not probABLE.\n\nAnswers in short: yes.\n\nYurii\n\n----------------------\nYurii Aulchenko\n(sent from mobile de",
+      "thread_id": "thread-62571194b48d",
+      "thread_depth": 1,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-2755ac26da14",
+      "message_id": "<244CF001646FF74FB34F372310A332C57B83DC@MBX5.rwth-ad.de>",
+      "from_name": "Frank, Alvaro Jesus",
+      "from_email_hash": "03b1f82497a45005c9e33286d7b44c4bdeef936783818aaa6c3706ee6669bbf9",
+      "date": "2014-05-15T15:01:12Z",
+      "subject": "[GenABEL-dev] automake",
+      "subject_clean": "[GenABEL-dev] automake",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi Lennart,\n\nI need some help with making the installation of omicabelnomm with ubuntu and similar systems possible for end users. Aparently some pre-compiled blas do not get compiled with support for openmp. After compiling an openblas i wish to keep using the automake path of installation. But I m having problems having automake to grab the new blas library.\n\nAnyone aware of how to do this?\n\n-Alvaro\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140515/3740c8f4/attachment.html>",
+      "body_snippet": "Hi Lennart,\n\nI need some help with making the installation of omicabelnomm with ubuntu and similar systems possible for end users. Aparently some pre-compiled blas do not get compiled with support for",
+      "thread_id": "thread-2755ac26da14",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-c5a24d7d297b",
+      "message_id": "<53750161.6080408@karssen.org>",
+      "from_name": "L.C. Karssen",
+      "from_email_hash": "fcacffa40cf963048cfbbe846220349b5dcd5d1db1f0bd005d24fcde516bbf11",
+      "date": "2014-05-15T18:03:13Z",
+      "subject": "[GenABEL-dev] automake",
+      "subject_clean": "[GenABEL-dev] automake",
+      "in_reply_to": "<244CF001646FF74FB34F372310A332C57B83DC@MBX5.rwth-ad.de>",
+      "references": [
+        "<244CF001646FF74FB34F372310A332C57B83DC@MBX5.rwth-ad.de>"
+      ],
+      "body_plain": "Hi Alvaro,\n\nOn 15-05-14 17:01, Frank, Alvaro Jesus wrote:\n> Hi Lennart,\n> \n> I need some help with making the installation of omicabelnomm with\n> ubuntu and similar systems possible for end users. Aparently some\n> pre-compiled blas do not get compiled with support for openmp. After\n> compiling an openblas i wish to keep using the automake path of\n> installation. \n\nI don't think I understand you: what exactly do you mean with \"the\nautomake path of installation\"?\n\n> But I m having problems having automake to grab the new\n> blas library.\n\nNormally you would set the LD_LIBRARY_PATH environment variable if you\nwant to point to a new (shared) library. Would that solve your problem\nas well?\n\n\nLennart.\n\n> \n> Anyone aware of how to do this?\n> \n> -Alvaro\n> \n> \n> _______________________________________________\n> genabel-devel mailing list\n> genabel-devel at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n> \n\n-- \n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: signature.asc\nType: application/pgp-signature\nSize: 213 bytes\nDesc: OpenPGP digital signature\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140515/68c6bb0b/attachment.sig>",
+      "body_snippet": "Hi Alvaro,\n\nOn 15-05-14 17:01, Frank, Alvaro Jesus wrote:\n> Hi Lennart,\n> \n> I need some help with making the installation of omicabelnomm with\n> ubuntu and similar systems possible for end users. Apa",
+      "thread_id": "thread-2755ac26da14",
+      "thread_depth": 1,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-460f9aac8bbd",
+      "message_id": "<537A0FF9.5070803@karssen.org>",
+      "from_name": "L.C. Karssen",
+      "from_email_hash": "fcacffa40cf963048cfbbe846220349b5dcd5d1db1f0bd005d24fcde516bbf11",
+      "date": "2014-05-19T14:06:49Z",
+      "subject": "[GenABEL-dev] Best way to 'round' small floats",
+      "subject_clean": "[GenABEL-dev] Best way to 'round' small floats",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Dear list,\n\nWhile working on adding p-values to the ProbABEL output I ran into the\nfact that (at least in the checks) we end up with small negative chi^2\nvalues (e.g. -1.14e-13) for some models (e.g. dominant). Of course this\nshouldn't happen, but my guess is it's a numerical problem caused by\nsubtracting the two likelihoods for the Likelihood Ratio Test.\n\nI'd like to add a bit of code like this to mitigate this issue:\n\n  if (chi2 < 0 && abs(chi2) < EPS) { chi2 = 0 }\n\nwith EPS set to e.g. 1e-9.\nThis won't harm any analysis, since we're only interested in chi^2\nvalues away from zero, but I was wondering if there is a more\nappropriate way to do this.\n\n\nThanks,\n\nLennart.\n-- \n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: signature.asc\nType: application/pgp-signature\nSize: 213 bytes\nDesc: OpenPGP digital signature\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140519/7e1fb153/attachment.sig>",
+      "body_snippet": "Dear list,\n\nWhile working on adding p-values to the ProbABEL output I ran into the\nfact that (at least in the checks) we end up with small negative chi^2\nvalues (e.g. -1.14e-13) for some models (e.g. ",
+      "thread_id": "thread-460f9aac8bbd",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-a9d91b1043f6",
+      "message_id": "<537A3384.6060406@karssen.org>",
+      "from_name": "L.C. Karssen",
+      "from_email_hash": "fcacffa40cf963048cfbbe846220349b5dcd5d1db1f0bd005d24fcde516bbf11",
+      "date": "2014-05-19T16:38:28Z",
+      "subject": "[GenABEL-dev] automake",
+      "subject_clean": "[GenABEL-dev] automake",
+      "in_reply_to": "<53750161.6080408@karssen.org>",
+      "references": [
+        "<244CF001646FF74FB34F372310A332C57B83DC@MBX5.rwth-ad.de>",
+        "<53750161.6080408@karssen.org>"
+      ],
+      "body_plain": "Hi Alvaro,\n\nI just realised that my previous answer may not be what you were looking\nfor.\nThe LD_LIBRARY_PATH variable is used to search for shared libraries at\nrun time. Instead you probably mean how to tell where the libraries is\nat compile time. For that you should add the CXXFLAGS option -L followed\nby the path.\n\n\nBest,\n\nLennart.\n\nOn 15-05-14 20:03, L.C. Karssen wrote:\n> Hi Alvaro,\n> \n> On 15-05-14 17:01, Frank, Alvaro Jesus wrote:\n>> Hi Lennart,\n>>\n>> I need some help with making the installation of omicabelnomm with\n>> ubuntu and similar systems possible for end users. Aparently some\n>> pre-compiled blas do not get compiled with support for openmp. After\n>> compiling an openblas i wish to keep using the automake path of\n>> installation. \n> \n> I don't think I understand you: what exactly do you mean with \"the\n> automake path of installation\"?\n> \n>> But I m having problems having automake to grab the new\n>> blas library.\n> \n> Normally you would set the LD_LIBRARY_PATH environment variable if you\n> want to point to a new (shared) library. Would that solve your problem\n> as well?\n> \n> \n> Lennart.\n> \n>>\n>> Anyone aware of how to do this?\n>>\n>> -Alvaro\n>>\n>>\n>> _______________________________________________\n>> genabel-devel mailing list\n>> genabel-devel at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n>>\n> \n> \n> \n> _______________________________________________\n> genabel-devel mailing list\n> genabel-devel at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n> \n\n-- \n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: signature.asc\nType: application/pgp-signature\nSize: 213 bytes\nDesc: OpenPGP digital signature\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140519/85354a90/attachment.sig>",
+      "body_snippet": "Hi Alvaro,\n\nI just realised that my previous answer may not be what you were looking\nfor.\nThe LD_LIBRARY_PATH variable is used to search for shared libraries at\nrun time. Instead you probably mean how",
+      "thread_id": "thread-2755ac26da14",
+      "thread_depth": 2,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-a5f21bfd437f",
+      "message_id": "<244CF001646FF74FB34F372310A332C57B936C@MBX5.rwth-ad.de>",
+      "from_name": "Frank, Alvaro Jesus",
+      "from_email_hash": "03b1f82497a45005c9e33286d7b44c4bdeef936783818aaa6c3706ee6669bbf9",
+      "date": "2014-05-21T07:26:20Z",
+      "subject": "[GenABEL-dev] automake",
+      "subject_clean": "[GenABEL-dev] automake",
+      "in_reply_to": "<537A3384.6060406@karssen.org>",
+      "references": [
+        "<244CF001646FF74FB34F372310A332C57B83DC@MBX5.rwth-ad.de>",
+        "<53750161.6080408@karssen.org>",
+        "<537A3384.6060406@karssen.org>"
+      ],
+      "body_plain": "Thank you for the info. My problems with this custom compiled libraries seem to be hard to solve once a normal shared one is installed. blas has to be compiled with OPENMP=1 enabled and default binaries  for Ubuntu seem not to have them. I will try your suggestion and will follow up soon too.\n________________________________________\nFrom: genabel-devel-bounces at lists.r-forge.r-project.org [genabel-devel-bounces at lists.r-forge.r-project.org] on behalf of L.C. Karssen [lennart at karssen.org]\nSent: Monday, May 19, 2014 6:38 PM\nTo: genabel-devel at lists.r-forge.r-project.org\nSubject: Re: [GenABEL-dev] automake\n\nHi Alvaro,\n\nI just realised that my previous answer may not be what you were looking\nfor.\nThe LD_LIBRARY_PATH variable is used to search for shared libraries at\nrun time. Instead you probably mean how to tell where the libraries is\nat compile time. For that you should add the CXXFLAGS option -L followed\nby the path.\n\n\nBest,\n\nLennart.\n\nOn 15-05-14 20:03, L.C. Karssen wrote:\n> Hi Alvaro,\n>\n> On 15-05-14 17:01, Frank, Alvaro Jesus wrote:\n>> Hi Lennart,\n>>\n>> I need some help with making the installation of omicabelnomm with\n>> ubuntu and similar systems possible for end users. Aparently some\n>> pre-compiled blas do not get compiled with support for openmp. After\n>> compiling an openblas i wish to keep using the automake path of\n>> installation.\n>\n> I don't think I understand you: what exactly do you mean with \"the\n> automake path of installation\"?\n>\n>> But I m having problems having automake to grab the new\n>> blas library.\n>\n> Normally you would set the LD_LIBRARY_PATH environment variable if you\n> want to point to a new (shared) library. Would that solve your problem\n> as well?\n>\n>\n> Lennart.\n>\n>>\n>> Anyone aware of how to do this?\n>>\n>> -Alvaro\n>>\n>>\n>> _______________________________________________\n>> genabel-devel mailing list\n>> genabel-devel at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n>>\n>\n>\n>\n> _______________________________________________\n> genabel-devel mailing list\n> genabel-devel at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel\n>\n\n--\n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-",
+      "body_snippet": "Thank you for the info. My problems with this custom compiled libraries seem to be hard to solve once a normal shared one is installed. blas has to be compiled with OPENMP=1 enabled and default binari",
+      "thread_id": "thread-2755ac26da14",
+      "thread_depth": 3,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-a484ebeef1fa",
+      "message_id": "<244CF001646FF74FB34F372310A332C57B9399@MBX5.rwth-ad.de>",
+      "from_name": "Frank, Alvaro Jesus",
+      "from_email_hash": "03b1f82497a45005c9e33286d7b44c4bdeef936783818aaa6c3706ee6669bbf9",
+      "date": "2014-05-21T08:02:25Z",
+      "subject": "[GenABEL-dev] Best way to 'round' small floats",
+      "subject_clean": "[GenABEL-dev] Best way to 'round' small floats",
+      "in_reply_to": "<537A0FF9.5070803@karssen.org>",
+      "references": [
+        "<537A0FF9.5070803@karssen.org>"
+      ],
+      "body_plain": "Hi All,\nchi^2 refers to the std error used to divide beta to calculate the t-test value? I am not familiar with this kind of t-statistic using Likelihood Ratio Test, the one I was familiar with is the one presented in the attached paper. \nIt seem to me weird that a ^2 value can be negative... Dominant should not have much difference with any other in terms of relation between the values used. I think Paolo and us have hinted several times to possible problems with significant digits and how this may affect results. I.e: Biomarkers with values exact up to 10^-3 will not give reliable results on any value direct or indirectly multiplied or added with it beyond 10^-3.\n\nOr perhaps that is a different issue.\n________________________________________\nFrom: genabel-devel-bounces at lists.r-forge.r-project.org [genabel-devel-bounces at lists.r-forge.r-project.org] on behalf of L.C. Karssen [lennart at karssen.org]\nSent: Monday, May 19, 2014 4:06 PM\nTo: GenABEL Development list\nSubject: [GenABEL-dev] Best way to 'round' small floats\n\nDear list,\n\nWhile working on adding p-values to the ProbABEL output I ran into the\nfact that (at least in the checks) we end up with small negative chi^2\nvalues (e.g. -1.14e-13) for some models (e.g. dominant). Of course this\nshouldn't happen, but my guess is it's a numerical problem caused by\nsubtracting the two likelihoods for the Likelihood Ratio Test.\n\nI'd like to add a bit of code like this to mitigate this issue:\n\n  if (chi2 < 0 && abs(chi2) < EPS) { chi2 = 0 }\n\nwith EPS set to e.g. 1e-9.\nThis won't harm any analysis, since we're only interested in chi^2\nvalues away from zero, but I was wondering if there is a more\nappropriate way to do this.\n\n\nThanks,\n\nLennart.\n--\n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: hippokratia-14-23.pdf\nType: application/pdf\nSize: 461655 bytes\nDesc: hippokratia-14-23.pdf\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140521/9071f805/attachment-0001.pdf>",
+      "body_snippet": "Hi All,\nchi^2 refers to the std error used to divide beta to calculate the t-test value? I am not familiar with this kind of t-statistic using Likelihood Ratio Test, the one I was familiar with is the",
+      "thread_id": "thread-460f9aac8bbd",
+      "thread_depth": 1,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-72418419e744",
+      "message_id": "<244CF001646FF74FB34F372310A332C57B93FB@MBX5.rwth-ad.de>",
+      "from_name": "Frank, Alvaro Jesus",
+      "from_email_hash": "03b1f82497a45005c9e33286d7b44c4bdeef936783818aaa6c3706ee6669bbf9",
+      "date": "2014-05-21T11:01:45Z",
+      "subject": "[GenABEL-dev] compressed dosage files and Big Data issues",
+      "subject_clean": "[GenABEL-dev] compressed dosage files and Big Data issues",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi All,\n\nIt has been brought to my attention that dosage files with imputed data used in regression analysis are ussually stored in disk in a compressed manner. For the tool snptest and perhaps others, users seem to just pass the path to the compressed files. Do the other GenABEL tools also decompress the data on the fly before using it on the analysis?\n\nIt seems to me that the project is meant to handle the \"Big Data\" problem, but many aspects of input and out data are being ignored.\n\nThe example dataset that I am talking about requires around 1.4 terabytes of data in compressed form. The uncompressed form seems to bring this to 10-20 terabytes. If one were to use the computational power of an entire 16core machine with pigz(parallel gzip) to uncompress the data, 4 hours would be required to uncompress the data. Any other tool wither in unix/R/c would take even longer in a sequential manner. I am being informed that reported times are around 24h+ hours to wait for the total uncompressing of the data when trying to extrac a subset of the data.  I can imagine that great chinks of the runtome from tools that do regression also suffer from having to uncompress on the fly. The total uncompressed data is never kept, only partial subparts of it as temporary files. Drives tipically offer 4Tb of storage space, so storing 10-20 TB seems a bit overwhelming if not done or designed correctly.\n\nNow consider a regression tool that is supposed to use all the data for a proper GWAS. This tool would have to spend days decompressing the data alone. If an entire research group is meant to use this data, and each member has to share resources on the same system, then uncompressing on the fly is even less optimal. The only real alternative is to keep the data uncompressed in disk and use only computational resources to calculate regressions. But then this runs into the problem of how to store it since drives are small and limited compared to the amount of data.\n\nA solution to this aspect of \"Big data\" comes from properly design supercomputing clusters or databases. This systems do not handle the filesystem where files are stored as part of individual drives. They simply use a version of a Distributed File System, like HDSP from Apache. The entire capacity filesystem can be expanded by simply adding drives to it, like normal hard drives for storage and PCIE SSD?s for high speed cache. This is all transparent to the end user, who only sees a unified filesystem.\n\nTo solve the \"Big Data\" problem,  such aspects of IT Infrastructure and systems like HDSP have to be included in the entire workflow process. What is the stance of the GenABEL in regards to how data is stored and handled?\n\nMy recommendation would be to to a tleast have a best practice disclosure, where many other aspects of workflow are included and discussed, as to make the usage of the computational tools optimal. It is not feasible to tackle big data with just faster or easier to use computational tools, since those tools have to adapt to the data going in and going out.\n\nSorry for the long email.\n\nTL;DR: Lets encourage uncompressing data and keeping it in disk using Distributed file systems as to make the computational tools faster and workflows more efficient to end-users.\n\n\nhttp://www-01.ibm.com/software/data/infosphere/hadoop/hdfs/\nhttps://en.wikipedia.org/wiki/Clustered_file_system#Distributed_file_systems\n\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140521/39847d39/attachment.html>",
+      "body_snippet": "Hi All,\n\nIt has been brought to my attention that dosage files with imputed data used in regression analysis are ussually stored in disk in a compressed manner. For the tool snptest and perhaps others",
+      "thread_id": "thread-72418419e744",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-327c386003d1",
+      "message_id": "<538482AF.2060507@karssen.org>",
+      "from_name": "L.C. Karssen",
+      "from_email_hash": "fcacffa40cf963048cfbbe846220349b5dcd5d1db1f0bd005d24fcde516bbf11",
+      "date": "2014-05-27T12:18:55Z",
+      "subject": "[GenABEL-dev] [Genabel-commits] r1748 - in pkg/OmicABELnoMM: . src tests",
+      "subject_clean": "[GenABEL-dev] [Genabel-commits] r1748 - in pkg/OmicABELnoMM: . src tests",
+      "in_reply_to": "<20140527120853.AB60C1873C7@r-forge.r-project.org>",
+      "references": [
+        "<20140527120853.AB60C1873C7@r-forge.r-project.org>"
+      ],
+      "body_plain": "Hi Alvaro,\n\nOn 27-05-14 14:08, noreply at r-forge.r-project.org wrote:\n> Author: afrank\n> Date: 2014-05-27 14:08:53 +0200 (Tue, 27 May 2014)\n> New Revision: 1748\n> \n> Modified:\n>    pkg/OmicABELnoMM/Makefile.am\n>    pkg/OmicABELnoMM/configure.ac\n>    pkg/OmicABELnoMM/src/Algorithm.cpp\n>    pkg/OmicABELnoMM/tests/Makefile\n>    pkg/OmicABELnoMM/tests/test.cpp\n> Log:\n> Automake integration of tests now runs them using make check. Tests are also compiled along with the normal executable.\n\n\nThat sounds good!\n\n> \n> \n> Modified: pkg/OmicABELnoMM/tests/Makefile\n> ===================================================================\n\nNow that you have a Makefile.am, the Makefile itself can be removed from\nSVN.\n\n\nThanks a lot!\n\nLennart.\n\n> \n> To get the complete diff run:\n>     svnlook diff /svnroot/genabel -r 1748\n> _______________________________________________\n> Genabel-commits mailing list\n> Genabel-commits at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits\n> \n\n-- \n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\n\n-------------- next part --------------\nA non-text attachment was scrubbed...\nName: signature.asc\nType: application/pgp-signature\nSize: 213 bytes\nDesc: OpenPGP digital signature\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140527/ffdf72e7/attachment.sig>",
+      "body_snippet": "Hi Alvaro,\n\nOn 27-05-14 14:08, noreply at r-forge.r-project.org wrote:\n> Author: afrank\n> Date: 2014-05-27 14:08:53 +0200 (Tue, 27 May 2014)\n> New Revision: 1748\n> \n> Modified:\n>    pkg/OmicABELnoMM/M",
+      "thread_id": "thread-327c386003d1",
+      "thread_depth": 0,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-aa43f8b16c46",
+      "message_id": "<244CF001646FF74FB34F372310A332C57B9BCD@MBX5.rwth-ad.de>",
+      "from_name": "Frank, Alvaro Jesus",
+      "from_email_hash": "03b1f82497a45005c9e33286d7b44c4bdeef936783818aaa6c3706ee6669bbf9",
+      "date": "2014-05-27T12:38:41Z",
+      "subject": "[GenABEL-dev] [Genabel-commits] r1748 - in pkg/OmicABELnoMM: .\tsrc tests",
+      "subject_clean": "[GenABEL-dev] [Genabel-commits] r1748 - in pkg/OmicABELnoMM: .\tsrc tests",
+      "in_reply_to": "<538482AF.2060507@karssen.org>",
+      "references": [
+        "<20140527120853.AB60C1873C7@r-forge.r-project.org>",
+        "<538482AF.2060507@karssen.org>"
+      ],
+      "body_plain": ">> Now that you have a Makefile.am, the Makefile itself can be removed from\n>> SVN.\n\nI will cleanse in my next commit when adding the missing statistics.\nI have me version of them alreadyin prototype form, but they are not that similar to those provided in the document you provided long ago. Different sources use different ways to calculate the divisor of the t-statistic and the degrees of freedom seems to vary too. Users do not help me in this case because pretty much no user knows what formula should be, they just care that it displays the resulting p values. Any thoughts on how to clarify this?\n\n________________________________________\nFrom: genabel-devel-bounces at lists.r-forge.r-project.org [genabel-devel-bounces at lists.r-forge.r-project.org] on behalf of L.C. Karssen [lennart at karssen.org]\nSent: Tuesday, May 27, 2014 2:18 PM\nTo: genabel-devel at lists.r-forge.r-project.org\nSubject: Re: [GenABEL-dev] [Genabel-commits] r1748 - in pkg/OmicABELnoMM: .     src tests\n\nHi Alvaro,\n\nOn 27-05-14 14:08, noreply at r-forge.r-project.org wrote:\n> Author: afrank\n> Date: 2014-05-27 14:08:53 +0200 (Tue, 27 May 2014)\n> New Revision: 1748\n>\n> Modified:\n>    pkg/OmicABELnoMM/Makefile.am\n>    pkg/OmicABELnoMM/configure.ac\n>    pkg/OmicABELnoMM/src/Algorithm.cpp\n>    pkg/OmicABELnoMM/tests/Makefile\n>    pkg/OmicABELnoMM/tests/test.cpp\n> Log:\n> Automake integration of tests now runs them using make check. Tests are also compiled along with the normal executable.\n\n\nThat sounds good!\n\n>\n>\n> Modified: pkg/OmicABELnoMM/tests/Makefile\n> ===================================================================\n\nNow that you have a Makefile.am, the Makefile itself can be removed from\nSVN.\n\n\nThanks a lot!\n\nLennart.\n\n>\n> To get the complete diff run:\n>     svnlook diff /svnroot/genabel -r 1748\n> _______________________________________________\n> Genabel-commits mailing list\n> Genabel-commits at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits\n>\n\n--\n*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\nL.C. Karssen\nUtrecht\nThe Netherlands\n\nlennart at karssen.org\nhttp://blog.karssen.org\nGPG key ID: A88F554A\n-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-",
+      "body_snippet": ">> Now that you have a Makefile.am, the Makefile itself can be removed from\n>> SVN.\n\nI will cleanse in my next commit when adding the missing statistics.\nI have me version of them alreadyin prototype ",
+      "thread_id": "thread-327c386003d1",
+      "thread_depth": 1,
+      "month": "2014-05"
+    },
+    {
+      "id": "msg-4c9203ef7494",
+      "message_id": "<244CF001646FF74FB34F372310A332C57B9BE1@MBX5.rwth-ad.de>",
+      "from_name": "Frank, Alvaro Jesus",
+      "from_email_hash": "03b1f82497a45005c9e33286d7b44c4bdeef936783818aaa6c3706ee6669bbf9",
+      "date": "2014-05-27T12:52:32Z",
+      "subject": "[GenABEL-dev] compression of binary data",
+      "subject_clean": "[GenABEL-dev] compression of binary data",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi All,\n\nRegarding compression of data, when ALL the data is in its genotyped form there is a very cosistent tructure of only 1?s and 0?s. since there are three columns per individual representing the observed snp, 2/3 of the resulting data are zeroes. Has it been considered to offer a variation of compression based on this? Either through sparse matrices or even by reducing the 3 columns to just 1 using a single digit, 1,2,3 to represent the presence of either AA, AB, BB ?\nthis of course would not work with imputed data.\nCompressing data using gz or similar is a bad practice anyway, with data handling taking HOURS just to uncompress datasets. Sparse matrices already work great with linear equation solvers and algorithms exist for them.\nI already managed to commence a cultural change locally here to move to uncompressed data. This requires a lot of infrastructure changes for the cluster used here, but waiting for uncompression is just bad practice when data is used across many institutes with limited computational resources. There seems to be some willingness to consider it.\nBecause of this I don't think pursuing a compression of imputed binary from filevector is of convenience. Offering some kind of tutorials on how to have a proper sustainable workflow seems more beneficial. Topics could be, quality control, scalable storage and computational resources, statistical requirements of the data, etc.\n\nProblems arise when the workflow is a mess of inconsistencies and in that case no single isolated tool can help.\n\nJust some thoughts. If there is any interest in any of this let me know.\n\n-Alvaro\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140527/5bf42926/attachment.html>",
+      "body_snippet": "Hi All,\n\nRegarding compression of data, when ALL the data is in its genotyped form there is a very cosistent tructure of only 1?s and 0?s. since there are three columns per individual representing the",
+      "thread_id": "thread-4c9203ef7494",
+      "thread_depth": 0,
+      "month": "2014-05"
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-650dfb723ad3",
+      "subject": "[GenABEL-dev] probabel big endian support",
+      "message_count": 1,
+      "participants": [
+        "L.C. Karssen"
+      ],
+      "started": "2014-05-01T17:04:12Z",
+      "last_reply": "2014-05-01T17:04:12Z",
+      "root_message_id": "msg-650dfb723ad3"
+    },
+    {
+      "id": "thread-6f18ea5caa64",
+      "subject": "[GenABEL-dev] Proposal to move to Github",
+      "message_count": 3,
+      "participants": [
+        "Diego Fabregat",
+        "L.C. Karssen",
+        "Yurii Aulchenko"
+      ],
+      "started": "2014-05-01T17:25:00Z",
+      "last_reply": "2014-05-02T08:27:34Z",
+      "root_message_id": "msg-6f18ea5caa64"
+    },
+    {
+      "id": "thread-59f612670857",
+      "subject": "[GenABEL-dev] mmscore_regression() in ProbABEL: code review",
+      "message_count": 3,
+      "participants": [
+        "L.C. Karssen",
+        "Maarten Kooyman"
+      ],
+      "started": "2014-05-09T15:03:56Z",
+      "last_reply": "2014-05-11T12:12:00Z",
+      "root_message_id": "msg-59f612670857"
+    },
+    {
+      "id": "thread-48972dd7069b",
+      "subject": "[GenABEL-dev] t-statistic, p-values from source data",
+      "message_count": 1,
+      "participants": [
+        "Frank, Alvaro Jesus"
+      ],
+      "started": "2014-05-13T14:03:02Z",
+      "last_reply": "2014-05-13T14:03:02Z",
+      "root_message_id": "msg-48972dd7069b"
+    },
+    {
+      "id": "thread-62571194b48d",
+      "subject": "[GenABEL-dev] Question about probABLE",
+      "message_count": 2,
+      "participants": [
+        "Erin C. Dunn",
+        "Yurii Aulchenko"
+      ],
+      "started": "2014-05-13T23:20:15Z",
+      "last_reply": "2014-05-14T06:52:24Z",
+      "root_message_id": "msg-62571194b48d"
+    },
+    {
+      "id": "thread-2755ac26da14",
+      "subject": "[GenABEL-dev] automake",
+      "message_count": 4,
+      "participants": [
+        "Frank, Alvaro Jesus",
+        "L.C. Karssen"
+      ],
+      "started": "2014-05-15T15:01:12Z",
+      "last_reply": "2014-05-21T07:26:20Z",
+      "root_message_id": "msg-2755ac26da14"
+    },
+    {
+      "id": "thread-460f9aac8bbd",
+      "subject": "[GenABEL-dev] Best way to 'round' small floats",
+      "message_count": 2,
+      "participants": [
+        "Frank, Alvaro Jesus",
+        "L.C. Karssen"
+      ],
+      "started": "2014-05-19T14:06:49Z",
+      "last_reply": "2014-05-21T08:02:25Z",
+      "root_message_id": "msg-460f9aac8bbd"
+    },
+    {
+      "id": "thread-72418419e744",
+      "subject": "[GenABEL-dev] compressed dosage files and Big Data issues",
+      "message_count": 1,
+      "participants": [
+        "Frank, Alvaro Jesus"
+      ],
+      "started": "2014-05-21T11:01:45Z",
+      "last_reply": "2014-05-21T11:01:45Z",
+      "root_message_id": "msg-72418419e744"
+    },
+    {
+      "id": "thread-327c386003d1",
+      "subject": "[GenABEL-dev] [Genabel-commits] r1748 - in pkg/OmicABELnoMM: . src tests",
+      "message_count": 2,
+      "participants": [
+        "Frank, Alvaro Jesus",
+        "L.C. Karssen"
+      ],
+      "started": "2014-05-27T12:18:55Z",
+      "last_reply": "2014-05-27T12:38:41Z",
+      "root_message_id": "msg-327c386003d1"
+    },
+    {
+      "id": "thread-4c9203ef7494",
+      "subject": "[GenABEL-dev] compression of binary data",
+      "message_count": 1,
+      "participants": [
+        "Frank, Alvaro Jesus"
+      ],
+      "started": "2014-05-27T12:52:32Z",
+      "last_reply": "2014-05-27T12:52:32Z",
+      "root_message_id": "msg-4c9203ef7494"
+    }
+  ]
+}

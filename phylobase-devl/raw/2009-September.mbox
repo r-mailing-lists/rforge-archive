@@ -1,0 +1,4205 @@
+From regetz at nceas.ucsb.edu  Wed Sep  2 09:59:38 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 02 Sep 2009 00:59:38 -0700
+Subject: [Phylobase-devl] prune/subset questions
+In-Reply-To: <4A988579.30303@nceas.ucsb.edu>
+References: <4A988579.30303@nceas.ucsb.edu>
+Message-ID: <4A9E25EA.5010507@nceas.ucsb.edu>
+
+Some follow-up...
+
+Jim Regetz wrote:
+> Hi all,
+> 
+> As far as I can tell, the new phylo4 prune method I've written is 
+> working just fine, and supports both trim.internal=TRUE and 
+> trim.internal=FALSE. It only does subtree=FALSE, more on that below.
+
+I just committed this. It is currently a prune method (for consistency 
+with previous organization), but as mentioned below I would prefer to 
+migrate it into the subset method.
+
+> Some questions for the group:
+> 
+> 1. Is there a compelling reason to keep both subset *and* prune methods? 
+> Or is this just a historical artifact? I think the only differences are: 
+> (1) you can only pass the trim.internal and subtree arguments to prune, 
+> but not subset, and (2) subset accepts tips.include, tips.exclude, mrca, 
+> and node.subtree, whereas prune only does tips.exclude. Why not just 
+> expose trim.internal and subtree (if desired) via the subset methods, 
+> and eliminate prune? Or if someone really wants a prune function, it can 
+> simply be an inflexible wrapper for subset, only accepting tips.exclude.
+
+I am increasingly inclined to drop prune as a formal method, making 
+subset (and associated "[" extraction) the sole interface to this 
+functionality.
+
+Objections?
+
+Going a step further, should we drop all the ape-based phylo subsetting 
+methods (including pruning and tip dropping)? Seems like ape 
+import/export are a sufficient link; maintaining additional coupling 
+through wrapper functions will mean duplication -- and maintenance -- of 
+code and documentation, which could become a headache as both phylobase 
+and ape continue to evolve.
+
+> 2. Do we need/want to support a subtree=TRUE option? I haven't worked on 
+> this at all. For what it's worth, even using the current ape-based 
+> subset method, this option unreliable for phylo4(d):
+> 
+> require(phylobase)
+> data(geospiza)
+> geotree <- extractTree(geospiza)
+> prune(geotree, c(1,3), subtree=TRUE)
+> ## Error in checkTree(object) : All labels must be unique
+> ## In addition: Warning message:
+> ## In asMethod(object) : trees with unknown order may be unsafe in ape
+> 
+> Here it's because the resulting tree would have two tip labels called 
+> "[1_tips]". Anyway, I would be happy with leaving subtree as a future 
+> feature possibility for now.
+
+Still not done. Currently, if you use subtree=TRUE, you get routed 
+through phylo coercion and ape::drop.tip, as before. Of course, this 
+won't be possible any longer if we drop ape-based subsetting altogether. 
+I don't have a good sense of how much of a priority this is.
+
+> 3. Any opinions on dealing with root edge length during subsetting? The 
+> current method (using ape::drop.tip) just loses that information. In the 
+> new method, the root edge essentially accumulates the edges associated 
+> with any singletons that form along it as a consequence of the pruning. 
+> Of course, that could make for a long root edge when retaining just two 
+> closely related species in a large tree. Alternatively, albeit somewhat 
+> arbitrarily, we could make it be the length of the edge connecting the 
+> new root to its parent node in the original tree. Of course, this could 
+> also be computed after the fact, e.g. with:
+> 
+> edgeLength(phy, MRCA(phy, tips.included))
+> 
+> where phy was the full (pre-subset) tree.
+
+Currently implemented as described. In case someone is interested in 
+obtaining the alternative root edge length, I can just add that line of 
+code to the example in the documentation.
+
+> 4. This new method was initially kinda slow, but mostly because it makes 
+> a bunch of descendants() calls in one part, and that can be slow. So I 
+> rewrote descendants() to use a (very simple) C function that works on a 
+> preordered edge matrix, which helps a lot with speed. I'll commit if 
+> this are no objections. The new subset is still slower than ape's 
+> drop.tip, but not horribly so.
+
+I've since modified phylo4 subset/prune to reduce the reliance on 
+descendants(), but I can still commit the C-based descendants 
+replacement. The subsetting does, however, now require at least one 
+reorder(), which is fine for small trees, but slow for large ones. So I 
+wrote a C function for reorder() as well (thanks to Peter for the push 
+in that direction). There are actually two alternative C functions, one 
+faster but only called if the tree is a true binary tree (no singletons 
+or polytomies), and the other slower but usable on any valid phylo4 tree 
+(I think). Performance of both is no better than the pure R reorder on 
+small trees, maybe even trivially slower, but much better on large trees.
+
+Are folks fine with having these things reimplemented as compiled C 
+functions? What I've done so far is pretty simple, and uses only the .C 
+interface, for what it's worth. I could imagine writing an analogous C 
+function for ancestors(), but that's probably enough at least for the 
+time being. Opinions?
+
+Thanks,
+Jim
+
+From bolker at ufl.edu  Wed Sep  2 14:25:09 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Wed, 02 Sep 2009 08:25:09 -0400
+Subject: [Phylobase-devl] prune/subset questions
+In-Reply-To: <4A9E25EA.5010507@nceas.ucsb.edu>
+References: <4A988579.30303@nceas.ucsb.edu> <4A9E25EA.5010507@nceas.ucsb.edu>
+Message-ID: <4A9E6425.9070408@ufl.edu>
+
+Jim Regetz wrote:
+> Some follow-up...
+> 
+> Jim Regetz wrote:
+>> Hi all,
+>>
+>> As far as I can tell, the new phylo4 prune method I've written is 
+>> working just fine, and supports both trim.internal=TRUE and 
+>> trim.internal=FALSE. It only does subtree=FALSE, more on that below.
+> 
+> I just committed this. It is currently a prune method (for consistency 
+> with previous organization), but as mentioned below I would prefer to 
+> migrate it into the subset method.
+> 
+>> Some questions for the group:
+>>
+>> 1. Is there a compelling reason to keep both subset *and* prune methods? 
+>> Or is this just a historical artifact? I think the only differences are: 
+>> (1) you can only pass the trim.internal and subtree arguments to prune, 
+>> but not subset, and (2) subset accepts tips.include, tips.exclude, mrca, 
+>> and node.subtree, whereas prune only does tips.exclude. Why not just 
+>> expose trim.internal and subtree (if desired) via the subset methods, 
+>> and eliminate prune? Or if someone really wants a prune function, it can 
+>> simply be an inflexible wrapper for subset, only accepting tips.exclude.
+
+> 
+> I am increasingly inclined to drop prune as a formal method, making 
+> subset (and associated "[" extraction) the sole interface to this 
+> functionality.
+> 
+> Objections?
+
+   OK with me.
+
+> 
+> Going a step further, should we drop all the ape-based phylo subsetting 
+> methods (including pruning and tip dropping)? Seems like ape 
+> import/export are a sufficient link; maintaining additional coupling 
+> through wrapper functions will mean duplication -- and maintenance -- of 
+> code and documentation, which could become a headache as both phylobase 
+> and ape continue to evolve.
+
+  Yes, if we can.
+> 
+>> 2. Do we need/want to support a subtree=TRUE option? I haven't worked on 
+>> this at all. For what it's worth, even using the current ape-based 
+>> subset method, this option unreliable for phylo4(d):
+>>
+>> require(phylobase)
+>> data(geospiza)
+>> geotree <- extractTree(geospiza)
+>> prune(geotree, c(1,3), subtree=TRUE)
+>> ## Error in checkTree(object) : All labels must be unique
+>> ## In addition: Warning message:
+>> ## In asMethod(object) : trees with unknown order may be unsafe in ape
+>>
+>> Here it's because the resulting tree would have two tip labels called 
+>> "[1_tips]". Anyway, I would be happy with leaving subtree as a future 
+>> feature possibility for now.
+
+  Also fine with me.
+> 
+> Still not done. Currently, if you use subtree=TRUE, you get routed 
+> through phylo coercion and ape::drop.tip, as before. Of course, this 
+> won't be possible any longer if we drop ape-based subsetting altogether. 
+> I don't have a good sense of how much of a priority this is.
+
+  I don't know either, since I don't use it that much.  Perhaps we
+could just make this a future feature and see if any of our users
+(ha!) yells for it.
+
+> 
+>> 3. Any opinions on dealing with root edge length during subsetting? The 
+>> current method (using ape::drop.tip) just loses that information. In the 
+>> new method, the root edge essentially accumulates the edges associated 
+>> with any singletons that form along it as a consequence of the pruning. 
+>> Of course, that could make for a long root edge when retaining just two 
+>> closely related species in a large tree. Alternatively, albeit somewhat 
+>> arbitrarily, we could make it be the length of the edge connecting the 
+>> new root to its parent node in the original tree. Of course, this could 
+>> also be computed after the fact, e.g. with:
+>>
+>> edgeLength(phy, MRCA(phy, tips.included))
+>>
+>> where phy was the full (pre-subset) tree.
+> 
+> Currently implemented as described. In case someone is interested in 
+> obtaining the alternative root edge length, I can just add that line of 
+> code to the example in the documentation.
+
+  Fine with me.
+> 
+>> 4. This new method was initially kinda slow, but mostly because it makes 
+>> a bunch of descendants() calls in one part, and that can be slow. So I 
+>> rewrote descendants() to use a (very simple) C function that works on a 
+>> preordered edge matrix, which helps a lot with speed. I'll commit if 
+>> this are no objections. The new subset is still slower than ape's 
+>> drop.tip, but not horribly so.
+> 
+> I've since modified phylo4 subset/prune to reduce the reliance on 
+> descendants(), but I can still commit the C-based descendants 
+> replacement. The subsetting does, however, now require at least one 
+> reorder(), which is fine for small trees, but slow for large ones. So I 
+> wrote a C function for reorder() as well (thanks to Peter for the push 
+> in that direction). There are actually two alternative C functions, one 
+> faster but only called if the tree is a true binary tree (no singletons 
+> or polytomies), and the other slower but usable on any valid phylo4 tree 
+> (I think). Performance of both is no better than the pure R reorder on 
+> small trees, maybe even trivially slower, but much better on large trees.
+> 
+> Are folks fine with having these things reimplemented as compiled C 
+> functions? What I've done so far is pretty simple, and uses only the .C 
+> interface, for what it's worth. I could imagine writing an analogous C 
+> function for ancestors(), but that's probably enough at least for the 
+> time being. Opinions?
+> 
+
+  This is *amazing*.  Thanks!
+
+  Ben
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090902/faeb46bb/attachment.pgp 
+
+From pdc at berkeley.edu  Wed Sep  2 19:43:01 2009
+From: pdc at berkeley.edu (Peter D. Cowan)
+Date: Wed, 2 Sep 2009 10:43:01 -0700
+Subject: [Phylobase-devl] prune/subset questions
+In-Reply-To: <4A9E25EA.5010507@nceas.ucsb.edu>
+References: <4A988579.30303@nceas.ucsb.edu> <4A9E25EA.5010507@nceas.ucsb.edu>
+Message-ID: <20090902173335.GA193@Macintosh-8.local>
+
+On Wed, Sep 02, 2009 at 12:59:38AM -0700, Jim Regetz wrote:
+> Some follow-up...
+> 
+> Jim Regetz wrote:
+> > Hi all,
+> > 
+> > As far as I can tell, the new phylo4 prune method I've written is 
+> > working just fine, and supports both trim.internal=TRUE and 
+> > trim.internal=FALSE. It only does subtree=FALSE, more on that below.
+> 
+> I just committed this. It is currently a prune method (for consistency 
+> with previous organization), but as mentioned below I would prefer to 
+> migrate it into the subset method.
+> 
+> > Some questions for the group:
+> > 
+> > 1. Is there a compelling reason to keep both subset *and* prune methods? 
+> > Or is this just a historical artifact? I think the only differences are: 
+> > (1) you can only pass the trim.internal and subtree arguments to prune, 
+> > but not subset, and (2) subset accepts tips.include, tips.exclude, mrca, 
+> > and node.subtree, whereas prune only does tips.exclude. Why not just 
+> > expose trim.internal and subtree (if desired) via the subset methods, 
+> > and eliminate prune? Or if someone really wants a prune function, it can 
+> > simply be an inflexible wrapper for subset, only accepting tips.exclude.
+> 
+> I am increasingly inclined to drop prune as a formal method, making 
+> subset (and associated "[" extraction) the sole interface to this 
+> functionality.
+> 
+> Objections?
+
+Fine by me.
+
+> Going a step further, should we drop all the ape-based phylo subsetting 
+> methods (including pruning and tip dropping)? Seems like ape 
+> import/export are a sufficient link; maintaining additional coupling 
+> through wrapper functions will mean duplication -- and maintenance -- of 
+> code and documentation, which could become a headache as both phylobase 
+> and ape continue to evolve.
+
++1
+
+> > 2. Do we need/want to support a subtree=TRUE option? I haven't worked on 
+> > this at all. For what it's worth, even using the current ape-based 
+> > subset method, this option unreliable for phylo4(d):
+> > 
+> > require(phylobase)
+> > data(geospiza)
+> > geotree <- extractTree(geospiza)
+> > prune(geotree, c(1,3), subtree=TRUE)
+> > ## Error in checkTree(object) : All labels must be unique
+> > ## In addition: Warning message:
+> > ## In asMethod(object) : trees with unknown order may be unsafe in ape
+> > 
+> > Here it's because the resulting tree would have two tip labels called 
+> > "[1_tips]". Anyway, I would be happy with leaving subtree as a future 
+> > feature possibility for now.
+> 
+> Still not done. Currently, if you use subtree=TRUE, you get routed 
+> through phylo coercion and ape::drop.tip, as before. Of course, this 
+> won't be possible any longer if we drop ape-based subsetting altogether. 
+> I don't have a good sense of how much of a priority this is.
+> 
+> > 3. Any opinions on dealing with root edge length during subsetting? The 
+> > current method (using ape::drop.tip) just loses that information. In the 
+> > new method, the root edge essentially accumulates the edges associated 
+> > with any singletons that form along it as a consequence of the pruning. 
+> > Of course, that could make for a long root edge when retaining just two 
+> > closely related species in a large tree. Alternatively, albeit somewhat 
+> > arbitrarily, we could make it be the length of the edge connecting the 
+> > new root to its parent node in the original tree. Of course, this could 
+> > also be computed after the fact, e.g. with:
+> > 
+> > edgeLength(phy, MRCA(phy, tips.included))
+> > 
+> > where phy was the full (pre-subset) tree.
+> 
+> Currently implemented as described. In case someone is interested in 
+> obtaining the alternative root edge length, I can just add that line of 
+> code to the example in the documentation.
+> 
+> > 4. This new method was initially kinda slow, but mostly because it makes 
+> > a bunch of descendants() calls in one part, and that can be slow. So I 
+> > rewrote descendants() to use a (very simple) C function that works on a 
+> > preordered edge matrix, which helps a lot with speed. I'll commit if 
+> > this are no objections. The new subset is still slower than ape's 
+> > drop.tip, but not horribly so.
+> 
+> I've since modified phylo4 subset/prune to reduce the reliance on 
+> descendants(), but I can still commit the C-based descendants 
+> replacement. The subsetting does, however, now require at least one 
+> reorder(), which is fine for small trees, but slow for large ones. So I 
+> wrote a C function for reorder() as well (thanks to Peter for the push 
+> in that direction). There are actually two alternative C functions, one 
+> faster but only called if the tree is a true binary tree (no singletons 
+> or polytomies), and the other slower but usable on any valid phylo4 tree 
+> (I think). Performance of both is no better than the pure R reorder on 
+> small trees, maybe even trivially slower, but much better on large trees.
+> 
+> Are folks fine with having these things reimplemented as compiled C 
+> functions? What I've done so far is pretty simple, and uses only the .C 
+> interface, for what it's worth. I could imagine writing an analogous C 
+> function for ancestors(), but that's probably enough at least for the 
+> time being. Opinions?
+
+I've been hoping to get the reorder command rewritten in C for a while, but don't know enough C to make it happen.  I spent a lot of time optimizing it, so its gratifying that it's at least fast for small trees.  Nonetheless, I'd love to see this committed.  
+
+I think it would be nice to keep the pure R in the sources, just commented out.  I know that I've looked at and benefited from code that was rewritten in C but still left as a comment next to the .Call().  Python has a similar policy of keeping both a C and a python version of the same function, and even updating them together.
+
+Peter
+
+> 
+> Thanks,
+> Jim
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+From regetz at nceas.ucsb.edu  Sat Sep  5 00:30:53 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Fri, 04 Sep 2009 15:30:53 -0700
+Subject: [Phylobase-devl] prune/subset questions
+In-Reply-To: <20090902173335.GA193@Macintosh-8.local>
+References: <4A988579.30303@nceas.ucsb.edu> <4A9E25EA.5010507@nceas.ucsb.edu>
+	<20090902173335.GA193@Macintosh-8.local>
+Message-ID: <4AA1951D.4000602@nceas.ucsb.edu>
+
+Hi all,
+
+Peter D. Cowan wrote:
+> On Wed, Sep 02, 2009 at 12:59:38AM -0700, Jim Regetz wrote:
+>> Some follow-up...
+>>
+>> Jim Regetz wrote:
+>>> Hi all,
+>>>
+>>> As far as I can tell, the new phylo4 prune method I've written is 
+>>> working just fine, and supports both trim.internal=TRUE and 
+>>> trim.internal=FALSE. It only does subtree=FALSE, more on that below.
+>> I just committed this. It is currently a prune method (for consistency 
+>> with previous organization), but as mentioned below I would prefer to 
+>> migrate it into the subset method.
+>>
+>>> Some questions for the group:
+>>>
+>>> 1. Is there a compelling reason to keep both subset *and* prune methods? 
+>>> Or is this just a historical artifact? I think the only differences are: 
+>>> (1) you can only pass the trim.internal and subtree arguments to prune, 
+>>> but not subset, and (2) subset accepts tips.include, tips.exclude, mrca, 
+>>> and node.subtree, whereas prune only does tips.exclude. Why not just 
+>>> expose trim.internal and subtree (if desired) via the subset methods, 
+>>> and eliminate prune? Or if someone really wants a prune function, it can 
+>>> simply be an inflexible wrapper for subset, only accepting tips.exclude.
+>> I am increasingly inclined to drop prune as a formal method, making 
+>> subset (and associated "[" extraction) the sole interface to this 
+>> functionality.
+>>
+>> Objections?
+> 
+> Fine by me.
+
+I changed my mind about removing prune altogether, but otherwise did the 
+above. Particularly given that prune is called twice when subsetting a 
+phylo4d object, I decided it was better to have one wrapper function 
+that does the argument matching, error checking, etc., and a second 
+function that does the real work. Those are pretty much the roles that 
+subset and prune, respectively, were already playing, so I decided just 
+to leave it that way. But really this is just an implementation detail. 
+As far as the user is concerned, and as far as the revised documentation 
+suggests, subset is the main function, and prune is a special case (with 
+"[" as third way to subset).
+
+>> Going a step further, should we drop all the ape-based phylo subsetting 
+>> methods (including pruning and tip dropping)? Seems like ape 
+>> import/export are a sufficient link; maintaining additional coupling 
+>> through wrapper functions will mean duplication -- and maintenance -- of 
+>> code and documentation, which could become a headache as both phylobase 
+>> and ape continue to evolve.
+> 
+> +1
+
+Done.
+
+>>> 2. Do we need/want to support a subtree=TRUE option? I haven't worked on 
+>>> this at all. For what it's worth, even using the current ape-based 
+>>> subset method, this option unreliable for phylo4(d):
+>>>
+>>> require(phylobase)
+>>> data(geospiza)
+>>> geotree <- extractTree(geospiza)
+>>> prune(geotree, c(1,3), subtree=TRUE)
+>>> ## Error in checkTree(object) : All labels must be unique
+>>> ## In addition: Warning message:
+>>> ## In asMethod(object) : trees with unknown order may be unsafe in ape
+>>>
+>>> Here it's because the resulting tree would have two tip labels called 
+>>> "[1_tips]". Anyway, I would be happy with leaving subtree as a future 
+>>> feature possibility for now.
+>> Still not done. Currently, if you use subtree=TRUE, you get routed 
+>> through phylo coercion and ape::drop.tip, as before. Of course, this 
+>> won't be possible any longer if we drop ape-based subsetting altogether. 
+>> I don't have a good sense of how much of a priority this is.
+
+Left for the future.
+
+>>> 3. Any opinions on dealing with root edge length during subsetting? The 
+>>> current method (using ape::drop.tip) just loses that information. In the 
+>>> new method, the root edge essentially accumulates the edges associated 
+>>> with any singletons that form along it as a consequence of the pruning. 
+>>> Of course, that could make for a long root edge when retaining just two 
+>>> closely related species in a large tree. Alternatively, albeit somewhat 
+>>> arbitrarily, we could make it be the length of the edge connecting the 
+>>> new root to its parent node in the original tree. Of course, this could 
+>>> also be computed after the fact, e.g. with:
+>>>
+>>> edgeLength(phy, MRCA(phy, tips.included))
+>>>
+>>> where phy was the full (pre-subset) tree.
+>> Currently implemented as described. In case someone is interested in 
+>> obtaining the alternative root edge length, I can just add that line of 
+>> code to the example in the documentation.
+
+Done.
+
+>>> 4. This new method was initially kinda slow, but mostly because it makes 
+>>> a bunch of descendants() calls in one part, and that can be slow. So I 
+>>> rewrote descendants() to use a (very simple) C function that works on a 
+>>> preordered edge matrix, which helps a lot with speed. I'll commit if 
+>>> this are no objections. The new subset is still slower than ape's 
+>>> drop.tip, but not horribly so.
+>> I've since modified phylo4 subset/prune to reduce the reliance on 
+>> descendants(), but I can still commit the C-based descendants 
+>> replacement. The subsetting does, however, now require at least one 
+>> reorder(), which is fine for small trees, but slow for large ones. So I 
+>> wrote a C function for reorder() as well (thanks to Peter for the push 
+>> in that direction). There are actually two alternative C functions, one 
+>> faster but only called if the tree is a true binary tree (no singletons 
+>> or polytomies), and the other slower but usable on any valid phylo4 tree 
+>> (I think). Performance of both is no better than the pure R reorder on 
+>> small trees, maybe even trivially slower, but much better on large trees.
+>>
+>> Are folks fine with having these things reimplemented as compiled C 
+>> functions? What I've done so far is pretty simple, and uses only the .C 
+>> interface, for what it's worth. I could imagine writing an analogous C 
+>> function for ancestors(), but that's probably enough at least for the 
+>> time being. Opinions?
+> 
+> I've been hoping to get the reorder command rewritten in C for a while, but don't know enough C to make it happen.  I spent a lot of time optimizing it, so its gratifying that it's at least fast for small trees.  Nonetheless, I'd love to see this committed.  
+> 
+> I think it would be nice to keep the pure R in the sources, just commented out.  I know that I've looked at and benefited from code that was rewritten in C but still left as a comment next to the .Call().  Python has a similar policy of keeping both a C and a python version of the same function, and even updating them together.
+
+Done and done.
+
+BTW, in the Rd file there is no longer an alias for subset itself, nor 
+for "[", both of which have generics defined elsewhere. AFAICT that is 
+what the current version of "Writing R Extensions" recommends (on page 40):
+
+"If a package has methods for a function defined originally somewhere 
+else, and does not change the underlying default method for the 
+function, the package is responsible for documenting the methods it 
+creates, but not for the function itself or the default method."
+
+These still do the trick though:
+
+methods?subset
+methods?"["
+?subset(phy) # for phylo4(d) object phy
+
+Cheers,
+Jim
+
+> Peter
+> 
+>> Thanks,
+>> Jim
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+From regetz at nceas.ucsb.edu  Sat Sep  5 02:37:41 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Fri, 04 Sep 2009 17:37:41 -0700
+Subject: [Phylobase-devl] accessor and replace method consistency
+Message-ID: <4AA1B2D5.8010802@nceas.ucsb.edu>
+
+Hi all,
+
+I promise this will be my last biggie proposal before the release.
+
+We've found and fixed a number of bugs resulting from misaligning the 
+elements of various slots (labels and nodes, edges and lengths, nodes 
+and data, etc). I've noticed a few new ones that I haven't reported yet 
+(in plot, prune, and tdata). Partly these occur because we sometimes 
+assume too much about slot data when accessing them directly via the @ 
+operator -- assumptions that tend to be true of the test data we usually 
+use, but aren't in fact enforced. And partly this is because the 
+accessor methods themselves are not consistent across slots (and have 
+changed over time).
+
+Rather than go with a band-aid approach, I think we should step back and 
+do a little accessor cleanup. It won't be that hard -- I'm happy to make 
+the changes, test things, and fix any downstream functions/methods that 
+break as a result. If we go with this, then I would recommend we use 
+accessors more routinely in the code. If in some case someone elects to 
+circumvent the getter/setter methods for performance reasons, fine, but 
+tread carefully (and consider adding a code comment for clarification).
+
+So, for the details. As I understand it, we place no restrictions on the 
+order of elements in the vector slots (tip.label, node.label, 
+edge.length, edge.label) nor on the order of rows in the tabular slots 
+(edge, tip.data, node.data). The association between slots is done via 
+the element names for the label and length slots, row names for the data 
+slots, and of course the actual matrix values for the edge matrix.
+
+That's fine, and provides some flexibility, but it also imposes extra 
+overhead on most phylobase functions. In lieu of enforcing particular 
+ordering as part of the phylo[4] definition (which we may yet decide to 
+do in the future, for efficiency!), I propose making the following 
+consistent ordering rules a feature of the getter/setter methods. Note 
+that some of these already work this way, especially coming out of 
+Francois' branch, but the point is to really codify and test it:
+
+* The following should always return the vectors ordered by node ID, in 
+ascending order:
+
+nodeId
+nodeType (already does)
+labels
+tipLabels
+nodeLabels
+
+This means the ordering will *always* correspond to 1:nTips for tips, 
+(nTips+1):(nTips+nNodes) for internal nodes, and 1:(nTips+nNodes) for 
+the 'all' case. In the case of missing labels, the accessor should still 
+return a complete vector of NAs.
+
+* Similarly, tdata (whether tip, internal, or all) should always return 
+a data frame with rows ordered by node ID, in ascending order.
+
+* edge should always returns the edge matrix as-is, because the actual 
+row order can matter for traversal methods.
+
+* edgeLength and edgeLabel should always return the vectors in an order 
+that matches the rows of the current edge matrix. As with node labels, 
+in the case of missing edge lengths or labels, the accessor should still 
+return a complete vector of NAs.
+
+* For Replace methods, when names are not used, the replacement ordering 
+should corresponding directly to accessor ordering (and not the existing 
+internal ordering). For example, even if the tip.label slot is:
+
+x at tip.label
+    2    3    1
+"t2" "t3" "t1"
+
+then tipLabels(x) <- c("tA", "tB", "tC") should still produce this:
+
+x at tip.label
+    1    2    3
+"tA" "tB" "tC"
+
+It already does, happily, but not all of the setters are like this.
+
+Incidentally, if we modify nodeId as I proposed, then the pretty print 
+method would show the object with tips first, then the internal nodes. I 
+realize that's different from what we have now, and maybe I missed an 
+earlier discussion about this, but I would be totally fine with that. Of 
+course, if folks always want internal nodes first, then tips, that's 
+fine, and we can tweak the print method accordingly. Either way would be 
+better than now IMHO, as the printed order can change when the edge 
+order changes (even with the pretty method).
+
+Whew. I'm happy to debate these (and can certainly change my mind on 
+details), but in any case I think it would be a boon for developers and 
+users alike to have more consistency on these fronts.
+
+Thoughts?
+
+Jim
+
+
+From pdc at berkeley.edu  Sat Sep  5 03:21:02 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Fri, 4 Sep 2009 18:21:02 -0700
+Subject: [Phylobase-devl] accessor and replace method consistency
+In-Reply-To: <4AA1B2D5.8010802@nceas.ucsb.edu>
+References: <4AA1B2D5.8010802@nceas.ucsb.edu>
+Message-ID: <BA27CFF8-B770-4F18-B8B3-83A46C519F8B@berkeley.edu>
+
+
+On Sep 4, 2009, at 5:37 PM, Jim Regetz wrote:
+
+> Hi all,
+>
+> I promise this will be my last biggie proposal before the release.
+>
+> We've found and fixed a number of bugs resulting from misaligning the
+> elements of various slots (labels and nodes, edges and lengths, nodes
+> and data, etc). I've noticed a few new ones that I haven't reported  
+> yet
+> (in plot, prune, and tdata). Partly these occur because we sometimes
+> assume too much about slot data when accessing them directly via the @
+> operator -- assumptions that tend to be true of the test data we  
+> usually
+> use, but aren't in fact enforced. And partly this is because the
+> accessor methods themselves are not consistent across slots (and have
+> changed over time).
+
+Yes, thank you Jim and Francois for identifying and fixing many of  
+these mismatches/bugs.  I think the agreed upon strategy is to promote  
+the use of the accessor methods for getting the elements.  I for one  
+am quite guilty of not following that advise.
+
+[snip]
+
+> * The following should always return the vectors ordered by node ID,  
+> in
+> ascending order:
+>
+> nodeId
+> nodeType (already does)
+> labels
+> tipLabels
+> nodeLabels
+>
+> This means the ordering will *always* correspond to 1:nTips for tips,
+> (nTips+1):(nTips+nNodes) for internal nodes, and 1:(nTips+nNodes) for
+> the 'all' case. In the case of missing labels, the accessor should  
+> still
+> return a complete vector of NAs.
+>
+> * Similarly, tdata (whether tip, internal, or all) should always  
+> return
+> a data frame with rows ordered by node ID, in ascending order.
+>
+> * edge should always returns the edge matrix as-is, because the actual
+> row order can matter for traversal methods.
+>
+> * edgeLength and edgeLabel should always return the vectors in an  
+> order
+> that matches the rows of the current edge matrix. As with node labels,
+> in the case of missing edge lengths or labels, the accessor should  
+> still
+> return a complete vector of NAs.
+>
+> * For Replace methods, when names are not used, the replacement  
+> ordering
+> should corresponding directly to accessor ordering (and not the  
+> existing
+> internal ordering). For example, even if the tip.label slot is:
+>
+> x at tip.label
+>   2    3    1
+> "t2" "t3" "t1"
+>
+> then tipLabels(x) <- c("tA", "tB", "tC") should still produce this:
+>
+> x at tip.label
+>   1    2    3
+> "tA" "tB" "tC"
+>
+> It already does, happily, but not all of the setters are like this.
+>
+> Incidentally, if we modify nodeId as I proposed, then the pretty print
+> method would show the object with tips first, then the internal  
+> nodes. I
+> realize that's different from what we have now, and maybe I missed an
+> earlier discussion about this, but I would be totally fine with  
+> that. Of
+> course, if folks always want internal nodes first, then tips, that's
+> fine, and we can tweak the print method accordingly. Either way  
+> would be
+> better than now IMHO, as the printed order can change when the edge
+> order changes (even with the pretty method).
+>
+> Whew. I'm happy to debate these (and can certainly change my mind on
+> details), but in any case I think it would be a boon for developers  
+> and
+> users alike to have more consistency on these fronts.
+
++1 from me.  Anything that is consistent *and* documented would be a  
+nice improvement in my book.
+
+This sounds like a pretty significant change.  How long do you think  
+it would take to pull off?  I can probably find some time to help w/  
+this if needed, especially after Wed.
+
+Peter
+
+>
+> Jim
+>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From francois.michonneau at gmail.com  Sat Sep  5 23:09:10 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Sat, 05 Sep 2009 17:09:10 -0400
+Subject: [Phylobase-devl] accessor and replace method consistency
+In-Reply-To: <4AA1B2D5.8010802@nceas.ucsb.edu>
+References: <4AA1B2D5.8010802@nceas.ucsb.edu>
+Message-ID: <1252184950.1454.68.camel@francois-laptop>
+
+On Fri, 2009-09-04 at 17:37 -0700, Jim Regetz wrote:
+> Hi all,
+> 
+> I promise this will be my last biggie proposal before the release.
+> 
+> We've found and fixed a number of bugs resulting from misaligning the 
+> elements of various slots (labels and nodes, edges and lengths, nodes 
+> and data, etc). I've noticed a few new ones that I haven't reported yet 
+> (in plot, prune, and tdata). Partly these occur because we sometimes 
+> assume too much about slot data when accessing them directly via the @ 
+> operator -- assumptions that tend to be true of the test data we usually 
+> use, but aren't in fact enforced. And partly this is because the 
+> accessor methods themselves are not consistent across slots (and have 
+> changed over time).
+> 
+> Rather than go with a band-aid approach, I think we should step back and 
+> do a little accessor cleanup. It won't be that hard -- I'm happy to make 
+> the changes, test things, and fix any downstream functions/methods that 
+> break as a result. If we go with this, then I would recommend we use 
+> accessors more routinely in the code. If in some case someone elects to 
+> circumvent the getter/setter methods for performance reasons, fine, but 
+> tread carefully (and consider adding a code comment for clarification).
+
+I have been trying to use accessors as much as possible in my code. I
+had to use the slots directly when I updated the conversion method from
+phylo4 to phylo, because it didn't work when edges were stored
+pruningwise. (I wouldn't have found this without the testing framework,
+thanks for this Jim!). 
+
+> So, for the details. As I understand it, we place no restrictions on the 
+> order of elements in the vector slots (tip.label, node.label, 
+> edge.length, edge.label) nor on the order of rows in the tabular slots 
+> (edge, tip.data, node.data). The association between slots is done via 
+> the element names for the label and length slots, row names for the data 
+> slots, and of course the actual matrix values for the edge matrix.
+> 
+> That's fine, and provides some flexibility, but it also imposes extra 
+> overhead on most phylobase functions. In lieu of enforcing particular 
+> ordering as part of the phylo[4] definition (which we may yet decide to 
+> do in the future, for efficiency!), I propose making the following 
+> consistent ordering rules a feature of the getter/setter methods.
+
+I agree that some of the methods I rewrote may have a few extra-safety
+layers that don't make things terribly efficient. 
+
+> Note 
+> that some of these already work this way, especially coming out of 
+> Francois' branch, but the point is to really codify and test it:
+> 
+> * The following should always return the vectors ordered by node ID, in 
+> ascending order:
+> 
+> nodeId
+> nodeType (already does)
+> labels
+> tipLabels
+> nodeLabels
+> 
+> This means the ordering will *always* correspond to 1:nTips for tips, 
+> (nTips+1):(nTips+nNodes) for internal nodes, and 1:(nTips+nNodes) for 
+> the 'all' case. In the case of missing labels, the accessor should still 
+> return a complete vector of NAs.
+> 
+> * Similarly, tdata (whether tip, internal, or all) should always return 
+> a data frame with rows ordered by node ID, in ascending order.
+> 
+> * edge should always returns the edge matrix as-is, because the actual 
+> row order can matter for traversal methods.
+> 
+> * edgeLength and edgeLabel should always return the vectors in an order 
+> that matches the rows of the current edge matrix. As with node labels, 
+> in the case of missing edge lengths or labels, the accessor should still 
+> return a complete vector of NAs.
+> 
+> * For Replace methods, when names are not used, the replacement ordering 
+> should corresponding directly to accessor ordering (and not the existing 
+> internal ordering). For example, even if the tip.label slot is:
+> 
+> x at tip.label
+>     2    3    1
+> "t2" "t3" "t1"
+> 
+> then tipLabels(x) <- c("tA", "tB", "tC") should still produce this:
+> 
+> x at tip.label
+>     1    2    3
+> "tA" "tB" "tC"
+> 
+> It already does, happily, but not all of the setters are like this.
+
+I agree with all this.
+
+> Incidentally, if we modify nodeId as I proposed, then the pretty print 
+> method would show the object with tips first, then the internal nodes. I 
+> realize that's different from what we have now, and maybe I missed an 
+> earlier discussion about this, but I would be totally fine with that. Of 
+> course, if folks always want internal nodes first, then tips, that's 
+> fine, and we can tweak the print method accordingly. Either way would be 
+> better than now IMHO, as the printed order can change when the edge 
+> order changes (even with the pretty method).
+
+I think nodeId determines the order of many things. Starting by this
+function should fix a few things. I'm not sure why internal nodes are
+first. I don't really mind either way.
+
+> Whew. I'm happy to debate these (and can certainly change my mind on 
+> details), but in any case I think it would be a boon for developers and 
+> users alike to have more consistency on these fronts.
+
+I agree.
+
+I can help with the changes (mostly in the evening). Maybe we can
+organize an IRC meeting to distribute the tasks? Tuesday, 11am EST?
+
+  Cheers,
+  -- Fran?ois
+
+> 
+> Thoughts?
+> 
+> Jim
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090905/1fcbfab2/attachment.pgp 
+
+From pdc at berkeley.edu  Sat Sep  5 23:37:12 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Sat, 5 Sep 2009 14:37:12 -0700
+Subject: [Phylobase-devl] accessor and replace method consistency
+In-Reply-To: <1252184950.1454.68.camel@francois-laptop>
+References: <4AA1B2D5.8010802@nceas.ucsb.edu>
+	<1252184950.1454.68.camel@francois-laptop>
+Message-ID: <6BBFD549-319D-416D-B074-65D0849FA741@berkeley.edu>
+
+
+On Sep 5, 2009, at 2:09 PM, Fran?ois Michonneau wrote:
+
+> On Fri, 2009-09-04 at 17:37 -0700, Jim Regetz wrote:
+>
+> I agree.
+>
+> I can help with the changes (mostly in the evening). Maybe we can
+> organize an IRC meeting to distribute the tasks? Tuesday, 11am EST?
+
+Good idea.  Tuesday works for me.  In fact, I'm usually logged into  
+IRC and so is Jim, which is handy when I have a quick phylobase  
+question.  I'll try to be around IRC more this week.
+
+Peter
+
+> Cheers,
+> -- Fran?ois
+>
+>>
+>> Thoughts?
+>>
+>> Jim
+>>
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From regetz at nceas.ucsb.edu  Tue Sep  8 09:21:53 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Tue, 08 Sep 2009 00:21:53 -0700
+Subject: [Phylobase-devl] accessor and replace method consistency
+In-Reply-To: <6BBFD549-319D-416D-B074-65D0849FA741@berkeley.edu>
+References: <4AA1B2D5.8010802@nceas.ucsb.edu>	<1252184950.1454.68.camel@francois-laptop>
+	<6BBFD549-319D-416D-B074-65D0849FA741@berkeley.edu>
+Message-ID: <4AA60611.5050401@nceas.ucsb.edu>
+
+Great idea. I will aim to be on IRC at 11am eastern tomorrow. I think 
+the main tasks are:
+
+* Briefly discuss then commit accessor changes (if we're in agreement). 
+I have the changes mostly ready to go as proposed, but there are 
+definitely a couple of minor things I'd love to chat about quickly on 
+IRC before proceeding. The big exception is tdata -- I haven't touched 
+it at all, so the work still needs to be done.
+
+* Split up duties for inspecting and, if needed, fixing functions that 
+use one or more of these accessors. I've already cataloged them (see 
+below), so we can just decide who wants to deal with which ones. Some 
+clearly aren't affected by the changes, but others are. None of the 
+fixes should be hard.
+
+* Revise the replace methods as needed. I haven't really looked at them yet.
+
+I can subsequently create a few simple unit tests of the revised 
+accessors and setters.
+
+Thanks,
+Jim
+
+Existing functions/methods that use one or more slot accessor method:
+
+       function/method              file
+     checkPhylo4Data()       checkdata.R
+           checkTree()       checkdata.R
+         .phylo4Data()   class-phylo4d.R
+          formatData()      formatData.R
+  `labels<-`("phylo4")  methods-phylo4.R
+    isRooted("phylo4")  methods-phylo4.R
+      nodeId("phylo4")  methods-phylo4.R
+    nodeType("phylo4")  methods-phylo4.R
+    rootNode("phylo4")  methods-phylo4.R
+     summary("phylo4")  methods-phylo4.R
+    summary("phylo4d") methods-phylo4d.R
+      tdata("phylo4d") methods-phylo4d.R
+      prune("phylo4d")           prune.R
+  .phylo4ToDataFrame()   setAs-Methods.R
+         phylo4->phylo   setAs-Methods.R
+         `[`("phylo4")          subset.R
+        `[`("phylo4d")          subset.R
+        phylobubbles()        treePlot.R
+         plotOneTree()        treePlot.R
+       tip.data.plot()        treePlot.R
+             hasPoly()       treestruc.R
+            hasRetic()       treestruc.R
+           hasSingle()       treestruc.R
+            ancestor()        treewalk.R
+            children()        treewalk.R
+     getNode("phylo4")        treewalk.R
+
+
+
+Peter Cowan wrote:
+> On Sep 5, 2009, at 2:09 PM, Fran?ois Michonneau wrote:
+> 
+>> On Fri, 2009-09-04 at 17:37 -0700, Jim Regetz wrote:
+>>
+>> I agree.
+>>
+>> I can help with the changes (mostly in the evening). Maybe we can
+>> organize an IRC meeting to distribute the tasks? Tuesday, 11am EST?
+> 
+> Good idea.  Tuesday works for me.  In fact, I'm usually logged into  
+> IRC and so is Jim, which is handy when I have a quick phylobase  
+> question.  I'll try to be around IRC more this week.
+> 
+> Peter
+> 
+>> Cheers,
+>> -- Fran?ois
+>>
+>>> Thoughts?
+>>>
+>>> Jim
+>>>
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+
+From bolker at ufl.edu  Tue Sep  8 13:49:14 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Tue, 08 Sep 2009 07:49:14 -0400
+Subject: [Phylobase-devl] accessor and replace method consistency
+In-Reply-To: <4AA60611.5050401@nceas.ucsb.edu>
+References: <4AA1B2D5.8010802@nceas.ucsb.edu>	<1252184950.1454.68.camel@francois-laptop>	<6BBFD549-319D-416D-B074-65D0849FA741@berkeley.edu>
+	<4AA60611.5050401@nceas.ucsb.edu>
+Message-ID: <4AA644BA.4080403@ufl.edu>
+
+  Oops.  I was completely spacing out and thought (believe it or not)
+that Peter said 11 PM PDT (two mistakes, and not very plausible either).
+
+  I am in agreement about the accessor changes; if you want to assign me
+tasks I will try to give them a shot.
+
+  Ben
+
+
+Jim Regetz wrote:
+> Great idea. I will aim to be on IRC at 11am eastern tomorrow. I think 
+> the main tasks are:
+> 
+> * Briefly discuss then commit accessor changes (if we're in agreement). 
+> I have the changes mostly ready to go as proposed, but there are 
+> definitely a couple of minor things I'd love to chat about quickly on 
+> IRC before proceeding. The big exception is tdata -- I haven't touched 
+> it at all, so the work still needs to be done.
+> 
+> * Split up duties for inspecting and, if needed, fixing functions that 
+> use one or more of these accessors. I've already cataloged them (see 
+> below), so we can just decide who wants to deal with which ones. Some 
+> clearly aren't affected by the changes, but others are. None of the 
+> fixes should be hard.
+> 
+> * Revise the replace methods as needed. I haven't really looked at them yet.
+> 
+> I can subsequently create a few simple unit tests of the revised 
+> accessors and setters.
+> 
+> Thanks,
+> Jim
+> 
+> Existing functions/methods that use one or more slot accessor method:
+> 
+>        function/method              file
+>      checkPhylo4Data()       checkdata.R
+>            checkTree()       checkdata.R
+>          .phylo4Data()   class-phylo4d.R
+>           formatData()      formatData.R
+>   `labels<-`("phylo4")  methods-phylo4.R
+>     isRooted("phylo4")  methods-phylo4.R
+>       nodeId("phylo4")  methods-phylo4.R
+>     nodeType("phylo4")  methods-phylo4.R
+>     rootNode("phylo4")  methods-phylo4.R
+>      summary("phylo4")  methods-phylo4.R
+>     summary("phylo4d") methods-phylo4d.R
+>       tdata("phylo4d") methods-phylo4d.R
+>       prune("phylo4d")           prune.R
+>   .phylo4ToDataFrame()   setAs-Methods.R
+>          phylo4->phylo   setAs-Methods.R
+>          `[`("phylo4")          subset.R
+>         `[`("phylo4d")          subset.R
+>         phylobubbles()        treePlot.R
+>          plotOneTree()        treePlot.R
+>        tip.data.plot()        treePlot.R
+>              hasPoly()       treestruc.R
+>             hasRetic()       treestruc.R
+>            hasSingle()       treestruc.R
+>             ancestor()        treewalk.R
+>             children()        treewalk.R
+>      getNode("phylo4")        treewalk.R
+> 
+> 
+> 
+> Peter Cowan wrote:
+>> On Sep 5, 2009, at 2:09 PM, Fran?ois Michonneau wrote:
+>>
+>>> On Fri, 2009-09-04 at 17:37 -0700, Jim Regetz wrote:
+>>>
+>>> I agree.
+>>>
+>>> I can help with the changes (mostly in the evening). Maybe we can
+>>> organize an IRC meeting to distribute the tasks? Tuesday, 11am EST?
+>> Good idea.  Tuesday works for me.  In fact, I'm usually logged into  
+>> IRC and so is Jim, which is handy when I have a quick phylobase  
+>> question.  I'll try to be around IRC more this week.
+>>
+>> Peter
+>>
+>>> Cheers,
+>>> -- Fran?ois
+>>>
+>>>> Thoughts?
+>>>>
+>>>> Jim
+>>>>
+>>>> _______________________________________________
+>>>> Phylobase-devl mailing list
+>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090908/2e82c93d/attachment.pgp 
+
+From regetz at nceas.ucsb.edu  Tue Sep  8 23:59:57 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Tue, 08 Sep 2009 14:59:57 -0700
+Subject: [Phylobase-devl] accessor and replace method consistency
+In-Reply-To: <4AA644BA.4080403@ufl.edu>
+References: <4AA1B2D5.8010802@nceas.ucsb.edu>	<1252184950.1454.68.camel@francois-laptop>	<6BBFD549-319D-416D-B074-65D0849FA741@berkeley.edu>
+	<4AA60611.5050401@nceas.ucsb.edu> <4AA644BA.4080403@ufl.edu>
+Message-ID: <4AA6D3DD.2090200@nceas.ucsb.edu>
+
+Hi all,
+
+We went ahead and conversed on IRC this morning, and doled out some 
+duties regarding testing/fixing functions that might rely on the old 
+accessor behavior.
+
+I then committed changes, as proposed, to labels, edgeLength, 
+edgeLabels, and nodeId, and added a new edgeId method analogous to nodeId.
+
+During this processes, we (or just I, if you need someone to blame :) 
+made a few changes to especially the 'type' defaults. I'm short on time 
+right now, but will try to summarize to the group more fully this 
+evening. I'll also summarize the related TODOs that I've jotted down. 
+It's definitely a very manageable list. More later...
+
+Cheers,
+Jim
+
+Ben Bolker wrote:
+>   Oops.  I was completely spacing out and thought (believe it or not)
+> that Peter said 11 PM PDT (two mistakes, and not very plausible either).
+> 
+>   I am in agreement about the accessor changes; if you want to assign me
+> tasks I will try to give them a shot.
+> 
+>   Ben
+> 
+> 
+> Jim Regetz wrote:
+>> Great idea. I will aim to be on IRC at 11am eastern tomorrow. I think 
+>> the main tasks are:
+>>
+>> * Briefly discuss then commit accessor changes (if we're in agreement). 
+>> I have the changes mostly ready to go as proposed, but there are 
+>> definitely a couple of minor things I'd love to chat about quickly on 
+>> IRC before proceeding. The big exception is tdata -- I haven't touched 
+>> it at all, so the work still needs to be done.
+>>
+>> * Split up duties for inspecting and, if needed, fixing functions that 
+>> use one or more of these accessors. I've already cataloged them (see 
+>> below), so we can just decide who wants to deal with which ones. Some 
+>> clearly aren't affected by the changes, but others are. None of the 
+>> fixes should be hard.
+>>
+>> * Revise the replace methods as needed. I haven't really looked at them yet.
+>>
+>> I can subsequently create a few simple unit tests of the revised 
+>> accessors and setters.
+>>
+>> Thanks,
+>> Jim
+>>
+>> Existing functions/methods that use one or more slot accessor method:
+>>
+>>        function/method              file
+>>      checkPhylo4Data()       checkdata.R
+>>            checkTree()       checkdata.R
+>>          .phylo4Data()   class-phylo4d.R
+>>           formatData()      formatData.R
+>>   `labels<-`("phylo4")  methods-phylo4.R
+>>     isRooted("phylo4")  methods-phylo4.R
+>>       nodeId("phylo4")  methods-phylo4.R
+>>     nodeType("phylo4")  methods-phylo4.R
+>>     rootNode("phylo4")  methods-phylo4.R
+>>      summary("phylo4")  methods-phylo4.R
+>>     summary("phylo4d") methods-phylo4d.R
+>>       tdata("phylo4d") methods-phylo4d.R
+>>       prune("phylo4d")           prune.R
+>>   .phylo4ToDataFrame()   setAs-Methods.R
+>>          phylo4->phylo   setAs-Methods.R
+>>          `[`("phylo4")          subset.R
+>>         `[`("phylo4d")          subset.R
+>>         phylobubbles()        treePlot.R
+>>          plotOneTree()        treePlot.R
+>>        tip.data.plot()        treePlot.R
+>>              hasPoly()       treestruc.R
+>>             hasRetic()       treestruc.R
+>>            hasSingle()       treestruc.R
+>>             ancestor()        treewalk.R
+>>             children()        treewalk.R
+>>      getNode("phylo4")        treewalk.R
+>>
+>>
+>>
+>> Peter Cowan wrote:
+>>> On Sep 5, 2009, at 2:09 PM, Fran?ois Michonneau wrote:
+>>>
+>>>> On Fri, 2009-09-04 at 17:37 -0700, Jim Regetz wrote:
+>>>>
+>>>> I agree.
+>>>>
+>>>> I can help with the changes (mostly in the evening). Maybe we can
+>>>> organize an IRC meeting to distribute the tasks? Tuesday, 11am EST?
+>>> Good idea.  Tuesday works for me.  In fact, I'm usually logged into  
+>>> IRC and so is Jim, which is handy when I have a quick phylobase  
+>>> question.  I'll try to be around IRC more this week.
+>>>
+>>> Peter
+>>>
+>>>> Cheers,
+>>>> -- Fran?ois
+>>>>
+>>>>> Thoughts?
+>>>>>
+>>>>> Jim
+>>>>>
+>>>>> _______________________________________________
+>>>>> Phylobase-devl mailing list
+>>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>>> _______________________________________________
+>>>> Phylobase-devl mailing list
+>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>>
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+> 
+
+From regetz at nceas.ucsb.edu  Thu Sep 17 00:17:01 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 16 Sep 2009 15:17:01 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+Message-ID: <4AB163DD.20701@nceas.ucsb.edu>
+
+Hi all,
+
+Promises, promises. I know I swore off any more pre-release proposals, 
+but because this involves class modification, I see this as a speak now 
+or forever hold my peace sort of thing!
+
+While fleshing out unit tests, I ran into some minor issues involving 
+tdata. What I thought would be quick fixes raised thorny questions about 
+how to coordinate node.data and tip.data more robustly, and I kept 
+coming back to the idea that one structural change in the phylo4d class 
+would do wonders for simplifying tree data management:
+
+What would folks think about having a single 'data' slot (it could be 
+called something else), rather than keeping 'tip.data' and 'node.data' 
+in separate slots?
+
+This basically amounts to the difference between maintaining data in two 
+places (then having to merge every time all data are needed) versus 
+maintaining a single data frame (then simply extracting appropriate rows 
+whenever someone requests tip or node data). I can come up with a bunch 
+of reasons to make this change, mostly revolving around the fact that 
+this merge step is a minefield:
+
+* Putting the tip and node data together involves decisions. Should 
+tip.data and node.data columns with the same name be treated as the same 
+variable? What if there are also two columns with that name *within* 
+tip.data? What if the data types are different? These are decisions that 
+need to be made based on user input at the time of construction. In 
+fact, some of these decisions *are* guided by inputs to the phylo4d 
+constructor, and the two slots are populated in a way that tries to 
+preserve those rules. But I see this is fragile. It's easy to break 
+things afterwards by modifying the slot contents in valid ways, and even 
+if the slots haven't been modified, the merge can be imperfect (see 
+below). I'd much prefer to see a data assembly step happen once during 
+construction (and as needed for data addition and/or replacement), with 
+those decisions unambiguously reflected in the structure of that single, 
+unified table.
+
+* The only requirement of the tip.data and node.data slots is that they 
+are data frames in which row.names exactly match the IDs of tips and 
+internal nodes, respectively. Merging these can have unexpected side 
+effects, making this a hard-to-debug process. Some examples:
+   1. Merge discards row names and makes new "automatic" ones, which is 
+dangerous in our case because the row names are node IDs! It usually 
+works because the automatic row names are 1:N, which matches how we 
+currently produce node IDs. But it doesn't work now if the tip.data 
+and/or node.data rows are not in node order (this is perfectly legal), 
+and of course it won't work if the scheme for numbering IDs ever changes 
+(I know, not a huge deal, but still...). This is a good reason to 
+assemble and validate the data frame up front, rather than doing it on 
+the fly.
+   2. The current approach can produce column name inconsistencies in 
+what tdata() returns. Below, note the difference in names between the 
+tip/internal vs all cases:
+
+phy <- phylo4(rtree(3))
+phyd <- phylo4d(phy, tip.data=data.frame(a=1:3),
+     node.data=data.frame(a=4:5), match.data=FALSE, merge.data=FALSE)
+tdata(phyd, "tip")
+##    a    a
+## t3 1 <NA>
+## t1 2 <NA>
+## t2 3 <NA>
+tdata(phyd, "internal")
+##    a a
+## 4 NA d
+## 5 NA e
+tdata(phyd, "all")
+##     a  a.1
+## t3  1 <NA>
+## t1  2 <NA>
+## t2  3 <NA>
+## 4  NA    d
+## 5  NA    e
+
+   3. The current approach can produce factor/character inconsistencies. 
+In particular, if you supply a constructor method node.data containing a 
+factor column, along with either tip.data or all.data, the factor gets 
+converted to character:
+
+phy <- phylo4(rtree(3))
+phyd <- phylo4d(phy, tip.data=data.frame(tdt=letters[1:3]),
+     node.data=data.frame(ndt=letters[4:5]), match.data=FALSE)
+sapply(tdata(phyd), class)
+##         tdt         ndt
+##    "factor" "character"
+
+* In my mind, tip data and internal data may have different scientific 
+interpretations, but are otherwise equivalent. Node data (read: data for 
+both tip and internal nodes) are node data, regardless of what kind of 
+nodes we're talking about. Keeping them separate adds coding complexity. 
+Of course, for convenience, we absolutely should continue to provide 
+separate programmatic access to tip vs internal data via the arguments 
+of tdata() and related methods.
+
+Other than the fact that it will take some programmer time (I am happy 
+to contribute as much as is necessary), the only possible disadvantage I 
+can think of is that we'd explicitly have to store NAs in cases where a 
+particular data column (or any data at all) is missing for one of the 
+node types. But at worst this means a doubling of the amount of data 
+stored. For what it's worth, I think the constructor methods essentially 
+do this already (i.e., creating NAs columns for variables that don't 
+exist for one node type but do for the other).
+
+Practicalities: This would require some modification of the following: 
+tdata, addData, formatData, .phylo4Data, and checkPhylo4Data. On the 
+construction side, I think most of the necessary logic is somewhere in 
+those functions already. As for the tdata accessor, it's just a matter 
+of replacing the current merges with row indexing to retrieve the 
+appropriate data. On the whole I think this change would make these 
+functions *simpler*. Meanwhile, because tdata would still return the 
+same thing as before (but with even greater consistency!), the change 
+would have minimal downstream effects -- by my count, direct tip.data or 
+node.data slot access occurs only 6 times in the code, ignoring the 
+functions above, and these could all be fixed with trivial changes. We'd 
+also have to update geospiza, the docs, and tests, naturally.
+
+Addendum: In case anyone else's mind happens to wander in this 
+direction, yes, I think a similar argument could be made for combining 
+the slots for tip and internal _labels_ into a single label slot, 
+because each label is now unambiguously identified by its name (node 
+ID). Seems like the separation is a historical artifact? Combining them 
+would simplify the corresponding accessor/replace methods, which 
+currently have to look conditionally in either tip.label or node.label 
+depending on the arguments. And it wouldn't be hard at all to make this 
+change in the code base. Of course, I'm not going to ask for the moon 
+*and* the stars, but if someone else proposed it... :)
+
+And, shoot, while I'm thinking about slots, I can't resist: what purpose 
+does the Nnode slot serve?
+
+Thanks,
+Jim
+
+From francois.michonneau at gmail.com  Thu Sep 17 02:41:58 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Wed, 16 Sep 2009 20:41:58 -0400
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB163DD.20701@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>
+Message-ID: <1253148118.24186.10.camel@francois-laptop>
+
+
+
+Hi Jim,
+
+  I totally agree with you. After rewriting the phylo4d constructor it
+seemed to me that the distinction in the code between tip and node data
+was unnecessary. It also seems to me that the advantages of having a
+single slots for the data outweighs the annoyances it could create.
+
+  I am also in favor on having a single slots for the labels. As for the
+data, the same functions are used to build them and match them, so it
+would be natural to have them in a single place.
+
+  Finally, I think the Nnode slot was there to match the structure of
+phylo objects. But, it seems superfluous with the tests that S4 methods
+bring.
+
+  I'm quite busy but would be keen on finding some time to help
+implementing these changes if other people agree...
+
+  Cheers,
+
+  -- Fran?ois 
+
+On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+> Hi all,
+> 
+> Promises, promises. I know I swore off any more pre-release proposals, 
+> but because this involves class modification, I see this as a speak now 
+> or forever hold my peace sort of thing!
+> 
+> While fleshing out unit tests, I ran into some minor issues involving 
+> tdata. What I thought would be quick fixes raised thorny questions about 
+> how to coordinate node.data and tip.data more robustly, and I kept 
+> coming back to the idea that one structural change in the phylo4d class 
+> would do wonders for simplifying tree data management:
+> 
+> What would folks think about having a single 'data' slot (it could be 
+> called something else), rather than keeping 'tip.data' and 'node.data' 
+> in separate slots?
+> 
+> This basically amounts to the difference between maintaining data in two 
+> places (then having to merge every time all data are needed) versus 
+> maintaining a single data frame (then simply extracting appropriate rows 
+> whenever someone requests tip or node data). I can come up with a bunch 
+> of reasons to make this change, mostly revolving around the fact that 
+> this merge step is a minefield:
+> 
+> * Putting the tip and node data together involves decisions. Should 
+> tip.data and node.data columns with the same name be treated as the same 
+> variable? What if there are also two columns with that name *within* 
+> tip.data? What if the data types are different? These are decisions that 
+> need to be made based on user input at the time of construction. In 
+> fact, some of these decisions *are* guided by inputs to the phylo4d 
+> constructor, and the two slots are populated in a way that tries to 
+> preserve those rules. But I see this is fragile. It's easy to break 
+> things afterwards by modifying the slot contents in valid ways, and even 
+> if the slots haven't been modified, the merge can be imperfect (see 
+> below). I'd much prefer to see a data assembly step happen once during 
+> construction (and as needed for data addition and/or replacement), with 
+> those decisions unambiguously reflected in the structure of that single, 
+> unified table.
+> 
+> * The only requirement of the tip.data and node.data slots is that they 
+> are data frames in which row.names exactly match the IDs of tips and 
+> internal nodes, respectively. Merging these can have unexpected side 
+> effects, making this a hard-to-debug process. Some examples:
+>    1. Merge discards row names and makes new "automatic" ones, which is 
+> dangerous in our case because the row names are node IDs! It usually 
+> works because the automatic row names are 1:N, which matches how we 
+> currently produce node IDs. But it doesn't work now if the tip.data 
+> and/or node.data rows are not in node order (this is perfectly legal), 
+> and of course it won't work if the scheme for numbering IDs ever changes 
+> (I know, not a huge deal, but still...). This is a good reason to 
+> assemble and validate the data frame up front, rather than doing it on 
+> the fly.
+>    2. The current approach can produce column name inconsistencies in 
+> what tdata() returns. Below, note the difference in names between the 
+> tip/internal vs all cases:
+> 
+> phy <- phylo4(rtree(3))
+> phyd <- phylo4d(phy, tip.data=data.frame(a=1:3),
+>      node.data=data.frame(a=4:5), match.data=FALSE, merge.data=FALSE)
+> tdata(phyd, "tip")
+> ##    a    a
+> ## t3 1 <NA>
+> ## t1 2 <NA>
+> ## t2 3 <NA>
+> tdata(phyd, "internal")
+> ##    a a
+> ## 4 NA d
+> ## 5 NA e
+> tdata(phyd, "all")
+> ##     a  a.1
+> ## t3  1 <NA>
+> ## t1  2 <NA>
+> ## t2  3 <NA>
+> ## 4  NA    d
+> ## 5  NA    e
+> 
+>    3. The current approach can produce factor/character inconsistencies. 
+> In particular, if you supply a constructor method node.data containing a 
+> factor column, along with either tip.data or all.data, the factor gets 
+> converted to character:
+> 
+> phy <- phylo4(rtree(3))
+> phyd <- phylo4d(phy, tip.data=data.frame(tdt=letters[1:3]),
+>      node.data=data.frame(ndt=letters[4:5]), match.data=FALSE)
+> sapply(tdata(phyd), class)
+> ##         tdt         ndt
+> ##    "factor" "character"
+> 
+> * In my mind, tip data and internal data may have different scientific 
+> interpretations, but are otherwise equivalent. Node data (read: data for 
+> both tip and internal nodes) are node data, regardless of what kind of 
+> nodes we're talking about. Keeping them separate adds coding complexity. 
+> Of course, for convenience, we absolutely should continue to provide 
+> separate programmatic access to tip vs internal data via the arguments 
+> of tdata() and related methods.
+> 
+> Other than the fact that it will take some programmer time (I am happy 
+> to contribute as much as is necessary), the only possible disadvantage I 
+> can think of is that we'd explicitly have to store NAs in cases where a 
+> particular data column (or any data at all) is missing for one of the 
+> node types. But at worst this means a doubling of the amount of data 
+> stored. For what it's worth, I think the constructor methods essentially 
+> do this already (i.e., creating NAs columns for variables that don't 
+> exist for one node type but do for the other).
+> 
+> Practicalities: This would require some modification of the following: 
+> tdata, addData, formatData, .phylo4Data, and checkPhylo4Data. On the 
+> construction side, I think most of the necessary logic is somewhere in 
+> those functions already. As for the tdata accessor, it's just a matter 
+> of replacing the current merges with row indexing to retrieve the 
+> appropriate data. On the whole I think this change would make these 
+> functions *simpler*. Meanwhile, because tdata would still return the 
+> same thing as before (but with even greater consistency!), the change 
+> would have minimal downstream effects -- by my count, direct tip.data or 
+> node.data slot access occurs only 6 times in the code, ignoring the 
+> functions above, and these could all be fixed with trivial changes. We'd 
+> also have to update geospiza, the docs, and tests, naturally.
+> 
+> Addendum: In case anyone else's mind happens to wander in this 
+> direction, yes, I think a similar argument could be made for combining 
+> the slots for tip and internal _labels_ into a single label slot, 
+> because each label is now unambiguously identified by its name (node 
+> ID). Seems like the separation is a historical artifact? Combining them 
+> would simplify the corresponding accessor/replace methods, which 
+> currently have to look conditionally in either tip.label or node.label 
+> depending on the arguments. And it wouldn't be hard at all to make this 
+> change in the code base. Of course, I'm not going to ask for the moon 
+> *and* the stars, but if someone else proposed it... :)
+> 
+> And, shoot, while I'm thinking about slots, I can't resist: what purpose 
+> does the Nnode slot serve?
+> 
+> Thanks,
+> Jim
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090916/42132979/attachment.pgp 
+
+From bolker at ufl.edu  Thu Sep 17 02:47:55 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Wed, 16 Sep 2009 20:47:55 -0400
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <1253148118.24186.10.camel@francois-laptop>
+References: <4AB163DD.20701@nceas.ucsb.edu>
+	<1253148118.24186.10.camel@francois-laptop>
+Message-ID: <4AB1873B.1050909@ufl.edu>
+
+
+  To the best of my recollection, our reason for keeping them separate
+was that we thought that the majority of trees would have tip data only,
+and that having node data would typically double the amount of data
+storage ... ?  or am I missing something here?
+
+  Ben
+
+Fran?ois Michonneau wrote:
+> 
+> Hi Jim,
+> 
+>   I totally agree with you. After rewriting the phylo4d constructor it
+> seemed to me that the distinction in the code between tip and node data
+> was unnecessary. It also seems to me that the advantages of having a
+> single slots for the data outweighs the annoyances it could create.
+> 
+>   I am also in favor on having a single slots for the labels. As for the
+> data, the same functions are used to build them and match them, so it
+> would be natural to have them in a single place.
+> 
+>   Finally, I think the Nnode slot was there to match the structure of
+> phylo objects. But, it seems superfluous with the tests that S4 methods
+> bring.
+> 
+>   I'm quite busy but would be keen on finding some time to help
+> implementing these changes if other people agree...
+> 
+>   Cheers,
+> 
+>   -- Fran?ois 
+> 
+> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>> Hi all,
+>>
+>> Promises, promises. I know I swore off any more pre-release proposals, 
+>> but because this involves class modification, I see this as a speak now 
+>> or forever hold my peace sort of thing!
+>>
+>> While fleshing out unit tests, I ran into some minor issues involving 
+>> tdata. What I thought would be quick fixes raised thorny questions about 
+>> how to coordinate node.data and tip.data more robustly, and I kept 
+>> coming back to the idea that one structural change in the phylo4d class 
+>> would do wonders for simplifying tree data management:
+>>
+>> What would folks think about having a single 'data' slot (it could be 
+>> called something else), rather than keeping 'tip.data' and 'node.data' 
+>> in separate slots?
+>>
+>> This basically amounts to the difference between maintaining data in two 
+>> places (then having to merge every time all data are needed) versus 
+>> maintaining a single data frame (then simply extracting appropriate rows 
+>> whenever someone requests tip or node data). I can come up with a bunch 
+>> of reasons to make this change, mostly revolving around the fact that 
+>> this merge step is a minefield:
+>>
+>> * Putting the tip and node data together involves decisions. Should 
+>> tip.data and node.data columns with the same name be treated as the same 
+>> variable? What if there are also two columns with that name *within* 
+>> tip.data? What if the data types are different? These are decisions that 
+>> need to be made based on user input at the time of construction. In 
+>> fact, some of these decisions *are* guided by inputs to the phylo4d 
+>> constructor, and the two slots are populated in a way that tries to 
+>> preserve those rules. But I see this is fragile. It's easy to break 
+>> things afterwards by modifying the slot contents in valid ways, and even 
+>> if the slots haven't been modified, the merge can be imperfect (see 
+>> below). I'd much prefer to see a data assembly step happen once during 
+>> construction (and as needed for data addition and/or replacement), with 
+>> those decisions unambiguously reflected in the structure of that single, 
+>> unified table.
+>>
+>> * The only requirement of the tip.data and node.data slots is that they 
+>> are data frames in which row.names exactly match the IDs of tips and 
+>> internal nodes, respectively. Merging these can have unexpected side 
+>> effects, making this a hard-to-debug process. Some examples:
+>>    1. Merge discards row names and makes new "automatic" ones, which is 
+>> dangerous in our case because the row names are node IDs! It usually 
+>> works because the automatic row names are 1:N, which matches how we 
+>> currently produce node IDs. But it doesn't work now if the tip.data 
+>> and/or node.data rows are not in node order (this is perfectly legal), 
+>> and of course it won't work if the scheme for numbering IDs ever changes 
+>> (I know, not a huge deal, but still...). This is a good reason to 
+>> assemble and validate the data frame up front, rather than doing it on 
+>> the fly.
+>>    2. The current approach can produce column name inconsistencies in 
+>> what tdata() returns. Below, note the difference in names between the 
+>> tip/internal vs all cases:
+>>
+>> phy <- phylo4(rtree(3))
+>> phyd <- phylo4d(phy, tip.data=data.frame(a=1:3),
+>>      node.data=data.frame(a=4:5), match.data=FALSE, merge.data=FALSE)
+>> tdata(phyd, "tip")
+>> ##    a    a
+>> ## t3 1 <NA>
+>> ## t1 2 <NA>
+>> ## t2 3 <NA>
+>> tdata(phyd, "internal")
+>> ##    a a
+>> ## 4 NA d
+>> ## 5 NA e
+>> tdata(phyd, "all")
+>> ##     a  a.1
+>> ## t3  1 <NA>
+>> ## t1  2 <NA>
+>> ## t2  3 <NA>
+>> ## 4  NA    d
+>> ## 5  NA    e
+>>
+>>    3. The current approach can produce factor/character inconsistencies. 
+>> In particular, if you supply a constructor method node.data containing a 
+>> factor column, along with either tip.data or all.data, the factor gets 
+>> converted to character:
+>>
+>> phy <- phylo4(rtree(3))
+>> phyd <- phylo4d(phy, tip.data=data.frame(tdt=letters[1:3]),
+>>      node.data=data.frame(ndt=letters[4:5]), match.data=FALSE)
+>> sapply(tdata(phyd), class)
+>> ##         tdt         ndt
+>> ##    "factor" "character"
+>>
+>> * In my mind, tip data and internal data may have different scientific 
+>> interpretations, but are otherwise equivalent. Node data (read: data for 
+>> both tip and internal nodes) are node data, regardless of what kind of 
+>> nodes we're talking about. Keeping them separate adds coding complexity. 
+>> Of course, for convenience, we absolutely should continue to provide 
+>> separate programmatic access to tip vs internal data via the arguments 
+>> of tdata() and related methods.
+>>
+>> Other than the fact that it will take some programmer time (I am happy 
+>> to contribute as much as is necessary), the only possible disadvantage I 
+>> can think of is that we'd explicitly have to store NAs in cases where a 
+>> particular data column (or any data at all) is missing for one of the 
+>> node types. But at worst this means a doubling of the amount of data 
+>> stored. For what it's worth, I think the constructor methods essentially 
+>> do this already (i.e., creating NAs columns for variables that don't 
+>> exist for one node type but do for the other).
+>>
+>> Practicalities: This would require some modification of the following: 
+>> tdata, addData, formatData, .phylo4Data, and checkPhylo4Data. On the 
+>> construction side, I think most of the necessary logic is somewhere in 
+>> those functions already. As for the tdata accessor, it's just a matter 
+>> of replacing the current merges with row indexing to retrieve the 
+>> appropriate data. On the whole I think this change would make these 
+>> functions *simpler*. Meanwhile, because tdata would still return the 
+>> same thing as before (but with even greater consistency!), the change 
+>> would have minimal downstream effects -- by my count, direct tip.data or 
+>> node.data slot access occurs only 6 times in the code, ignoring the 
+>> functions above, and these could all be fixed with trivial changes. We'd 
+>> also have to update geospiza, the docs, and tests, naturally.
+>>
+>> Addendum: In case anyone else's mind happens to wander in this 
+>> direction, yes, I think a similar argument could be made for combining 
+>> the slots for tip and internal _labels_ into a single label slot, 
+>> because each label is now unambiguously identified by its name (node 
+>> ID). Seems like the separation is a historical artifact? Combining them 
+>> would simplify the corresponding accessor/replace methods, which 
+>> currently have to look conditionally in either tip.label or node.label 
+>> depending on the arguments. And it wouldn't be hard at all to make this 
+>> change in the code base. Of course, I'm not going to ask for the moon 
+>> *and* the stars, but if someone else proposed it... :)
+>>
+>> And, shoot, while I'm thinking about slots, I can't resist: what purpose 
+>> does the Nnode slot serve?
+>>
+>> Thanks,
+>> Jim
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090916/efd5ccd1/attachment-0001.pgp 
+
+From regetz at nceas.ucsb.edu  Thu Sep 17 03:11:23 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 16 Sep 2009 18:11:23 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB1873B.1050909@ufl.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>
+	<4AB1873B.1050909@ufl.edu>
+Message-ID: <4AB18CBB.20204@nceas.ucsb.edu>
+
+If truly you mean most trees will have tip data *only*, as opposed to 
+tip data *mostly*, a solution is that we don't require every node to 
+have a row in the data frame. So if you only supply tip data, then we'll 
+only store rows for the tips, and for internal tips the NAs will be 
+implied (but not stored) for all columns.
+
+The caveat is that if you want even just a single column of data for 
+nodes, then you'll actually have to store NAs for all the other columns 
+as well.
+
+So for a 3-tip (2-internal node) tree, if you only have tip data (but no 
+node data) for columns a and b, then this is your space-efficient data 
+frame:
+
+@data
+     a   b
+1   x   x
+2   x   x
+3   x   x
+
+But if you decide to add a column c for node data, then yes, we'd need 
+to expand it to this:
+
+@data:
+     a   b   c
+1   x   x  NA
+2   x   x  NA
+3   x   x  NA
+4  NA  NA   x
+5  NA  NA   x
+
+Does that help at all? I guess I don't really blink much at the idea of 
+"doubling the amount of data storage", but if others have very practical 
+reasons for avoiding this, I understand.
+
+BTW, I think the phylo4d constructor basically does the second thing 
+above already if you supply both tip and node data, but it would store 
+the first 3 rows in the @tip.data data frame and the last 2 rows in the 
+@node.data data frame.
+
+Jim
+
+
+Ben Bolker wrote:
+>   To the best of my recollection, our reason for keeping them separate
+> was that we thought that the majority of trees would have tip data only,
+> and that having node data would typically double the amount of data
+> storage ... ?  or am I missing something here?
+> 
+>   Ben
+> 
+> Fran?ois Michonneau wrote:
+>> Hi Jim,
+>>
+>>   I totally agree with you. After rewriting the phylo4d constructor it
+>> seemed to me that the distinction in the code between tip and node data
+>> was unnecessary. It also seems to me that the advantages of having a
+>> single slots for the data outweighs the annoyances it could create.
+>>
+>>   I am also in favor on having a single slots for the labels. As for the
+>> data, the same functions are used to build them and match them, so it
+>> would be natural to have them in a single place.
+>>
+>>   Finally, I think the Nnode slot was there to match the structure of
+>> phylo objects. But, it seems superfluous with the tests that S4 methods
+>> bring.
+>>
+>>   I'm quite busy but would be keen on finding some time to help
+>> implementing these changes if other people agree...
+>>
+>>   Cheers,
+>>
+>>   -- Fran?ois 
+>>
+>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>> Hi all,
+>>>
+>>> Promises, promises. I know I swore off any more pre-release proposals, 
+>>> but because this involves class modification, I see this as a speak now 
+>>> or forever hold my peace sort of thing!
+>>>
+>>> While fleshing out unit tests, I ran into some minor issues involving 
+>>> tdata. What I thought would be quick fixes raised thorny questions about 
+>>> how to coordinate node.data and tip.data more robustly, and I kept 
+>>> coming back to the idea that one structural change in the phylo4d class 
+>>> would do wonders for simplifying tree data management:
+>>>
+>>> What would folks think about having a single 'data' slot (it could be 
+>>> called something else), rather than keeping 'tip.data' and 'node.data' 
+>>> in separate slots?
+>>>
+>>> This basically amounts to the difference between maintaining data in two 
+>>> places (then having to merge every time all data are needed) versus 
+>>> maintaining a single data frame (then simply extracting appropriate rows 
+>>> whenever someone requests tip or node data). I can come up with a bunch 
+>>> of reasons to make this change, mostly revolving around the fact that 
+>>> this merge step is a minefield:
+>>>
+>>> * Putting the tip and node data together involves decisions. Should 
+>>> tip.data and node.data columns with the same name be treated as the same 
+>>> variable? What if there are also two columns with that name *within* 
+>>> tip.data? What if the data types are different? These are decisions that 
+>>> need to be made based on user input at the time of construction. In 
+>>> fact, some of these decisions *are* guided by inputs to the phylo4d 
+>>> constructor, and the two slots are populated in a way that tries to 
+>>> preserve those rules. But I see this is fragile. It's easy to break 
+>>> things afterwards by modifying the slot contents in valid ways, and even 
+>>> if the slots haven't been modified, the merge can be imperfect (see 
+>>> below). I'd much prefer to see a data assembly step happen once during 
+>>> construction (and as needed for data addition and/or replacement), with 
+>>> those decisions unambiguously reflected in the structure of that single, 
+>>> unified table.
+>>>
+>>> * The only requirement of the tip.data and node.data slots is that they 
+>>> are data frames in which row.names exactly match the IDs of tips and 
+>>> internal nodes, respectively. Merging these can have unexpected side 
+>>> effects, making this a hard-to-debug process. Some examples:
+>>>    1. Merge discards row names and makes new "automatic" ones, which is 
+>>> dangerous in our case because the row names are node IDs! It usually 
+>>> works because the automatic row names are 1:N, which matches how we 
+>>> currently produce node IDs. But it doesn't work now if the tip.data 
+>>> and/or node.data rows are not in node order (this is perfectly legal), 
+>>> and of course it won't work if the scheme for numbering IDs ever changes 
+>>> (I know, not a huge deal, but still...). This is a good reason to 
+>>> assemble and validate the data frame up front, rather than doing it on 
+>>> the fly.
+>>>    2. The current approach can produce column name inconsistencies in 
+>>> what tdata() returns. Below, note the difference in names between the 
+>>> tip/internal vs all cases:
+>>>
+>>> phy <- phylo4(rtree(3))
+>>> phyd <- phylo4d(phy, tip.data=data.frame(a=1:3),
+>>>      node.data=data.frame(a=4:5), match.data=FALSE, merge.data=FALSE)
+>>> tdata(phyd, "tip")
+>>> ##    a    a
+>>> ## t3 1 <NA>
+>>> ## t1 2 <NA>
+>>> ## t2 3 <NA>
+>>> tdata(phyd, "internal")
+>>> ##    a a
+>>> ## 4 NA d
+>>> ## 5 NA e
+>>> tdata(phyd, "all")
+>>> ##     a  a.1
+>>> ## t3  1 <NA>
+>>> ## t1  2 <NA>
+>>> ## t2  3 <NA>
+>>> ## 4  NA    d
+>>> ## 5  NA    e
+>>>
+>>>    3. The current approach can produce factor/character inconsistencies. 
+>>> In particular, if you supply a constructor method node.data containing a 
+>>> factor column, along with either tip.data or all.data, the factor gets 
+>>> converted to character:
+>>>
+>>> phy <- phylo4(rtree(3))
+>>> phyd <- phylo4d(phy, tip.data=data.frame(tdt=letters[1:3]),
+>>>      node.data=data.frame(ndt=letters[4:5]), match.data=FALSE)
+>>> sapply(tdata(phyd), class)
+>>> ##         tdt         ndt
+>>> ##    "factor" "character"
+>>>
+>>> * In my mind, tip data and internal data may have different scientific 
+>>> interpretations, but are otherwise equivalent. Node data (read: data for 
+>>> both tip and internal nodes) are node data, regardless of what kind of 
+>>> nodes we're talking about. Keeping them separate adds coding complexity. 
+>>> Of course, for convenience, we absolutely should continue to provide 
+>>> separate programmatic access to tip vs internal data via the arguments 
+>>> of tdata() and related methods.
+>>>
+>>> Other than the fact that it will take some programmer time (I am happy 
+>>> to contribute as much as is necessary), the only possible disadvantage I 
+>>> can think of is that we'd explicitly have to store NAs in cases where a 
+>>> particular data column (or any data at all) is missing for one of the 
+>>> node types. But at worst this means a doubling of the amount of data 
+>>> stored. For what it's worth, I think the constructor methods essentially 
+>>> do this already (i.e., creating NAs columns for variables that don't 
+>>> exist for one node type but do for the other).
+>>>
+>>> Practicalities: This would require some modification of the following: 
+>>> tdata, addData, formatData, .phylo4Data, and checkPhylo4Data. On the 
+>>> construction side, I think most of the necessary logic is somewhere in 
+>>> those functions already. As for the tdata accessor, it's just a matter 
+>>> of replacing the current merges with row indexing to retrieve the 
+>>> appropriate data. On the whole I think this change would make these 
+>>> functions *simpler*. Meanwhile, because tdata would still return the 
+>>> same thing as before (but with even greater consistency!), the change 
+>>> would have minimal downstream effects -- by my count, direct tip.data or 
+>>> node.data slot access occurs only 6 times in the code, ignoring the 
+>>> functions above, and these could all be fixed with trivial changes. We'd 
+>>> also have to update geospiza, the docs, and tests, naturally.
+>>>
+>>> Addendum: In case anyone else's mind happens to wander in this 
+>>> direction, yes, I think a similar argument could be made for combining 
+>>> the slots for tip and internal _labels_ into a single label slot, 
+>>> because each label is now unambiguously identified by its name (node 
+>>> ID). Seems like the separation is a historical artifact? Combining them 
+>>> would simplify the corresponding accessor/replace methods, which 
+>>> currently have to look conditionally in either tip.label or node.label 
+>>> depending on the arguments. And it wouldn't be hard at all to make this 
+>>> change in the code base. Of course, I'm not going to ask for the moon 
+>>> *and* the stars, but if someone else proposed it... :)
+>>>
+>>> And, shoot, while I'm thinking about slots, I can't resist: what purpose 
+>>> does the Nnode slot serve?
+>>>
+>>> Thanks,
+>>> Jim
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+> 
+> 
+> ------------------------------------------------------------------------
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+From francois.michonneau at gmail.com  Thu Sep 17 03:19:37 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Wed, 16 Sep 2009 21:19:37 -0400
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB18CBB.20204@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>
+	<1253148118.24186.10.camel@francois-laptop> <4AB1873B.1050909@ufl.edu>
+	<4AB18CBB.20204@nceas.ucsb.edu>
+Message-ID: <1253150377.24186.20.camel@francois-laptop>
+
+> BTW, I think the phylo4d constructor basically does the second thing 
+> above already if you supply both tip and node data, but it would store 
+> the first 3 rows in the @tip.data data frame and the last 2 rows in the 
+> @node.data data frame.
+
+Yes it does. I didn't think really hard about this, but I didn't see
+another way of providing at the same time tip, node and all.data without
+filling the missing part of the data frame with NA.
+
+  -- Fran?ois
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090916/9cf92bf1/attachment.pgp 
+
+From pdc at berkeley.edu  Thu Sep 17 03:32:06 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Wed, 16 Sep 2009 18:32:06 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB1873B.1050909@ufl.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>
+	<1253148118.24186.10.camel@francois-laptop>
+	<4AB1873B.1050909@ufl.edu>
+Message-ID: <B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+
+
+On Sep 16, 2009, at 5:47 PM, Ben Bolker wrote:
+
+>
+> To the best of my recollection, our reason for keeping them separate
+> was that we thought that the majority of trees would have tip data  
+> only,
+> and that having node data would typically double the amount of data
+> storage ... ?  or am I missing something here?
+
+Ben, that's one issue, and there are some related ones.  See my  
+comments below.
+
+> Fran?ois Michonneau wrote:
+>>
+>> Hi Jim,
+>>
+>> I totally agree with you. After rewriting the phylo4d constructor it
+>> seemed to me that the distinction in the code between tip and node  
+>> data
+>> was unnecessary. It also seems to me that the advantages of having a
+>> single slots for the data outweighs the annoyances it could create.
+>>
+>> I am also in favor on having a single slots for the labels. As for  
+>> the
+>> data, the same functions are used to build them and match them, so it
+>> would be natural to have them in a single place.
+>>
+>> Finally, I think the Nnode slot was there to match the structure of
+>> phylo objects. But, it seems superfluous with the tests that S4  
+>> methods
+>> bring.
+
+That's my recollection also, +1 for removing it.
+
+>> I'm quite busy but would be keen on finding some time to help
+>> implementing these changes if other people agree...
+>>
+>> Cheers,
+>>
+>> -- Fran?ois
+>>
+>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>> Hi all,
+>>>
+>>> Promises, promises. I know I swore off any more pre-release  
+>>> proposals,
+>>> but because this involves class modification, I see this as a  
+>>> speak now
+>>> or forever hold my peace sort of thing!
+
+Please, keep the proposed improvements coming!  That said, I'm not  
+sure this is the last chance to make this type of change.  There are  
+good accessors to both of these slots, so we should be able to change  
+what is really an implementation detail at a later date.  I know it  
+wishful thinking, but people shouldn't complain about class changes,  
+if we give them a way to be future proofed.
+
+The other thing lurking in the background here is the implementation  
+of pdata which is/was to be a class for storing data for trees.  It  
+would be capable of handling more complicated data types (such as a  
+vector for a tip trait instead of a single value.  It never really got  
+going, and I don't know what it's future is...
+
+>>> While fleshing out unit tests, I ran into some minor issues  
+>>> involving
+>>> tdata. What I thought would be quick fixes raised thorny questions  
+>>> about
+>>> how to coordinate node.data and tip.data more robustly, and I kept
+>>> coming back to the idea that one structural change in the phylo4d  
+>>> class
+>>> would do wonders for simplifying tree data management:
+>>>
+>>> What would folks think about having a single 'data' slot (it could  
+>>> be
+>>> called something else), rather than keeping 'tip.data' and  
+>>> 'node.data'
+>>> in separate slots?
+
+I think this was discussed at least once in the past.  Others will  
+need to fill in the details of that conversation.
+
+>>> This basically amounts to the difference between maintaining data  
+>>> in two
+>>> places (then having to merge every time all data are needed) versus
+>>> maintaining a single data frame (then simply extracting  
+>>> appropriate rows
+>>> whenever someone requests tip or node data). I can come up with a  
+>>> bunch
+>>> of reasons to make this change, mostly revolving around the fact  
+>>> that
+>>> this merge step is a minefield:
+>>>
+>>> * Putting the tip and node data together involves decisions. Should
+>>> tip.data and node.data columns with the same name be treated as  
+>>> the same
+>>> variable?
+
+I'd tend to say no, that we should append .node or .tip to duplicate  
+names the way merge does, but I can envision situations where you  
+would like the names to be the same (ancestral trait reconstruction  
+for one)
+
+>>> What if there are also two columns with that name *within*
+>>> tip.data? What if the data types are different? These are  
+>>> decisions that
+>>> need to be made based on user input at the time of construction. In
+>>> fact, some of these decisions *are* guided by inputs to the phylo4d
+>>> constructor, and the two slots are populated in a way that tries to
+>>> preserve those rules. But I see this is fragile. It's easy to break
+>>> things afterwards by modifying the slot contents in valid ways,  
+>>> and even
+>>> if the slots haven't been modified, the merge can be imperfect (see
+>>> below). I'd much prefer to see a data assembly step happen once  
+>>> during
+>>> construction (and as needed for data addition and/or replacement),  
+>>> with
+>>> those decisions unambiguously reflected in the structure of that  
+>>> single,
+>>> unified table.
+>>>
+>>> * The only requirement of the tip.data and node.data slots is that  
+>>> they
+>>> are data frames in which row.names exactly match the IDs of tips and
+>>> internal nodes, respectively. Merging these can have unexpected side
+>>> effects, making this a hard-to-debug process. Some examples:
+>>>  1. Merge discards row names and makes new "automatic" ones, which  
+>>> is
+>>> dangerous in our case because the row names are node IDs! It usually
+>>> works because the automatic row names are 1:N, which matches how we
+>>> currently produce node IDs. But it doesn't work now if the tip.data
+>>> and/or node.data rows are not in node order (this is perfectly  
+>>> legal),
+>>> and of course it won't work if the scheme for numbering IDs ever  
+>>> changes
+>>> (I know, not a huge deal, but still...). This is a good reason to
+>>> assemble and validate the data frame up front, rather than doing  
+>>> it on
+>>> the fly.
+
+This is a problem, and while it appears possible to preserve them,  
+it's not the most elegant [^1]
+
+[1] <http://tolstoy.newcastle.edu.au/R/help/05/11/14978.html >
+
+>>>  2. The current approach can produce column name inconsistencies in
+>>> what tdata() returns. Below, note the difference in names between  
+>>> the
+>>> tip/internal vs all cases:
+>>>
+>>> phy <- phylo4(rtree(3))
+>>> phyd <- phylo4d(phy, tip.data=data.frame(a=1:3),
+>>>    node.data=data.frame(a=4:5), match.data=FALSE, merge.data=FALSE)
+>>> tdata(phyd, "tip")
+>>> ##    a    a
+>>> ## t3 1 <NA>
+>>> ## t1 2 <NA>
+>>> ## t2 3 <NA>
+>>> tdata(phyd, "internal")
+>>> ##    a a
+>>> ## 4 NA d
+>>> ## 5 NA e
+>>> tdata(phyd, "all")
+>>> ##     a  a.1
+>>> ## t3  1 <NA>
+>>> ## t1  2 <NA>
+>>> ## t2  3 <NA>
+>>> ## 4  NA    d
+>>> ## 5  NA    e
+>>>
+>>>  3. The current approach can produce factor/character  
+>>> inconsistencies.
+>>> In particular, if you supply a constructor method node.data  
+>>> containing a
+>>> factor column, along with either tip.data or all.data, the factor  
+>>> gets
+>>> converted to character:
+>>>
+>>> phy <- phylo4(rtree(3))
+>>> phyd <- phylo4d(phy, tip.data=data.frame(tdt=letters[1:3]),
+>>>    node.data=data.frame(ndt=letters[4:5]), match.data=FALSE)
+>>> sapply(tdata(phyd), class)
+>>> ##         tdt         ndt
+>>> ##    "factor" "character"
+>>>
+>>> * In my mind, tip data and internal data may have different  
+>>> scientific
+>>> interpretations, but are otherwise equivalent. Node data (read:  
+>>> data for
+>>> both tip and internal nodes) are node data, regardless of what  
+>>> kind of
+>>> nodes we're talking about. Keeping them separate adds coding  
+>>> complexity.
+>>> Of course, for convenience, we absolutely should continue to provide
+>>> separate programmatic access to tip vs internal data via the  
+>>> arguments
+>>> of tdata() and related methods.
+
+Agreed
+
+>>> Other than the fact that it will take some programmer time (I am  
+>>> happy
+>>> to contribute as much as is necessary), the only possible  
+>>> disadvantage I
+>>> can think of is that we'd explicitly have to store NAs in cases  
+>>> where a
+>>> particular data column (or any data at all) is missing for one of  
+>>> the
+>>> node types. But at worst this means a doubling of the amount of data
+>>> stored. For what it's worth, I think the constructor methods  
+>>> essentially
+>>> do this already (i.e., creating NAs columns for variables that don't
+>>> exist for one node type but do for the other).
+>>>
+>>> Practicalities: This would require some modification of the  
+>>> following:
+>>> tdata, addData, formatData, .phylo4Data, and checkPhylo4Data. On the
+>>> construction side, I think most of the necessary logic is  
+>>> somewhere in
+>>> those functions already. As for the tdata accessor, it's just a  
+>>> matter
+>>> of replacing the current merges with row indexing to retrieve the
+>>> appropriate data. On the whole I think this change would make these
+>>> functions *simpler*. Meanwhile, because tdata would still return the
+>>> same thing as before (but with even greater consistency!), the  
+>>> change
+>>> would have minimal downstream effects -- by my count, direct  
+>>> tip.data or
+>>> node.data slot access occurs only 6 times in the code, ignoring the
+>>> functions above, and these could all be fixed with trivial  
+>>> changes. We'd
+>>> also have to update geospiza, the docs, and tests, naturally.
+>>>
+>>> Addendum: In case anyone else's mind happens to wander in this
+>>> direction, yes, I think a similar argument could be made for  
+>>> combining
+>>> the slots for tip and internal _labels_ into a single label slot,
+>>> because each label is now unambiguously identified by its name (node
+>>> ID). Seems like the separation is a historical artifact? Combining  
+>>> them
+>>> would simplify the corresponding accessor/replace methods, which
+>>> currently have to look conditionally in either tip.label or  
+>>> node.label
+>>> depending on the arguments. And it wouldn't be hard at all to make  
+>>> this
+>>> change in the code base. Of course, I'm not going to ask for the  
+>>> moon
+>>> *and* the stars, but if someone else proposed it... :)
+
+Again, I think performance was the reason here.  The assumption that  
+more often than not trees will not have any internal node labels.
+
+>>> And, shoot, while I'm thinking about slots, I can't resist: what  
+>>> purpose
+>>> does the Nnode slot serve?
+>>>
+>>> Thanks,
+>>> Jim
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>
+>
+> -- 
+> Ben Bolker
+> Associate professor, Biology Dep't, Univ. of Florida
+> bolker at ufl.edu / www.zoology.ufl.edu/bolker
+> GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From regetz at nceas.ucsb.edu  Thu Sep 17 20:54:07 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Thu, 17 Sep 2009 11:54:07 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+Message-ID: <4AB285CF.7020006@nceas.ucsb.edu>
+
+Quick reply just about the labels question:
+
+Peter Cowan wrote:
+>>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>>> 
+>>>> Addendum: In case anyone else's mind happens to wander in this 
+>>>> direction, yes, I think a similar argument could be made for 
+>>>> combining the slots for tip and internal _labels_ into a single
+>>>> label slot, because each label is now unambiguously identified
+>>>> by its name (node ID). Seems like the separation is a
+>>>> historical artifact? Combining them would simplify the
+>>>> corresponding accessor/replace methods, which currently have to
+>>>> look conditionally in either tip.label or node.label depending
+>>>> on the arguments. And it wouldn't be hard at all to make this 
+>>>> change in the code base. Of course, I'm not going to ask for
+>>>> the moon *and* the stars, but if someone else proposed it... :)
+>>>> 
+> 
+> Again, I think performance was the reason here.  The assumption that
+>  more often than not trees will not have any internal node labels.
+
+That doesn't have to be a problem. What I said about tree data applies 
+even more clearly here: only labels that actually exist need to be in 
+the vector. So if you only supply tip labels when you create the tree, 
+the (unified) label slot would be exactly the same as what we now call 
+tip.label. Example with a 3-tip tree:
+
+## actual slot contents -- no internal labels stored
+ > phy at label
+    1    2    3
+"t2" "t1" "t3"
+
+## but the accessors would still "fill in" implied the NAs:
+ > labels(phy) ## default type is 'all'
+    1    2    3    4    5
+"t2" "t1" "t3"   NA   NA
+
+ > tipLabels(phy)
+    1    2    3
+"t2" "t1" "t3"
+
+ > nodeLabels(phy)
+  4  5
+NA NA
+
+## now add internal labels
+ > nodeLabels(phy) <- c("n4", "n5")
+ > phy at label
+    1    2    3    4    5
+"t2" "t1" "t3" "n4" "n5"
+
+## and remove them again!
+ > nodeLabels(phy) <- as.character(NA)
+ > phy at label
+    1    2    3
+"t2" "t1" "t3"
+
+I just quickly wrote up new accessor and replace methods that would 
+behave this way. As illustrated above, the replacement method will also 
+drop any NA labels it encounters, for efficiency (but obviously attempts 
+to do this for tip labels will produce an error).
+
+Jim
+
+From steve.kembel at gmail.com  Thu Sep 17 20:57:08 2009
+From: steve.kembel at gmail.com (Steven Kembel)
+Date: Thu, 17 Sep 2009 11:57:08 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB285CF.7020006@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+	<4AB285CF.7020006@nceas.ucsb.edu>
+Message-ID: <9E400093-3848-4507-8325-A2A1B4A9A53A@gmail.com>
+
+Hello,
+
+I've been out of the loop for a while but wanted to quickly say that  
+reworking the labels/data to be a single slot and letting accessors  
+deal with making it look consistent sounds good. IIRC the main  
+argument previously against a single tip/node data slot was the  
+storage space issue (i.e. when I load a phylogeny with 20K tips I  
+don't want to unnecesarily store node data if it doesn't exist) but it  
+sounds like this is no longer an issue since the data are not stored  
+if they don't exist?
+
+Cheers,
+Steve
+
+On Sep 17, 2009, at 11:54 AM, Jim Regetz wrote:
+
+> Quick reply just about the labels question:
+>
+> Peter Cowan wrote:
+>>>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>>>>
+>>>>> Addendum: In case anyone else's mind happens to wander in this
+>>>>> direction, yes, I think a similar argument could be made for
+>>>>> combining the slots for tip and internal _labels_ into a single
+>>>>> label slot, because each label is now unambiguously identified
+>>>>> by its name (node ID). Seems like the separation is a
+>>>>> historical artifact? Combining them would simplify the
+>>>>> corresponding accessor/replace methods, which currently have to
+>>>>> look conditionally in either tip.label or node.label depending
+>>>>> on the arguments. And it wouldn't be hard at all to make this
+>>>>> change in the code base. Of course, I'm not going to ask for
+>>>>> the moon *and* the stars, but if someone else proposed it... :)
+>>>>>
+>>
+>> Again, I think performance was the reason here.  The assumption that
+>> more often than not trees will not have any internal node labels.
+>
+> That doesn't have to be a problem. What I said about tree data applies
+> even more clearly here: only labels that actually exist need to be in
+> the vector. So if you only supply tip labels when you create the tree,
+> the (unified) label slot would be exactly the same as what we now call
+> tip.label. Example with a 3-tip tree:
+>
+> ## actual slot contents -- no internal labels stored
+>> phy at label
+>    1    2    3
+> "t2" "t1" "t3"
+>
+> ## but the accessors would still "fill in" implied the NAs:
+>> labels(phy) ## default type is 'all'
+>    1    2    3    4    5
+> "t2" "t1" "t3"   NA   NA
+>
+>> tipLabels(phy)
+>    1    2    3
+> "t2" "t1" "t3"
+>
+>> nodeLabels(phy)
+>  4  5
+> NA NA
+>
+> ## now add internal labels
+>> nodeLabels(phy) <- c("n4", "n5")
+>> phy at label
+>    1    2    3    4    5
+> "t2" "t1" "t3" "n4" "n5"
+>
+> ## and remove them again!
+>> nodeLabels(phy) <- as.character(NA)
+>> phy at label
+>    1    2    3
+> "t2" "t1" "t3"
+>
+> I just quickly wrote up new accessor and replace methods that would
+> behave this way. As illustrated above, the replacement method will  
+> also
+> drop any NA labels it encounters, for efficiency (but obviously  
+> attempts
+> to do this for tip labels will produce an error).
+>
+> Jim
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From bolker at ufl.edu  Thu Sep 17 21:25:25 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Thu, 17 Sep 2009 15:25:25 -0400
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <9E400093-3848-4507-8325-A2A1B4A9A53A@gmail.com>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+	<4AB285CF.7020006@nceas.ucsb.edu>
+	<9E400093-3848-4507-8325-A2A1B4A9A53A@gmail.com>
+Message-ID: <4AB28D25.7050305@ufl.edu>
+
+  Agreed.  I think the only concern is the "changing things around"
+issue.  I'm OK with the idea that if people have node data for just a
+few nodes, then they have to pay the cost of storing NAs for all the
+rest.  I am much happier with the "changing things around" plan now that
+we are starting to have a halfway-decent testing framework so that we
+can be slightly more certain that we're not f*cking everything up by
+making changes ...
+
+   So I'd say I'm a +0 -- I'm not going to argue against it, but I won't
+do the work either :-)
+   At some point I *do* want to get back into helping develop, but I
+can't even afford the time to get back up to speed about the current
+status ...
+
+  cheers
+    Ben
+
+Steven Kembel wrote:
+> Hello,
+> 
+> I've been out of the loop for a while but wanted to quickly say that  
+> reworking the labels/data to be a single slot and letting accessors  
+> deal with making it look consistent sounds good. IIRC the main  
+> argument previously against a single tip/node data slot was the  
+> storage space issue (i.e. when I load a phylogeny with 20K tips I  
+> don't want to unnecesarily store node data if it doesn't exist) but it  
+> sounds like this is no longer an issue since the data are not stored  
+> if they don't exist?
+> 
+> Cheers,
+> Steve
+> 
+> On Sep 17, 2009, at 11:54 AM, Jim Regetz wrote:
+> 
+>> Quick reply just about the labels question:
+>>
+>> Peter Cowan wrote:
+>>>>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>>>>> Addendum: In case anyone else's mind happens to wander in this
+>>>>>> direction, yes, I think a similar argument could be made for
+>>>>>> combining the slots for tip and internal _labels_ into a single
+>>>>>> label slot, because each label is now unambiguously identified
+>>>>>> by its name (node ID). Seems like the separation is a
+>>>>>> historical artifact? Combining them would simplify the
+>>>>>> corresponding accessor/replace methods, which currently have to
+>>>>>> look conditionally in either tip.label or node.label depending
+>>>>>> on the arguments. And it wouldn't be hard at all to make this
+>>>>>> change in the code base. Of course, I'm not going to ask for
+>>>>>> the moon *and* the stars, but if someone else proposed it... :)
+>>>>>>
+>>> Again, I think performance was the reason here.  The assumption that
+>>> more often than not trees will not have any internal node labels.
+>> That doesn't have to be a problem. What I said about tree data applies
+>> even more clearly here: only labels that actually exist need to be in
+>> the vector. So if you only supply tip labels when you create the tree,
+>> the (unified) label slot would be exactly the same as what we now call
+>> tip.label. Example with a 3-tip tree:
+>>
+>> ## actual slot contents -- no internal labels stored
+>>> phy at label
+>>    1    2    3
+>> "t2" "t1" "t3"
+>>
+>> ## but the accessors would still "fill in" implied the NAs:
+>>> labels(phy) ## default type is 'all'
+>>    1    2    3    4    5
+>> "t2" "t1" "t3"   NA   NA
+>>
+>>> tipLabels(phy)
+>>    1    2    3
+>> "t2" "t1" "t3"
+>>
+>>> nodeLabels(phy)
+>>  4  5
+>> NA NA
+>>
+>> ## now add internal labels
+>>> nodeLabels(phy) <- c("n4", "n5")
+>>> phy at label
+>>    1    2    3    4    5
+>> "t2" "t1" "t3" "n4" "n5"
+>>
+>> ## and remove them again!
+>>> nodeLabels(phy) <- as.character(NA)
+>>> phy at label
+>>    1    2    3
+>> "t2" "t1" "t3"
+>>
+>> I just quickly wrote up new accessor and replace methods that would
+>> behave this way. As illustrated above, the replacement method will  
+>> also
+>> drop any NA labels it encounters, for efficiency (but obviously  
+>> attempts
+>> to do this for tip labels will produce an error).
+>>
+>> Jim
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090917/fbc8c8b2/attachment.pgp 
+
+From regetz at nceas.ucsb.edu  Mon Sep 21 23:05:49 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Mon, 21 Sep 2009 14:05:49 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB28D25.7050305@ufl.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+	<4AB285CF.7020006@nceas.ucsb.edu>
+	<9E400093-3848-4507-8325-A2A1B4A9A53A@gmail.com>
+	<4AB28D25.7050305@ufl.edu>
+Message-ID: <4AB7EAAD.60803@nceas.ucsb.edu>
+
+Okay, I think the responses to this proposal ranged from somewhat 
+hesitant to definitely supportive, with center of mass somewhere on the 
+positive side of neutral :)
+
+I think it's worth giving this a shot. And because it would (I believe) 
+cleanly fix some existing bugs/buglets that I'd rather not patch up with 
+workarounds, I'd prefer to try it now.
+
+Perhaps a branch is in order? I think the changes can be implemented 
+without too much pain, but it would be nice to know I/we can commit 
+partial changes if need be, without worrying about passing package check 
+with every commit.
+
+Please let me know if you don't think I captured the group sentiment, or 
+if you have other reactions/thoughts.
+
+Thanks!
+Jim
+
+Ben Bolker wrote:
+>   Agreed.  I think the only concern is the "changing things around"
+> issue.  I'm OK with the idea that if people have node data for just a
+> few nodes, then they have to pay the cost of storing NAs for all the
+> rest.  I am much happier with the "changing things around" plan now that
+> we are starting to have a halfway-decent testing framework so that we
+> can be slightly more certain that we're not f*cking everything up by
+> making changes ...
+> 
+>    So I'd say I'm a +0 -- I'm not going to argue against it, but I won't
+> do the work either :-)
+>    At some point I *do* want to get back into helping develop, but I
+> can't even afford the time to get back up to speed about the current
+> status ...
+> 
+>   cheers
+>     Ben
+> 
+> Steven Kembel wrote:
+>> Hello,
+>>
+>> I've been out of the loop for a while but wanted to quickly say that  
+>> reworking the labels/data to be a single slot and letting accessors  
+>> deal with making it look consistent sounds good. IIRC the main  
+>> argument previously against a single tip/node data slot was the  
+>> storage space issue (i.e. when I load a phylogeny with 20K tips I  
+>> don't want to unnecesarily store node data if it doesn't exist) but it  
+>> sounds like this is no longer an issue since the data are not stored  
+>> if they don't exist?
+>>
+>> Cheers,
+>> Steve
+>>
+>> On Sep 17, 2009, at 11:54 AM, Jim Regetz wrote:
+>>
+>>> Quick reply just about the labels question:
+>>>
+>>> Peter Cowan wrote:
+>>>>>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>>>>>> Addendum: In case anyone else's mind happens to wander in this
+>>>>>>> direction, yes, I think a similar argument could be made for
+>>>>>>> combining the slots for tip and internal _labels_ into a single
+>>>>>>> label slot, because each label is now unambiguously identified
+>>>>>>> by its name (node ID). Seems like the separation is a
+>>>>>>> historical artifact? Combining them would simplify the
+>>>>>>> corresponding accessor/replace methods, which currently have to
+>>>>>>> look conditionally in either tip.label or node.label depending
+>>>>>>> on the arguments. And it wouldn't be hard at all to make this
+>>>>>>> change in the code base. Of course, I'm not going to ask for
+>>>>>>> the moon *and* the stars, but if someone else proposed it... :)
+>>>>>>>
+>>>> Again, I think performance was the reason here.  The assumption that
+>>>> more often than not trees will not have any internal node labels.
+>>> That doesn't have to be a problem. What I said about tree data applies
+>>> even more clearly here: only labels that actually exist need to be in
+>>> the vector. So if you only supply tip labels when you create the tree,
+>>> the (unified) label slot would be exactly the same as what we now call
+>>> tip.label. Example with a 3-tip tree:
+>>>
+>>> ## actual slot contents -- no internal labels stored
+>>>> phy at label
+>>>    1    2    3
+>>> "t2" "t1" "t3"
+>>>
+>>> ## but the accessors would still "fill in" implied the NAs:
+>>>> labels(phy) ## default type is 'all'
+>>>    1    2    3    4    5
+>>> "t2" "t1" "t3"   NA   NA
+>>>
+>>>> tipLabels(phy)
+>>>    1    2    3
+>>> "t2" "t1" "t3"
+>>>
+>>>> nodeLabels(phy)
+>>>  4  5
+>>> NA NA
+>>>
+>>> ## now add internal labels
+>>>> nodeLabels(phy) <- c("n4", "n5")
+>>>> phy at label
+>>>    1    2    3    4    5
+>>> "t2" "t1" "t3" "n4" "n5"
+>>>
+>>> ## and remove them again!
+>>>> nodeLabels(phy) <- as.character(NA)
+>>>> phy at label
+>>>    1    2    3
+>>> "t2" "t1" "t3"
+>>>
+>>> I just quickly wrote up new accessor and replace methods that would
+>>> behave this way. As illustrated above, the replacement method will  
+>>> also
+>>> drop any NA labels it encounters, for efficiency (but obviously  
+>>> attempts
+>>> to do this for tip labels will produce an error).
+>>>
+>>> Jim
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+> 
+
+From bolker at ufl.edu  Mon Sep 21 23:09:20 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Mon, 21 Sep 2009 17:09:20 -0400
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB7EAAD.60803@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+	<4AB285CF.7020006@nceas.ucsb.edu>
+	<9E400093-3848-4507-8325-A2A1B4A9A53A@gmail.com>
+	<4AB28D25.7050305@ufl.edu> <4AB7EAAD.60803@nceas.ucsb.edu>
+Message-ID: <4AB7EB80.108@ufl.edu>
+
+ I would lean towards just going for it and cleaning it up as we go.
+ It's a development version, after all.  Merging branches always seems a
+little scary/hairy.
+
+   Ben
+
+Jim Regetz wrote:
+> Okay, I think the responses to this proposal ranged from somewhat 
+> hesitant to definitely supportive, with center of mass somewhere on the 
+> positive side of neutral :)
+> 
+> I think it's worth giving this a shot. And because it would (I believe) 
+> cleanly fix some existing bugs/buglets that I'd rather not patch up with 
+> workarounds, I'd prefer to try it now.
+> 
+> Perhaps a branch is in order? I think the changes can be implemented 
+> without too much pain, but it would be nice to know I/we can commit 
+> partial changes if need be, without worrying about passing package check 
+> with every commit.
+> 
+> Please let me know if you don't think I captured the group sentiment, or 
+> if you have other reactions/thoughts.
+> 
+> Thanks!
+> Jim
+> 
+> Ben Bolker wrote:
+>>   Agreed.  I think the only concern is the "changing things around"
+>> issue.  I'm OK with the idea that if people have node data for just a
+>> few nodes, then they have to pay the cost of storing NAs for all the
+>> rest.  I am much happier with the "changing things around" plan now that
+>> we are starting to have a halfway-decent testing framework so that we
+>> can be slightly more certain that we're not f*cking everything up by
+>> making changes ...
+>>
+>>    So I'd say I'm a +0 -- I'm not going to argue against it, but I won't
+>> do the work either :-)
+>>    At some point I *do* want to get back into helping develop, but I
+>> can't even afford the time to get back up to speed about the current
+>> status ...
+>>
+>>   cheers
+>>     Ben
+>>
+>> Steven Kembel wrote:
+>>> Hello,
+>>>
+>>> I've been out of the loop for a while but wanted to quickly say that  
+>>> reworking the labels/data to be a single slot and letting accessors  
+>>> deal with making it look consistent sounds good. IIRC the main  
+>>> argument previously against a single tip/node data slot was the  
+>>> storage space issue (i.e. when I load a phylogeny with 20K tips I  
+>>> don't want to unnecesarily store node data if it doesn't exist) but it  
+>>> sounds like this is no longer an issue since the data are not stored  
+>>> if they don't exist?
+>>>
+>>> Cheers,
+>>> Steve
+>>>
+>>> On Sep 17, 2009, at 11:54 AM, Jim Regetz wrote:
+>>>
+>>>> Quick reply just about the labels question:
+>>>>
+>>>> Peter Cowan wrote:
+>>>>>>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>>>>>>> Addendum: In case anyone else's mind happens to wander in this
+>>>>>>>> direction, yes, I think a similar argument could be made for
+>>>>>>>> combining the slots for tip and internal _labels_ into a single
+>>>>>>>> label slot, because each label is now unambiguously identified
+>>>>>>>> by its name (node ID). Seems like the separation is a
+>>>>>>>> historical artifact? Combining them would simplify the
+>>>>>>>> corresponding accessor/replace methods, which currently have to
+>>>>>>>> look conditionally in either tip.label or node.label depending
+>>>>>>>> on the arguments. And it wouldn't be hard at all to make this
+>>>>>>>> change in the code base. Of course, I'm not going to ask for
+>>>>>>>> the moon *and* the stars, but if someone else proposed it... :)
+>>>>>>>>
+>>>>> Again, I think performance was the reason here.  The assumption that
+>>>>> more often than not trees will not have any internal node labels.
+>>>> That doesn't have to be a problem. What I said about tree data applies
+>>>> even more clearly here: only labels that actually exist need to be in
+>>>> the vector. So if you only supply tip labels when you create the tree,
+>>>> the (unified) label slot would be exactly the same as what we now call
+>>>> tip.label. Example with a 3-tip tree:
+>>>>
+>>>> ## actual slot contents -- no internal labels stored
+>>>>> phy at label
+>>>>    1    2    3
+>>>> "t2" "t1" "t3"
+>>>>
+>>>> ## but the accessors would still "fill in" implied the NAs:
+>>>>> labels(phy) ## default type is 'all'
+>>>>    1    2    3    4    5
+>>>> "t2" "t1" "t3"   NA   NA
+>>>>
+>>>>> tipLabels(phy)
+>>>>    1    2    3
+>>>> "t2" "t1" "t3"
+>>>>
+>>>>> nodeLabels(phy)
+>>>>  4  5
+>>>> NA NA
+>>>>
+>>>> ## now add internal labels
+>>>>> nodeLabels(phy) <- c("n4", "n5")
+>>>>> phy at label
+>>>>    1    2    3    4    5
+>>>> "t2" "t1" "t3" "n4" "n5"
+>>>>
+>>>> ## and remove them again!
+>>>>> nodeLabels(phy) <- as.character(NA)
+>>>>> phy at label
+>>>>    1    2    3
+>>>> "t2" "t1" "t3"
+>>>>
+>>>> I just quickly wrote up new accessor and replace methods that would
+>>>> behave this way. As illustrated above, the replacement method will  
+>>>> also
+>>>> drop any NA labels it encounters, for efficiency (but obviously  
+>>>> attempts
+>>>> to do this for tip labels will produce an error).
+>>>>
+>>>> Jim
+>>>> _______________________________________________
+>>>> Phylobase-devl mailing list
+>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090921/3fd8d824/attachment.pgp 
+
+From pdc at berkeley.edu  Mon Sep 21 23:47:40 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Mon, 21 Sep 2009 14:47:40 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB7EB80.108@ufl.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+	<4AB285CF.7020006@nceas.ucsb.edu>
+	<9E400093-3848-4507-8325-A2A1B4A9A53A@gmail.com>
+	<4AB28D25.7050305@ufl.edu> <4AB7EAAD.60803@nceas.ucsb.edu>
+	<4AB7EB80.108@ufl.edu>
+Message-ID: <A1ABDB5D-8A28-41D8-8593-094CE2C4533E@berkeley.edu>
+
+
+On Sep 21, 2009, at 2:09 PM, Ben Bolker wrote:
+
+> I would lean towards just going for it and cleaning it up as we go.
+> It's a development version, after all.  Merging branches always  
+> seems a
+> little scary/hairy.
+>
+>   Ben
+>
+> Jim Regetz wrote:
+>> Okay, I think the responses to this proposal ranged from somewhat
+>> hesitant to definitely supportive, with center of mass somewhere on  
+>> the
+>> positive side of neutral :)
+>>
+>> I think it's worth giving this a shot. And because it would (I  
+>> believe)
+>> cleanly fix some existing bugs/buglets that I'd rather not patch up  
+>> with
+>> workarounds, I'd prefer to try it now.
+
+I agree the opinions seemed to range from +0 to +1 so I say lets do  
+it.  I can help out if there's need.
+
+>> Perhaps a branch is in order? I think the changes can be implemented
+>> without too much pain, but it would be nice to know I/we can commit
+>> partial changes if need be, without worrying about passing package  
+>> check
+>> with every commit.
+
+I'd say in this case a branch is a wise idea, because it will make it  
+easier to compare the benefits/compromises of the unified data.
+
+Peter
+
+>> Please let me know if you don't think I captured the group  
+>> sentiment, or
+>> if you have other reactions/thoughts.
+>>
+>> Thanks!
+>> Jim
+>>
+>> Ben Bolker wrote:
+>>>  Agreed.  I think the only concern is the "changing things around"
+>>> issue.  I'm OK with the idea that if people have node data for  
+>>> just a
+>>> few nodes, then they have to pay the cost of storing NAs for all the
+>>> rest.  I am much happier with the "changing things around" plan  
+>>> now that
+>>> we are starting to have a halfway-decent testing framework so that  
+>>> we
+>>> can be slightly more certain that we're not f*cking everything up by
+>>> making changes ...
+>>>
+>>>   So I'd say I'm a +0 -- I'm not going to argue against it, but I  
+>>> won't
+>>> do the work either :-)
+>>>   At some point I *do* want to get back into helping develop, but I
+>>> can't even afford the time to get back up to speed about the current
+>>> status ...
+>>>
+>>>  cheers
+>>>    Ben
+>>>
+>>> Steven Kembel wrote:
+>>>> Hello,
+>>>>
+>>>> I've been out of the loop for a while but wanted to quickly say  
+>>>> that
+>>>> reworking the labels/data to be a single slot and letting accessors
+>>>> deal with making it look consistent sounds good. IIRC the main
+>>>> argument previously against a single tip/node data slot was the
+>>>> storage space issue (i.e. when I load a phylogeny with 20K tips I
+>>>> don't want to unnecesarily store node data if it doesn't exist)  
+>>>> but it
+>>>> sounds like this is no longer an issue since the data are not  
+>>>> stored
+>>>> if they don't exist?
+>>>>
+>>>> Cheers,
+>>>> Steve
+>>>>
+>>>> On Sep 17, 2009, at 11:54 AM, Jim Regetz wrote:
+>>>>
+>>>>> Quick reply just about the labels question:
+>>>>>
+>>>>> Peter Cowan wrote:
+>>>>>>>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>>>>>>>> Addendum: In case anyone else's mind happens to wander in this
+>>>>>>>>> direction, yes, I think a similar argument could be made for
+>>>>>>>>> combining the slots for tip and internal _labels_ into a  
+>>>>>>>>> single
+>>>>>>>>> label slot, because each label is now unambiguously identified
+>>>>>>>>> by its name (node ID). Seems like the separation is a
+>>>>>>>>> historical artifact? Combining them would simplify the
+>>>>>>>>> corresponding accessor/replace methods, which currently have  
+>>>>>>>>> to
+>>>>>>>>> look conditionally in either tip.label or node.label depending
+>>>>>>>>> on the arguments. And it wouldn't be hard at all to make this
+>>>>>>>>> change in the code base. Of course, I'm not going to ask for
+>>>>>>>>> the moon *and* the stars, but if someone else proposed  
+>>>>>>>>> it... :)
+>>>>>>>>>
+>>>>>> Again, I think performance was the reason here.  The assumption  
+>>>>>> that
+>>>>>> more often than not trees will not have any internal node labels.
+>>>>> That doesn't have to be a problem. What I said about tree data  
+>>>>> applies
+>>>>> even more clearly here: only labels that actually exist need to  
+>>>>> be in
+>>>>> the vector. So if you only supply tip labels when you create the  
+>>>>> tree,
+>>>>> the (unified) label slot would be exactly the same as what we  
+>>>>> now call
+>>>>> tip.label. Example with a 3-tip tree:
+>>>>>
+>>>>> ## actual slot contents -- no internal labels stored
+>>>>>> phy at label
+>>>>>   1    2    3
+>>>>> "t2" "t1" "t3"
+>>>>>
+>>>>> ## but the accessors would still "fill in" implied the NAs:
+>>>>>> labels(phy) ## default type is 'all'
+>>>>>   1    2    3    4    5
+>>>>> "t2" "t1" "t3"   NA   NA
+>>>>>
+>>>>>> tipLabels(phy)
+>>>>>   1    2    3
+>>>>> "t2" "t1" "t3"
+>>>>>
+>>>>>> nodeLabels(phy)
+>>>>> 4  5
+>>>>> NA NA
+>>>>>
+>>>>> ## now add internal labels
+>>>>>> nodeLabels(phy) <- c("n4", "n5")
+>>>>>> phy at label
+>>>>>   1    2    3    4    5
+>>>>> "t2" "t1" "t3" "n4" "n5"
+>>>>>
+>>>>> ## and remove them again!
+>>>>>> nodeLabels(phy) <- as.character(NA)
+>>>>>> phy at label
+>>>>>   1    2    3
+>>>>> "t2" "t1" "t3"
+>>>>>
+>>>>> I just quickly wrote up new accessor and replace methods that  
+>>>>> would
+>>>>> behave this way. As illustrated above, the replacement method will
+>>>>> also
+>>>>> drop any NA labels it encounters, for efficiency (but obviously
+>>>>> attempts
+>>>>> to do this for tip labels will produce an error).
+>>>>>
+>>>>> Jim
+>>>>> _______________________________________________
+>>>>> Phylobase-devl mailing list
+>>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>>
+>
+>
+> -- 
+> Ben Bolker
+> Associate professor, Biology Dep't, Univ. of Florida
+> bolker at ufl.edu / www.zoology.ufl.edu/bolker
+> GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+>
+
+
+From pdc at berkeley.edu  Mon Sep 21 23:52:32 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Mon, 21 Sep 2009 14:52:32 -0700
+Subject: [Phylobase-devl] change root node from NA to 0
+Message-ID: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>
+
+Given that significant changes are still fair game, I'd like to  
+propose changes the root edge from having NA as the ancestor to 0 as  
+the ancestor.
+
+I'd be willing to do the lifting for this one, and could probably get  
+it done around the same time the unification gets finished up.
+
+I found myself having to work around the NA issue in several places  
+where 0 wouldn't have been a problem.  Does anyone have a case where  
+NA is superior to 0 in the edge matrix?
+
+Peter
+
+From bolker at ufl.edu  Tue Sep 22 00:12:08 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Mon, 21 Sep 2009 18:12:08 -0400
+Subject: [Phylobase-devl] change root node from NA to 0
+In-Reply-To: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>
+References: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>
+Message-ID: <4AB7FA38.4030601@ufl.edu>
+
+  OK.  But can I propose that this be the *last* major change?  I want
+to get into clean-up mode ...
+
+  cheers
+   Ben
+
+
+Peter Cowan wrote:
+> Given that significant changes are still fair game, I'd like to  
+> propose changes the root edge from having NA as the ancestor to 0 as  
+> the ancestor.
+> 
+> I'd be willing to do the lifting for this one, and could probably get  
+> it done around the same time the unification gets finished up.
+> 
+> I found myself having to work around the NA issue in several places  
+> where 0 wouldn't have been a problem.  Does anyone have a case where  
+> NA is superior to 0 in the edge matrix?
+> 
+> Peter
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090921/eb814f14/attachment.pgp 
+
+From regetz at nceas.ucsb.edu  Tue Sep 22 01:23:05 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Mon, 21 Sep 2009 16:23:05 -0700
+Subject: [Phylobase-devl] change root node from NA to 0
+In-Reply-To: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>
+References: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>
+Message-ID: <4AB80AD9.2000505@nceas.ucsb.edu>
+
+Fine with me. One suggestion: In recent weeks I have changed several 
+instances of this sort of thing:
+   edges(x)[which(is.na(edges(x)[,1])), ]
+
+to this:
+   edges(x, drop.root=TRUE)
+
+which accomplishes the same thing but leaves the implementation details 
+to the edges method. I know for sure there are still several instances 
+of the former in the code base. I suggest making sure the latter form is 
+used everywhere. It would then be easy enough to update the edges method 
+to match a new 0 encoding for root nodes.
+
+On that note, would it further simplify this transition to add an 
+analogous drop.root=TRUE argument to some of the other edge-related 
+phylo4 methods? It would be most obviously beneficial in the case of 
+edgeLength (and thus probably sumEdgeLength to match), but also possibly 
+edgeLabels, edgeId, and maybe even nEdges. Just a thought.
+
+Jim
+
+
+Peter Cowan wrote:
+> Given that significant changes are still fair game, I'd like to  
+> propose changes the root edge from having NA as the ancestor to 0 as  
+> the ancestor.
+> 
+> I'd be willing to do the lifting for this one, and could probably get  
+> it done around the same time the unification gets finished up.
+> 
+> I found myself having to work around the NA issue in several places  
+> where 0 wouldn't have been a problem.  Does anyone have a case where  
+> NA is superior to 0 in the edge matrix?
+> 
+> Peter
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+
+From regetz at nceas.ucsb.edu  Tue Sep 22 09:20:05 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Tue, 22 Sep 2009 00:20:05 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+Message-ID: <4AB87AA5.4020007@nceas.ucsb.edu>
+
+Peter Cowan wrote:
+>> Fran?ois Michonneau wrote:
+>>>
+>>> Finally, I think the Nnode slot was there to match the structure of
+>>> phylo objects. But, it seems superfluous with the tests that S4  
+>>> methods
+>>> bring.
+> 
+> That's my recollection also, +1 for removing it.
+
+The Nnode slot of phylo4 is now gone, along with most vestiges of it in 
+the code, documentation, and geospiza.rda. Two minor exceptions:
+
+1. There is a reference to an Nnode slot in multiPhylo-class.Rd. I 
+didn't remove it because I'm not sure whether this necessarily refers to 
+the same thing.
+
+2. I removed the Nnode slot one-liner from phylobase.Rnw, but didn't 
+regenerate the associated PDF. I actually see a couple of other things 
+that need to be updated in that document after the recent updates to 
+slot accessors (pretty much all having to do with the order of returned 
+elements).
+
+All for now,
+Jim
+
+From regetz at nceas.ucsb.edu  Wed Sep 23 20:34:40 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 23 Sep 2009 11:34:40 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4AB285CF.7020006@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+	<4AB285CF.7020006@nceas.ucsb.edu>
+Message-ID: <4ABA6A40.7040203@nceas.ucsb.edu>
+
+Hi all,
+
+In the slot-mods branch, phylo4 now has a single 'label' slot, replacing 
+the separate 'tip.label' and 'node.label' slots in the original class 
+definition. As proposed, the tipLabels, nodeLabels, and labels accessors 
+all return exactly the same thing as before.
+
+One other modification of note: I also changed the labels<- default type 
+to 'all' instead of 'tip', matching the labels accessor. The idea here 
+is that the accessor and replacement forms of both tipLabels and 
+nodeLabels already provide shortcuts for working solely with tip and 
+node labels, respectively, so 'all' is a more sensible default for the 
+generalized labels accessor and replacement methods.
+
+I believe I've updated all parts of the package code that are, by 
+necessity, more tightly coupled to the internal slot configuration, and 
+as far as I can tell, everything is working properly.
+
+I also intend to change the phylo4 constructor methods so that they 
+don't create and store explicit NAs for node labels when node labels are 
+not provided. I figure the same change is in order for edge labels and 
+edge lengths, too. In all cases the accessors will still explicitly 
+return NAs for missing values, so again, this change will be transparent 
+if you use accessors.
+
+Then I'll tackle combining the data slots next. This will require making 
+a couple of decisions that I'll pose to the list in a separate post.
+
+Cheers,
+Jim
+
+Jim Regetz wrote:
+> Quick reply just about the labels question:
+> 
+> Peter Cowan wrote:
+>>>> On Wed, 2009-09-16 at 15:17 -0700, Jim Regetz wrote:
+>>>>> Addendum: In case anyone else's mind happens to wander in this 
+>>>>> direction, yes, I think a similar argument could be made for 
+>>>>> combining the slots for tip and internal _labels_ into a single
+>>>>> label slot, because each label is now unambiguously identified
+>>>>> by its name (node ID). Seems like the separation is a
+>>>>> historical artifact? Combining them would simplify the
+>>>>> corresponding accessor/replace methods, which currently have to
+>>>>> look conditionally in either tip.label or node.label depending
+>>>>> on the arguments. And it wouldn't be hard at all to make this 
+>>>>> change in the code base. Of course, I'm not going to ask for
+>>>>> the moon *and* the stars, but if someone else proposed it... :)
+>>>>>
+>> Again, I think performance was the reason here.  The assumption that
+>>  more often than not trees will not have any internal node labels.
+> 
+> That doesn't have to be a problem. What I said about tree data applies 
+> even more clearly here: only labels that actually exist need to be in 
+> the vector. So if you only supply tip labels when you create the tree, 
+> the (unified) label slot would be exactly the same as what we now call 
+> tip.label. Example with a 3-tip tree:
+> 
+> ## actual slot contents -- no internal labels stored
+>  > phy at label
+>     1    2    3
+> "t2" "t1" "t3"
+> 
+> ## but the accessors would still "fill in" implied the NAs:
+>  > labels(phy) ## default type is 'all'
+>     1    2    3    4    5
+> "t2" "t1" "t3"   NA   NA
+> 
+>  > tipLabels(phy)
+>     1    2    3
+> "t2" "t1" "t3"
+> 
+>  > nodeLabels(phy)
+>   4  5
+> NA NA
+> 
+> ## now add internal labels
+>  > nodeLabels(phy) <- c("n4", "n5")
+>  > phy at label
+>     1    2    3    4    5
+> "t2" "t1" "t3" "n4" "n5"
+> 
+> ## and remove them again!
+>  > nodeLabels(phy) <- as.character(NA)
+>  > phy at label
+>     1    2    3
+> "t2" "t1" "t3"
+> 
+> I just quickly wrote up new accessor and replace methods that would 
+> behave this way. As illustrated above, the replacement method will also 
+> drop any NA labels it encounters, for efficiency (but obviously attempts 
+> to do this for tip labels will produce an error).
+> 
+> Jim
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+From pdc at berkeley.edu  Thu Sep 24 02:05:20 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Wed, 23 Sep 2009 17:05:20 -0700
+Subject: [Phylobase-devl] change root node from NA to 0
+In-Reply-To: <4AB80AD9.2000505@nceas.ucsb.edu>
+References: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>
+	<4AB80AD9.2000505@nceas.ucsb.edu>
+Message-ID: <24C160F0-26C4-4315-A676-10ED4E1495F5@berkeley.edu>
+
+Okay, I think this is finished.  For the time being I've uploaded the  
+result to a branch called edgesNAto0.  It is ready to be merged if  
+people approve.
+
+In a testament to the nice abstractions of the package, most of the  
+changes are actually to examples and unit tests that use hand made  
+edge matrices.
+
+It does make some code slightly less elegant e.g.
+
+-    singletons <- which(tabulate(na.omit(edge.new[,1]))==1)
++    singletons <- which(tabulate(edge.new[edge.new[, 1] != 0, 1])==1)
+
+One remaining question: getNode(NA) would return NA but getNode(0)  
+returns 0, is this the desired behavior?
+
+Cheers
+
+Peter
+
+On Sep 21, 2009, at 4:23 PM, Jim Regetz wrote:
+
+> Fine with me. One suggestion: In recent weeks I have changed several  
+> instances of this sort of thing:
+>  edges(x)[which(is.na(edges(x)[,1])), ]
+>
+> to this:
+>  edges(x, drop.root=TRUE)
+>
+> which accomplishes the same thing but leaves the implementation  
+> details to the edges method. I know for sure there are still several  
+> instances of the former in the code base. I suggest making sure the  
+> latter form is used everywhere. It would then be easy enough to  
+> update the edges method to match a new 0 encoding for root nodes.
+>
+> On that note, would it further simplify this transition to add an  
+> analogous drop.root=TRUE argument to some of the other edge-related  
+> phylo4 methods? It would be most obviously beneficial in the case of  
+> edgeLength (and thus probably sumEdgeLength to match), but also  
+> possibly edgeLabels, edgeId, and maybe even nEdges. Just a thought.
+>
+> Jim
+>
+>
+> Peter Cowan wrote:
+>> Given that significant changes are still fair game, I'd like to   
+>> propose changes the root edge from having NA as the ancestor to 0  
+>> as  the ancestor.
+>> I'd be willing to do the lifting for this one, and could probably  
+>> get  it done around the same time the unification gets finished up.
+>> I found myself having to work around the NA issue in several  
+>> places  where 0 wouldn't have been a problem.  Does anyone have a  
+>> case where  NA is superior to 0 in the edge matrix?
+>> Peter
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From bolker at ufl.edu  Thu Sep 24 02:08:04 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Wed, 23 Sep 2009 20:08:04 -0400
+Subject: [Phylobase-devl] change root node from NA to 0
+In-Reply-To: <24C160F0-26C4-4315-A676-10ED4E1495F5@berkeley.edu>
+References: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>	<4AB80AD9.2000505@nceas.ucsb.edu>
+	<24C160F0-26C4-4315-A676-10ED4E1495F5@berkeley.edu>
+Message-ID: <4ABAB864.9060204@ufl.edu>
+
+Peter Cowan wrote:
+> Okay, I think this is finished.  For the time being I've uploaded the  
+> result to a branch called edgesNAto0.  It is ready to be merged if  
+> people approve.
+> 
+> In a testament to the nice abstractions of the package, most of the  
+> changes are actually to examples and unit tests that use hand made  
+> edge matrices.
+> 
+> It does make some code slightly less elegant e.g.
+> 
+> -    singletons <- which(tabulate(na.omit(edge.new[,1]))==1)
+> +    singletons <- which(tabulate(edge.new[edge.new[, 1] != 0, 1])==1)
+
+  Yes, although I guess we could write a zero.omit() helper function if
+we wanted to ...
+
+> 
+> One remaining question: getNode(NA) would return NA but getNode(0)  
+> returns 0, is this the desired behavior?
+
+   NA feels more intuitive to me, both are reasonable, I haven't thought
+through consequences very much.
+
+> 
+> Cheers
+> 
+> Peter
+> 
+> On Sep 21, 2009, at 4:23 PM, Jim Regetz wrote:
+> 
+>> Fine with me. One suggestion: In recent weeks I have changed several  
+>> instances of this sort of thing:
+>>  edges(x)[which(is.na(edges(x)[,1])), ]
+>>
+>> to this:
+>>  edges(x, drop.root=TRUE)
+>>
+>> which accomplishes the same thing but leaves the implementation  
+>> details to the edges method. I know for sure there are still several  
+>> instances of the former in the code base. I suggest making sure the  
+>> latter form is used everywhere. It would then be easy enough to  
+>> update the edges method to match a new 0 encoding for root nodes.
+>>
+>> On that note, would it further simplify this transition to add an  
+>> analogous drop.root=TRUE argument to some of the other edge-related  
+>> phylo4 methods? It would be most obviously beneficial in the case of  
+>> edgeLength (and thus probably sumEdgeLength to match), but also  
+>> possibly edgeLabels, edgeId, and maybe even nEdges. Just a thought.
+>>
+>> Jim
+>>
+>>
+>> Peter Cowan wrote:
+>>> Given that significant changes are still fair game, I'd like to   
+>>> propose changes the root edge from having NA as the ancestor to 0  
+>>> as  the ancestor.
+>>> I'd be willing to do the lifting for this one, and could probably  
+>>> get  it done around the same time the unification gets finished up.
+>>> I found myself having to work around the NA issue in several  
+>>> places  where 0 wouldn't have been a problem.  Does anyone have a  
+>>> case where  NA is superior to 0 in the edge matrix?
+>>> Peter
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090923/a0eba5f2/attachment.pgp 
+
+From regetz at nceas.ucsb.edu  Thu Sep 24 02:34:24 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 23 Sep 2009 17:34:24 -0700
+Subject: [Phylobase-devl] change root node from NA to 0
+In-Reply-To: <4ABAB864.9060204@ufl.edu>
+References: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>	<4AB80AD9.2000505@nceas.ucsb.edu>	<24C160F0-26C4-4315-A676-10ED4E1495F5@berkeley.edu>
+	<4ABAB864.9060204@ufl.edu>
+Message-ID: <4ABABE90.6040508@nceas.ucsb.edu>
+
+
+Ben Bolker wrote:
+> Peter Cowan wrote:
+> 
+>> One remaining question: getNode(NA) would return NA but getNode(0)  
+>> returns 0, is this the desired behavior?
+> 
+>    NA feels more intuitive to me, both are reasonable, I haven't thought
+> through consequences very much.
+
+I would strongly vote for NA. I definitely view 0 not as a node, but 
+simply as a placeholder for the ancestral end of the root edge. As far 
+as I know, everything else in the phylobase code jives with this 
+assertion. So if getNode gets nodes, and 0 is not actually a node, then 
+getNode(0) should return NA just like getNode(-999) would.
+
+Or to put it another way, my expectation has always been that calling 
+getNode on any value in the set nodeId(phy, "all") (which doesn't and 
+shouldn't include) should return a valid node, but calling getNode on 
+any integer *not* in that set should return NA.
+
+Thanks for the efforts on this!
+
+Jim
+
+From francois.michonneau at gmail.com  Thu Sep 24 19:01:13 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Thu, 24 Sep 2009 13:01:13 -0400
+Subject: [Phylobase-devl] change root node from NA to 0
+In-Reply-To: <4ABABE90.6040508@nceas.ucsb.edu>
+References: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>
+	<4AB80AD9.2000505@nceas.ucsb.edu>
+	<24C160F0-26C4-4315-A676-10ED4E1495F5@berkeley.edu>
+	<4ABAB864.9060204@ufl.edu>  <4ABABE90.6040508@nceas.ucsb.edu>
+Message-ID: <1253811673.10568.0.camel@francois-laptop>
+
+
+I agree, it should return NA.
+  -- Fran?ois
+
+
+On Wed, 2009-09-23 at 17:34 -0700, Jim Regetz wrote:
+> Ben Bolker wrote:
+> > Peter Cowan wrote:
+> > 
+> >> One remaining question: getNode(NA) would return NA but getNode(0)  
+> >> returns 0, is this the desired behavior?
+> > 
+> >    NA feels more intuitive to me, both are reasonable, I haven't thought
+> > through consequences very much.
+> 
+> I would strongly vote for NA. I definitely view 0 not as a node, but 
+> simply as a placeholder for the ancestral end of the root edge. As far 
+> as I know, everything else in the phylobase code jives with this 
+> assertion. So if getNode gets nodes, and 0 is not actually a node, then 
+> getNode(0) should return NA just like getNode(-999) would.
+> 
+> Or to put it another way, my expectation has always been that calling 
+> getNode on any value in the set nodeId(phy, "all") (which doesn't and 
+> shouldn't include) should return a valid node, but calling getNode on 
+> any integer *not* in that set should return NA.
+> 
+> Thanks for the efforts on this!
+> 
+> Jim
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090924/1c1861a2/attachment.pgp 
+
+From pdc at berkeley.edu  Thu Sep 24 19:23:14 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Thu, 24 Sep 2009 10:23:14 -0700
+Subject: [Phylobase-devl] change root node from NA to 0
+In-Reply-To: <1253811673.10568.0.camel@francois-laptop>
+References: <21D8276A-091B-4B4C-8553-549F191AC43E@berkeley.edu>
+	<4AB80AD9.2000505@nceas.ucsb.edu>
+	<24C160F0-26C4-4315-A676-10ED4E1495F5@berkeley.edu>
+	<4ABAB864.9060204@ufl.edu> <4ABABE90.6040508@nceas.ucsb.edu>
+	<1253811673.10568.0.camel@francois-laptop>
+Message-ID: <ED1CEFAF-CF92-49DC-8809-97E77AD5B4B5@berkeley.edu>
+
+Thanks all for the feedback.  I'm happy to make that change.  However,  
+it will cause the following to no longer be true:
+
+In the runit.setAs-Methods.R
+
+test..phylo4ToDataFrame <- function() {
+   checkIdentical(phy.show$ancestor, ancestor[match(c(nid.tip, nid.int),
+     descendant)])
+}
+
+In this case the ancestor vector is used to build an edge matrix (e.g.  
+is contains 0) and phy.show$ancestor is the output from setAs(phy,  
+dataframe) and uses getNode() -- thus containing NA.
+
+How should this be handled?
+
+btw thanks for all the unit tests guys!!
+
+Peter
+
+On Sep 24, 2009, at 10:01 AM, Fran?ois Michonneau wrote:
+
+>
+> I agree, it should return NA.
+>  -- Fran?ois
+>
+>
+> On Wed, 2009-09-23 at 17:34 -0700, Jim Regetz wrote:
+>> Ben Bolker wrote:
+>>> Peter Cowan wrote:
+>>>
+>>>> One remaining question: getNode(NA) would return NA but getNode(0)
+>>>> returns 0, is this the desired behavior?
+>>>
+>>>   NA feels more intuitive to me, both are reasonable, I haven't  
+>>> thought
+>>> through consequences very much.
+>>
+>> I would strongly vote for NA. I definitely view 0 not as a node, but
+>> simply as a placeholder for the ancestral end of the root edge. As  
+>> far
+>> as I know, everything else in the phylobase code jives with this
+>> assertion. So if getNode gets nodes, and 0 is not actually a node,  
+>> then
+>> getNode(0) should return NA just like getNode(-999) would.
+>>
+>> Or to put it another way, my expectation has always been that calling
+>> getNode on any value in the set nodeId(phy, "all") (which doesn't and
+>> shouldn't include) should return a valid node, but calling getNode on
+>> any integer *not* in that set should return NA.
+>>
+>> Thanks for the efforts on this!
+>>
+>> Jim
+>> _______________________________________________
+>> Phylobase-devl mailing list
+>> Phylobase-devl at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From regetz at nceas.ucsb.edu  Sat Sep 26 01:32:49 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Fri, 25 Sep 2009 16:32:49 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4ABA6A40.7040203@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>	<4AB285CF.7020006@nceas.ucsb.edu>
+	<4ABA6A40.7040203@nceas.ucsb.edu>
+Message-ID: <4ABD5321.1060700@nceas.ucsb.edu>
+
+Hi everyone,
+
+Last but not least, phylo4d now has a single 'data' slot in the 
+slot-mods branch. The code for tdata, tdata<-, and .phylo4Data is 
+definitely shorter now. The formatData function is mostly unchanged, 
+although I did move a small section of code from .phylo4Data to 
+formatData. I updated the documentation, geospiza.rda, and tests to 
+match, including reinstating some unit tests that were failing before. I 
+otherwise only had to make very minimal changes to repair indirect 
+breakage associated with this set of modifications.
+
+As part of this process, I did make some user-level changes. Details are 
+below for anyone interested. How should we proceed on determining 
+whether to apply these changes to trunk? We also have Peter's NA->0 
+changes in the queue, and if we adopt both, we'll need to coordinate our 
+merges-to-trunk in a sensible way.
+
+One somewhat superficial question -- I called the new slot 'data'. Any 
+strong feelings on whether it should be 'tdata' instead?
+
+Cheers,
+Jim
+
+
+User-level changes:
+
+(1) The phyo4d tree construction is slightly different. I re-wrote the 
+documentation to match the changes (I think), but here is a recap:
+
+  - If both tip.data and node.data are supplied, *any* columns with 
+common names are merged if merge.data=TRUE (the default), and they are 
+kept separate but the names appended with .tip and .node if 
+merge.data=FALSE. If columns of different types are merged, standard R 
+rules will apply, so it's up to the user to make sure the desired 
+outcome is achieved. Columns with different names will always be kept 
+separate, of course. Previously, the data were merged only if *all* 
+columns had the same name and merge.data=TRUE.
+     (Note: if multiple columns have the same name *within* input data 
+frame, things get complicated albeit in a predictable way, especially if 
+these columns are also involved in tip-internal data merging. For now 
+I'm happy to just leave that as user-beware.)
+
+  - The old documentation said that all.data was split up and matched to 
+tip.data and node.data before being matched to the actual tree node 
+labels or numbers. I'm not sure if that's truly how it was recently 
+working, but in any case, now each of tip.data, node.data, and all.data 
+are separately matched to the tree nodes as specified by function 
+arguments (all via formatData), then the cleaned-up data frames are 
+combined as appropriate.
+
+  - After the data are combined, any/all rows containing only NA values 
+are removed before being assigned to the data slot.
+
+  - It is now an error if any columns of all.data have the same name as 
+columns in either tip.data or node.data. If people feel strongly, I 
+could relax this error and instead e.g. make it so that ".all" is 
+appended to the offending all.data column name, but (not surprisingly :) 
+I think the stricter approach is reasonable in this case.
+
+(2) tdata is also a little different:
+
+   - It *always* returns a data.frame in which the number of rows is 
+equal to the number of nodes of the specified type (tip, internal, or 
+all). If label.type="row.names" and labels exist, the row names are node 
+labels, otherwise the row names are node numbers. This is exactly as 
+before if data actually exist, BUT is slightly different if there are no 
+data. Example:
+
+## let's say phyd has no data
+ > phyd at data
+data frame with 0 columns and 0 rows
+
+## accessor still returns a data frame with rows, just no columns
+ > tdata(phyd, "tip")
+data frame with 0 columns and 4 rows
+
+## and the row names of this otherwise empty data.frame are still
+## the labels (or node numbers if no labels)
+ > row.names(tdata(phyd, "tip"))
+[1] "A" "B" "D" "E"
+
+   - I changed type option "allnode" to "all", completing this 
+transition for all methods (which I believe folks agreed to in list 
+discussion some months ago, and which I also prefer).
+
+(3) Miscellany:
+
+* addData basically acts just like the constructor in how it combines 
+its multiple data arguments. The resulting data frame is then merged to 
+the existing @data. If there are column name conflicts, ".old" is 
+appended to the original column name and ".new" is appended to the new 
+column name. I'm happy to make this an error (or throw a warning?) 
+instead, similar to what you get if all.data has a column name conflict 
+with either tip.data and node.data. I guess I figured the difference is 
+that it's *really* an error to have name conflicts across arguments 
+within a single function call (phylo4d constructor), but we can be more 
+lenient in the case of adding data after the fact (addData method).
+
+* In treePlot, if plot.data=TRUE but the tree !hasTipData, plot.data is 
+now automatically switched to FALSE with a warning. This "unbreaks" one 
+of the test cases in test/phylo4dtests.R. An alternative way to achieve 
+the same result would be to change the default plot.data value from 
+is(phy, 'phylo4d') to hasTipData, as long as we also added a new 
+hasTipData method for phylo4 that is hard-coded to return FALSE.
+
+* In checkPhylo4Data, I commented out the part that checks that the 
+number of data rows matches the number of corresponding nodes. In the 
+new formulation, you don't need to have data for all (tip or internal) 
+nodes. The only real @data slot requirement is that all row names in the 
+data frame correspond to existing node numbers in the tree. If no one 
+disagrees, we can remove the commented-out code entirely.
+
+* tbind didn't seem to be working in the first place, but I nevertheless 
+updated it to work using the new slot configuration, mostly by replacing 
+a direct tip.data access with tdata(x, "tip"), and replacing a check for 
+node data with hasNodeData. A few other pieces of the function look 
+slightly fishy (like, just because an object is phylo4d doesn't mean it 
+actually has data), but I didn't muck around any more.
+
+TODO:
+
+(These can all be post-release, and I'll try to get around to putting 
+them in the tracker.)
+
+* Make prune(phylo4) a wrapper for prune(phylo4d), rather than the 
+reverse. Currently prune(phylo4d) has calls prune(phylo4) twice, once to 
+prune the user-supplied tree, and another time to prune a fully labeled 
+tree in order to reconstruct which tips/nodes were pruned. (This was 
+necessary when prune was just a wrapper for ape::drop.tip.) I plan to 
+make prune(phylo4d) do the work that prune(phylo4) now does, but also 
+deal with the data (if it exists), then switch prune(phylo4) to wrap 
+prune(phylo4d).
+
+* Add tipData and nodeData accessor methods for convenience, then 
+probably change tdata to have default type "all"? This would be similar 
+to the labels-and-friends accessors.
+
+* Re-examine checkTree and related validity methods to make sure we're 
+checking everything that should be checked, while not being stricter 
+than necessary.
+
+* Write some addData unit tests.
+
+
+From pdc at berkeley.edu  Sat Sep 26 06:59:33 2009
+From: pdc at berkeley.edu (Peter Cowan)
+Date: Fri, 25 Sep 2009 21:59:33 -0700
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4ABD5321.1060700@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>	<4AB285CF.7020006@nceas.ucsb.edu>
+	<4ABA6A40.7040203@nceas.ucsb.edu> <4ABD5321.1060700@nceas.ucsb.edu>
+Message-ID: <98A3B5B6-565B-44C1-BA61-FFA9069FD56D@berkeley.edu>
+
+
+On Sep 25, 2009, at 4:32 PM, Jim Regetz wrote:
+
+> Hi everyone,
+>
+> Last but not least, phylo4d now has a single 'data' slot in the
+> slot-mods branch. The code for tdata, tdata<-, and .phylo4Data is
+> definitely shorter now. The formatData function is mostly unchanged,
+> although I did move a small section of code from .phylo4Data to
+> formatData. I updated the documentation, geospiza.rda, and tests to
+> match, including reinstating some unit tests that were failing  
+> before. I
+> otherwise only had to make very minimal changes to repair indirect
+> breakage associated with this set of modifications.
+>
+> As part of this process, I did make some user-level changes. Details  
+> are
+> below for anyone interested. How should we proceed on determining
+> whether to apply these changes to trunk? We also have Peter's NA->0
+> changes in the queue, and if we adopt both, we'll need to coordinate  
+> our
+> merges-to-trunk in a sensible way.
+
+Yeah, I think that the NA->0 involves fewer changes, so whether that  
+should be first or second, I'm not sure.  I guessing that the merge  
+will actually be straight forward with only one conflict  
+(geospiza.rda, because it's a binary file there's no simple merge).
+
+> One somewhat superficial question -- I called the new slot 'data'. Any
+> strong feelings on whether it should be 'tdata' instead?
+
++1 for data
+
+> Cheers,
+> Jim
+>
+>
+> User-level changes:
+>
+> (1) The phyo4d tree construction is slightly different. I re-wrote the
+> documentation to match the changes (I think), but here is a recap:
+>
+> - If both tip.data and node.data are supplied, *any* columns with
+> common names are merged if merge.data=TRUE (the default), and they are
+> kept separate but the names appended with .tip and .node if
+> merge.data=FALSE. If columns of different types are merged, standard R
+> rules will apply, so it's up to the user to make sure the desired
+> outcome is achieved. Columns with different names will always be kept
+> separate, of course. Previously, the data were merged only if *all*
+> columns had the same name and merge.data=TRUE.
+>    (Note: if multiple columns have the same name *within* input data
+> frame, things get complicated albeit in a predictable way,  
+> especially if
+> these columns are also involved in tip-internal data merging. For now
+> I'm happy to just leave that as user-beware.)
+>
+> - The old documentation said that all.data was split up and matched to
+> tip.data and node.data before being matched to the actual tree node
+> labels or numbers. I'm not sure if that's truly how it was recently
+> working, but in any case, now each of tip.data, node.data, and  
+> all.data
+> are separately matched to the tree nodes as specified by function
+> arguments (all via formatData), then the cleaned-up data frames are
+> combined as appropriate.
+>
+> - After the data are combined, any/all rows containing only NA values
+> are removed before being assigned to the data slot.
+>
+> - It is now an error if any columns of all.data have the same name as
+> columns in either tip.data or node.data. If people feel strongly, I
+> could relax this error and instead e.g. make it so that ".all" is
+> appended to the offending all.data column name, but (not  
+> surprisingly :)
+> I think the stricter approach is reasonable in this case.
+>
+> (2) tdata is also a little different:
+>
+>  - It *always* returns a data.frame in which the number of rows is
+> equal to the number of nodes of the specified type (tip, internal, or
+> all). If label.type="row.names" and labels exist, the row names are  
+> node
+> labels, otherwise the row names are node numbers. This is exactly as
+> before if data actually exist, BUT is slightly different if there  
+> are no
+> data. Example:
+>
+> ## let's say phyd has no data
+>> phyd at data
+> data frame with 0 columns and 0 rows
+>
+> ## accessor still returns a data frame with rows, just no columns
+>> tdata(phyd, "tip")
+> data frame with 0 columns and 4 rows
+>
+> ## and the row names of this otherwise empty data.frame are still
+> ## the labels (or node numbers if no labels)
+>> row.names(tdata(phyd, "tip"))
+> [1] "A" "B" "D" "E"
+>
+>  - I changed type option "allnode" to "all", completing this
+> transition for all methods (which I believe folks agreed to in list
+> discussion some months ago, and which I also prefer).
+>
+> (3) Miscellany:
+>
+> * addData basically acts just like the constructor in how it combines
+> its multiple data arguments. The resulting data frame is then merged  
+> to
+> the existing @data. If there are column name conflicts, ".old" is
+> appended to the original column name and ".new" is appended to the new
+> column name. I'm happy to make this an error (or throw a warning?)
+> instead, similar to what you get if all.data has a column name  
+> conflict
+> with either tip.data and node.data. I guess I figured the difference  
+> is
+> that it's *really* an error to have name conflicts across arguments
+> within a single function call (phylo4d constructor), but we can be  
+> more
+> lenient in the case of adding data after the fact (addData method).
+>
+> * In treePlot, if plot.data=TRUE but the tree !hasTipData, plot.data  
+> is
+> now automatically switched to FALSE with a warning. This "unbreaks"  
+> one
+> of the test cases in test/phylo4dtests.R. An alternative way to  
+> achieve
+> the same result would be to change the default plot.data value from
+> is(phy, 'phylo4d') to hasTipData, as long as we also added a new
+> hasTipData method for phylo4 that is hard-coded to return FALSE.
+
+why not plot.data = is(phy, 'phylo4d) && hasTipData.  I don't think we  
+need to warn when users try to plot data that isn't there.   Though  
+this wouldn't handle the case of a user setting the plot.data=TRUE  
+even when there is no data (which the first solution does).   Perhaps  
+both the first change and the class + data check are in order.
+
+> * In checkPhylo4Data, I commented out the part that checks that the
+> number of data rows matches the number of corresponding nodes. In the
+> new formulation, you don't need to have data for all (tip or internal)
+> nodes. The only real @data slot requirement is that all row names in  
+> the
+> data frame correspond to existing node numbers in the tree. If no one
+> disagrees, we can remove the commented-out code entirely.
+>
+> * tbind didn't seem to be working in the first place, but I  
+> nevertheless
+> updated it to work using the new slot configuration, mostly by  
+> replacing
+> a direct tip.data access with tdata(x, "tip"), and replacing a check  
+> for
+> node data with hasNodeData. A few other pieces of the function look
+> slightly fishy (like, just because an object is phylo4d doesn't mean  
+> it
+> actually has data), but I didn't muck around any more.
+>
+> TODO:
+>
+> (These can all be post-release, and I'll try to get around to putting
+> them in the tracker.)
+>
+> * Make prune(phylo4) a wrapper for prune(phylo4d), rather than the
+> reverse. Currently prune(phylo4d) has calls prune(phylo4) twice,  
+> once to
+> prune the user-supplied tree, and another time to prune a fully  
+> labeled
+> tree in order to reconstruct which tips/nodes were pruned. (This was
+> necessary when prune was just a wrapper for ape::drop.tip.) I plan to
+> make prune(phylo4d) do the work that prune(phylo4) now does, but also
+> deal with the data (if it exists), then switch prune(phylo4) to wrap
+> prune(phylo4d).
+>
+> * Add tipData and nodeData accessor methods for convenience, then
+> probably change tdata to have default type "all"? This would be  
+> similar
+> to the labels-and-friends accessors.
+
++ 1
+
+> * Re-examine checkTree and related validity methods to make sure we're
+> checking everything that should be checked, while not being stricter
+> than necessary.
+>
+> * Write some addData unit tests.
+>
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+From bolker at ufl.edu  Tue Sep 29 23:03:09 2009
+From: bolker at ufl.edu (Ben Bolker)
+Date: Tue, 29 Sep 2009 17:03:09 -0400
+Subject: [Phylobase-devl] where are we?
+Message-ID: <4AC2760D.8000703@ufl.edu>
+
+
+  I am watching somewhat in awe as the commits and comments fly by.
+At what point will we be at a stopping point/a point where it's useful
+for those of us who have been semi-out-of-the-loop to get in and (1)
+check what's been done (2) help (3) push this thing toward beta release
+status ... ?
+
+  cheers
+    Ben
+
+
+-- 
+Ben Bolker
+Associate professor, Biology Dep't, Univ. of Florida
+bolker at ufl.edu / www.zoology.ufl.edu/bolker
+GPG key: www.zoology.ufl.edu/bolker/benbolker-publickey.asc
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090929/fe52e391/attachment.pgp 
+
+From francois.michonneau at gmail.com  Wed Sep 30 13:55:32 2009
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Wed, 30 Sep 2009 07:55:32 -0400
+Subject: [Phylobase-devl] unification of tree data slots
+In-Reply-To: <4ABD5321.1060700@nceas.ucsb.edu>
+References: <4AB163DD.20701@nceas.ucsb.edu>
+	<1253148118.24186.10.camel@francois-laptop>	<4AB1873B.1050909@ufl.edu>
+	<B51BA287-E522-4E4C-9F61-66CA14ABBD24@berkeley.edu>
+	<4AB285CF.7020006@nceas.ucsb.edu> <4ABA6A40.7040203@nceas.ucsb.edu>
+	<4ABD5321.1060700@nceas.ucsb.edu>
+Message-ID: <1254311732.3883.42.camel@francois-laptop>
+
+
+> As part of this process, I did make some user-level changes. Details are 
+> below for anyone interested. How should we proceed on determining 
+> whether to apply these changes to trunk? We also have Peter's NA->0 
+> changes in the queue, and if we adopt both, we'll need to coordinate our 
+> merges-to-trunk in a sensible way.
+
+  I haven't really had a chance to test the new functionalities but the
+changes you introduce look great, so I agree for merging your branch
+into the trunk.
+
+  I also read over the user-visible changes, and I think the choices you
+made are all sensible. Thanks for fixing the behavior of merge.data
+(this was on my TODO list).
+
+  I enforced the size of the data frames in checkPhylo4Data mainly
+because it's what was expected to be returned by the phylo4d
+constructor. So, if we would have to use this assumption, then it was a
+test to make sure that the user doesn't modify the slots. However, as
+the behavior of the constructor has changed, I think it's OK to remove
+the code you commented out.
+
+> One somewhat superficial question -- I called the new slot 'data'. Any 
+> strong feelings on whether it should be 'tdata' instead?
+
+I slightly prefer 'data'.
+
+  -- Fran?ois
+
+> Cheers,
+> Jim
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: This is a digitally signed message part
+Url : http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20090930/f14f6383/attachment.pgp 
+
+From regetz at nceas.ucsb.edu  Wed Sep 30 19:40:54 2009
+From: regetz at nceas.ucsb.edu (Jim Regetz)
+Date: Wed, 30 Sep 2009 10:40:54 -0700
+Subject: [Phylobase-devl] where are we?
+In-Reply-To: <4AC2760D.8000703@ufl.edu>
+References: <4AC2760D.8000703@ufl.edu>
+Message-ID: <4AC39826.8020502@nceas.ucsb.edu>
+
+In the wake of our two branch-to-trunk merges, I think we're close to 
+release. In the past day or so, I've just been (finally) revisiting the 
+replace methods in the wake of all the other recent changes to accessors 
+and slots. One more coming in the tdata area.
+
+Otherwise, it feels like clean-up mode to me. I have some scattered 
+TODOs, nearly all of which I've mentioned at some point already. I can 
+try to pull those together in a coherent way, probably by making sure 
+they're all in the tracker. Let's say, anything that seems important 
+enough to do pre-release will be priority 4 or 5, and anything 
+definitely not pre-release will be 1 or 2?
+
+I suspect one of the biggest remaining tasks (in terms of value, not 
+difficulty) is to go over the documentation to make sure everything is 
+actually up-to-date and reasonably thorough.
+
+Cheers,
+Jim
+
+Ben Bolker wrote:
+>   I am watching somewhat in awe as the commits and comments fly by.
+> At what point will we be at a stopping point/a point where it's useful
+> for those of us who have been semi-out-of-the-loop to get in and (1)
+> check what's been done (2) help (3) push this thing toward beta release
+> status ... ?
+> 
+>   cheers
+>     Ben
+> 
+> 
+> 
+> 
+> ------------------------------------------------------------------------
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+

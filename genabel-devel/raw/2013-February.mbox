@@ -1,0 +1,1172 @@
+From lennart at karssen.org  Mon Feb 11 23:40:57 2013
+From: lennart at karssen.org (L.C. Karssen)
+Date: Mon, 11 Feb 2013 23:40:57 +0100
+Subject: [GenABEL-dev] Float to double conversion in filevector/DatABEL files
+Message-ID: <51197379.9030005@karssen.org>
+
+Dear list,
+
+As I was trying to improve the concordance between the results of
+palinear and pacoxph with their R counterparts I ran into the following:
+First I set the number of significant digits in the ProbABEL output a
+bit higher. I also changed the use of floats for SNP data to doubles.
+
+With that the ratio of beta_PA/beta_R equals 1. At least that's what I
+first saw. I also noticed that now the outputs when using dose and prob
+files were identical!
+ However, it turns out that this is only true when using plain text
+files (non-filevector) for input. Before my changes there was no diff
+between regular and filevector output. Now there is...
+
+The relevant section for text files in gendata.cpp is in lines 166-175
+approximately:
+
+ double dosage = strtod(tmpstr.c_str(), (char **) NULL);
+ G.put(dosage, k, j);
+
+Here the G matrix (a double in my case) with the double dosage that
+results from strtod().
+
+
+For filevector files things become complicated. In gendata.cpp lines
+20-47 the following line is used to read the SNP data:
+
+ float tmpdata[DAG->getNumObservations()];
+ DAG->readVariableAs((unsigned long int) var, tmpdata);
+
+I tried to change the float into a double, but when inspecting the
+values in tmpdata[] I notice that there are rounding errors typical of a
+float to double cast (e.g. 1.66 in the dose.fv file becomes 1.65999998).
+
+I tried to dig into the fvlib a bit and it seems that readVariableAs()
+performs a cast based on the data type stored in the fv file. From the
+DatABEL manual I gathered that you can specify a data type for fv files.
+Does someone know how I can read the header of an fv file to check the
+data type used in a give fv file?
+
+It seems to me that if the data type is indeed stored in the header (and
+assuming we don't want to convert all our fv files) my problem is
+difficult to fix. Since the fv data is not stored as text we can't use a
+strtod()-like function to get the correct values as doubles.
+
+Anyone has any ideas/suggestions?
+
+Thanks,
+
+Lennart.
+
+
+-- 
+-----------------------------------------------------------------
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+
+Stuur mij aub geen Word of Powerpoint bestanden!
+Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+------------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 230 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130211/4a222103/attachment.sig>
+
+From yurii.aulchenko at gmail.com  Tue Feb 12 21:16:16 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Tue, 12 Feb 2013 21:16:16 +0100
+Subject: [GenABEL-dev] problem with MixABEL
+Message-ID: <CAHX9t6JSGSSXckUDR0xmwZVvFCk2+WC1er4CDuSFA5rigb-GUg@mail.gmail.com>
+
+This is a possible bug report:
+
+I am trying to build latest MixABEL on Mac OS using the 'makedistrib' script
+
+https://r-forge.r-project.org/scm/viewvc.php/pkg/GenABEL-general/scripts/makedistrib_MixABEL.sh?view=markup&root=genabel
+
+I get
+
+> time0.fmm <- proc.time()
+> fmm <- FastMixedModel(Response=res,
++ Explan=expl,
++ Kin = gkin,
++ Cov=covariates)
+
+ *** caught bus error ***
+address 0x105639487, cause 'non-existent physical address'
+
+ *** caught bus error ***
+
+ *** caught bus error ***
+address 0x105639487, cause 'non-existent physical address'
+address 0x105639487, cause 'non-existent physical address'
+
+ *** caught bus error ***
+address 0x105639487, cause 'non-existent physical address'
+
+Traceback:
+ 1: .Call("rint_flmm", as.double(Explan), as.double(Response),
+as.integer(dim(Explan)[1]),     as.integer(dim(Explan)[2]),
+as.double(t(Covariates)), as.integer(dim(Covariates)[2]),
+as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught))
+ 2: FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov =
+covariates)
+aborting ...
+
+Traceback:
+ 1:
+Traceback:
+
+Traceback:
+.Call("rint_flmm", as.double(Explan), as.double(Response),
+as.integer(dim(Explan)[1]),  1:  1:     as.integer(dim(Explan)[2]),
+as.double(t(Covariates)), as.integer(dim(Covariates)[2]),
+.Call("rint_flmm", as.double(Explan), as.double(Response),
+as.integer(dim(Explan)[1]), .Call("rint_flmm", as.double(Explan),
+as.double(Response), as.integer(dim(Explan)[1]),     as.double(t(GenVar)),
+as.double(nu_naught), as.double(gamma_naught))
+ as.integer(dim(Explan)[2]), as.double(t(Covariates)),
+as.integer(dim(Covariates)[2]),     as.integer(dim(Explan)[2]),
+as.double(t(Covariates)), as.integer(dim(Covariates)[2]),
+    as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught))
+ as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught)) 2:
+
+FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov = covariates)
+2:  2:
+FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov =
+covariates)FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov =
+covariates)aborting ...
+
+... SO ON
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130212/9b72bbba/attachment.html>
+
+From william.astle at mail.mcgill.ca  Tue Feb 12 21:47:16 2013
+From: william.astle at mail.mcgill.ca (William Astle)
+Date: Tue, 12 Feb 2013 20:47:16 +0000
+Subject: [GenABEL-dev] problem with MixABEL
+In-Reply-To: <CAHX9t6JSGSSXckUDR0xmwZVvFCk2+WC1er4CDuSFA5rigb-GUg@mail.gmail.com>
+References: <CAHX9t6JSGSSXckUDR0xmwZVvFCk2+WC1er4CDuSFA5rigb-GUg@mail.gmail.com>
+Message-ID: <8137DCC37877D6428FCE92A4C8E7ADCAF16F61@EXMBX2010-2.campus.MCGILL.CA>
+
+Hi,
+
+I think this is fixed. I don't have access to a compiler on Mac OS X. Would you mind testing it for me Yurii?
+
+Thanks
+
+Will
+
+On 12 Feb 2013, at 15:16, Yurii Aulchenko <yurii.aulchenko at gmail.com<mailto:yurii.aulchenko at gmail.com>>
+ wrote:
+
+This is a possible bug report:
+
+I am trying to build latest MixABEL on Mac OS using the 'makedistrib' script
+
+https://r-forge.r-project.org/scm/viewvc.php/pkg/GenABEL-general/scripts/makedistrib_MixABEL.sh?view=markup&root=genabel
+
+I get
+
+> time0.fmm <- proc.time()
+> fmm <- FastMixedModel(Response=res,
++ Explan=expl,
++ Kin = gkin,
++ Cov=covariates)
+
+ *** caught bus error ***
+address 0x105639487, cause 'non-existent physical address'
+
+ *** caught bus error ***
+
+ *** caught bus error ***
+address 0x105639487, cause 'non-existent physical address'
+address 0x105639487, cause 'non-existent physical address'
+
+ *** caught bus error ***
+address 0x105639487, cause 'non-existent physical address'
+
+Traceback:
+ 1: .Call("rint_flmm", as.double(Explan), as.double(Response), as.integer(dim(Explan)[1]),     as.integer(dim(Explan)[2]), as.double(t(Covariates)), as.integer(dim(Covariates)[2]),     as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught))
+ 2: FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov = covariates)
+aborting ...
+
+Traceback:
+ 1:
+Traceback:
+
+Traceback:
+.Call("rint_flmm", as.double(Explan), as.double(Response), as.integer(dim(Explan)[1]),  1:  1:     as.integer(dim(Explan)[2]), as.double(t(Covariates)), as.integer(dim(Covariates)[2]), .Call("rint_flmm", as.double(Explan), as.double(Response), as.integer(dim(Explan)[1]), .Call("rint_flmm", as.double(Explan), as.double(Response), as.integer(dim(Explan)[1]),     as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught))    as.integer(dim(Explan)[2]), as.double(t(Covariates)), as.integer(dim(Covariates)[2]),     as.integer(dim(Explan)[2]), as.double(t(Covariates)), as.integer(dim(Covariates)[2]),
+    as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught))    as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught)) 2:
+
+FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov = covariates) 2:  2:
+FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov = covariates)FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov = covariates)aborting ...
+
+... SO ON
+_______________________________________________
+genabel-devel mailing list
+genabel-devel at lists.r-forge.r-project.org<mailto:genabel-devel at lists.r-forge.r-project.org>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130212/729e79a5/attachment.html>
+
+From yurii.aulchenko at gmail.com  Tue Feb 12 22:17:03 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Tue, 12 Feb 2013 22:17:03 +0100
+Subject: [GenABEL-dev] problem with MixABEL
+In-Reply-To: <8137DCC37877D6428FCE92A4C8E7ADCAF16F61@EXMBX2010-2.campus.MCGILL.CA>
+References: <CAHX9t6JSGSSXckUDR0xmwZVvFCk2+WC1er4CDuSFA5rigb-GUg@mail.gmail.com>
+ <8137DCC37877D6428FCE92A4C8E7ADCAF16F61@EXMBX2010-2.campus.MCGILL.CA>
+Message-ID: <CAHX9t6JNn4=UtMXyJZt5TCFBKy7sB66daeLbXxCXHnUR331Nbw@mail.gmail.com>
+
+Now it is much better! - there are still many problems, but, as far as I
+can see these are not related to the FastMixedModel :)
+
+Thank you very much for such prompt reaction, William! - I really
+appreciate this!
+
+best wishes,
+Yurii
+
+
+On Tue, Feb 12, 2013 at 9:47 PM, William Astle <william.astle at mail.mcgill.ca
+> wrote:
+
+>  Hi,
+>
+>  I think this is fixed. I don't have access to a compiler on Mac OS X.
+> Would you mind testing it for me Yurii?
+>
+>  Thanks
+>
+>  Will
+>
+>  On 12 Feb 2013, at 15:16, Yurii Aulchenko <yurii.aulchenko at gmail.com>
+>  wrote:
+>
+>  This is a possible bug report:
+>
+>  I am trying to build latest MixABEL on Mac OS using the 'makedistrib'
+> script
+>
+>
+> https://r-forge.r-project.org/scm/viewvc.php/pkg/GenABEL-general/scripts/makedistrib_MixABEL.sh?view=markup&root=genabel
+>
+>  I get
+>
+>  > time0.fmm <- proc.time()
+> > fmm <- FastMixedModel(Response=res,
+> + Explan=expl,
+> + Kin = gkin,
+> + Cov=covariates)
+>
+>   *** caught bus error ***
+> address 0x105639487, cause 'non-existent physical address'
+>
+>   *** caught bus error ***
+>
+>   *** caught bus error ***
+> address 0x105639487, cause 'non-existent physical address'
+> address 0x105639487, cause 'non-existent physical address'
+>
+>   *** caught bus error ***
+> address 0x105639487, cause 'non-existent physical address'
+>
+>  Traceback:
+>  1: .Call("rint_flmm", as.double(Explan), as.double(Response),
+> as.integer(dim(Explan)[1]),     as.integer(dim(Explan)[2]),
+> as.double(t(Covariates)), as.integer(dim(Covariates)[2]),
+> as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught))
+>  2: FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov =
+> covariates)
+> aborting ...
+>
+>  Traceback:
+>  1:
+> Traceback:
+>
+>  Traceback:
+> .Call("rint_flmm", as.double(Explan), as.double(Response),
+> as.integer(dim(Explan)[1]),  1:  1:     as.integer(dim(Explan)[2]),
+> as.double(t(Covariates)), as.integer(dim(Covariates)[2]),
+> .Call("rint_flmm", as.double(Explan), as.double(Response),
+> as.integer(dim(Explan)[1]), .Call("rint_flmm", as.double(Explan),
+> as.double(Response), as.integer(dim(Explan)[1]),     as.double(t(GenVar)),
+> as.double(nu_naught), as.double(gamma_naught))
+>  as.integer(dim(Explan)[2]), as.double(t(Covariates)),
+> as.integer(dim(Covariates)[2]),     as.integer(dim(Explan)[2]),
+> as.double(t(Covariates)), as.integer(dim(Covariates)[2]),
+>     as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught))
+>  as.double(t(GenVar)), as.double(nu_naught), as.double(gamma_naught)) 2:
+>
+>  FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov =
+> covariates) 2:  2:
+> FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov =
+> covariates)FastMixedModel(Response = res, Explan = expl, Kin = gkin, Cov =
+> covariates)aborting ...
+>
+>  ... SO ON
+>  _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>
+>
+>
+
+
+-- 
+-----------------------------------------------------
+Yurii S. Aulchenko
+
+[ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [
+Twitter<http://twitter.com/YuriiAulchenko>] [
+Blog <http://yurii-aulchenko.blogspot.nl/> ]
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130212/1ed7274d/attachment.html>
+
+From yurii.aulchenko at gmail.com  Wed Feb 13 08:50:02 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Wed, 13 Feb 2013 08:50:02 +0100
+Subject: [GenABEL-dev] Float to double conversion in filevector/DatABEL
+	files
+In-Reply-To: <51197379.9030005@karssen.org>
+References: <51197379.9030005@karssen.org>
+Message-ID: <CAHX9t6KHQ4knoe-6Jq82OMfw6PbYo3KkYSB4kpzne9QdDko2ng@mail.gmail.com>
+
+> I tried to dig into the fvlib a bit and it seems that readVariableAs()
+> performs a cast based on the data type stored in the fv file. From the
+> DatABEL manual I gathered that you can specify a data type for fv files.
+> Does someone know how I can read the header of an fv file to check the
+> data type used in a give fv file?
+>
+>
+Hope this info may be useful:
+
+index file contains information about dimensions of the data file, data type
+used, and columns/rows names
+
+The beginning is (frutil.h)
+
+	unsigned short int type;
+	// should change that to long!!!
+	unsigned int nelements;
+	unsigned int numObservations;
+	unsigned int numVariables;
+	unsigned int bytesPerRecord;
+	unsigned int bitsPerRecord;
+	unsigned int namelength;
+	unsigned int reserved[RESERVEDSPACE];
+
+then names...
+
+where (const.h)
+
+#define RESERVEDSPACE      5
+
+// internal format data types
+#define UNSIGNED_SHORT_INT 1
+#define SHORT_INT          2
+#define UNSIGNED_INT       3
+#define INT                4
+#define FLOAT              5
+#define DOUBLE             6
+#define SIGNED_CHAR        7
+#define UNSIGNED_CHAR      8
+
+// number of chars used to keep var/obs names
+#define NAMELENGTH        32
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130213/06e441f3/attachment-0001.html>
+
+From lennart at karssen.org  Thu Feb 14 17:40:33 2013
+From: lennart at karssen.org (L.C. Karssen)
+Date: Thu, 14 Feb 2013 17:40:33 +0100
+Subject: [GenABEL-dev] Float to double conversion in filevector/DatABEL
+ files
+In-Reply-To: <CAHX9t6KHQ4knoe-6Jq82OMfw6PbYo3KkYSB4kpzne9QdDko2ng@mail.gmail.com>
+References: <51197379.9030005@karssen.org>
+ <CAHX9t6KHQ4knoe-6Jq82OMfw6PbYo3KkYSB4kpzne9QdDko2ng@mail.gmail.com>
+Message-ID: <511D1381.1070200@karssen.org>
+
+Thanks for these pointers, this looks like a good start for
+understanding the filvector internals.
+
+
+
+Best,
+
+Lennart.
+
+On 13/02/13 08:50, Yurii Aulchenko wrote:
+> 
+>     I tried to dig into the fvlib a bit and it seems that readVariableAs()
+>     performs a cast based on the data type stored in the fv file. From the
+>     DatABEL manual I gathered that you can specify a data type for fv files.
+>     Does someone know how I can read the header of an fv file to check the
+>     data type used in a give fv file?
+> 
+> 
+> Hope this info may be useful:
+> 
+> index file contains information about dimensions of
+> the data file, data type used, and columns/rows names
+> 
+> The beginning is (frutil.h)
+> 
+> 	unsigned short int type;
+> 	// should change that to long!!!
+> 	unsigned int nelements;
+> 	unsigned int numObservations;
+> 	unsigned int numVariables;
+> 	unsigned int bytesPerRecord;
+> 	unsigned int bitsPerRecord;
+> 	unsigned int namelength;
+> 	unsigned int reserved[RESERVEDSPACE];
+> 
+> then names...
+> 
+> where (const.h)
+> 
+> #define RESERVEDSPACE      5
+> 
+> // internal format data types
+> #define UNSIGNED_SHORT_INT 1
+> #define SHORT_INT          2
+> #define UNSIGNED_INT       3
+> #define INT                4
+> #define FLOAT              5
+> #define DOUBLE             6
+> #define SIGNED_CHAR        7
+> #define UNSIGNED_CHAR      8
+> 
+> // number of chars used to keep var/obs names
+> #define NAMELENGTH        32
+> 
+
+-- 
+-----------------------------------------------------------------
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+
+Stuur mij aub geen Word of Powerpoint bestanden!
+Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+------------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 230 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130214/4857015a/attachment.sig>
+
+From darthastu at gmail.com  Fri Feb 15 10:05:25 2013
+From: darthastu at gmail.com (Nicola Pirastu)
+Date: Fri, 15 Feb 2013 10:05:25 +0100
+Subject: [GenABEL-dev] Float to double conversion in filevector/DatABEL
+	files
+In-Reply-To: <511D1381.1070200@karssen.org>
+References: <51197379.9030005@karssen.org>
+ <CAHX9t6KHQ4knoe-6Jq82OMfw6PbYo3KkYSB4kpzne9QdDko2ng@mail.gmail.com>
+ <511D1381.1070200@karssen.org>
+Message-ID: <0177EAE1-F6B9-4CF1-9F3A-FF1C78E057FA@gmail.com>
+
+Dear List,
+
+I think I've spotted a small bug in the grammar function when method=="gamma",
+
+the problem is linked to this post.
+
+http://forum.genabel.org/viewtopic.php?f=6&t=753&p=1401#p1401
+
+Looking at the grammar code line 6 is:
+
+        out at results[, "effB"] <- out[, "chi2.1df"]/polyObject$grammarGamma$Beta
+
+while I think it should be:
+
+        out at results[, "effB"] <- out[, "effB"]/polyObject$grammarGamma$Beta
+ 
+Best.
+
+Nicola
+
+From darthastu at gmail.com  Fri Feb 15 10:05:58 2013
+From: darthastu at gmail.com (Nicola Pirastu)
+Date: Fri, 15 Feb 2013 10:05:58 +0100
+Subject: [GenABEL-dev] Float to double conversion in filevector/DatABEL
+	files
+In-Reply-To: <0177EAE1-F6B9-4CF1-9F3A-FF1C78E057FA@gmail.com>
+References: <51197379.9030005@karssen.org>
+ <CAHX9t6KHQ4knoe-6Jq82OMfw6PbYo3KkYSB4kpzne9QdDko2ng@mail.gmail.com>
+ <511D1381.1070200@karssen.org>
+ <0177EAE1-F6B9-4CF1-9F3A-FF1C78E057FA@gmail.com>
+Message-ID: <465B1FB5-34E9-422E-A031-60CE6AE9DCAE@gmail.com>
+
+Sorry I forgot to change the object of the mail?
+
+N.
+
+Il giorno 15/feb/2013, alle ore 10:05, Nicola Pirastu <darthastu at gmail.com> ha scritto:
+
+> Dear List,
+> 
+> I think I've spotted a small bug in the grammar function when method=="gamma",
+> 
+> the problem is linked to this post.
+> 
+> http://forum.genabel.org/viewtopic.php?f=6&t=753&p=1401#p1401
+> 
+> Looking at the grammar code line 6 is:
+> 
+>        out at results[, "effB"] <- out[, "chi2.1df"]/polyObject$grammarGamma$Beta
+> 
+> while I think it should be:
+> 
+>        out at results[, "effB"] <- out[, "effB"]/polyObject$grammarGamma$Beta
+> 
+> Best.
+> 
+> Nicola
+
+
+From yurii.aulchenko at gmail.com  Fri Feb 15 19:22:06 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Fri, 15 Feb 2013 19:22:06 +0100
+Subject: [GenABEL-dev] problem with Grammar-gamma
+Message-ID: <CAHX9t6J4ZsbDM3mp5PdH0jn+_zbureSnChxQkZkWLOMgScvMPA@mail.gmail.com>
+
+Yep, and there are even more problems; - fixed in dev version (1.7-4) on
+R-Forge
+
+you can use the script
+
+https://r-forge.r-project.org/scm/viewvc.php/pkg/GenABEL-general/scripts/makedistrib_GenABEL.sh?view=markup&root=genabel
+
+to build the dev-version
+
+best,
+Yurii
+
+On Fri, Feb 15, 2013 at 10:05 AM, Nicola Pirastu <darthastu at gmail.com>wrote:
+
+> Sorry I forgot to change the object of the mail?
+>
+> N.
+>
+> Il giorno 15/feb/2013, alle ore 10:05, Nicola Pirastu <darthastu at gmail.com>
+> ha scritto:
+>
+> > Dear List,
+> >
+> > I think I've spotted a small bug in the grammar function when
+> method=="gamma",
+> >
+> > the problem is linked to this post.
+> >
+> > http://forum.genabel.org/viewtopic.php?f=6&t=753&p=1401#p1401
+> >
+> > Looking at the grammar code line 6 is:
+> >
+> >        out at results[, "effB"] <- out[,
+> "chi2.1df"]/polyObject$grammarGamma$Beta
+> >
+> > while I think it should be:
+> >
+> >        out at results[, "effB"] <- out[,
+> "effB"]/polyObject$grammarGamma$Beta
+> >
+> > Best.
+> >
+> > Nicola
+>
+>
+
+
+-- 
+-----------------------------------------------------
+Yurii S. Aulchenko
+
+[ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [
+Twitter<http://twitter.com/YuriiAulchenko>] [
+Blog <http://yurii-aulchenko.blogspot.nl/> ]
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130215/2f597503/attachment.html>
+
+From yurii.aulchenko at gmail.com  Sat Feb 16 14:45:54 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Sat, 16 Feb 2013 14:45:54 +0100
+Subject: [GenABEL-dev] [Genabel-commits] r1095 -
+	branches/ProbABEL-pacox/v.0.3.0/ProbABEL/src
+In-Reply-To: <20130211074902.BA143183B60@r-forge.r-project.org>
+References: <20130211074902.BA143183B60@r-forge.r-project.org>
+Message-ID: <CAHX9t6+Vzw9zvBji=WTAa9KFJ7Sv3z_Cud0C08MRZ1KvefRTLA@mail.gmail.com>
+
+This is really cleaning the things up! :)
+
+On Mon, Feb 11, 2013 at 8:49 AM, <noreply at r-forge.r-project.org> wrote:
+
+> Author: lckarssen
+> Date: 2013-02-11 08:49:02 +0100 (Mon, 11 Feb 2013)
+> New Revision: 1095
+>
+> Modified:
+>    branches/ProbABEL-pacox/v.0.3.0/ProbABEL/src/gendata.cpp
+> Log:
+> Three very small improvements in gendata.ccp:
+>       - Fix spacing in an error message
+>       - Add filename to another error message
+>       - Fix name of a function (in commented code)
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130216/cac4609f/attachment.html>
+
+From lennart at karssen.org  Sun Feb 17 23:58:08 2013
+From: lennart at karssen.org (L.C. Karssen)
+Date: Sun, 17 Feb 2013 23:58:08 +0100
+Subject: [GenABEL-dev] [Genabel-commits] r1095 -
+	branches/ProbABEL-pacox/v.0.3.0/ProbABEL/src
+In-Reply-To: <CAHX9t6+Vzw9zvBji=WTAa9KFJ7Sv3z_Cud0C08MRZ1KvefRTLA@mail.gmail.com>
+References: <20130211074902.BA143183B60@r-forge.r-project.org>
+ <CAHX9t6+Vzw9zvBji=WTAa9KFJ7Sv3z_Cud0C08MRZ1KvefRTLA@mail.gmail.com>
+Message-ID: <51216080.9080503@karssen.org>
+
+Indeed :-). While digging into the float/double question I mailed to the
+list earlier I came across these and decided to make them a quick
+separate commit.
+
+
+Lennart.
+
+On 16-02-13 14:45, Yurii Aulchenko wrote:
+> This is really cleaning the things up! :)
+> 
+> On Mon, Feb 11, 2013 at 8:49 AM, <noreply at r-forge.r-project.org
+> <mailto:noreply at r-forge.r-project.org>> wrote:
+> 
+>     Author: lckarssen
+>     Date: 2013-02-11 08:49:02 +0100 (Mon, 11 Feb 2013)
+>     New Revision: 1095
+> 
+>     Modified:
+>        branches/ProbABEL-pacox/v.0.3.0/ProbABEL/src/gendata.cpp
+>     Log:
+>     Three very small improvements in gendata.ccp:
+>           - Fix spacing in an error message
+>           - Add filename to another error message
+>           - Fix name of a function (in commented code)
+> 
+> 
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+-----------------------------------------------------------------
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+
+Stuur mij aub geen Word of Powerpoint bestanden!
+Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+------------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 230 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130217/b28eaed6/attachment.sig>
+
+From yurii.aulchenko at gmail.com  Wed Feb 20 16:35:09 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Wed, 20 Feb 2013 16:35:09 +0100
+Subject: [GenABEL-dev] GenABEL tutorials to SVN
+Message-ID: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+
+Dear All,
+
+For long time I was thinking that GenABEL tutorial(s) should be a part of
+the project - the same logic as with the code, with the same idea that in
+such case people can easily contribute by submitting patches and new
+pieces.
+
+The problem was (and still is) that the tutorial uses some data sets, which
+are not public domain, and it is quite awkward if we as the project start
+re-distributing them. Little by little I am trying to switch the whole
+thing to the use of only public and simulated data, but this is a lengthy
+process.
+
+So I thought that may be a good solution is to put the code of tutorials on
+our SVN; and put the data only if these are either public or simulated. Of
+cause in this way the tutorials will not be really "functional" (e.g. they
+would not compile right away), but this may become a starting point for
+others to build up something new and really
+free-for-all-to-use-and-contribute.
+
+Let me know what you think,
+best regards,
+Yurii
+-- 
+-----------------------------------------------------
+Yurii S. Aulchenko
+
+[ LinkedIn <http://nl.linkedin.com/in/yuriiaulchenko> ] [
+Twitter<http://twitter.com/YuriiAulchenko>] [
+Blog <http://yurii-aulchenko.blogspot.nl/> ]
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130220/bfeb09c7/attachment.html>
+
+From lennart at karssen.org  Wed Feb 20 18:54:09 2013
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 20 Feb 2013 18:54:09 +0100
+Subject: [GenABEL-dev] GenABEL tutorials to SVN
+In-Reply-To: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+References: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+Message-ID: <51250DC1.5040505@karssen.org>
+
+Dear Yurii,
+
+Great idea. I'm all for putting the tutorials in SVN. They are already
+of high quality and together with our community we can make them even
+better.
+I do see the problem with the data sets, of course.
+
+You are using Sweave, right? I'm wondering how much not having the data
+will impact the possibility to tweak the document. Fixing small typos
+will be alright, but before you know it a typo can mess up the LaTeX or
+R code and since you can't compile the document to check it this may
+lead to a lot of bug hunting for you, once you recompile it again.
+That's the only potential problem I see.
+
+How about also including the latest PDF version of the tutorial (I know,
+this is against SVN's principles) each time you compile a version? This
+way people who don't have the data know what it is supposed to look like
+and could even help creating replacement data sets.
+
+
+Best,
+
+Lennart.
+
+On 02/20/2013 04:35 PM, Yurii Aulchenko wrote:
+> Dear All,
+>
+> For long time I was thinking that GenABEL tutorial(s) should be a part of
+> the project - the same logic as with the code, with the same idea that in
+> such case people can easily contribute by submitting patches and new
+> pieces.
+>
+> The problem was (and still is) that the tutorial uses some data sets, which
+> are not public domain, and it is quite awkward if we as the project start
+> re-distributing them. Little by little I am trying to switch the whole
+> thing to the use of only public and simulated data, but this is a lengthy
+> process.
+>
+> So I thought that may be a good solution is to put the code of tutorials on
+> our SVN; and put the data only if these are either public or simulated. Of
+> cause in this way the tutorials will not be really "functional" (e.g. they
+> would not compile right away), but this may become a starting point for
+> others to build up something new and really
+> free-for-all-to-use-and-contribute.
+>
+> Let me know what you think,
+> best regards,
+> Yurii
+>
+>
+>
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>
+
+
+--
+-----------------------------------------------------------------
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+
+Stuur mij aub geen Word of Powerpoint bestanden!
+Zie http://www.gnu.org/philosophy/no-word-attachments.nl.html
+------------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 230 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130220/a0da9ad3/attachment.sig>
+
+From kooyman at gmail.com  Wed Feb 20 22:40:42 2013
+From: kooyman at gmail.com (Maarten Kooyman)
+Date: Wed, 20 Feb 2013 22:40:42 +0100
+Subject: [GenABEL-dev] GenABEL tutorials to SVN
+In-Reply-To: <51250DC1.5040505@karssen.org>
+References: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+ <51250DC1.5040505@karssen.org>
+Message-ID: <512542DA.5090700@gmail.com>
+
+Dear All,
+
+I think on the long run replacing the data is the best thing to do. 
+(although it will take quite some effort).
+
+As an temporary solution we could use a build server with jenkins 
+(http://jenkins-ci.org/), that recreates the document after each 
+alteration on svn and publish this on a public place(by coping it to a 
+webserver). On this build server the datasets are secure in a trusted 
+environment and the results are visible to the outer world. I use  
+Jenkins also  for monitoring Probabel, but the goal is the same: keep 
+the quality of the code in check.
+
+This solution prevent coping binary files to svn and this can be done in 
+a completely automated way.
+
+Kind regards,
+
+Maarten
+
+
+On 02/20/2013 06:54 PM, L.C. Karssen wrote:
+> Dear Yurii,
+>
+> Great idea. I'm all for putting the tutorials in SVN. They are already
+> of high quality and together with our community we can make them even
+> better.
+> I do see the problem with the data sets, of course.
+>
+> You are using Sweave, right? I'm wondering how much not having the data
+> will impact the possibility to tweak the document. Fixing small typos
+> will be alright, but before you know it a typo can mess up the LaTeX or
+> R code and since you can't compile the document to check it this may
+> lead to a lot of bug hunting for you, once you recompile it again.
+> That's the only potential problem I see.
+>
+> How about also including the latest PDF version of the tutorial (I know,
+> this is against SVN's principles) each time you compile a version? This
+> way people who don't have the data know what it is supposed to look like
+> and could even help creating replacement data sets.
+>
+>
+> Best,
+>
+> Lennart.
+>
+> On 02/20/2013 04:35 PM, Yurii Aulchenko wrote:
+>> Dear All,
+>>
+>> For long time I was thinking that GenABEL tutorial(s) should be a part of
+>> the project - the same logic as with the code, with the same idea that in
+>> such case people can easily contribute by submitting patches and new
+>> pieces.
+>>
+>> The problem was (and still is) that the tutorial uses some data sets, which
+>> are not public domain, and it is quite awkward if we as the project start
+>> re-distributing them. Little by little I am trying to switch the whole
+>> thing to the use of only public and simulated data, but this is a lengthy
+>> process.
+>>
+>> So I thought that may be a good solution is to put the code of tutorials on
+>> our SVN; and put the data only if these are either public or simulated. Of
+>> cause in this way the tutorials will not be really "functional" (e.g. they
+>> would not compile right away), but this may become a starting point for
+>> others to build up something new and really
+>> free-for-all-to-use-and-contribute.
+>>
+>> Let me know what you think,
+>> best regards,
+>> Yurii
+>>
+>>
+>>
+>> _______________________________________________
+
+
+From yurii.aulchenko at gmail.com  Sun Feb 24 17:27:28 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Sun, 24 Feb 2013 17:27:28 +0100
+Subject: [GenABEL-dev] GenABEL tutorials to SVN
+In-Reply-To: <512542DA.5090700@gmail.com>
+References: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+ <51250DC1.5040505@karssen.org> <512542DA.5090700@gmail.com>
+Message-ID: <CAHX9t6LeKOMQyFGBZ_cyRdfyzH0zDVF9-cMbODPTwq7QJfPuew@mail.gmail.com>
+
+Dear Lennart, Maarten, All,
+
+Lennart - thank you for drawing the attention to the problem of not being
+able to compile affecting the whole thing (I personally would never change
+the code of something I am not able to compile :) ). Maarten, thanks a lot
+for suggesting this elegant Jenkins solution - I was not aware of this
+system.
+
+All together, I see two ways to proceed:
+
+1) Solution based on Jenkins - the code is open, can be modified, bud build
+happens in 'private' environment
+
+2) I replace the data sets we can not distribute with some small fake
+datasets. This will make the code technically compilable, though all the
+interpretation of the "results" will be screwed up
+
+I like the solution (1) technically, but I do not like it because it does
+not really address the point behind: we can not share these datasets. In a
+way, people can look at these PDFs but people can not use these parts as
+tutorial, because they do not have the data sets! Therefore, if I had to
+choose, I would be inclined towards the solution (2).
+
+But I think we do not need to choose. We could keep both the "full old PDF"
+together with "incomplete new" on the genabel.org's tutorial section. Next,
+I am going to try to construct a smarter Makefile, which could build both
+'private' and 'public' version depending on the availability of data files.
+Then we could combine both solutions :)
+
+I think the next steps are 1) for me to look up how many chapters in the
+GenA tutorial become crap when I remove these datasets 2) try to do smart
+Makefile - hopefully with your help
+
+Let me know what you think, and I will keep you updated
+
+best wishes,
+Yurii
+
+On Wed, Feb 20, 2013 at 10:40 PM, Maarten Kooyman <kooyman at gmail.com> wrote:
+
+> Dear All,
+>
+> I think on the long run replacing the data is the best thing to do.
+> (although it will take quite some effort).
+>
+> As an temporary solution we could use a build server with jenkins (
+> http://jenkins-ci.org/), that recreates the document after each
+> alteration on svn and publish this on a public place(by coping it to a
+> webserver). On this build server the datasets are secure in a trusted
+> environment and the results are visible to the outer world. I use  Jenkins
+> also  for monitoring Probabel, but the goal is the same: keep the quality
+> of the code in check.
+>
+> This solution prevent coping binary files to svn and this can be done in a
+> completely automated way.
+>
+> Kind regards,
+>
+> Maarten
+>
+>
+>
+> On 02/20/2013 06:54 PM, L.C. Karssen wrote:
+>
+>> Dear Yurii,
+>>
+>> Great idea. I'm all for putting the tutorials in SVN. They are already
+>> of high quality and together with our community we can make them even
+>> better.
+>> I do see the problem with the data sets, of course.
+>>
+>> You are using Sweave, right? I'm wondering how much not having the data
+>> will impact the possibility to tweak the document. Fixing small typos
+>> will be alright, but before you know it a typo can mess up the LaTeX or
+>> R code and since you can't compile the document to check it this may
+>> lead to a lot of bug hunting for you, once you recompile it again.
+>> That's the only potential problem I see.
+>>
+>> How about also including the latest PDF version of the tutorial (I know,
+>> this is against SVN's principles) each time you compile a version? This
+>> way people who don't have the data know what it is supposed to look like
+>> and could even help creating replacement data sets.
+>>
+>>
+>> Best,
+>>
+>> Lennart.
+>>
+>> On 02/20/2013 04:35 PM, Yurii Aulchenko wrote:
+>>
+>>> Dear All,
+>>>
+>>> For long time I was thinking that GenABEL tutorial(s) should be a part of
+>>> the project - the same logic as with the code, with the same idea that in
+>>> such case people can easily contribute by submitting patches and new
+>>> pieces.
+>>>
+>>> The problem was (and still is) that the tutorial uses some data sets,
+>>> which
+>>> are not public domain, and it is quite awkward if we as the project start
+>>> re-distributing them. Little by little I am trying to switch the whole
+>>> thing to the use of only public and simulated data, but this is a lengthy
+>>> process.
+>>>
+>>> So I thought that may be a good solution is to put the code of tutorials
+>>> on
+>>> our SVN; and put the data only if these are either public or simulated.
+>>> Of
+>>> cause in this way the tutorials will not be really "functional" (e.g.
+>>> they
+>>> would not compile right away), but this may become a starting point for
+>>> others to build up something new and really
+>>> free-for-all-to-use-and-**contribute.
+>>>
+>>> Let me know what you think,
+>>> best regards,
+>>> Yurii
+>>>
+>>>
+>>>
+>>> ______________________________**_________________
+>>>
+>>
+> ______________________________**_________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-**project.org<genabel-devel at lists.r-forge.r-project.org>
+> https://lists.r-forge.r-**project.org/cgi-bin/mailman/**
+> listinfo/genabel-devel<https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20130224/b9e2073c/attachment.html>
+
+From pirastu at burlo.trieste.it  Tue Feb 26 15:00:05 2013
+From: pirastu at burlo.trieste.it (Nicola Pirastu)
+Date: Tue, 26 Feb 2013 15:00:05 +0100
+Subject: [GenABEL-dev] GenABEL tutorials to SVN
+In-Reply-To: <CAHX9t6LeKOMQyFGBZ_cyRdfyzH0zDVF9-cMbODPTwq7QJfPuew@mail.gmail.com>
+References: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+ <51250DC1.5040505@karssen.org> <512542DA.5090700@gmail.com>
+ <CAHX9t6LeKOMQyFGBZ_cyRdfyzH0zDVF9-cMbODPTwq7QJfPuew@mail.gmail.com>
+Message-ID: <F16C0E24-0A54-4BA2-B199-661CAAA1D5B5@burlo.trieste.it>
+
+Dear all,
+
+while responding today in the forum about a ProbABEL error on the forum, I realized that probably 90% of the 1000G posts are about the "long allele" issue.
+
+Since I'm sure that actually solving it in the software is probably complex,  could we insert a warning about it?
+
+I think that this would help a lot of users.
+
+Best Nicola
+
+From yurii.aulchenko at gmail.com  Tue Feb 26 17:05:36 2013
+From: yurii.aulchenko at gmail.com (Yurii Aulchenko)
+Date: Tue, 26 Feb 2013 16:05:36 +0000
+Subject: [GenABEL-dev] GenABEL tutorials to SVN
+In-Reply-To: <F16C0E24-0A54-4BA2-B199-661CAAA1D5B5@burlo.trieste.it>
+References: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+ <51250DC1.5040505@karssen.org> <512542DA.5090700@gmail.com>
+ <CAHX9t6LeKOMQyFGBZ_cyRdfyzH0zDVF9-cMbODPTwq7QJfPuew@mail.gmail.com>
+ <F16C0E24-0A54-4BA2-B199-661CAAA1D5B5@burlo.trieste.it>
+Message-ID: <8604491761526394735@unknownmsgid>
+
+Nicola - can you pls repost using new subject - it really complicates
+the discussion to have this - important! - issue tagged with
+"tutorials on SVN" :(
+
+----------------------
+Yurii Aulchenko
+(sent from mobile device)
+
+On 26 Feb 2013, at 14:00, Nicola Pirastu <pirastu at burlo.trieste.it> wrote:
+
+> Dear all,
+>
+> while responding today in the forum about a ProbABEL error on the forum, I realized that probably 90% of the 1000G posts are about the "long allele" issue.
+>
+> Since I'm sure that actually solving it in the software is probably complex,  could we insert a warning about it?
+>
+> I think that this would help a lot of users.
+>
+> Best Nicola
+
+From pirastu at burlo.trieste.it  Tue Feb 26 17:18:19 2013
+From: pirastu at burlo.trieste.it (Nicola Pirastu)
+Date: Tue, 26 Feb 2013 17:18:19 +0100
+Subject: [GenABEL-dev] GenABEL tutorials to SVN
+In-Reply-To: <8604491761526394735@unknownmsgid>
+References: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+ <51250DC1.5040505@karssen.org> <512542DA.5090700@gmail.com>
+ <CAHX9t6LeKOMQyFGBZ_cyRdfyzH0zDVF9-cMbODPTwq7QJfPuew@mail.gmail.com>
+ <F16C0E24-0A54-4BA2-B199-661CAAA1D5B5@burlo.trieste.it>
+ <8604491761526394735@unknownmsgid>
+Message-ID: <9C818039-9C1F-478B-8D32-3F43773BDDA9@burlo.trieste.it>
+
+Yes sorry, I again forgot to change subject?
+
+N.
+Il giorno 26/feb/2013, alle ore 17:05, Yurii Aulchenko <yurii.aulchenko at gmail.com> ha scritto:
+
+> Nicola - can you pls repost using new subject - it really complicates
+> the discussion to have this - important! - issue tagged with
+> "tutorials on SVN" :(
+> 
+> ----------------------
+> Yurii Aulchenko
+> (sent from mobile device)
+> 
+> On 26 Feb 2013, at 14:00, Nicola Pirastu <pirastu at burlo.trieste.it> wrote:
+> 
+>> Dear all,
+>> 
+>> while responding today in the forum about a ProbABEL error on the forum, I realized that probably 90% of the 1000G posts are about the "long allele" issue.
+>> 
+>> Since I'm sure that actually solving it in the software is probably complex,  could we insert a warning about it?
+>> 
+>> I think that this would help a lot of users.
+>> 
+>> Best Nicola
+
+
+From pirastu at burlo.trieste.it  Tue Feb 26 17:19:02 2013
+From: pirastu at burlo.trieste.it (Nicola Pirastu)
+Date: Tue, 26 Feb 2013 17:19:02 +0100
+Subject: [GenABEL-dev]  ProbABEL long alleles
+In-Reply-To: <25805_1361887209_512CBFE9_25805_584_1_F16C0E24-0A54-4BA2-B199-661CAAA1D5B5@burlo.trieste.it>
+References: <CAHX9t6LXvd4qO7wg2GtiiVd0CSEuUmCjq7jB=hx3oE2vFyV3Jw@mail.gmail.com>
+ <51250DC1.5040505@karssen.org> <512542DA.5090700@gmail.com>
+ <CAHX9t6LeKOMQyFGBZ_cyRdfyzH0zDVF9-cMbODPTwq7QJfPuew@mail.gmail.com>
+ <25805_1361887209_512CBFE9_25805_584_1_F16C0E24-0A54-4BA2-B199-661CAAA1D5B5@burlo.trieste.it>
+Message-ID: <3670D383-7199-47B2-859E-0C120F6D716E@burlo.trieste.it>
+
+Dear all,
+
+while responding today in the forum about a ProbABEL error on the forum, I realized that probably 90% of the 1000G posts are about the "long allele" issue.
+
+Since I'm sure that actually solving it in the software is probably complex,  could we insert a warning about it?
+
+I think that this would help a lot of users.
+
+Best Nicola
+

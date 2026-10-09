@@ -1,0 +1,1355 @@
+From alvaro.frank at rwth-aachen.de  Mon Aug  4 16:16:06 2014
+From: alvaro.frank at rwth-aachen.de (Frank, Alvaro Jesus)
+Date: Mon, 4 Aug 2014 14:16:06 +0000
+Subject: [GenABEL-dev] Population Mean and Variance
+Message-ID: <244CF001646FF74FB34F372310A332C501155F99@MBX-S2.rwth-ad.de>
+
+Hi all,
+
+I have the following dilemma and possible solution, hope I can get 1 or 2 responses.
+Dilemma:
+There is an overall population of N individuals.
+For a set of SNP's X and Traits Y there will be data missing for some X or Y depending on a set of individuals in N. This is normal/expected.
+For two different pairs of X, Y, depending on the missing values, the effective population becomes N->n smaller. Two different pairs X,Y wont have the same effective population participating in the calculation of Beta, n1 != n2. This is normal/expected.
+After doing the regression and when calculating the t-statistic, MEAN and VARIANCE of X,Y have to be calculated.
+Omicabel does this once during the loading of the data, since it assumes that any missing's will become valid population samples by replacing them with the avg and therefore all analyses will have the same n1=n2=ni=N.  This is normal/expected.
+With noMM and they way I handle missing data, all n1 !=n2 !=ni != N. I still wish to compute avg and variances only once during load time. I do not wish to calculate the mean/variance of the sample population once for every subset of n. This is not only time-consuming being expensive (since it has to be recalculated for each pair of X,Y), but also bad for the evaluation of the regression. The regression is evaluated using the t-statistic (p-value has a 1-1 relationship with it so I will stick to the t-stat for this discussion). The t-stat requires GOOD estimates of avg(X), avg(Y), var(X), var(Y). The fundamentals of the best estimates (BLUE) prefer bigger sample populations for the calculations of the avg/var. But if I only take into account n1 instead of N, my estimate will be less accurate, and so will be the evaluation of the regression through the t-stat, which requires avg and variance.
+Solution:
+I can save a lot of computations by calculating them ONCE with a bigger population N and also give better estimates (population size N > n). This might sound controversial at first, but it is already being done by omicabel. The fact that for a specific pair of X,Y n<<N wont invalidate a t-stat using N instead of n. If I can better estimate avg(X) using all X data available then the resulting evaluation of t-stat will be better. This of-course as long as the user understands that any data not excluded by means of the exclusion list, will be considered valid as part of the population of interest with size N.
+For example, for a dataset where men and women are present and a trait Y has to be correlated with their age: only Women are of interest for the correlation, the MEN have to be excluded by an exclusion list and the user shall not set their trait Y to NaN to simulate exclusion. The population of interest is women in this example, so even if there are a few missings in Y for women, the avg(AGE_WOMEN) will be calculated with all available present data N, and not the subset n from only the present data of the relation X,Y. This will still generate the standard missing data correlation of the slope beta, but during the evaluation using t-stat, the evaluation will have at its disposal a better estimate of avg(Y). Men had to be excluded using the exclusion list and not forced missing data.
+
+I need to underline the importance of the user knowing that any data in the analysis will be considered as part of the population of interest, so that the assumption that avg using N is better than n. Also, note that this is crucial to avoid having to recompute BAD estimates of avg and var for every pair of X and Y.
+
+Is this something reasonable? are there are any theoretical or practical objections?
+
+Any questions let me know!
+
+Alvaro Frank
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140804/68f46b34/attachment.html>
+
+From lennart at karssen.org  Wed Aug  6 16:48:41 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 06 Aug 2014 16:48:41 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1785 - pkg/ProbABEL/doc
+In-Reply-To: <20140804221456.A5800186726@r-forge.r-project.org>
+References: <20140804221456.A5800186726@r-forge.r-project.org>
+Message-ID: <53E24049.9030504@karssen.org>
+
+Hi Maarten,
+
+Thanks! That is indeed important information!
+
+
+Lennart.
+
+On 05-08-14 00:14, noreply at r-forge.r-project.org wrote:
+> Author: maartenk
+> Date: 2014-08-05 00:14:56 +0200 (Tue, 05 Aug 2014)
+> New Revision: 1785
+> 
+> Modified:
+>    pkg/ProbABEL/doc/ChangeLog
+> Log:
+> addded speedups I made to changelog(benchmarked 0.4.3 and 0.50 5 times alternating on a Ivy Bridge CPU,files are stored on a ramdisk, timings are from build it timers and overall timing from GNU time,using EIGEN 3.2.0 )
+> 
+> Modified: pkg/ProbABEL/doc/ChangeLog
+> ===================================================================
+> --- pkg/ProbABEL/doc/ChangeLog	2014-07-30 21:45:28 UTC (rev 1784)
+> +++ pkg/ProbABEL/doc/ChangeLog	2014-08-04 22:14:56 UTC (rev 1785)
+> @@ -3,6 +3,14 @@
+>    Eigen has been removed.
+>  * Not-a-number values in the output are now printed as "NaN" instead of
+>    "nan".
+> +* Linear regression mmscore option is 2 times faster
+> +* Speedup of Linear regression:(measured with multiple runs with 2 covariates,
+> +  33815 SNP and 3485 people(using all) compares to v.0.4.3)
+> +** Reading mldose/mlprob files 14 times faster 
+> +** Calculation of regression is more than 3.5 faster
+> +** Overall runtime using above settings is 5
+> +* Handles multiple variants of NaN (NA,Na,Nan,na,nan) correct while reading of
+> +  mldose/mlprob files
+>  
+>  
+>  ***** v.0.4.3 (2014.04.01)
+> 
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140806/8a479973/attachment.sig>
+
+From lennart at karssen.org  Wed Aug  6 17:14:56 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 06 Aug 2014 17:14:56 +0200
+Subject: [GenABEL-dev] Population Mean and Variance
+In-Reply-To: <244CF001646FF74FB34F372310A332C501155F99@MBX-S2.rwth-ad.de>
+References: <244CF001646FF74FB34F372310A332C501155F99@MBX-S2.rwth-ad.de>
+Message-ID: <53E24670.8020408@karssen.org>
+
+Hi Alvaro,
+
+On 04-08-14 16:16, Frank, Alvaro Jesus wrote:
+> Hi all,
+> 
+> I have the following dilemma and possible solution, hope I can get 1 or
+> 2 responses.
+> *Dilemma*:
+>
+
+(some text removed)
+
+
+> With noMM and they way I handle missing data, all n1 !=n2 !=ni != N. I
+> still wish to compute avg and variances only once during load time. I do
+> not wish to calculate the mean/variance of the sample population once
+> for every subset of n. This is not only time-consuming being expensive
+> (since it has to be recalculated for each pair of X,Y), but also bad for
+> the evaluation of the regression. The regression is evaluated using the
+> t-statistic (p-value has a 1-1 relationship with it so I will stick to
+> the t-stat for this discussion). The t-stat requires GOOD estimates of
+> avg(X), avg(Y), var(X), var(Y). The fundamentals of the best estimates
+> (BLUE) prefer bigger sample populations for the calculations of the
+> avg/var. But if I only take into account n1 instead of N, my estimate
+> will be less accurate, and so will be the evaluation of the regression
+> through the t-stat, which requires avg and variance.
+
+My first thought was that usually n1 is not << N (not much missing
+phenotype data. However, with increasing numbers of Omics measured
+usually not all samples are actually measured.
+
+Let's assume that N is the number of samples for which genetic (imputed)
+data is present. I'd say that this is always the largest number of
+samples, newer omics data (Y) may only be present for a subset n_i of N.
+I can easily see that only 1/3 of N has another omics measured (n_i/N =
+0.33).
+This is (almost) what you mean, right? I say almost, because you allow
+for missing X as well, but I don't think that after imputation there
+will be missing X. Let's say that a study has basic phenotype data (i.e.
+height, BMI) on 8000 people. If they have (imputed) genetic data on 7500
+people, then that is the number we care about. Right? Genomics is our X
+data. So missing X should not occur. Of course, a missing Y for a given
+X is very much possible.
+
+
+In principle you know n_i and N at data load time. Maybe this is the
+place to add a warning if n_i/N dives below a certain threshold?
+
+> *Solution*:
+> I can save a lot of computations by calculating them ONCE with a bigger
+> population N and also give better estimates (population size N > n).
+> This might sound controversial at first, but it is already being done by
+> omicabel. The fact that for a specific pair of X,Y n<<N wont invalidate
+> a t-stat using N instead of n. If I can better estimate avg(X) using all
+> X data available then the resulting evaluation of t-stat will be better.
+> This of-course as long as the user understands that any data not
+> excluded by means of the exclusion list, will be considered valid as
+> part of the population of interest with size N.
+> For example, for a dataset where men and women are present and a trait Y
+> has to be correlated with their age: only Women are of interest for the
+> correlation, the MEN have to be excluded by an exclusion list and the
+> user shall not set their trait Y to NaN to simulate exclusion.
+
+This is important information that you should put in the manual. If it
+is in the manual then we can assume people read it (if they don't, I
+don't feel responsible for their negligence).
+
+> The
+> population of interest is women in this example, so even if there are a
+> few missings in Y for women, the avg(AGE_WOMEN) will be calculated with
+> all available present data N, and not the subset n from only the present
+> data of the relation X,Y. This will still generate the standard missing
+> data correlation of the slope beta, but during the evaluation using
+> t-stat, the evaluation will have at its disposal a better estimate of
+> avg(Y). Men had to be excluded using the exclusion list and not forced
+> missing data.
+> 
+> I need to underline the importance of the user knowing that any data in
+> the analysis will be considered as part of the population of interest,
+> so that the assumption that avg using N is better than n.
+
+Again, this is something to put in the documentation. Maybe there should
+be a chapter/section containing a list of these important requirements
+(so they are not (only) buried in the main text).
+
+> Also, note
+> that this is crucial to avoid having to recompute BAD estimates of avg
+> and var for every pair of X and Y.
+> 
+> Is this something reasonable? are there are any theoretical or practical
+> objections?
+> 
+> Any questions let me know!
+> 
+> Alvaro Frank
+
+
+Best,
+
+Lennart.
+
+> 
+> 
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140806/05c38a33/attachment.sig>
+
+From lennart at karssen.org  Sun Aug 10 17:11:35 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Sun, 10 Aug 2014 17:11:35 +0200
+Subject: [GenABEL-dev] MixABEL compilation
+Message-ID: <53E78BA7.6040702@karssen.org>
+
+Hi Maarten,
+
+I seem to remember that you compiled MixABEL a couple of months ago. Did
+you use the version on CRAN or the one from SVN?
+
+We tried to install the CRAN version today and it failed with a GCC
+error (we needed to add -fpermissive to src/Makevars to fix it), but
+building from SVN currently fails miserably (I presume because of the
+stricter CRAN checks).
+How did you handle this?
+
+
+Best,
+
+Lennart.
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140810/0a39dfc6/attachment.sig>
+
+From kooyman at gmail.com  Sun Aug 10 21:33:09 2014
+From: kooyman at gmail.com (Maarten Kooyman)
+Date: Sun, 10 Aug 2014 21:33:09 +0200
+Subject: [GenABEL-dev] MixABEL compilation
+In-Reply-To: <53E78BA7.6040702@karssen.org>
+References: <53E78BA7.6040702@karssen.org>
+Message-ID: <53E7C8F5.3020907@gmail.com>
+
+Hi Lennart,
+
+I did install MixABEL from the file MixABEL_0.1-2.tar.gz under R 2.15. I 
+think I got it from Nicola, but I can't recall exactly.
+
+I tried to install the file under R 3.1.0 (R CMD INSTALL 
+MixABEL_0.1-2.tar.gz ) and it failed (after same compiler warning) with:
+
+installing to /home/mkooyman/R/x86_64-pc-linux-gnu-library/3.1/MixABEL/libs
+** R
+** inst
+** preparing package for lazy loading
+Error : .onAttach failed in attachNamespace() for 'DatABEL', details:
+   call: if (pkgVersion != cranVersion) {
+   error: argument is of length zero
+Error : package ?DatABEL? could not be loaded
+ERROR: lazy loading failed for package ?MixABEL?
+* removing ?/home/mkooyman/R/x86_64-pc-linux-gnu-library/3.1/MixABEL?
+
+Kind regards,
+
+Maarten
+
+
+On 10-08-14 17:11, L.C. Karssen wrote:
+> Hi Maarten,
+>
+> I seem to remember that you compiled MixABEL a couple of months ago. Did
+> you use the version on CRAN or the one from SVN?
+>
+> We tried to install the CRAN version today and it failed with a GCC
+> error (we needed to add -fpermissive to src/Makevars to fix it), but
+> building from SVN currently fails miserably (I presume because of the
+> stricter CRAN checks).
+> How did you handle this?
+>
+>
+> Best,
+>
+> Lennart.
+
+
+From darthastu at gmail.com  Mon Aug 11 09:29:01 2014
+From: darthastu at gmail.com (Nicola Pirastu)
+Date: Mon, 11 Aug 2014 09:29:01 +0200
+Subject: [GenABEL-dev] MixABEL compilation
+In-Reply-To: <53E7C8F5.3020907@gmail.com>
+References: <53E78BA7.6040702@karssen.org> <53E7C8F5.3020907@gmail.com>
+Message-ID: <6724A6E9-A8A1-4C5D-ABDC-8908CF4BE3F5@gmail.com>
+
+Hi,
+
+I have a working version which I got from Yakov, which we are still using, We have been using it on the latest R so it should compile anywhere. 
+I think that the error Maarten gets is still the one linked to the check version of DatABEL.
+I can send it to you if you like.
+
+Best.
+
+Nicola
+
+
+Il giorno 10/ago/2014, alle ore 21:33, Maarten Kooyman <kooyman at gmail.com> ha scritto:
+
+> Hi Lennart,
+> 
+> I did install MixABEL from the file MixABEL_0.1-2.tar.gz under R 2.15. I think I got it from Nicola, but I can't recall exactly.
+> 
+> I tried to install the file under R 3.1.0 (R CMD INSTALL MixABEL_0.1-2.tar.gz ) and it failed (after same compiler warning) with:
+> 
+> installing to /home/mkooyman/R/x86_64-pc-linux-gnu-library/3.1/MixABEL/libs
+> ** R
+> ** inst
+> ** preparing package for lazy loading
+> Error : .onAttach failed in attachNamespace() for 'DatABEL', details:
+>  call: if (pkgVersion != cranVersion) {
+>  error: argument is of length zero
+> Error : package ?DatABEL? could not be loaded
+> ERROR: lazy loading failed for package ?MixABEL?
+> * removing ?/home/mkooyman/R/x86_64-pc-linux-gnu-library/3.1/MixABEL?
+> 
+> Kind regards,
+> 
+> Maarten
+> 
+> 
+> On 10-08-14 17:11, L.C. Karssen wrote:
+>> Hi Maarten,
+>> 
+>> I seem to remember that you compiled MixABEL a couple of months ago. Did
+>> you use the version on CRAN or the one from SVN?
+>> 
+>> We tried to install the CRAN version today and it failed with a GCC
+>> error (we needed to add -fpermissive to src/Makevars to fix it), but
+>> building from SVN currently fails miserably (I presume because of the
+>> stricter CRAN checks).
+>> How did you handle this?
+>> 
+>> 
+>> Best,
+>> 
+>> Lennart.
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+
+
+From lennart at karssen.org  Mon Aug 11 13:10:31 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Mon, 11 Aug 2014 13:10:31 +0200
+Subject: [GenABEL-dev] MixABEL compilation
+In-Reply-To: <6724A6E9-A8A1-4C5D-ABDC-8908CF4BE3F5@gmail.com>
+References: <53E78BA7.6040702@karssen.org> <53E7C8F5.3020907@gmail.com>
+ <6724A6E9-A8A1-4C5D-ABDC-8908CF4BE3F5@gmail.com>
+Message-ID: <53E8A4A7.60000@karssen.org>
+
+Thanks Nicola and Maarten,
+
+I'm currently sitting in the same room with Yakov :-). We managed to get
+MixABEL installed by downloading the CRAN version and adding the
+-fpermissive GCC option to the Makevars file and rebuild the package.
+As you may have noticed, I also committed several fixes to MixABEL
+trunk, but R CMD check doesn't finish without errors yet...
+
+
+Lennart.
+
+On 11-08-14 09:29, Nicola Pirastu wrote:
+> Hi,
+> 
+> I have a working version which I got from Yakov, which we are still using, We have been using it on the latest R so it should compile anywhere. 
+> I think that the error Maarten gets is still the one linked to the check version of DatABEL.
+> I can send it to you if you like.
+> 
+> Best.
+> 
+> Nicola
+> 
+> 
+> Il giorno 10/ago/2014, alle ore 21:33, Maarten Kooyman <kooyman at gmail.com> ha scritto:
+> 
+>> Hi Lennart,
+>>
+>> I did install MixABEL from the file MixABEL_0.1-2.tar.gz under R 2.15. I think I got it from Nicola, but I can't recall exactly.
+>>
+>> I tried to install the file under R 3.1.0 (R CMD INSTALL MixABEL_0.1-2.tar.gz ) and it failed (after same compiler warning) with:
+>>
+>> installing to /home/mkooyman/R/x86_64-pc-linux-gnu-library/3.1/MixABEL/libs
+>> ** R
+>> ** inst
+>> ** preparing package for lazy loading
+>> Error : .onAttach failed in attachNamespace() for 'DatABEL', details:
+>>  call: if (pkgVersion != cranVersion) {
+>>  error: argument is of length zero
+>> Error : package ?DatABEL? could not be loaded
+>> ERROR: lazy loading failed for package ?MixABEL?
+>> * removing ?/home/mkooyman/R/x86_64-pc-linux-gnu-library/3.1/MixABEL?
+>>
+>> Kind regards,
+>>
+>> Maarten
+>>
+>>
+>> On 10-08-14 17:11, L.C. Karssen wrote:
+>>> Hi Maarten,
+>>>
+>>> I seem to remember that you compiled MixABEL a couple of months ago. Did
+>>> you use the version on CRAN or the one from SVN?
+>>>
+>>> We tried to install the CRAN version today and it failed with a GCC
+>>> error (we needed to add -fpermissive to src/Makevars to fix it), but
+>>> building from SVN currently fails miserably (I presume because of the
+>>> stricter CRAN checks).
+>>> How did you handle this?
+>>>
+>>>
+>>> Best,
+>>>
+>>> Lennart.
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140811/1252a7bb/attachment.sig>
+
+From lennart at karssen.org  Mon Aug 11 17:10:45 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Mon, 11 Aug 2014 17:10:45 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1773 - pkg/DatABEL
+In-Reply-To: <53D90743.4050609@karssen.org>
+References: <20140728100451.63272187620@r-forge.r-project.org>
+ <53D62182.1070306@karssen.org> <53D6FC47.5030107@mail.ru>
+ <53D75689.5010005@karssen.org> <53D90743.4050609@karssen.org>
+Message-ID: <53E8DCF5.1000308@karssen.org>
+
+Hi Maksim,
+
+I just noticed that SVN doesn't have a tag yet for DatABEL v0.9-4.1 that
+you submitted to CRAN recently. Could you please add a tag? If you've
+never created tags before, please read the tutorial at
+http://genabel.r-forge.r-project.org/tutHowToMakeTags.html. Feel free to
+contact me if you have any questions.
+
+
+Best regards,
+
+Lennart.
+
+
+On 30-07-14 16:54, L.C. Karssen wrote:
+> Hi Maksim,
+> 
+> I just noticed that CRAN lists DatABEL v0.9-4.1, whereas you set the
+> version number in the DESCRIPTION file to 0.9-5 in one of your later
+> commits.
+> 
+> When I installed v0.9-4.1 and loaded it in R I did get the old (March
+> 12) package date, which you fixed in r1779 and r1780.
+> 
+> Maybe you submitted an older version of the tar.gz file to CRAN, or did
+> you submit multiple versions and is 0.9-5 not processed by CRAN yet?
+> 
+> 
+> Best regards,
+> 
+> Lennart.
+> 
+> 
+> On 29-07-14 10:08, L.C. Karssen wrote:
+>> Hi Maksim,
+>>
+>> On 29-07-14 03:43, Maksim Struchalin wrote:
+>>> Hi Lennart,
+>>>
+>>> I changed the numbering. Looks like the forth digit is for internal use
+>>> during 'R CMD check'.
+>>
+>> Aha. I didn't know that.
+>>
+>>>
+>>> There were no 'NOTE's relating documentation so it should be ok I guess.
+>>
+>> Great! Let's see what CRAN has to say.
+>>
+>>
+>> Thanks for uploading the fix so quickly,
+>>
+>> Lennart.
+>>
+>>>
+>>> best,
+>>> Maksim
+>>>
+>>>
+>>> On 28/07/2014 17:10, L.C. Karssen wrote:
+>>>> Hi Maksim,
+>>>>
+>>>> On 28-07-14 12:04, noreply at r-forge.r-project.org wrote:
+>>>>> Author: maksim
+>>>>> Date: 2014-07-28 12:04:50 +0200 (Mon, 28 Jul 2014)
+>>>>> New Revision: 1773
+>>>>>
+>>>>> Modified:
+>>>>>    pkg/DatABEL/DESCRIPTION
+>>>>> Log:
+>>>>> Prepare for submission to CRAN
+>>>>>
+>>>>> Modified: pkg/DatABEL/DESCRIPTION
+>>>>> ===================================================================
+>>>>> --- pkg/DatABEL/DESCRIPTION	2014-07-28 09:41:46 UTC (rev 1772)
+>>>>> +++ pkg/DatABEL/DESCRIPTION	2014-07-28 10:04:50 UTC (rev 1773)
+>>>>> @@ -1,9 +1,9 @@
+>>>>>  Package: DatABEL
+>>>>>  Type: Package
+>>>>>  Title: file-based access to large matrices stored on HDD in binary format
+>>>>> -Version: 0.9-4
+>>>>> -Date: 2013-03-12
+>>>>> -Author: Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel Kempenaar
+>>>>> +Version: 0.9-4.1
+>>>> I'm not sure if CRAN allows this type of numbering (with a 4th digit). I
+>>>> seem to remember it was not allowed.
+>>>> My suggestion would be to go for 0.9-5.
+>>>>
+>>>>
+>>>> Also, I hope my messing around with the documentation (which I still
+>>>> haven't finished :-(, unfortunately) will not result in big problems
+>>>> when running the CRAN checks.
+>>>>
+>>>> Let me know if you need help.
+>>>>
+>>>>
+>>>> Best,
+>>>>
+>>>> Lennart.
+>>>>
+>>>>> +Date: 2014-07-28
+>>>>> +Author: Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel Kempenaar, Maksim Struchalin
+>>>>>  Maintainer: Yurii Aulchenko <yurii at bionet.nsc.ru>
+>>>>>  Depends:
+>>>>>      R (>= 2.4.0),
+>>>>>
+>>>>> _______________________________________________
+>>>>> Genabel-commits mailing list
+>>>>> Genabel-commits at lists.r-forge.r-project.org
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+>>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> genabel-devel mailing list
+>>>> genabel-devel at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> genabel-devel mailing list
+>>> genabel-devel at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>
+>>
+>>
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140811/4cbeb482/attachment.sig>
+
+From m.v.struchalin at mail.ru  Mon Aug 11 18:25:25 2014
+From: m.v.struchalin at mail.ru (Maksim Struchalin)
+Date: Mon, 11 Aug 2014 23:25:25 +0700
+Subject: [GenABEL-dev] [Genabel-commits] r1773 - pkg/DatABEL
+In-Reply-To: <53E8DCF5.1000308@karssen.org>
+References: <20140728100451.63272187620@r-forge.r-project.org>
+ <53D62182.1070306@karssen.org> <53D6FC47.5030107@mail.ru>
+ <53D75689.5010005@karssen.org> <53D90743.4050609@karssen.org>
+ <53E8DCF5.1000308@karssen.org>
+Message-ID: <53E8EE75.4050109@mail.ru>
+
+Hi Lennart,
+
+I submited version 0.9-5. CRAN people disliked that there are no 
+help/manual in DatABEL for some functions and did not proceed with this 
+version further. As I understand, you are working on it now. Do you plan 
+to finish it soon or should I submit DatABEL with old helps/mans?
+
+Best,
+Maksim
+
+
+
+
+8/11/2014 10:10 PM, L.C. Karssen ?????:
+> Hi Maksim,
+>
+> I just noticed that SVN doesn't have a tag yet for DatABEL v0.9-4.1 that
+> you submitted to CRAN recently. Could you please add a tag? If you've
+> never created tags before, please read the tutorial at
+> http://genabel.r-forge.r-project.org/tutHowToMakeTags.html. Feel free to
+> contact me if you have any questions.
+>
+>
+> Best regards,
+>
+> Lennart.
+>
+>
+> On 30-07-14 16:54, L.C. Karssen wrote:
+>> Hi Maksim,
+>>
+>> I just noticed that CRAN lists DatABEL v0.9-4.1, whereas you set the
+>> version number in the DESCRIPTION file to 0.9-5 in one of your later
+>> commits.
+>>
+>> When I installed v0.9-4.1 and loaded it in R I did get the old (March
+>> 12) package date, which you fixed in r1779 and r1780.
+>>
+>> Maybe you submitted an older version of the tar.gz file to CRAN, or did
+>> you submit multiple versions and is 0.9-5 not processed by CRAN yet?
+>>
+>>
+>> Best regards,
+>>
+>> Lennart.
+>>
+>>
+>> On 29-07-14 10:08, L.C. Karssen wrote:
+>>> Hi Maksim,
+>>>
+>>> On 29-07-14 03:43, Maksim Struchalin wrote:
+>>>> Hi Lennart,
+>>>>
+>>>> I changed the numbering. Looks like the forth digit is for internal use
+>>>> during 'R CMD check'.
+>>> Aha. I didn't know that.
+>>>
+>>>> There were no 'NOTE's relating documentation so it should be ok I guess.
+>>> Great! Let's see what CRAN has to say.
+>>>
+>>>
+>>> Thanks for uploading the fix so quickly,
+>>>
+>>> Lennart.
+>>>
+>>>> best,
+>>>> Maksim
+>>>>
+>>>>
+>>>> On 28/07/2014 17:10, L.C. Karssen wrote:
+>>>>> Hi Maksim,
+>>>>>
+>>>>> On 28-07-14 12:04, noreply at r-forge.r-project.org wrote:
+>>>>>> Author: maksim
+>>>>>> Date: 2014-07-28 12:04:50 +0200 (Mon, 28 Jul 2014)
+>>>>>> New Revision: 1773
+>>>>>>
+>>>>>> Modified:
+>>>>>>     pkg/DatABEL/DESCRIPTION
+>>>>>> Log:
+>>>>>> Prepare for submission to CRAN
+>>>>>>
+>>>>>> Modified: pkg/DatABEL/DESCRIPTION
+>>>>>> ===================================================================
+>>>>>> --- pkg/DatABEL/DESCRIPTION	2014-07-28 09:41:46 UTC (rev 1772)
+>>>>>> +++ pkg/DatABEL/DESCRIPTION	2014-07-28 10:04:50 UTC (rev 1773)
+>>>>>> @@ -1,9 +1,9 @@
+>>>>>>   Package: DatABEL
+>>>>>>   Type: Package
+>>>>>>   Title: file-based access to large matrices stored on HDD in binary format
+>>>>>> -Version: 0.9-4
+>>>>>> -Date: 2013-03-12
+>>>>>> -Author: Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel Kempenaar
+>>>>>> +Version: 0.9-4.1
+>>>>> I'm not sure if CRAN allows this type of numbering (with a 4th digit). I
+>>>>> seem to remember it was not allowed.
+>>>>> My suggestion would be to go for 0.9-5.
+>>>>>
+>>>>>
+>>>>> Also, I hope my messing around with the documentation (which I still
+>>>>> haven't finished :-(, unfortunately) will not result in big problems
+>>>>> when running the CRAN checks.
+>>>>>
+>>>>> Let me know if you need help.
+>>>>>
+>>>>>
+>>>>> Best,
+>>>>>
+>>>>> Lennart.
+>>>>>
+>>>>>> +Date: 2014-07-28
+>>>>>> +Author: Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel Kempenaar, Maksim Struchalin
+>>>>>>   Maintainer: Yurii Aulchenko <yurii at bionet.nsc.ru>
+>>>>>>   Depends:
+>>>>>>       R (>= 2.4.0),
+>>>>>>
+>>>>>> _______________________________________________
+>>>>>> Genabel-commits mailing list
+>>>>>> Genabel-commits at lists.r-forge.r-project.org
+>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+>>>>>>
+>>>>>
+>>>>> _______________________________________________
+>>>>> genabel-devel mailing list
+>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> genabel-devel mailing list
+>>>> genabel-devel at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> genabel-devel mailing list
+>>> genabel-devel at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>
+>>
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>
+
+
+---
+This email is free from viruses and malware because avast! Antivirus protection is active.
+http://www.avast.com
+
+
+From lennart at karssen.org  Tue Aug 12 11:57:02 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Tue, 12 Aug 2014 11:57:02 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1773 - pkg/DatABEL
+In-Reply-To: <53E8EE75.4050109@mail.ru>
+References: <20140728100451.63272187620@r-forge.r-project.org>
+ <53D62182.1070306@karssen.org> <53D6FC47.5030107@mail.ru>
+ <53D75689.5010005@karssen.org> <53D90743.4050609@karssen.org>
+ <53E8DCF5.1000308@karssen.org> <53E8EE75.4050109@mail.ru>
+Message-ID: <53E9E4EE.5050209@karssen.org>
+
+Hi Maksim,
+
+On 11-08-14 18:25, Maksim Struchalin wrote:
+> Hi Lennart,
+> 
+> I submited version 0.9-5. CRAN people disliked that there are no
+> help/manual in DatABEL for some functions and did not proceed with this
+> version further.
+
+I know about 0.9-5, but I think it is good practice to have a tag for
+each version that is accepted in CRAN, so we can always go back and see
+what exeactly was in that package.
+
+> As I understand, you are working on it now. Do you plan
+> to finish it soon or should I submit DatABEL with old helps/mans?
+
+I just submitted a bunch of changes. The documentation errors/warnings
+are now gone. Could try to build the package? I hope all goes without
+warnings now.
+
+
+Lennart.
+
+> 
+> Best,
+> Maksim
+> 
+> 
+> 
+> 
+> 8/11/2014 10:10 PM, L.C. Karssen ?????:
+>> Hi Maksim,
+>>
+>> I just noticed that SVN doesn't have a tag yet for DatABEL v0.9-4.1 that
+>> you submitted to CRAN recently. Could you please add a tag? If you've
+>> never created tags before, please read the tutorial at
+>> http://genabel.r-forge.r-project.org/tutHowToMakeTags.html. Feel free to
+>> contact me if you have any questions.
+>>
+>>
+>> Best regards,
+>>
+>> Lennart.
+>>
+>>
+>> On 30-07-14 16:54, L.C. Karssen wrote:
+>>> Hi Maksim,
+>>>
+>>> I just noticed that CRAN lists DatABEL v0.9-4.1, whereas you set the
+>>> version number in the DESCRIPTION file to 0.9-5 in one of your later
+>>> commits.
+>>>
+>>> When I installed v0.9-4.1 and loaded it in R I did get the old (March
+>>> 12) package date, which you fixed in r1779 and r1780.
+>>>
+>>> Maybe you submitted an older version of the tar.gz file to CRAN, or did
+>>> you submit multiple versions and is 0.9-5 not processed by CRAN yet?
+>>>
+>>>
+>>> Best regards,
+>>>
+>>> Lennart.
+>>>
+>>>
+>>> On 29-07-14 10:08, L.C. Karssen wrote:
+>>>> Hi Maksim,
+>>>>
+>>>> On 29-07-14 03:43, Maksim Struchalin wrote:
+>>>>> Hi Lennart,
+>>>>>
+>>>>> I changed the numbering. Looks like the forth digit is for internal
+>>>>> use
+>>>>> during 'R CMD check'.
+>>>> Aha. I didn't know that.
+>>>>
+>>>>> There were no 'NOTE's relating documentation so it should be ok I
+>>>>> guess.
+>>>> Great! Let's see what CRAN has to say.
+>>>>
+>>>>
+>>>> Thanks for uploading the fix so quickly,
+>>>>
+>>>> Lennart.
+>>>>
+>>>>> best,
+>>>>> Maksim
+>>>>>
+>>>>>
+>>>>> On 28/07/2014 17:10, L.C. Karssen wrote:
+>>>>>> Hi Maksim,
+>>>>>>
+>>>>>> On 28-07-14 12:04, noreply at r-forge.r-project.org wrote:
+>>>>>>> Author: maksim
+>>>>>>> Date: 2014-07-28 12:04:50 +0200 (Mon, 28 Jul 2014)
+>>>>>>> New Revision: 1773
+>>>>>>>
+>>>>>>> Modified:
+>>>>>>>     pkg/DatABEL/DESCRIPTION
+>>>>>>> Log:
+>>>>>>> Prepare for submission to CRAN
+>>>>>>>
+>>>>>>> Modified: pkg/DatABEL/DESCRIPTION
+>>>>>>> ===================================================================
+>>>>>>> --- pkg/DatABEL/DESCRIPTION    2014-07-28 09:41:46 UTC (rev 1772)
+>>>>>>> +++ pkg/DatABEL/DESCRIPTION    2014-07-28 10:04:50 UTC (rev 1773)
+>>>>>>> @@ -1,9 +1,9 @@
+>>>>>>>   Package: DatABEL
+>>>>>>>   Type: Package
+>>>>>>>   Title: file-based access to large matrices stored on HDD in
+>>>>>>> binary format
+>>>>>>> -Version: 0.9-4
+>>>>>>> -Date: 2013-03-12
+>>>>>>> -Author: Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel
+>>>>>>> Kempenaar
+>>>>>>> +Version: 0.9-4.1
+>>>>>> I'm not sure if CRAN allows this type of numbering (with a 4th
+>>>>>> digit). I
+>>>>>> seem to remember it was not allowed.
+>>>>>> My suggestion would be to go for 0.9-5.
+>>>>>>
+>>>>>>
+>>>>>> Also, I hope my messing around with the documentation (which I still
+>>>>>> haven't finished :-(, unfortunately) will not result in big problems
+>>>>>> when running the CRAN checks.
+>>>>>>
+>>>>>> Let me know if you need help.
+>>>>>>
+>>>>>>
+>>>>>> Best,
+>>>>>>
+>>>>>> Lennart.
+>>>>>>
+>>>>>>> +Date: 2014-07-28
+>>>>>>> +Author: Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel
+>>>>>>> Kempenaar, Maksim Struchalin
+>>>>>>>   Maintainer: Yurii Aulchenko <yurii at bionet.nsc.ru>
+>>>>>>>   Depends:
+>>>>>>>       R (>= 2.4.0),
+>>>>>>>
+>>>>>>> _______________________________________________
+>>>>>>> Genabel-commits mailing list
+>>>>>>> Genabel-commits at lists.r-forge.r-project.org
+>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+>>>>>>>
+>>>>>>>
+>>>>>>
+>>>>>> _______________________________________________
+>>>>>> genabel-devel mailing list
+>>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>>>>
+>>>>>
+>>>>>
+>>>>> _______________________________________________
+>>>>> genabel-devel mailing list
+>>>>> genabel-devel at lists.r-forge.r-project.org
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>>>
+>>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> genabel-devel mailing list
+>>>> genabel-devel at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>>
+>>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> genabel-devel mailing list
+>>> genabel-devel at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>>
+>>>
+> 
+> 
+> ---
+> This email is free from viruses and malware because avast! Antivirus
+> protection is active.
+> http://www.avast.com
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140812/e778ab52/attachment.sig>
+
+From lennart at karssen.org  Fri Aug 22 14:29:02 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 22 Aug 2014 14:29:02 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1803 - pkg/ProbABEL/src
+In-Reply-To: <20140821055738.830231874D2@r-forge.r-project.org>
+References: <20140821055738.830231874D2@r-forge.r-project.org>
+Message-ID: <53F7378E.7050208@karssen.org>
+
+Hi Maksim,
+
+Thank you for fixing bug #5883!
+
+I noticed that the patch wasn't following our coding style guidelines
+(see http://genabel.r-forge.r-project.org/codingstyle.html). For example
+you had a couple of very long lines and no spaces around operators (i.e.
+<<). I've fixed those in r1805.
+
+Regarding the output that print I have a few questions. If I run
+ProbABLE now, I get this (partial) output:
+
+Actual number of people in phenofile = 200; using all of these
+nphenocols=4
+i=3, is_interaction_excluded=0, interaction=1, n_model_terms=2
+model=( height ) ~ mu + sex + age
+Linear model: ( height ) ~ mu + sex + age + SNP_A1 + sex*SNP_A1
+
+Can you please explain why you print the variables in the line that
+starts with "i=3"? Is that just debug output that shouldn't have been
+committed?
+And about the line starting with "model=": is that also debug output
+(the next line prints the same information)?
+
+
+Thanks for clearing this up,
+
+Lennart.
+
+On 21-08-14 07:57, noreply at r-forge.r-project.org wrote:
+> Author: maksim
+> Date: 2014-08-21 07:57:37 +0200 (Thu, 21 Aug 2014)
+> New Revision: 1803
+> 
+> Modified:
+>    pkg/ProbABEL/src/phedata.cpp
+> Log:
+> Fixed an issue with --interaction_only when ProbABEL reported wrong model (the same as for --intreaction) while analysis was done correctly for --interaction_only.
+> 
+> Modified: pkg/ProbABEL/src/phedata.cpp
+> ===================================================================
+> --- pkg/ProbABEL/src/phedata.cpp	2014-08-15 12:59:56 UTC (rev 1802)
+> +++ pkg/ProbABEL/src/phedata.cpp	2014-08-21 05:57:37 UTC (rev 1803)
+> @@ -27,6 +27,7 @@
+>  #include <fstream>
+>  #include <cstdarg>
+>  #include <cstdlib>
+> +#include <cstring>
+>  
+>  using std::cout;
+>  using std::cerr;
+> @@ -66,6 +67,7 @@
+>      std::ifstream myfile(fname);
+>      char *line = new char[BFS];
+>      char *tmp  = new char[BFS];
+> +    char *interaction_cov_name  = new char[BFS];
+>      noutcomes = noutc;
+>      is_interaction_excluded = false;
+>  
+> @@ -146,6 +148,11 @@
+>      model_terms[n_model_terms++] = "mu";
+>  #endif
+>  
+> +
+> +
+> +
+> +
+> +
+>      if (nphenocols > noutcomes + 1)
+>      {
+>          infile >> tmp;
+> @@ -154,12 +161,18 @@
+>          for (int i = (2 + noutcomes); i < nphenocols; i++)
+>          {
+>              infile >> tmp;
+> +            std::cout << "nphenocols="<<nphenocols<<"\n";
+> +            std::cout<<"i="<<i<<", is_interaction_excluded="<<is_interaction_excluded<<", interaction="<<interaction<<", n_model_terms="<<n_model_terms<<"\n";
+> +            if(n_model_terms == interaction  && is_interaction_excluded)
+> +               {
+> +               strcpy(interaction_cov_name, tmp);
+> +               continue;
+> +               }
+>  
+> -            // if(iscox && ) {if(n_model_terms+1 == interaction-1) {continue;} }
+> -            // else      {if(n_model_terms+1 == interaction) {continue;} }
+>              model = model + " + ";
+>              model = model + tmp;
+>              model_terms[n_model_terms++] = tmp;
+> +            std::cout << "model="<<model<<"\n";
+>          }
+>      }
+>      model = model + " + SNP_A1";
+> @@ -167,29 +180,27 @@
+>      {
+>          if (iscox)
+>          {
+> -            model = model + " + " + model_terms[interaction - 1] + "*SNP_A1";
+> +           if(!is_interaction_excluded) model = model + " + " + model_terms[interaction - 1] + "*SNP_A1";
+> +           else model = model + " + " + interaction_cov_name + "*SNP_A1";
+>          }
+>          else
+>          {
+> -            model = model + " + " + model_terms[interaction] + "*SNP_A1";
+> +            if(!is_interaction_excluded) model = model + " + " + model_terms[interaction] + "*SNP_A1";
+> +            else model = model + " + " + interaction_cov_name + "*SNP_A1";
+>          }
+>      }
+>      model_terms[n_model_terms++] = "SNP_A1";
+>  
+> -    if (is_interaction_excluded) // exclude covariates from covariate names
+> -    {
+> -        if (iscox)
+> -        {
+> -            std::cout << "model is running without "
+> -                      << model_terms[interaction - 1] << ", term\n";
+> -        }
+> -        else
+> -        {
+> -            std::cout << "model is running without " << model_terms[interaction]
+> -                      << ", term\n";
+> -        }
+> -    }
+>  
+> +
+> +
+> +
+> +
+> +
+> +
+> +
+> +
+> +
+>  #if LOGISTIC
+>      std::cout << "Logistic ";
+>  #elif LINEAR
+> 
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140822/83106273/attachment.sig>
+
+From lennart at karssen.org  Fri Aug 22 14:33:56 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 22 Aug 2014 14:33:56 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1803 - pkg/ProbABEL/src
+In-Reply-To: <20140821055738.830231874D2@r-forge.r-project.org>
+References: <20140821055738.830231874D2@r-forge.r-project.org>
+Message-ID: <53F738B4.8070602@karssen.org>
+
+Hi again Maksim,
+
+By the way, Jenkins informed me that you introduced a memory leak. See
+the line where you create the char[]. In this case I would simply use a
+C++ string. Much simpler, no memory leaks and since we're using
+std::cout also no problems when printing.
+
+
+Best,
+
+Lennart.
+
+On 21-08-14 07:57, noreply at r-forge.r-project.org wrote:
+> Author: maksim
+> Date: 2014-08-21 07:57:37 +0200 (Thu, 21 Aug 2014)
+> New Revision: 1803
+
+> Modified: pkg/ProbABEL/src/phedata.cpp
+> ===================================================================
+> --- pkg/ProbABEL/src/phedata.cpp	2014-08-15 12:59:56 UTC (rev 1802)
+> +++ pkg/ProbABEL/src/phedata.cpp	2014-08-21 05:57:37 UTC (rev 1803)
+> @@ -27,6 +27,7 @@
+>  #include <fstream>
+>  #include <cstdarg>
+>  #include <cstdlib>
+> +#include <cstring>
+>  
+>  using std::cout;
+>  using std::cerr;
+> @@ -66,6 +67,7 @@
+>      std::ifstream myfile(fname);
+>      char *line = new char[BFS];
+>      char *tmp  = new char[BFS];
+> +    char *interaction_cov_name  = new char[BFS];
+>      noutcomes = noutc;
+>      is_interaction_excluded = false;
+>  
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140822/395ca2aa/attachment.sig>
+
+From alvaro.frank at rwth-aachen.de  Wed Aug 27 16:37:32 2014
+From: alvaro.frank at rwth-aachen.de (Frank, Alvaro Jesus)
+Date: Wed, 27 Aug 2014 14:37:32 +0000
+Subject: [GenABEL-dev] impute2databel FLOAT
+Message-ID: <244CF001646FF74FB34F372310A332C5011571D3@MBX-S2.rwth-ad.de>
+
+Hi All,
+
+I am in the process of finishing the first USER usable version of omicabelnomm and would need help converting real data from impute2 to databel.
+
+The function impute2databel seems ok but I have no idea if it stores in FLOAT or DOUBLE the values.
+
+I found this on the mailing list, would it work?
+
+
+> owd<- setwd(pth)
+> fls<- list.files(pattern="^chr")
+> ufls<- unique(sapply(strsplit(fls, "_"), "[", 1))
+> for(i in ufls){
+>       of<- strsplit(i, "\\.")[[1]]
+>       of<- paste(of[1], tail(of, 1), sep=".")
+>       impute2databel(genofile = i,
+>                      samplefile = paste(i, "info", sep="_"),
+>                      outfile = of,
+>                      makeprob=TRUE, old=FALSE)
+> }
+> setwd(owd)
+
+Best,
+
+Alvaro
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140827/d7eb6e41/attachment.html>
+
+From alvaro.frank at rwth-aachen.de  Wed Aug 27 18:56:44 2014
+From: alvaro.frank at rwth-aachen.de (Frank, Alvaro Jesus)
+Date: Wed, 27 Aug 2014 16:56:44 +0000
+Subject: [GenABEL-dev] databel vs impute2 vs me
+Message-ID: <244CF001646FF74FB34F372310A332C5011571F9@MBX-S2.rwth-ad.de>
+
+Hi Lennart,
+
+I wanted to re-introduce the issue of compression, file sizes and formats.
+
+At the moment I am trying to use a a file in format impute2, which seems to code a lot of 0 1 and every now and then a 0. + 3digits.
+
+When converting such a file to databel, the size is clearly BIGGER, since (instead of using 1 byte for 1,0 s, like impute2) DATABEL will use 4bytes. Databel has no idea what is binary and what is not so codes all as floats/doubles.
+Never the less a compressed 7z of the databel format can reduce 200MBs to less than 4MBs.
+80MB of impute2 get compressed to 5Mbs in gz format and around 3MB in 7z format.
+
+Compression is already an option for databel as is.
+
+Now to the real issue, Compression of data SHOULD NEVER HAPPEN! (Decompression of data on the fly, (to analyze it) is just adding compute overhead (cpus are being used to decompress!))
+
+
+To deal with (not using compressed) output data I developed a small footprint format of the data and a program that reads it and outputs .txt human readable versions of the results (for subsets of the results). The binary custom version of the output is very aware of data and stores significant values (user defined) only, as well as required data to reproduce the entire output, independently of the source data used to produce it. This means that p values, t statistics and such can be recomputed with the outputfiles and only very minimal data is stored and virtually no compute time is required. As an extra, a .txt file is also produced automatically by omicabelnomm which contains significant data only (another parameter set by the user). The output binary data can then be used to produce new txt files according to different degrees of significance, as long as the data had been stored.
+
+For example, from 1000 Phe and 1000 SNP, 10^6 results are meant to be computed. from those only 0.1% are relevant/significant. The user says, display as txt  only P < 0.05 and store all results with P < 0.1. This is done. File sizes are minimal. User then comes in a week and wants to see not only what he had but perhaps only P < 0.0005. This results were stored. He also want to see P < 0.9 and those were stored too, so for both cases he receives new .txts with human readable format. If he wants to see all results above P >0.1, those were not stored.... so no luck there. Re-computation should not be an issue as it is FAST.
+
+That is just a sample of how to handle the "big data" problem, which I insist, is not a problem at all.
+The next issue is storing data like the one from impute2 I have encountered here.
+Is this kind of data normal? or are there situations where EVERY entry (90%+?) are floating point numbers? Are 3 digits after the . the maximum impute2 supports?
+If so, I can already envision a super "compressed" file format to contain this impute2 like data with megabytes instead of gygabytes/terabytes. What other formats are used for bot Y and X? (genotypes/phenotypes) Do they have same impute2 structure? I know there is non imputed datatypes, how do they look?
+
+Hope to commit the new omicabelnomm soon and will work on a real life sample usage too.
+
+Thank you for any help on the matter!
+
+-Alvaro
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140827/e1406274/attachment.html>
+

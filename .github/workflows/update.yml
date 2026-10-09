@@ -1,0 +1,47 @@
+name: Update Archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_redownload:
+        description: 'Force re-download all mbox files (not just new or current ones)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download rmail-parser
+        run: |
+          curl -sL -o rmail-parser \
+            "https://github.com/r-mailing-lists/rmail-parser/releases/latest/download/rmail-parser-linux-x86_64"
+          chmod +x rmail-parser
+
+      - name: Download aliases
+        run: |
+          curl -sL -o aliases.json \
+            "https://raw.githubusercontent.com/r-mailing-lists/rmail-parser/main/aliases.json" \
+            2>/dev/null || echo '{"aliases":[]}' > aliases.json
+
+      - name: Fetch and parse all lists
+        run: scripts/update.sh ${{ inputs.force_redownload && '--force' || '' }}
+        env:
+          ALIASES: aliases.json
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update archive $(date +%Y-%m-%d)"
+            git push
+          fi

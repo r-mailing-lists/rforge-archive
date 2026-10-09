@@ -1,0 +1,417 @@
+From fhertel at bigsss.uni-bremen.de  Sat Feb  5 14:46:12 2011
+From: fhertel at bigsss.uni-bremen.de (Florian Hertel)
+Date: Sat, 05 Feb 2011 14:46:12 +0100
+Subject: [Traminer-users] transition rates as substitution costs with HAM
+	metric in seqdistmc
+Message-ID: <4D4D54A4.4040800@bigsss.uni-bremen.de>
+
+  Hi all,
+
+first of all: thanks for TraMineR!
+
+I encountered a problem running a multiple sequence analyzes using the 
+HAM metric with substitution costs based on transition rates. I started 
+with creating a substitution cost matrix (scm) for each channel based on 
+the transition rates not allowing the rates to vary over the time. The 
+seqdistmc command (using the HAM metric) fed with my scm reported, that 
+the dimensions of the substitution matrix are not equal to the number of 
+episodes in my sequences. Thus, I created an array  replicating the 
+substitution cost matrix for each possible point in time. From the 
+report, I read that seqdistmc created a "time-varying substitution cost 
+matrix using 1 as a constant value", therefore abandoning my 
+substitution cost matrix. In order to achieve my goal I just used a DHD 
+metric based on my replicated substitution cost matrix which seemed to 
+work fine.
+
+Here a small example:
+
+dat25_1 <- matrix(c("HighCl", "LowCl", "LowCl",
+                   "LowCl", "HighCl", "LowCl",
+                   "HighCl", "LowCl", "HighCl"),
+                   3,3,dimnames=list(c("pers1","pers2","pers3"),
+                   c("class1","class2","class3")))
+dat25_2 <- matrix(c("BMW", "VW", "VW",
+                   "BMW", "BMW", "VW",
+                   "BMW", "VW", "VW"),
+                   3,3,dimnames=list(c("pers1","pers2","pers3"),
+                   c("car1","car2","car3")))
+
+seqdat1 <- seqdef(dat25_1)
+seqdat2 <- seqdef(dat25_2)
+
+subm1 <- seqsubm(seqdat1,method="TRATE",time.varying=FALSE)
+subm2 <- seqsubm(seqdat2,method="TRATE",time.varying=FALSE)
+
+subm1
+subm2
+
+
+# The first tral with error message
+seqdistmc(channels=list(seqdat1,seqdat2),method="HAM", sm=list(subm1,subm2))
+
+subm13 <- array(subm1,c(2,2,3),dimnames(subm1))
+subm23 <- array(subm2,c(2,2,3),dimnames(subm2))
+
+#The second trial, ignoring my sm list but using a constant value of 1 
+for all substitutions.
+seqdistmc(channels=list(seqdat1,seqdat2),method="HAM", 
+sm=list(subm13,subm23))
+
+#The third trial, working fine (hopefully)
+seqdistmc(channels=list(seqdat1,seqdat2),method="DHD", 
+sm=list(subm13,subm23))
+
+ From what I understood the first trial did not work because my 
+substitution cost matrix (scm) are only 2-dimensional. But the second 
+trial which should be "OM without indels" did not work out with my scm 
+but seqdistmc chose the default mode instead with a constant 
+substitution cost of 1. Why did the seqdist program ignored my matrix? 
+Is it because the Hamming distance is the number of positions at which 
+the corresponding states differ? If so, why is it then possible to 
+insert an own scm?
+
+Many thanks in advance and apologies for any inconvenience caused by the 
+long message.
+
+Best,
+Florian
+
+-- 
+
+Florian Hertel
+
+--
+Institute of Sociology
+Social Science Faculty
+University of Bremen
+
+Bremen International Graduate School of Social Sciences (BIGSSS)
+
+--
+Office:
+BIGSSS / University of Bremen
+Wiener Stra?e
+28359 Bremen
+Germany
+
+phone: ++49.(0)421.218-66418
+mail : fhertel at bigsss.uni-bremen.de
+web  : www.bigsss-bremen.de/index.php?id=fhertel
+
+
+From Matthias.Studer at unige.ch  Mon Feb  7 10:06:26 2011
+From: Matthias.Studer at unige.ch (Matthias Studer)
+Date: Mon, 07 Feb 2011 10:06:26 +0100
+Subject: [Traminer-users] transition rates as substitution costs with
+	HAM	metric in seqdistmc
+In-Reply-To: <4D4D54A4.4040800@bigsss.uni-bremen.de>
+References: <4D4D54A4.4040800@bigsss.uni-bremen.de>
+Message-ID: <4D4FB612.1020409@unige.ch>
+
+Hi Florian,
+
+Many thanks for your bug report. The problem you have pointed out also 
+affects "seqdist". Actually, seqdist and seqdistmc do not uses 
+substitution costs matrix when method="HAM".
+
+This problem will be corrected in the next version of TraMineR which 
+should be released soon.
+
+Many thanks again.
+All the best.
+
+Matthias Studer
+
+Le 05.02.2011 14:46, Florian Hertel a ?crit :
+>  Hi all,
+>
+> first of all: thanks for TraMineR!
+>
+> I encountered a problem running a multiple sequence analyzes using the 
+> HAM metric with substitution costs based on transition rates. I 
+> started with creating a substitution cost matrix (scm) for each 
+> channel based on the transition rates not allowing the rates to vary 
+> over the time. The seqdistmc command (using the HAM metric) fed with 
+> my scm reported, that the dimensions of the substitution matrix are 
+> not equal to the number of episodes in my sequences. Thus, I created 
+> an array  replicating the substitution cost matrix for each possible 
+> point in time. From the report, I read that seqdistmc created a 
+> "time-varying substitution cost matrix using 1 as a constant value", 
+> therefore abandoning my substitution cost matrix. In order to achieve 
+> my goal I just used a DHD metric based on my replicated substitution 
+> cost matrix which seemed to work fine.
+>
+> Here a small example:
+>
+> dat25_1 <- matrix(c("HighCl", "LowCl", "LowCl",
+>                   "LowCl", "HighCl", "LowCl",
+>                   "HighCl", "LowCl", "HighCl"),
+>                   3,3,dimnames=list(c("pers1","pers2","pers3"),
+>                   c("class1","class2","class3")))
+> dat25_2 <- matrix(c("BMW", "VW", "VW",
+>                   "BMW", "BMW", "VW",
+>                   "BMW", "VW", "VW"),
+>                   3,3,dimnames=list(c("pers1","pers2","pers3"),
+>                   c("car1","car2","car3")))
+>
+> seqdat1 <- seqdef(dat25_1)
+> seqdat2 <- seqdef(dat25_2)
+>
+> subm1 <- seqsubm(seqdat1,method="TRATE",time.varying=FALSE)
+> subm2 <- seqsubm(seqdat2,method="TRATE",time.varying=FALSE)
+>
+> subm1
+> subm2
+>
+>
+> # The first tral with error message
+> seqdistmc(channels=list(seqdat1,seqdat2),method="HAM", 
+> sm=list(subm1,subm2))
+>
+> subm13 <- array(subm1,c(2,2,3),dimnames(subm1))
+> subm23 <- array(subm2,c(2,2,3),dimnames(subm2))
+>
+> #The second trial, ignoring my sm list but using a constant value of 1 
+> for all substitutions.
+> seqdistmc(channels=list(seqdat1,seqdat2),method="HAM", 
+> sm=list(subm13,subm23))
+>
+> #The third trial, working fine (hopefully)
+> seqdistmc(channels=list(seqdat1,seqdat2),method="DHD", 
+> sm=list(subm13,subm23))
+>
+> From what I understood the first trial did not work because my 
+> substitution cost matrix (scm) are only 2-dimensional. But the second 
+> trial which should be "OM without indels" did not work out with my scm 
+> but seqdistmc chose the default mode instead with a constant 
+> substitution cost of 1. Why did the seqdist program ignored my matrix? 
+> Is it because the Hamming distance is the number of positions at which 
+> the corresponding states differ? If so, why is it then possible to 
+> insert an own scm?
+>
+> Many thanks in advance and apologies for any inconvenience caused by 
+> the long message.
+>
+> Best,
+> Florian
+>
+
+
+From gilles.hunault at univ-angers.fr  Tue Feb 22 13:46:23 2011
+From: gilles.hunault at univ-angers.fr (Gilles HUNAULT)
+Date: Tue, 22 Feb 2011 13:46:23 +0100 (CET)
+Subject: [Traminer-users] does it apply to amino acid sequences ?
+Message-ID: <alpine.DEB.1.00.1102221341500.9752@sirius.info-ua>
+
+
+Dear TraMineR users,
+
+It seems to me that the data and examples shown in the
+R package are more or less oriented toward social or economical data.
+Since amino acid sequences are sequences of categorical data
+(through amino acid #1 in the first sequence does not correspond
+necessarily to amino acid #1 in the other sequences), is it
+correct to use the methods and functions of TraMineR for the
+analysis of amino acid sequences.
+
+Has anyone already seen such an application ?
+
+Thank you for your help.
+
+
+<<Au plaisir de vous relire.>>
+
+(.=.)
+Gilles J. HUNAULT, gilles.hunault at univ-angers.fr
+"Science needs culture and feelings"
+http://www.info.univ-angers.fr/pub/gh/
+
+From Alexis.Gabadinho at unige.ch  Wed Feb 23 10:09:45 2011
+From: Alexis.Gabadinho at unige.ch (Alexis Gabadinho)
+Date: Wed, 23 Feb 2011 10:09:45 +0100
+Subject: [Traminer-users] does it apply to amino acid sequences ?
+In-Reply-To: <alpine.DEB.1.00.1102221341500.9752@sirius.info-ua>
+References: <alpine.DEB.1.00.1102221341500.9752@sirius.info-ua>
+Message-ID: <4D64CED9.6020701@unige.ch>
+
+Dear Gilles,
+
+I guess you can use many tools in the TraMineR package to analyse DNA 
+sequences. At least you can try, we are very much interested in such 
+application that could help us to improve the package.
+
+I imagine that one important difference between social science and DNA 
+sequences is their length. We usually use TraMineR with sequences having 
+at most several hundred of states, and I guess that you will have to set 
+a high graphical resolution if you want to use the tools for 
+visualization of sequences containing several thousand of amino acids.
+
+The tools for - pairwise - sequence alignment will work fine (however, 
+you cannot visualize pairwise sequence alignments at this time, but we 
+have a function under development for this purpose). Multiple sequence 
+alignment is not available at this time.
+
+You can also handle sequences that do not start at the same position by 
+using missing values.
+
+If you give a try to TraMineR, let us know!
+
+Salutations,
+Alexis.
+
+
+Le 22. 02. 11 13:46, Gilles HUNAULT a ?crit :
+>
+> Dear TraMineR users,
+>
+> It seems to me that the data and examples shown in the
+> R package are more or less oriented toward social or economical data.
+> Since amino acid sequences are sequences of categorical data
+> (through amino acid #1 in the first sequence does not correspond
+> necessarily to amino acid #1 in the other sequences), is it
+> correct to use the methods and functions of TraMineR for the
+> analysis of amino acid sequences.
+>
+> Has anyone already seen such an application ?
+>
+> Thank you for your help.
+>
+>
+> <<Au plaisir de vous relire.>>
+>
+> (.=.)
+> Gilles J. HUNAULT, gilles.hunault at univ-angers.fr
+> "Science needs culture and feelings"
+> http://www.info.univ-angers.fr/pub/gh/
+> _______________________________________________
+> Traminer-users mailing list
+> Traminer-users at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users 
+>
+
+
+From gilles.hunault at univ-angers.fr  Wed Feb 23 16:17:11 2011
+From: gilles.hunault at univ-angers.fr (Gilles HUNAULT)
+Date: Wed, 23 Feb 2011 16:17:11 +0100 (CET)
+Subject: [Traminer-users] does it apply to amino acid sequences ?
+In-Reply-To: <4D64CED9.6020701@unige.ch>
+References: <alpine.DEB.1.00.1102221341500.9752@sirius.info-ua>
+	<4D64CED9.6020701@unige.ch>
+Message-ID: <alpine.DEB.1.00.1102231614120.26482@sirius.info-ua>
+
+
+Thank you for your quick reply. Several hundreds of state are fine
+for the data that we want to analyze. I will try the functions of
+TraMiner and tell you what we get...
+
+<<Au plaisir de vous relire.>>
+
+(.=.)
+Gilles J. HUNAULT, gilles.hunault at univ-angers.fr
+"Science needs culture and feelings"
+http://www.info.univ-angers.fr/pub/gh/
+
+Le 23/02/11 ? 10:09 (+0100), Alexis Gabadinho a ?crit :
+
+> Dear Gilles,
+>
+> I guess you can use many tools in the TraMineR package to analyse DNA 
+> sequences. At least you can try, we are very much interested in such 
+> application that could help us to improve the package.
+>
+> I imagine that one important difference between social science and DNA 
+> sequences is their length. We usually use TraMineR with sequences having at 
+> most several hundred of states, and I guess that you will have to set a high 
+> graphical resolution if you want to use the tools for visualization of 
+> sequences containing several thousand of amino acids.
+>
+> The tools for - pairwise - sequence alignment will work fine (however, you 
+> cannot visualize pairwise sequence alignments at this time, but we have a 
+> function under development for this purpose). Multiple sequence alignment is 
+> not available at this time.
+>
+> You can also handle sequences that do not start at the same position by using 
+> missing values.
+>
+> If you give a try to TraMineR, let us know!
+>
+> Salutations,
+> Alexis.
+>
+>
+> Le 22. 02. 11 13:46, Gilles HUNAULT a ?crit :
+>> 
+>> Dear TraMineR users,
+>> 
+>> It seems to me that the data and examples shown in the
+>> R package are more or less oriented toward social or economical data.
+>> Since amino acid sequences are sequences of categorical data
+>> (through amino acid #1 in the first sequence does not correspond
+>> necessarily to amino acid #1 in the other sequences), is it
+>> correct to use the methods and functions of TraMineR for the
+>> analysis of amino acid sequences.
+>> 
+>> Has anyone already seen such an application ?
+>> 
+>> Thank you for your help.
+>> 
+>> 
+>> <<Au plaisir de vous relire.>>
+>> 
+>> (.=.)
+>> Gilles J. HUNAULT, gilles.hunault at univ-angers.fr
+>> "Science needs culture and feelings"
+>> http://www.info.univ-angers.fr/pub/gh/
+>> _______________________________________________
+>> Traminer-users mailing list
+>> Traminer-users at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users 
+>
+> _______________________________________________
+> Traminer-users mailing list
+> Traminer-users at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/traminer-users
+>
+
+From nicola.barban at gmail.com  Sat Feb 26 09:34:19 2011
+From: nicola.barban at gmail.com (Nicola Barban)
+Date: Sat, 26 Feb 2011 09:34:19 +0100
+Subject: [Traminer-users] refseq in multichannel distance
+In-Reply-To: <4D64CED9.6020701@unige.ch>
+References: <alpine.DEB.1.00.1102221341500.9752@sirius.info-ua>
+	<4D64CED9.6020701@unige.ch>
+Message-ID: <17729BDE-953D-41F1-93E9-7954463A3903@gmail.com>
+
+Dear TraMineR users,
+
+I am using the multichannel distance and I wonder if one can compute MC distance to a reference sequence as in the seqdist function.
+Thanks,
+
+Nicola Barban
+
+
+--
+Nicola Barban
+DONDENA-Centre for Research on Social Dynamics
+Bocconi University
+via G. R?ntgen n. 1 
+4th floor, Room A2-13
+20136 Milan  (Italy)
+tel. +39.02.58362714
+fax +39.02.58362798
+email: nicola.barban at unibocconi.it
+http://sites.google.com/site/nicolabarban/
+
+
+From Dina.Frommert at drv-bund.de  Sun Feb 27 01:00:43 2011
+From: Dina.Frommert at drv-bund.de (Dina.Frommert at drv-bund.de)
+Date: Sun, 27 Feb 2011 01:00:43 +0100
+Subject: [Traminer-users] =?iso-8859-1?q?Dina_Frommert_ist_au=DFer_Haus=2E?=
+Message-ID: <OFE925CAEC.1AE2B6EA-ONC1257844.00001116-C1257844.00001116@drv-bund.de>
+
+Ich werde ab  23.02.2011 nicht im B?ro sein. Ich kehre zur?ck am
+28.02.2011.
+
+Ich werde Ihre Nachricht nach meiner R?ckkehr beantworten.
+
+

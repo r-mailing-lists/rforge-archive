@@ -1,0 +1,3428 @@
+From ggrothendieck at gmail.com  Thu Dec  3 02:10:46 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Wed, 2 Dec 2009 20:10:46 -0500
+Subject: [Tikzdevice-bugs] Peformance
+Message-ID: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com>
+
+Are there any performance benchmarks for tikzdevice?  Is the relative speed
+noticeable?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091202/c103f88c/attachment.htm 
+
+From cameron.bracken at gmail.com  Thu Dec  3 02:23:30 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Wed, 2 Dec 2009 18:23:30 -0700
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com>
+Message-ID: <FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+
+Not quite sure what you mean by relative speed, but yes there is a  
+test suite that times some output.  The suite is in the inst/tests  
+directory of the source code. A vast majority of the time is taken by  
+calculating string widths.  The performance gain from caching metrics  
+calculations is very noticable, somtimes up to 90% when lots of  
+strings are involved. Does this answer your question?
+
+-Cameron
+
+On Dec 2, 2009, at 6:10 PM, Gabor Grothendieck  
+<ggrothendieck at gmail.com> wrote:
+
+> Are there any performance benchmarks for tikzdevice?  Is the  
+> relative speed noticeable?
+>
+>
+> _______________________________________________
+> Tikzdevice-bugs mailing list
+> Tikzdevice-bugs at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tikzdevice-bugs
+
+From cameron.bracken at gmail.com  Fri Dec  4 08:57:14 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Fri, 4 Dec 2009 00:57:14 -0700
+Subject: [Tikzdevice-bugs] tikzDevice and pgfSweave
+In-Reply-To: <4B18BA2A.2050506@gmail.com>
+References: <4B1840A9.5080506@gmail.com>
+	<28152c800912031536m1f7387daye3e91b5fe924a7fd@mail.gmail.com> 
+	<4B18BA2A.2050506@gmail.com>
+Message-ID: <28152c800912032357v72902695g3c6a196c3501866f@mail.gmail.com>
+
+On Fri, Dec 4, 2009 at 12:28 AM, Rasmus Pank Roulund
+<rasmus.pank at gmail.com> wrote:
+>
+> Hi,
+>
+>
+>> I was not able to reproduce this since I don't have have the data.
+>> Could you possibly send the data or a more reproducible example. From
+>> the image it indeed seems like the string placement is slightly off
+>> and so warrants investigation.
+>
+> Sure. I was probably a bit sloppy. I figured you could use any regression, since the relevant part(s) of the plots would be identical. Anyhow, I have attached an example, which produce the spacing error. It might also produce similar errors with less exotic packages.
+
+Ok, so I was able to reproduce this.  It does seem like a possible
+bug, I will investigate further when I get a chance. Thanks for the
+report.
+
+>
+>
+>> I was not aware that latexmk was able to run as a daemon.
+>
+> sure. here is an example-script we use when doing pure LaTeX:
+> ? ? ? ?latexmk main.tex ?--pdf --pvc
+>
+> At the moment I use the following script though:
+> ? ? ? ?cd sections
+> ? ? ? ?for file in *.Rnw ; do ?pgfsweave --pgfsweave-only $file; done
+> ? ? ? ?cd ..
+> ? ? ? ?echo done
+> ? ? ? ?latexmk -pdf main.tex
+> ? ? ? ?# rm sections/*.tex
+> ? ? ? ?rm */*.sh
+> ? ? ? ?rm */*.map
+> ? ? ? ?rm */*.log
+
+I use a very similar script
+
+#!/bin/bash
+
+R CMD pgfsweave --graphics-only "$1"
+latexmk -pdf "${1%.*}"
+
+
+>
+> As you can tell from the attached test this is slow with lots of diagnostic plots. cacheSweave makes it better, though.
+
+I consider cacheSweave a must when using pgfSweave and tikz. tikz
+externalization (the external option in pgfSweave) helps even more
+with lots of plots.  I have documents that take minutes to generate
+graphics but with externalization they take only seconds.
+
+>
+> An alternative approach would be to implement Sweave in one's editor and have latexmk watch for changes.
+
+This seems possible with TeXShop and TeXWorks at least since they can
+use custom scripts.  I dont have much experience with other editors.
+
+>
+> IMO LaTeXDaemon for Win is better than latexmk. It also features synctex out of the box. latexmk has to 'hacked'.
+>
+> ? ? ? ?http://william.famille-blum.org/software/latexdaemon/index.html
+>
+
+Shame it is only for windows.
+
+>> My
+>> experience in the past with continuous compilers is that they take too
+>> many computer resources, but that is just me.
+>
+> It uses 2 pct of my 1.6-1.8Ghz C2D (I think that is the specs; it doesn't really interest me). I don't remember how
+>
+>> As for an R daemon,
+>> there is a texmate bundle that does something similar though the goal
+>> is different.
+>
+> I saw it, but I figured it was a daemon in the way that it included R into textmate (like ESS for Emacs). I did not investigate it probably since I could not find any proper README or info on it.
+>
+>> Charlie and I are actually investigating the idea of a latex daemon
+>> for use with tikzDevice. Currently most of the time in string
+>> calculations are composed of the time it takes to startup latex (which
+>> is currently done for each string width calculation). ?We are planning
+>> on implementing this in a future release which will result in a
+>> drastic speed improvement.
+>
+> Cool. As said a daemon functionality would be cool.
+>
+>> Thanks, I am really glad to hear you are making use of these tools. ?I
+>> also have found them incredibly useful for my own work.
+>
+> Sure thing.
+>
+> --Rasmus
+
+-Cameron
+
+From ggrothendieck at gmail.com  Fri Dec  4 13:12:01 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Fri, 4 Dec 2009 07:12:01 -0500
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com> 
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+Message-ID: <971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com>
+
+Thanks.  When I try to run the test it fails.  This is the stderr output is
+shown below and test.log is attached.  I am on Windows Vista and am running
+R 2.10.0.
+
+---
+
+C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output >
+test.l
+og
+Loading required package: filehash
+Loading required package: methods
+filehash: Simple key-value database (2.0-1 2008-12-19)
+tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+Checking for a LaTeX compiler...
+
+
+A working LaTeX compiler was found in:
+        The PATH using the command latex
+
+Global option tikzLatex set to:
+        C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+
+MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+TeX is a trademark of the American Mathematical Society.
+
+
+Error in getMetricsFromLatex(TeXMetrics) :
+  ******** There was a problem calculating string metrics,
+  ******** likely there was a problem with your custom packages.
+  ******** See the LaTeX log file above for details.
+Calls: source ... Axis.default -> axis -> <Anonymous> -> getMetricsFromLatex
+Execution halted
+
+---
+
+On Wed, Dec 2, 2009 at 8:23 PM, Cameron Bracken
+<cameron.bracken at gmail.com>wrote:
+
+> Not quite sure what you mean by relative speed, but yes there is a test
+> suite that times some output.  The suite is in the inst/tests directory of
+> the source code. A vast majority of the time is taken by calculating string
+> widths.  The performance gain from caching metrics calculations is very
+> noticable, somtimes up to 90% when lots of strings are involved. Does this
+> answer your question?
+>
+> -Cameron
+>
+>
+> On Dec 2, 2009, at 6:10 PM, Gabor Grothendieck <ggrothendieck at gmail.com>
+> wrote:
+>
+>  Are there any performance benchmarks for tikzdevice?  Is the relative
+>> speed noticeable?
+>>
+>>
+>> _______________________________________________
+>> Tikzdevice-bugs mailing list
+>> Tikzdevice-bugs at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tikzdevice-bugs
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091204/82c67946/attachment-0001.htm 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: test.log
+Type: application/octet-stream
+Size: 30829 bytes
+Desc: not available
+Url : http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091204/82c67946/attachment-0001.obj 
+
+From cameron.bracken at gmail.com  Fri Dec  4 20:50:47 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Fri, 4 Dec 2009 12:50:47 -0700
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com>
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+	<971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com>
+Message-ID: <28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com>
+
+That problem is from the XeLaTeX test, which has been segfaulting for
+a while, I don't know why. Apologies for the lack of instructions.
+The rest of the tests should work if you comment out the line
+
+source('testXeLaTeX.R')
+
+near the top of?testRTikZDevice.R. Then you can either run the script
+run-tests.sh (which builds and installs the package) or do what you
+did before (it is better to redirect the output to another directory)
+
+mkdir output
+Rscript testRTikZDevice.R --output-prefix=output
+
+If you want to investigate the speedup from global string width
+caching put a line like
+
+options(tikzMetricsDictionary = "/Users/cameron/.tikzMetricsDictionary")
+
+In your?.Rprofile file. The first run will be slow then subsequent
+runs will be much faster. For example on my system without using
+global string width caching:
+
+  Running Test 01 ... Done, took  4.455 seconds.
+Compiling Test 01 ... Done, took  0.423 seconds.
+  Running Test 02 ... Done, took  1.145 seconds.
+Compiling Test 02 ... Done, took  0.419 seconds.
+  Running Test 03 ... Done, took  6.042 seconds.
+Compiling Test 03 ... Done, took  0.542 seconds.
+  Running Test 04 ... Done, took  6.719 seconds.
+Compiling Test 04 ... Done, took  0.586 seconds.
+  Running Test 05 ... Done, took  11.283 seconds.
+Compiling Test 05 ... Done, took  0.676 seconds.
+  Running Test 06 ... Done, took  0.391 seconds.
+Compiling Test 06 ... Done, took  0.449 seconds.
+  Running Test 07 ... Done, took  0.365 seconds.
+Compiling Test 07 ... Done, took  0.423 seconds.
+  Running Test 08 ... Done, took  0.355 seconds.
+Compiling Test 08 ... Done, took  0.405 seconds.
+  Running Test 09 ... Done, took  0.394 seconds.
+Compiling Test 09 ... Done, took  0.399 seconds.
+  Running Test 10 ... Done, took  0.364 seconds.
+Compiling Test 10 ... Done, took  0.411 seconds.
+  Running Test 11 ... Done, took  0.364 seconds.
+Compiling Test 11 ... Done, took  0.422 seconds.
+  Running Test 12 ... Done, took  0.376 seconds.
+Compiling Test 12 ... Done, took  0.401 seconds.
+  Running Test 13 ... Done, took  0.376 seconds.
+Compiling Test 13 ... Done, took  0.568 seconds.
+  Running Test 14 ... Done, took  0.381 seconds.
+Compiling Test 14 ... Done, took  1.995 seconds.
+  Running Test 15 ... Done, took  23.414 seconds.
+Compiling Test 15 ... Done, took  3.241 seconds.
+  Running Test 16 ... Done, took  27.007 seconds.
+Compiling Test 16 ... Done, took  0.779 seconds.
+  Running Test 17 ... Done, took  2.648 seconds.
+Compiling Test 17 ... Done, took  0.415 seconds.
+  Running Test 18 ... Done, took  2.183 seconds.
+Compiling Test 18 ... Done, took  3.592 seconds.
+  Running Test 19 ... Done, took  17.97 seconds.
+Compiling Test 19 ... Done, took  2.409 seconds.
+
+and with caching
+
+  Running Test 01 ... Done, took  0.085 seconds.
+Compiling Test 01 ... Done, took  0.428 seconds.
+  Running Test 02 ... Done, took  0.031 seconds.
+Compiling Test 02 ... Done, took  0.439 seconds.
+  Running Test 03 ... Done, took  0.198 seconds.
+Compiling Test 03 ... Done, took  0.529 seconds.
+  Running Test 04 ... Done, took  0.254 seconds.
+Compiling Test 04 ... Done, took  0.556 seconds.
+  Running Test 05 ... Done, took  0.353 seconds.
+Compiling Test 05 ... Done, took  0.66 seconds.
+  Running Test 06 ... Done, took  0.021 seconds.
+Compiling Test 06 ... Done, took  0.45 seconds.
+  Running Test 07 ... Done, took  0.013 seconds.
+Compiling Test 07 ... Done, took  0.426 seconds.
+  Running Test 08 ... Done, took  0.014 seconds.
+Compiling Test 08 ... Done, took  0.393 seconds.
+  Running Test 09 ... Done, took  0.012 seconds.
+Compiling Test 09 ... Done, took  0.403 seconds.
+  Running Test 10 ... Done, took  0.028 seconds.
+Compiling Test 10 ... Done, took  0.463 seconds.
+  Running Test 11 ... Done, took  0.015 seconds.
+Compiling Test 11 ... Done, took  0.415 seconds.
+  Running Test 12 ... Done, took  0.021 seconds.
+Compiling Test 12 ... Done, took  0.408 seconds.
+  Running Test 13 ... Done, took  0.014 seconds.
+Compiling Test 13 ... Done, took  0.544 seconds.
+  Running Test 14 ... Done, took  0.022 seconds.
+Compiling Test 14 ... Done, took  1.86 seconds.
+  Running Test 15 ... Done, took  1.484 seconds.
+Compiling Test 15 ... Done, took  3.33 seconds.
+  Running Test 16 ... Done, took  2.988 seconds.
+Compiling Test 16 ... Done, took  0.779 seconds.
+  Running Test 17 ... Done, took  0.111 seconds.
+Compiling Test 17 ... Done, took  0.437 seconds.
+  Running Test 18 ... Done, took  0.096 seconds.
+Compiling Test 18 ... Done, took  3.585 seconds.
+  Running Test 19 ... Done, took  11.742 seconds.
+Compiling Test 19 ... Done, took  2.293 seconds.
+
+The last thing you can do if you really want to get into it is turn on
+the debugging switch in tikzDevice.c by changing the line
+
+#define DEBUG FALSE
+
+near the top of the file to
+
+#define DEBUG TRUE
+
+Then recompiling and installing the package. After this running the
+test will show the number of times string width was calculated or
+looked up which will give you some idea of where the speedup is coming
+from.
+
+-Cameron
+
+
+
+On Fri, Dec 4, 2009 at 5:12 AM, Gabor Grothendieck
+<ggrothendieck at gmail.com> wrote:
+>
+> Thanks.? When I try to run the test it fails.? This is the stderr output is shown below and test.log is attached.? I am on Windows Vista and am running R 2.10.0.
+>
+> ---
+>
+> C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output > test.l
+> og
+> Loading required package: filehash
+> Loading required package: methods
+> filehash: Simple key-value database (2.0-1 2008-12-19)
+> tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+> Checking for a LaTeX compiler...
+>
+>
+> A working LaTeX compiler was found in:
+> ??????? The PATH using the command latex
+>
+> Global option tikzLatex set to:
+> ??????? C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+>
+> MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+> Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+> TeX is a trademark of the American Mathematical Society.
+>
+>
+> Error in getMetricsFromLatex(TeXMetrics) :
+> ? ******** There was a problem calculating string metrics,
+> ? ******** likely there was a problem with your custom packages.
+> ? ******** See the LaTeX log file above for details.
+> Calls: source ... Axis.default -> axis -> <Anonymous> -> getMetricsFromLatex
+> Execution halted
+>
+> ---
+>
+> On Wed, Dec 2, 2009 at 8:23 PM, Cameron Bracken <cameron.bracken at gmail.com> wrote:
+>>
+>> Not quite sure what you mean by relative speed, but yes there is a test suite that times some output. ?The suite is in the inst/tests directory of the source code. A vast majority of the time is taken by calculating string widths. ?The performance gain from caching metrics calculations is very noticable, somtimes up to 90% when lots of strings are involved. Does this answer your question?
+>>
+>> -Cameron
+>>
+>> On Dec 2, 2009, at 6:10 PM, Gabor Grothendieck <ggrothendieck at gmail.com> wrote:
+>>
+>>> Are there any performance benchmarks for tikzdevice? ?Is the relative speed noticeable?
+>>>
+>>>
+>>> _______________________________________________
+>>> Tikzdevice-bugs mailing list
+>>> Tikzdevice-bugs at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tikzdevice-bugs
+>
+
+From ggrothendieck at gmail.com  Sat Dec  5 00:03:15 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Fri, 4 Dec 2009 18:03:15 -0500
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com> 
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+	<971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com> 
+	<28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com>
+Message-ID: <971536df0912041503p472e032ate59b095c847382ea@mail.gmail.com>
+
+I commented out the source statement but am still getting an error on this.
+Here is the output and test.log is attached.
+
+C:\tmp2\tikzDevice\inst\tests>findstr source testRTikZDevice.R
+# source('testXeLaTeX.R')
+
+C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output >
+test.l
+og
+Loading required package: filehash
+Loading required package: methods
+filehash: Simple key-value database (2.0-1 2008-12-19)
+tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+Checking for a LaTeX compiler...
+
+
+A working LaTeX compiler was found in:
+        The PATH using the command latex
+
+Global option tikzLatex set to:
+        C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+
+MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+TeX is a trademark of the American Mathematical Society.
+
+
+Error in getMetricsFromLatex(TeXMetrics) :
+  ******** There was a problem calculating string metrics,
+  ******** likely there was a problem with your custom packages.
+  ******** See the LaTeX log file above for details.
+Calls: system.time ... localTitle -> title -> <Anonymous> ->
+getMetricsFromLatex
+
+Execution halted
+
+
+On Fri, Dec 4, 2009 at 2:50 PM, Cameron Bracken
+<cameron.bracken at gmail.com>wrote:
+
+> That problem is from the XeLaTeX test, which has been segfaulting for
+> a while, I don't know why. Apologies for the lack of instructions.
+> The rest of the tests should work if you comment out the line
+>
+> source('testXeLaTeX.R')
+>
+> near the top of testRTikZDevice.R. Then you can either run the script
+> run-tests.sh (which builds and installs the package) or do what you
+> did before (it is better to redirect the output to another directory)
+>
+> mkdir output
+> Rscript testRTikZDevice.R --output-prefix=output
+>
+> If you want to investigate the speedup from global string width
+> caching put a line like
+>
+> options(tikzMetricsDictionary = "/Users/cameron/.tikzMetricsDictionary")
+>
+> In your .Rprofile file. The first run will be slow then subsequent
+> runs will be much faster. For example on my system without using
+> global string width caching:
+>
+>  Running Test 01 ... Done, took  4.455 seconds.
+> Compiling Test 01 ... Done, took  0.423 seconds.
+>  Running Test 02 ... Done, took  1.145 seconds.
+> Compiling Test 02 ... Done, took  0.419 seconds.
+>  Running Test 03 ... Done, took  6.042 seconds.
+> Compiling Test 03 ... Done, took  0.542 seconds.
+>  Running Test 04 ... Done, took  6.719 seconds.
+> Compiling Test 04 ... Done, took  0.586 seconds.
+>  Running Test 05 ... Done, took  11.283 seconds.
+> Compiling Test 05 ... Done, took  0.676 seconds.
+>  Running Test 06 ... Done, took  0.391 seconds.
+> Compiling Test 06 ... Done, took  0.449 seconds.
+>  Running Test 07 ... Done, took  0.365 seconds.
+> Compiling Test 07 ... Done, took  0.423 seconds.
+>  Running Test 08 ... Done, took  0.355 seconds.
+> Compiling Test 08 ... Done, took  0.405 seconds.
+>  Running Test 09 ... Done, took  0.394 seconds.
+> Compiling Test 09 ... Done, took  0.399 seconds.
+>  Running Test 10 ... Done, took  0.364 seconds.
+> Compiling Test 10 ... Done, took  0.411 seconds.
+>  Running Test 11 ... Done, took  0.364 seconds.
+> Compiling Test 11 ... Done, took  0.422 seconds.
+>  Running Test 12 ... Done, took  0.376 seconds.
+> Compiling Test 12 ... Done, took  0.401 seconds.
+>  Running Test 13 ... Done, took  0.376 seconds.
+> Compiling Test 13 ... Done, took  0.568 seconds.
+>  Running Test 14 ... Done, took  0.381 seconds.
+> Compiling Test 14 ... Done, took  1.995 seconds.
+>  Running Test 15 ... Done, took  23.414 seconds.
+> Compiling Test 15 ... Done, took  3.241 seconds.
+>  Running Test 16 ... Done, took  27.007 seconds.
+> Compiling Test 16 ... Done, took  0.779 seconds.
+>  Running Test 17 ... Done, took  2.648 seconds.
+> Compiling Test 17 ... Done, took  0.415 seconds.
+>  Running Test 18 ... Done, took  2.183 seconds.
+> Compiling Test 18 ... Done, took  3.592 seconds.
+>  Running Test 19 ... Done, took  17.97 seconds.
+> Compiling Test 19 ... Done, took  2.409 seconds.
+>
+> and with caching
+>
+>  Running Test 01 ... Done, took  0.085 seconds.
+> Compiling Test 01 ... Done, took  0.428 seconds.
+>  Running Test 02 ... Done, took  0.031 seconds.
+> Compiling Test 02 ... Done, took  0.439 seconds.
+>  Running Test 03 ... Done, took  0.198 seconds.
+> Compiling Test 03 ... Done, took  0.529 seconds.
+>  Running Test 04 ... Done, took  0.254 seconds.
+> Compiling Test 04 ... Done, took  0.556 seconds.
+>  Running Test 05 ... Done, took  0.353 seconds.
+> Compiling Test 05 ... Done, took  0.66 seconds.
+>  Running Test 06 ... Done, took  0.021 seconds.
+> Compiling Test 06 ... Done, took  0.45 seconds.
+>  Running Test 07 ... Done, took  0.013 seconds.
+> Compiling Test 07 ... Done, took  0.426 seconds.
+>  Running Test 08 ... Done, took  0.014 seconds.
+> Compiling Test 08 ... Done, took  0.393 seconds.
+>  Running Test 09 ... Done, took  0.012 seconds.
+> Compiling Test 09 ... Done, took  0.403 seconds.
+>  Running Test 10 ... Done, took  0.028 seconds.
+> Compiling Test 10 ... Done, took  0.463 seconds.
+>  Running Test 11 ... Done, took  0.015 seconds.
+> Compiling Test 11 ... Done, took  0.415 seconds.
+>  Running Test 12 ... Done, took  0.021 seconds.
+> Compiling Test 12 ... Done, took  0.408 seconds.
+>  Running Test 13 ... Done, took  0.014 seconds.
+> Compiling Test 13 ... Done, took  0.544 seconds.
+>  Running Test 14 ... Done, took  0.022 seconds.
+> Compiling Test 14 ... Done, took  1.86 seconds.
+>  Running Test 15 ... Done, took  1.484 seconds.
+> Compiling Test 15 ... Done, took  3.33 seconds.
+>  Running Test 16 ... Done, took  2.988 seconds.
+> Compiling Test 16 ... Done, took  0.779 seconds.
+>  Running Test 17 ... Done, took  0.111 seconds.
+> Compiling Test 17 ... Done, took  0.437 seconds.
+>  Running Test 18 ... Done, took  0.096 seconds.
+> Compiling Test 18 ... Done, took  3.585 seconds.
+>  Running Test 19 ... Done, took  11.742 seconds.
+> Compiling Test 19 ... Done, took  2.293 seconds.
+>
+> The last thing you can do if you really want to get into it is turn on
+> the debugging switch in tikzDevice.c by changing the line
+>
+> #define DEBUG FALSE
+>
+> near the top of the file to
+>
+> #define DEBUG TRUE
+>
+> Then recompiling and installing the package. After this running the
+> test will show the number of times string width was calculated or
+> looked up which will give you some idea of where the speedup is coming
+> from.
+>
+> -Cameron
+>
+>
+>
+> On Fri, Dec 4, 2009 at 5:12 AM, Gabor Grothendieck
+> <ggrothendieck at gmail.com> wrote:
+> >
+> > Thanks.  When I try to run the test it fails.  This is the stderr output
+> is shown below and test.log is attached.  I am on Windows Vista and am
+> running R 2.10.0.
+> >
+> > ---
+> >
+> > C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output >
+> test.l
+> > og
+> > Loading required package: filehash
+> > Loading required package: methods
+> > filehash: Simple key-value database (2.0-1 2008-12-19)
+> > tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+> > Checking for a LaTeX compiler...
+> >
+> >
+> > A working LaTeX compiler was found in:
+> >         The PATH using the command latex
+> >
+> > Global option tikzLatex set to:
+> >         C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+> >
+> > MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+> > Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+> > TeX is a trademark of the American Mathematical Society.
+> >
+> >
+> > Error in getMetricsFromLatex(TeXMetrics) :
+> >   ******** There was a problem calculating string metrics,
+> >   ******** likely there was a problem with your custom packages.
+> >   ******** See the LaTeX log file above for details.
+> > Calls: source ... Axis.default -> axis -> <Anonymous> ->
+> getMetricsFromLatex
+> > Execution halted
+> >
+> > ---
+> >
+> > On Wed, Dec 2, 2009 at 8:23 PM, Cameron Bracken <
+> cameron.bracken at gmail.com> wrote:
+> >>
+> >> Not quite sure what you mean by relative speed, but yes there is a test
+> suite that times some output.  The suite is in the inst/tests directory of
+> the source code. A vast majority of the time is taken by calculating string
+> widths.  The performance gain from caching metrics calculations is very
+> noticable, somtimes up to 90% when lots of strings are involved. Does this
+> answer your question?
+> >>
+> >> -Cameron
+> >>
+> >> On Dec 2, 2009, at 6:10 PM, Gabor Grothendieck <ggrothendieck at gmail.com>
+> wrote:
+> >>
+> >>> Are there any performance benchmarks for tikzdevice?  Is the relative
+> speed noticeable?
+> >>>
+> >>>
+> >>> _______________________________________________
+> >>> Tikzdevice-bugs mailing list
+> >>> Tikzdevice-bugs at lists.r-forge.r-project.org
+> >>>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tikzdevice-bugs
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091204/c4db4d4e/attachment-0001.htm 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: test.log
+Type: application/octet-stream
+Size: 23811 bytes
+Desc: not available
+Url : http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091204/c4db4d4e/attachment-0001.obj 
+
+From cameron.bracken at gmail.com  Sat Dec  5 00:23:45 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Fri, 4 Dec 2009 16:23:45 -0700
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <971536df0912041503p472e032ate59b095c847382ea@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com>
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+	<971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com>
+	<28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com>
+	<971536df0912041503p472e032ate59b095c847382ea@mail.gmail.com>
+Message-ID: <28152c800912041523v49b4cbf0j47a2c3ece64856c3@mail.gmail.com>
+
+It seems like you are using an outdated version of pgf/tikz:
+
+Package: tikz 2007/06/07 v1.18 (rcs-revision 1.87)
+
+There must be something in one of the tests that depends on version
+2.00.  This is likely causing the error.  It is really worth upgrading
+(http://sourceforge.net/projects/pgf/).  If I'm not mistaken this
+version is included in MikTeX 2.8.
+
+It is not listed currently as a SystemRequirement but it really should be.
+
+-Cameron
+
+
+
+On Fri, Dec 4, 2009 at 4:03 PM, Gabor Grothendieck
+<ggrothendieck at gmail.com> wrote:
+> I commented out the source statement but am still getting an error on this.
+> Here is the output and test.log is attached.
+>
+> C:\tmp2\tikzDevice\inst\tests>findstr source testRTikZDevice.R
+> # source('testXeLaTeX.R')
+>
+> C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output >
+> test.l
+> og
+> Loading required package: filehash
+> Loading required package: methods
+> filehash: Simple key-value database (2.0-1 2008-12-19)
+> tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+> Checking for a LaTeX compiler...
+>
+>
+> A working LaTeX compiler was found in:
+> ??????? The PATH using the command latex
+>
+> Global option tikzLatex set to:
+> ??????? C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+>
+> MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+> Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+> TeX is a trademark of the American Mathematical Society.
+>
+>
+> Error in getMetricsFromLatex(TeXMetrics) :
+> ? ******** There was a problem calculating string metrics,
+> ? ******** likely there was a problem with your custom packages.
+> ? ******** See the LaTeX log file above for details.
+> Calls: system.time ... localTitle -> title -> <Anonymous> ->
+> getMetricsFromLatex
+>
+> Execution halted
+
+From ggrothendieck at gmail.com  Sat Dec  5 16:38:39 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sat, 5 Dec 2009 10:38:39 -0500
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <28152c800912041523v49b4cbf0j47a2c3ece64856c3@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com> 
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+	<971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com> 
+	<28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com> 
+	<971536df0912041503p472e032ate59b095c847382ea@mail.gmail.com> 
+	<28152c800912041523v49b4cbf0j47a2c3ece64856c3@mail.gmail.com>
+Message-ID: <971536df0912050738p622d7fffo87baafdfb5f6fe90@mail.gmail.com>
+
+Thanks.  I have upgraded to MiKTeX 2.8 but it still fails.  See below and
+attached test.log.  If I look in the MiKTeX package manager (mpm from
+commandn line) I see a pgf latex package was installed today so I presume
+its the latest.  I do not see a separate tikz latex package so I presume its
+part of pgf.
+
+C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output >
+test.log
+Loading required package: filehash
+Loading required package: methods
+filehash: Simple key-value database (2.0-1 2008-12-19)
+tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+Checking for a LaTeX compiler...
+
+
+A working LaTeX compiler was found in:
+        The PATH using the command latex
+
+Global option tikzLatex set to:
+        C:\PROGRA~1\MIKTEX~1.8\miktex\bin\latex.exe
+
+MiKTeX-pdfTeX 2.8.3563 (1.40.10) (MiKTeX 2.8)
+Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+TeX is a trademark of the American Mathematical Society.
+
+
+Error in getMetricsFromLatex(TeXMetrics) :
+  ******** There was a problem calculating string metrics,
+  ******** likely there was a problem with your custom packages.
+  ******** See the LaTeX log file above for details.
+Calls: system.time ... localTitle -> title -> <Anonymous> ->
+getMetricsFromLatex
+
+Execution halted
+
+On Fri, Dec 4, 2009 at 6:23 PM, Cameron Bracken
+<cameron.bracken at gmail.com>wrote:
+
+> It seems like you are using an outdated version of pgf/tikz:
+>
+> Package: tikz 2007/06/07 v1.18 (rcs-revision 1.87)
+>
+> There must be something in one of the tests that depends on version
+> 2.00.  This is likely causing the error.  It is really worth upgrading
+> (http://sourceforge.net/projects/pgf/).  If I'm not mistaken this
+> version is included in MikTeX 2.8.
+>
+> It is not listed currently as a SystemRequirement but it really should be.
+>
+> -Cameron
+>
+>
+>
+> On Fri, Dec 4, 2009 at 4:03 PM, Gabor Grothendieck
+> <ggrothendieck at gmail.com> wrote:
+> > I commented out the source statement but am still getting an error on
+> this.
+> > Here is the output and test.log is attached.
+> >
+> > C:\tmp2\tikzDevice\inst\tests>findstr source testRTikZDevice.R
+> > # source('testXeLaTeX.R')
+> >
+> > C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output >
+> > test.l
+> > og
+> > Loading required package: filehash
+> > Loading required package: methods
+> > filehash: Simple key-value database (2.0-1 2008-12-19)
+> > tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+> > Checking for a LaTeX compiler...
+> >
+> >
+> > A working LaTeX compiler was found in:
+> >         The PATH using the command latex
+> >
+> > Global option tikzLatex set to:
+> >         C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+> >
+> > MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+> > Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+> > TeX is a trademark of the American Mathematical Society.
+> >
+> >
+> > Error in getMetricsFromLatex(TeXMetrics) :
+> >   ******** There was a problem calculating string metrics,
+> >   ******** likely there was a problem with your custom packages.
+> >   ******** See the LaTeX log file above for details.
+> > Calls: system.time ... localTitle -> title -> <Anonymous> ->
+> > getMetricsFromLatex
+> >
+> > Execution halted
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091205/41d83b02/attachment-0001.htm 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: test.log
+Type: application/octet-stream
+Size: 23891 bytes
+Desc: not available
+Url : http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091205/41d83b02/attachment-0001.obj 
+
+From ggrothendieck at gmail.com  Sat Dec  5 18:18:08 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sat, 5 Dec 2009 12:18:08 -0500
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <971536df0912050738p622d7fffo87baafdfb5f6fe90@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com> 
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+	<971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com> 
+	<28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com> 
+	<971536df0912041503p472e032ate59b095c847382ea@mail.gmail.com> 
+	<28152c800912041523v49b4cbf0j47a2c3ece64856c3@mail.gmail.com> 
+	<971536df0912050738p622d7fffo87baafdfb5f6fe90@mail.gmail.com>
+Message-ID: <971536df0912050918q50bab58fu64fdbd2b018a01ef@mail.gmail.com>
+
+You can ignore the problem I previously reported. I have it mostly working
+now.   In MiKTeX 2.8 there can be a local repository for all users and per
+user and it was updating one but using the other.   I think I have it
+straight now.
+
+There are a few problems with running the test that seem to be Windows
+related:
+
+1. the testRTikZDevice.R script uses an environment variable R_PDFLATEXCMD
+but  that was not set so I set it manually like this:
+
+   set R_PDFLATEXCMD=pdflatex
+   Rscript testRTikZDevice.R --output=output
+
+The script should supply a default of "pdflatex" so that this is not
+necessary..
+
+2. Also in test 19 it stops because of a reference to /dev/null which is not
+present on Windows.  Note that in the case of Windows NUL is the
+corresponding filename.   Or, if that test is not important you could just
+eliminate it.
+
+On Sat, Dec 5, 2009 at 10:38 AM, Gabor Grothendieck <ggrothendieck at gmail.com
+> wrote:
+
+> Thanks.  I have upgraded to MiKTeX 2.8 but it still fails.  See below and
+> attached test.log.  If I look in the MiKTeX package manager (mpm from
+> commandn line) I see a pgf latex package was installed today so I presume
+> its the latest.  I do not see a separate tikz latex package so I presume its
+> part of pgf.
+>
+>
+> C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output >
+> test.log
+> Loading required package: filehash
+> Loading required package: methods
+> filehash: Simple key-value database (2.0-1 2008-12-19)
+> tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+> Checking for a LaTeX compiler...
+>
+>
+> A working LaTeX compiler was found in:
+>         The PATH using the command latex
+>
+> Global option tikzLatex set to:
+>          C:\PROGRA~1\MIKTEX~1.8\miktex\bin\latex.exe
+>
+> MiKTeX-pdfTeX 2.8.3563 (1.40.10) (MiKTeX 2.8)
+>
+> Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+> TeX is a trademark of the American Mathematical Society.
+>
+>
+> Error in getMetricsFromLatex(TeXMetrics) :
+>   ******** There was a problem calculating string metrics,
+>   ******** likely there was a problem with your custom packages.
+>   ******** See the LaTeX log file above for details.
+> Calls: system.time ... localTitle -> title -> <Anonymous> ->
+> getMetricsFromLatex
+>
+> Execution halted
+>
+> On Fri, Dec 4, 2009 at 6:23 PM, Cameron Bracken <cameron.bracken at gmail.com
+> > wrote:
+>
+>> It seems like you are using an outdated version of pgf/tikz:
+>>
+>> Package: tikz 2007/06/07 v1.18 (rcs-revision 1.87)
+>>
+>> There must be something in one of the tests that depends on version
+>> 2.00.  This is likely causing the error.  It is really worth upgrading
+>> (http://sourceforge.net/projects/pgf/).  If I'm not mistaken this
+>> version is included in MikTeX 2.8.
+>>
+>> It is not listed currently as a SystemRequirement but it really should be.
+>>
+>> -Cameron
+>>
+>>
+>>
+>> On Fri, Dec 4, 2009 at 4:03 PM, Gabor Grothendieck
+>> <ggrothendieck at gmail.com> wrote:
+>> > I commented out the source statement but am still getting an error on
+>> this.
+>> > Here is the output and test.log is attached.
+>> >
+>> > C:\tmp2\tikzDevice\inst\tests>findstr source testRTikZDevice.R
+>> > # source('testXeLaTeX.R')
+>> >
+>> > C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output
+>> >
+>> > test.l
+>> > og
+>> > Loading required package: filehash
+>> > Loading required package: methods
+>> > filehash: Simple key-value database (2.0-1 2008-12-19)
+>> > tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+>> > Checking for a LaTeX compiler...
+>> >
+>> >
+>> > A working LaTeX compiler was found in:
+>> >         The PATH using the command latex
+>> >
+>> > Global option tikzLatex set to:
+>> >         C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+>> >
+>> > MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+>> > Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+>> > TeX is a trademark of the American Mathematical Society.
+>> >
+>> >
+>> > Error in getMetricsFromLatex(TeXMetrics) :
+>> >   ******** There was a problem calculating string metrics,
+>> >   ******** likely there was a problem with your custom packages.
+>> >   ******** See the LaTeX log file above for details.
+>> > Calls: system.time ... localTitle -> title -> <Anonymous> ->
+>> > getMetricsFromLatex
+>> >
+>> > Execution halted
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091205/fe211cdc/attachment.htm 
+
+From cameron.bracken at gmail.com  Sat Dec  5 19:10:21 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Sat, 5 Dec 2009 11:10:21 -0700
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <971536df0912050918q50bab58fu64fdbd2b018a01ef@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com>
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+	<971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com>
+	<28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com>
+	<971536df0912041503p472e032ate59b095c847382ea@mail.gmail.com>
+	<28152c800912041523v49b4cbf0j47a2c3ece64856c3@mail.gmail.com>
+	<971536df0912050738p622d7fffo87baafdfb5f6fe90@mail.gmail.com>
+	<971536df0912050918q50bab58fu64fdbd2b018a01ef@mail.gmail.com>
+Message-ID: <28152c800912051010x5bb3ba6ch7cfe54a102945749@mail.gmail.com>
+
+I would have been surprised if there were not issues on windows.  We
+developed the tests for use in development (hence the reason they are
+in inst/tests and not the standard tests/ location) and so did not
+really have cross platform compatibility in mind. Good to know the
+tests run successfully on windows.
+
+The reference to /dev/null is just there to suppress the output of the
+packages on loading and so does not affect the test at all. A similar
+way would be
+
+sink(tempfile())
+<load packages>
+sink()
+
+-Cameron
+
+
+
+On Sat, Dec 5, 2009 at 10:18 AM, Gabor Grothendieck
+<ggrothendieck at gmail.com> wrote:
+> You can ignore the problem I previously reported. I have it mostly working
+> now.?? In MiKTeX 2.8 there can be a local repository for all users and per
+> user and it was updating one but using the other.?? I think I have it
+> straight now.
+>
+> There are a few problems with running the test that seem to be Windows
+> related:
+>
+> 1. the testRTikZDevice.R script uses an environment variable R_PDFLATEXCMD
+> but? that was not set so I set it manually like this:
+>
+> ?? set R_PDFLATEXCMD=pdflatex
+> ?? Rscript testRTikZDevice.R --output=output
+>
+> The script should supply a default of "pdflatex" so that this is not
+> necessary..
+>
+> 2. Also in test 19 it stops because of a reference to /dev/null which is not
+> present on Windows.? Note that in the case of Windows NUL is the
+> corresponding filename.?? Or, if that test is not important you could just
+> eliminate it.
+>
+> On Sat, Dec 5, 2009 at 10:38 AM, Gabor Grothendieck
+> <ggrothendieck at gmail.com> wrote:
+>>
+>> Thanks.? I have upgraded to MiKTeX 2.8 but it still fails.? See below and
+>> attached test.log.? If I look in the MiKTeX package manager (mpm from
+>> commandn line) I see a pgf latex package was installed today so I presume
+>> its the latest.? I do not see a separate tikz latex package so I presume its
+>> part of pgf.
+>>
+>> C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output >
+>> test.log
+>> Loading required package: filehash
+>> Loading required package: methods
+>> filehash: Simple key-value database (2.0-1 2008-12-19)
+>> tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+>> Checking for a LaTeX compiler...
+>>
+>>
+>> A working LaTeX compiler was found in:
+>> ??????? The PATH using the command latex
+>>
+>> Global option tikzLatex set to:
+>> ??????? C:\PROGRA~1\MIKTEX~1.8\miktex\bin\latex.exe
+>>
+>> MiKTeX-pdfTeX 2.8.3563 (1.40.10) (MiKTeX 2.8)
+>> Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+>> TeX is a trademark of the American Mathematical Society.
+>>
+>>
+>> Error in getMetricsFromLatex(TeXMetrics) :
+>> ? ******** There was a problem calculating string metrics,
+>> ? ******** likely there was a problem with your custom packages.
+>> ? ******** See the LaTeX log file above for details.
+>> Calls: system.time ... localTitle -> title -> <Anonymous> ->
+>> getMetricsFromLatex
+>>
+>> Execution halted
+>>
+>> On Fri, Dec 4, 2009 at 6:23 PM, Cameron Bracken
+>> <cameron.bracken at gmail.com> wrote:
+>>>
+>>> It seems like you are using an outdated version of pgf/tikz:
+>>>
+>>> Package: tikz 2007/06/07 v1.18 (rcs-revision 1.87)
+>>>
+>>> There must be something in one of the tests that depends on version
+>>> 2.00. ?This is likely causing the error. ?It is really worth upgrading
+>>> (http://sourceforge.net/projects/pgf/). ?If I'm not mistaken this
+>>> version is included in MikTeX 2.8.
+>>>
+>>> It is not listed currently as a SystemRequirement but it really should
+>>> be.
+>>>
+>>> -Cameron
+>>>
+>>>
+>>>
+>>> On Fri, Dec 4, 2009 at 4:03 PM, Gabor Grothendieck
+>>> <ggrothendieck at gmail.com> wrote:
+>>> > I commented out the source statement but am still getting an error on
+>>> > this.
+>>> > Here is the output and test.log is attached.
+>>> >
+>>> > C:\tmp2\tikzDevice\inst\tests>findstr source testRTikZDevice.R
+>>> > # source('testXeLaTeX.R')
+>>> >
+>>> > C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output
+>>> > >
+>>> > test.l
+>>> > og
+>>> > Loading required package: filehash
+>>> > Loading required package: methods
+>>> > filehash: Simple key-value database (2.0-1 2008-12-19)
+>>> > tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+>>> > Checking for a LaTeX compiler...
+>>> >
+>>> >
+>>> > A working LaTeX compiler was found in:
+>>> > ??????? The PATH using the command latex
+>>> >
+>>> > Global option tikzLatex set to:
+>>> > ??????? C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+>>> >
+>>> > MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+>>> > Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+>>> > TeX is a trademark of the American Mathematical Society.
+>>> >
+>>> >
+>>> > Error in getMetricsFromLatex(TeXMetrics) :
+>>> > ? ******** There was a problem calculating string metrics,
+>>> > ? ******** likely there was a problem with your custom packages.
+>>> > ? ******** See the LaTeX log file above for details.
+>>> > Calls: system.time ... localTitle -> title -> <Anonymous> ->
+>>> > getMetricsFromLatex
+>>> >
+>>> > Execution halted
+>>
+>
+>
+
+From ggrothendieck at gmail.com  Sun Dec  6 15:24:01 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sun, 6 Dec 2009 09:24:01 -0500
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <28152c800912051010x5bb3ba6ch7cfe54a102945749@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com> 
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+	<971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com> 
+	<28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com> 
+	<971536df0912041503p472e032ate59b095c847382ea@mail.gmail.com> 
+	<28152c800912041523v49b4cbf0j47a2c3ece64856c3@mail.gmail.com> 
+	<971536df0912050738p622d7fffo87baafdfb5f6fe90@mail.gmail.com> 
+	<971536df0912050918q50bab58fu64fdbd2b018a01ef@mail.gmail.com> 
+	<28152c800912051010x5bb3ba6ch7cfe54a102945749@mail.gmail.com>
+Message-ID: <971536df0912060624h6c62df98y5ac41c7a64907d00@mail.gmail.com>
+
+I have modified the testRTikZDevice.R so that it will also run on Windows
+and have also created run-tests.bat which is the Windows counterpart to
+run-tests.sh except the dangerous parts of run-tests have been commented
+out.  (run-tests.sh automatically wiped out the contents of the output
+folder and it automatically rebuilt and installed the package whereas
+run-tests.bat gives messages asking the user to do those.)
+
+The changes to testRTikZDevice.R are that the R_PDFLATEXCMD environment
+variable now defaults to "pdflatex" if its not otherwise specified and the
+new GSCMD environment variable defaults to "gswin32c.exe" on Windows and
+"gs" for other platforms.  Also the use of sink(tempfile()), as you
+suggested below, is incorporated.
+
+Will send these two files offline.
+
+On Sat, Dec 5, 2009 at 1:10 PM, Cameron Bracken
+<cameron.bracken at gmail.com>wrote:
+
+> I would have been surprised if there were not issues on windows.  We
+> developed the tests for use in development (hence the reason they are
+> in inst/tests and not the standard tests/ location) and so did not
+> really have cross platform compatibility in mind. Good to know the
+> tests run successfully on windows.
+>
+> The reference to /dev/null is just there to suppress the output of the
+> packages on loading and so does not affect the test at all. A similar
+> way would be
+>
+> sink(tempfile())
+> <load packages>
+> sink()
+>
+> -Cameron
+>
+>
+>
+> On Sat, Dec 5, 2009 at 10:18 AM, Gabor Grothendieck
+> <ggrothendieck at gmail.com> wrote:
+> > You can ignore the problem I previously reported. I have it mostly
+> working
+> > now.   In MiKTeX 2.8 there can be a local repository for all users and
+> per
+> > user and it was updating one but using the other.   I think I have it
+> > straight now.
+> >
+> > There are a few problems with running the test that seem to be Windows
+> > related:
+> >
+> > 1. the testRTikZDevice.R script uses an environment variable
+> R_PDFLATEXCMD
+> > but  that was not set so I set it manually like this:
+> >
+> >    set R_PDFLATEXCMD=pdflatex
+> >    Rscript testRTikZDevice.R --output=output
+> >
+> > The script should supply a default of "pdflatex" so that this is not
+> > necessary..
+> >
+> > 2. Also in test 19 it stops because of a reference to /dev/null which is
+> not
+> > present on Windows.  Note that in the case of Windows NUL is the
+> > corresponding filename.   Or, if that test is not important you could
+> just
+> > eliminate it.
+> >
+> > On Sat, Dec 5, 2009 at 10:38 AM, Gabor Grothendieck
+> > <ggrothendieck at gmail.com> wrote:
+> >>
+> >> Thanks.  I have upgraded to MiKTeX 2.8 but it still fails.  See below
+> and
+> >> attached test.log.  If I look in the MiKTeX package manager (mpm from
+> >> commandn line) I see a pgf latex package was installed today so I
+> presume
+> >> its the latest.  I do not see a separate tikz latex package so I presume
+> its
+> >> part of pgf.
+> >>
+> >> C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output
+> >
+> >> test.log
+> >> Loading required package: filehash
+> >> Loading required package: methods
+> >> filehash: Simple key-value database (2.0-1 2008-12-19)
+> >> tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+> >> Checking for a LaTeX compiler...
+> >>
+> >>
+> >> A working LaTeX compiler was found in:
+> >>         The PATH using the command latex
+> >>
+> >> Global option tikzLatex set to:
+> >>         C:\PROGRA~1\MIKTEX~1.8\miktex\bin\latex.exe
+> >>
+> >> MiKTeX-pdfTeX 2.8.3563 (1.40.10) (MiKTeX 2.8)
+> >> Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+> >> TeX is a trademark of the American Mathematical Society.
+> >>
+> >>
+> >> Error in getMetricsFromLatex(TeXMetrics) :
+> >>   ******** There was a problem calculating string metrics,
+> >>   ******** likely there was a problem with your custom packages.
+> >>   ******** See the LaTeX log file above for details.
+> >> Calls: system.time ... localTitle -> title -> <Anonymous> ->
+> >> getMetricsFromLatex
+> >>
+> >> Execution halted
+> >>
+> >> On Fri, Dec 4, 2009 at 6:23 PM, Cameron Bracken
+> >> <cameron.bracken at gmail.com> wrote:
+> >>>
+> >>> It seems like you are using an outdated version of pgf/tikz:
+> >>>
+> >>> Package: tikz 2007/06/07 v1.18 (rcs-revision 1.87)
+> >>>
+> >>> There must be something in one of the tests that depends on version
+> >>> 2.00.  This is likely causing the error.  It is really worth upgrading
+> >>> (http://sourceforge.net/projects/pgf/).  If I'm not mistaken this
+> >>> version is included in MikTeX 2.8.
+> >>>
+> >>> It is not listed currently as a SystemRequirement but it really should
+> >>> be.
+> >>>
+> >>> -Cameron
+> >>>
+> >>>
+> >>>
+> >>> On Fri, Dec 4, 2009 at 4:03 PM, Gabor Grothendieck
+> >>> <ggrothendieck at gmail.com> wrote:
+> >>> > I commented out the source statement but am still getting an error on
+> >>> > this.
+> >>> > Here is the output and test.log is attached.
+> >>> >
+> >>> > C:\tmp2\tikzDevice\inst\tests>findstr source testRTikZDevice.R
+> >>> > # source('testXeLaTeX.R')
+> >>> >
+> >>> > C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R
+> --output=output
+> >>> > >
+> >>> > test.l
+> >>> > og
+> >>> > Loading required package: filehash
+> >>> > Loading required package: methods
+> >>> > filehash: Simple key-value database (2.0-1 2008-12-19)
+> >>> > tikzDevice: A Device for R Graphics Output in PGF/TikZ Format
+> (v0.4.8)
+> >>> > Checking for a LaTeX compiler...
+> >>> >
+> >>> >
+> >>> > A working LaTeX compiler was found in:
+> >>> >         The PATH using the command latex
+> >>> >
+> >>> > Global option tikzLatex set to:
+> >>> >         C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+> >>> >
+> >>> > MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+> >>> > Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+> >>> > TeX is a trademark of the American Mathematical Society.
+> >>> >
+> >>> >
+> >>> > Error in getMetricsFromLatex(TeXMetrics) :
+> >>> >   ******** There was a problem calculating string metrics,
+> >>> >   ******** likely there was a problem with your custom packages.
+> >>> >   ******** See the LaTeX log file above for details.
+> >>> > Calls: system.time ... localTitle -> title -> <Anonymous> ->
+> >>> > getMetricsFromLatex
+> >>> >
+> >>> > Execution halted
+> >>
+> >
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091206/70f57942/attachment-0001.htm 
+
+From ggrothendieck at gmail.com  Sun Dec  6 17:02:18 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sun, 6 Dec 2009 11:02:18 -0500
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+Message-ID: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com>
+
+I would like to create a single file that has my latex and tikzDevice output
+as opposed to outputting the tikZ output into a separate file and using
+\input .  The latex would be generated using cat statements in R.
+
+Can that be done?  If so, can you provide a small example.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091206/b1a529ff/attachment.htm 
+
+From cameron.bracken at gmail.com  Sun Dec  6 17:34:46 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Sun, 6 Dec 2009 09:34:46 -0700
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com>
+Message-ID: <28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com>
+
+Interesting Idea.  This should work with plain Sweave.  It is not very
+efficient and would be very slow for large files since it must write
+out then read in then write out.
+
+\documentclass{article}
+\usepackage{tikz}
+\usepackage[nogin]{Sweave}
+\begin{document}
+\begin{figure}[ht]
+\centering
+<<inline,echo=F,results=tex>>=
+
+  require(tikzDevice)
+  tf <- tempfile()
+  tikz(tf,width=5,height=5)
+    x <- rnorm(100)
+    plot(x)
+  #Suppress "null device 1" from being printed
+  dummy <- dev.off()
+  cat(readLines(tf),sep='\n')
+
+@
+\caption{caption}
+\label{fig:inline}
+\end{figure}
+\end{document}
+
+
+-Cameron
+
+
+
+On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+<ggrothendieck at gmail.com> wrote:
+> I would like to create a single file that has my latex and tikzDevice output
+> as opposed to outputting the tikZ output into a separate file and using
+> \input .? The latex would be generated using cat statements in R.
+>
+> Can that be done?? If so, can you provide a small example.
+>
+>
+
+From ggrothendieck at gmail.com  Sun Dec  6 17:46:09 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sun, 6 Dec 2009 11:46:09 -0500
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com> 
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com>
+Message-ID: <971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com>
+
+If you able to provide this feature (i.e. incorporate the tikz tex directly
+into the current file rather than writing out a temporary file and reading
+it back in) then that would be useful since one of the key potential
+advantages of tikz and pgf are the ability to have a single file rather than
+multiple files.  Perhaps an append=TRUE argument like this:
+
+cat("\\documentclass{article}
+\\usepackage{tikz}
+\begin{document}
+\\begin{figure}[ht]
+\\centering
+", file = "myfile.tex")
+tikz("myfile.tex", width=5, height=5, append = TRUE)
+x <- rnorm(100)
+plot(x)
+dev.off()
+cat("\\caption{caption}
+\\label{fig:inline}
+\\end{figure}
+\\end{document}
+", file = "myfile.tex", append = TRUE)
+
+On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken
+<cameron.bracken at gmail.com>wrote:
+
+> Interesting Idea.  This should work with plain Sweave.  It is not very
+> efficient and would be very slow for large files since it must write
+> out then read in then write out.
+>
+> \documentclass{article}
+> \usepackage{tikz}
+> \usepackage[nogin]{Sweave}
+> \begin{document}
+> \begin{figure}[ht]
+> \centering
+> <<inline,echo=F,results=tex>>=
+>
+>  require(tikzDevice)
+>  tf <- tempfile()
+>  tikz(tf,width=5,height=5)
+>    x <- rnorm(100)
+>    plot(x)
+>  #Suppress "null device 1" from being printed
+>  dummy <- dev.off()
+>  cat(readLines(tf),sep='\n')
+>
+> @
+> \caption{caption}
+> \label{fig:inline}
+> \end{figure}
+> \end{document}
+>
+>
+> -Cameron
+>
+>
+>
+> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+> <ggrothendieck at gmail.com> wrote:
+> > I would like to create a single file that has my latex and tikzDevice
+> output
+> > as opposed to outputting the tikZ output into a separate file and using
+> > \input .  The latex would be generated using cat statements in R.
+> >
+> > Can that be done?  If so, can you provide a small example.
+> >
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091206/1c605ab8/attachment.htm 
+
+From cameron.bracken at gmail.com  Sun Dec  6 17:47:59 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Sun, 6 Dec 2009 09:47:59 -0700
+Subject: [Tikzdevice-bugs] Peformance
+In-Reply-To: <971536df0912060624h6c62df98y5ac41c7a64907d00@mail.gmail.com>
+References: <971536df0912021710t767a28ebk4c3fe215c79f206c@mail.gmail.com>
+	<FFBCB4C7-C7BF-49B9-9A5A-36F35C135CC8@gmail.com>
+	<971536df0912040412v7a1681c9me36ae414c8e41d21@mail.gmail.com>
+	<28152c800912041150u7ffc8d8eqd0b59b9a77b35a8c@mail.gmail.com>
+	<971536df0912041503p472e032ate59b095c847382ea@mail.gmail.com>
+	<28152c800912041523v49b4cbf0j47a2c3ece64856c3@mail.gmail.com>
+	<971536df0912050738p622d7fffo87baafdfb5f6fe90@mail.gmail.com>
+	<971536df0912050918q50bab58fu64fdbd2b018a01ef@mail.gmail.com>
+	<28152c800912051010x5bb3ba6ch7cfe54a102945749@mail.gmail.com>
+	<971536df0912060624h6c62df98y5ac41c7a64907d00@mail.gmail.com>
+Message-ID: <28152c800912060847m328224c3m6f6762570cda3c90@mail.gmail.com>
+
+Thanks!  I will look these over and likely include them in the next release.
+-Cameron
+
+
+On Sun, Dec 6, 2009 at 7:24 AM, Gabor Grothendieck
+<ggrothendieck at gmail.com> wrote:
+> I have modified the testRTikZDevice.R so that it will also run on Windows
+> and have also created run-tests.bat which is the Windows counterpart to
+> run-tests.sh except the dangerous parts of run-tests have been commented
+> out.? (run-tests.sh automatically wiped out the contents of the output
+> folder and it automatically rebuilt and installed the package whereas
+> run-tests.bat gives messages asking the user to do those.)
+>
+> The changes to testRTikZDevice.R are that the R_PDFLATEXCMD environment
+> variable now defaults to "pdflatex" if its not otherwise specified and the
+> new GSCMD environment variable defaults to "gswin32c.exe" on Windows and
+> "gs" for other platforms.? Also the use of sink(tempfile()), as you
+> suggested below, is incorporated.
+>
+> Will send these two files offline.
+>
+> On Sat, Dec 5, 2009 at 1:10 PM, Cameron Bracken <cameron.bracken at gmail.com>
+> wrote:
+>>
+>> I would have been surprised if there were not issues on windows. ?We
+>> developed the tests for use in development (hence the reason they are
+>> in inst/tests and not the standard tests/ location) and so did not
+>> really have cross platform compatibility in mind. Good to know the
+>> tests run successfully on windows.
+>>
+>> The reference to /dev/null is just there to suppress the output of the
+>> packages on loading and so does not affect the test at all. A similar
+>> way would be
+>>
+>> sink(tempfile())
+>> <load packages>
+>> sink()
+>>
+>> -Cameron
+>>
+>>
+>>
+>> On Sat, Dec 5, 2009 at 10:18 AM, Gabor Grothendieck
+>> <ggrothendieck at gmail.com> wrote:
+>> > You can ignore the problem I previously reported. I have it mostly
+>> > working
+>> > now.?? In MiKTeX 2.8 there can be a local repository for all users and
+>> > per
+>> > user and it was updating one but using the other.?? I think I have it
+>> > straight now.
+>> >
+>> > There are a few problems with running the test that seem to be Windows
+>> > related:
+>> >
+>> > 1. the testRTikZDevice.R script uses an environment variable
+>> > R_PDFLATEXCMD
+>> > but? that was not set so I set it manually like this:
+>> >
+>> > ?? set R_PDFLATEXCMD=pdflatex
+>> > ?? Rscript testRTikZDevice.R --output=output
+>> >
+>> > The script should supply a default of "pdflatex" so that this is not
+>> > necessary..
+>> >
+>> > 2. Also in test 19 it stops because of a reference to /dev/null which is
+>> > not
+>> > present on Windows.? Note that in the case of Windows NUL is the
+>> > corresponding filename.?? Or, if that test is not important you could
+>> > just
+>> > eliminate it.
+>> >
+>> > On Sat, Dec 5, 2009 at 10:38 AM, Gabor Grothendieck
+>> > <ggrothendieck at gmail.com> wrote:
+>> >>
+>> >> Thanks.? I have upgraded to MiKTeX 2.8 but it still fails.? See below
+>> >> and
+>> >> attached test.log.? If I look in the MiKTeX package manager (mpm from
+>> >> commandn line) I see a pgf latex package was installed today so I
+>> >> presume
+>> >> its the latest.? I do not see a separate tikz latex package so I
+>> >> presume its
+>> >> part of pgf.
+>> >>
+>> >> C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R --output=output
+>> >> >
+>> >> test.log
+>> >> Loading required package: filehash
+>> >> Loading required package: methods
+>> >> filehash: Simple key-value database (2.0-1 2008-12-19)
+>> >> tikzDevice: A Device for R Graphics Output in PGF/TikZ Format (v0.4.8)
+>> >> Checking for a LaTeX compiler...
+>> >>
+>> >>
+>> >> A working LaTeX compiler was found in:
+>> >> ??????? The PATH using the command latex
+>> >>
+>> >> Global option tikzLatex set to:
+>> >> ??????? C:\PROGRA~1\MIKTEX~1.8\miktex\bin\latex.exe
+>> >>
+>> >> MiKTeX-pdfTeX 2.8.3563 (1.40.10) (MiKTeX 2.8)
+>> >> Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+>> >> TeX is a trademark of the American Mathematical Society.
+>> >>
+>> >>
+>> >> Error in getMetricsFromLatex(TeXMetrics) :
+>> >> ? ******** There was a problem calculating string metrics,
+>> >> ? ******** likely there was a problem with your custom packages.
+>> >> ? ******** See the LaTeX log file above for details.
+>> >> Calls: system.time ... localTitle -> title -> <Anonymous> ->
+>> >> getMetricsFromLatex
+>> >>
+>> >> Execution halted
+>> >>
+>> >> On Fri, Dec 4, 2009 at 6:23 PM, Cameron Bracken
+>> >> <cameron.bracken at gmail.com> wrote:
+>> >>>
+>> >>> It seems like you are using an outdated version of pgf/tikz:
+>> >>>
+>> >>> Package: tikz 2007/06/07 v1.18 (rcs-revision 1.87)
+>> >>>
+>> >>> There must be something in one of the tests that depends on version
+>> >>> 2.00. ?This is likely causing the error. ?It is really worth upgrading
+>> >>> (http://sourceforge.net/projects/pgf/). ?If I'm not mistaken this
+>> >>> version is included in MikTeX 2.8.
+>> >>>
+>> >>> It is not listed currently as a SystemRequirement but it really should
+>> >>> be.
+>> >>>
+>> >>> -Cameron
+>> >>>
+>> >>>
+>> >>>
+>> >>> On Fri, Dec 4, 2009 at 4:03 PM, Gabor Grothendieck
+>> >>> <ggrothendieck at gmail.com> wrote:
+>> >>> > I commented out the source statement but am still getting an error
+>> >>> > on
+>> >>> > this.
+>> >>> > Here is the output and test.log is attached.
+>> >>> >
+>> >>> > C:\tmp2\tikzDevice\inst\tests>findstr source testRTikZDevice.R
+>> >>> > # source('testXeLaTeX.R')
+>> >>> >
+>> >>> > C:\tmp2\tikzDevice\inst\tests>Rscript testRTikZDevice.R
+>> >>> > --output=output
+>> >>> > >
+>> >>> > test.l
+>> >>> > og
+>> >>> > Loading required package: filehash
+>> >>> > Loading required package: methods
+>> >>> > filehash: Simple key-value database (2.0-1 2008-12-19)
+>> >>> > tikzDevice: A Device for R Graphics Output in PGF/TikZ Format
+>> >>> > (v0.4.8)
+>> >>> > Checking for a LaTeX compiler...
+>> >>> >
+>> >>> >
+>> >>> > A working LaTeX compiler was found in:
+>> >>> > ??????? The PATH using the command latex
+>> >>> >
+>> >>> > Global option tikzLatex set to:
+>> >>> > ??????? C:\PROGRA~1\MIKTEX~1.7\miktex\bin\latex.exe
+>> >>> >
+>> >>> > MiKTeX-pdfTeX 2.7.2808 (1.40.4) (MiKTeX 2.7)
+>> >>> > Copyright (C) 1982 D. E. Knuth, (C) 1996-2006 Han The Thanh
+>> >>> > TeX is a trademark of the American Mathematical Society.
+>> >>> >
+>> >>> >
+>> >>> > Error in getMetricsFromLatex(TeXMetrics) :
+>> >>> > ? ******** There was a problem calculating string metrics,
+>> >>> > ? ******** likely there was a problem with your custom packages.
+>> >>> > ? ******** See the LaTeX log file above for details.
+>> >>> > Calls: system.time ... localTitle -> title -> <Anonymous> ->
+>> >>> > getMetricsFromLatex
+>> >>> >
+>> >>> > Execution halted
+>> >>
+>> >
+>> >
+>
+>
+
+From cameron.bracken at gmail.com  Sun Dec  6 21:04:41 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Sun, 6 Dec 2009 13:04:41 -0700
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com>
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com>
+	<971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com>
+Message-ID: <28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com>
+
+I liked this idea so much that I implemented it right away. You can
+get it from the master branch of my github fork until the next release
+
+http://github.com/cameronbracken/rtikzdevice/network
+
+Instead of "append" i called it "console."  It works nearly as you envisioned:
+
+cat("\\documentclass{article}
+\\usepackage{tikz}
+
+\\begin{document}
+\\begin{figure}[ht]
+\\centering
+", file = "myfile.tex")
+
+sink("myfile.tex",append=T)
+tikz(console=T, width=5, height=5)
+
+x <- rnorm(100)
+plot(x)
+quiet <- dev.off()
+sink()
+
+cat("\\caption{caption}
+
+\\label{fig:inline}
+\\end{figure}
+\\end{document}
+", file = "myfile.tex", append = TRUE)
+
+The following will now produce a self contained tex file:
+
+\documentclass{article}
+\usepackage{tikz}
+\usepackage[nogin]{Sweave}
+\begin{document}
+\begin{figure}[ht]
+\centering
+<<inline,echo=F,results=tex>>=
+
+  require(tikzDevice)
+  tikz(console=T,width=5,height=5)
+    x <- rnorm(100)
+    plot(x)
+  dummy <- dev.off()
+
+@
+\caption{caption}
+\label{fig:inline}
+\end{figure}
+\end{document}
+
+
+-Cameron
+
+
+On Sun, Dec 6, 2009 at 9:46 AM, Gabor Grothendieck
+<ggrothendieck at gmail.com> wrote:
+> If you able to provide this feature (i.e. incorporate the tikz tex directly
+> into the current file rather than writing out a temporary file and reading
+> it back in) then that would be useful since one of the key potential
+> advantages of tikz and pgf are the ability to have a single file rather than
+> multiple files.? Perhaps an append=TRUE argument like this:
+>
+> cat("\\documentclass{article}
+> \\usepackage{tikz}
+> \begin{document}
+> \\begin{figure}[ht]
+> \\centering
+> ", file = "myfile.tex")
+> tikz("myfile.tex", width=5, height=5, append = TRUE)
+> x <- rnorm(100)
+> plot(x)
+> dev.off()
+> cat("\\caption{caption}
+> \\label{fig:inline}
+> \\end{figure}
+> \\end{document}
+> ", file = "myfile.tex", append = TRUE)
+>
+> On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken <cameron.bracken at gmail.com>
+> wrote:
+>>
+>> Interesting Idea. ?This should work with plain Sweave. ?It is not very
+>> efficient and would be very slow for large files since it must write
+>> out then read in then write out.
+>>
+>> \documentclass{article}
+>> \usepackage{tikz}
+>> \usepackage[nogin]{Sweave}
+>> \begin{document}
+>> \begin{figure}[ht]
+>> \centering
+>> <<inline,echo=F,results=tex>>=
+>>
+>> ?require(tikzDevice)
+>> ?tf <- tempfile()
+>> ?tikz(tf,width=5,height=5)
+>> ? ?x <- rnorm(100)
+>> ? ?plot(x)
+>> ?#Suppress "null device 1" from being printed
+>> ?dummy <- dev.off()
+>> ?cat(readLines(tf),sep='\n')
+>>
+>> @
+>> \caption{caption}
+>> \label{fig:inline}
+>> \end{figure}
+>> \end{document}
+>>
+>>
+>> -Cameron
+>>
+>>
+>>
+>> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+>> <ggrothendieck at gmail.com> wrote:
+>> > I would like to create a single file that has my latex and tikzDevice
+>> > output
+>> > as opposed to outputting the tikZ output into a separate file and using
+>> > \input .? The latex would be generated using cat statements in R.
+>> >
+>> > Can that be done?? If so, can you provide a small example.
+>> >
+>> >
+>
+>
+
+From ggrothendieck at gmail.com  Sun Dec  6 21:17:18 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sun, 6 Dec 2009 15:17:18 -0500
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com> 
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com> 
+	<971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com> 
+	<28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com>
+Message-ID: <971536df0912061217r7f3f8d6eqf93d26c7e2b4b63c@mail.gmail.com>
+
+Great. Just one other related comment.  I think I would likely use the
+tikz(..., append=TRUE) style but some might prefer to use sink.  That could
+be done if it were possible to write the output to stdout like this.   If
+its not a problem you might want to add that too.
+
+sink("myfile.tex")
+cat("\\documentclass{article}
+\\usepackage{tikz}
+\begin{document}
+\\begin{figure}[ht]
+\\centering
+")
+# "" or "stdout" or default writes to stdout
+tikz(width=5, height=5)
+x <- rnorm(100)
+plot(x)
+dev.off()
+cat("\\caption{caption}
+\\label{fig:inline}
+\\end{figure}
+\\end{document}
+")
+sink()
+
+
+
+On Sun, Dec 6, 2009 at 3:04 PM, Cameron Bracken
+<cameron.bracken at gmail.com>wrote:
+
+> I liked this idea so much that I implemented it right away. You can
+> get it from the master branch of my github fork until the next release
+>
+> http://github.com/cameronbracken/rtikzdevice/network
+>
+> Instead of "append" i called it "console."  It works nearly as you
+> envisioned:
+>
+> cat("\\documentclass{article}
+> \\usepackage{tikz}
+>
+> \\begin{document}
+> \\begin{figure}[ht]
+> \\centering
+> ", file = "myfile.tex")
+>
+> sink("myfile.tex",append=T)
+> tikz(console=T, width=5, height=5)
+>
+> x <- rnorm(100)
+> plot(x)
+> quiet <- dev.off()
+> sink()
+>
+> cat("\\caption{caption}
+>
+> \\label{fig:inline}
+> \\end{figure}
+> \\end{document}
+> ", file = "myfile.tex", append = TRUE)
+>
+> The following will now produce a self contained tex file:
+>
+> \documentclass{article}
+> \usepackage{tikz}
+> \usepackage[nogin]{Sweave}
+> \begin{document}
+> \begin{figure}[ht]
+> \centering
+> <<inline,echo=F,results=tex>>=
+>
+>  require(tikzDevice)
+>   tikz(console=T,width=5,height=5)
+>     x <- rnorm(100)
+>    plot(x)
+>   dummy <- dev.off()
+>
+> @
+> \caption{caption}
+> \label{fig:inline}
+> \end{figure}
+> \end{document}
+>
+>
+> -Cameron
+>
+>
+> On Sun, Dec 6, 2009 at 9:46 AM, Gabor Grothendieck
+> <ggrothendieck at gmail.com> wrote:
+> > If you able to provide this feature (i.e. incorporate the tikz tex
+> directly
+> > into the current file rather than writing out a temporary file and
+> reading
+> > it back in) then that would be useful since one of the key potential
+> > advantages of tikz and pgf are the ability to have a single file rather
+> than
+> > multiple files.  Perhaps an append=TRUE argument like this:
+> >
+> > cat("\\documentclass{article}
+> > \\usepackage{tikz}
+> > \begin{document}
+> > \\begin{figure}[ht]
+> > \\centering
+> > ", file = "myfile.tex")
+> > tikz("myfile.tex", width=5, height=5, append = TRUE)
+> > x <- rnorm(100)
+> > plot(x)
+> > dev.off()
+> > cat("\\caption{caption}
+> > \\label{fig:inline}
+> > \\end{figure}
+> > \\end{document}
+> > ", file = "myfile.tex", append = TRUE)
+> >
+> > On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken <
+> cameron.bracken at gmail.com>
+> > wrote:
+> >>
+> >> Interesting Idea.  This should work with plain Sweave.  It is not very
+> >> efficient and would be very slow for large files since it must write
+> >> out then read in then write out.
+> >>
+> >> \documentclass{article}
+> >> \usepackage{tikz}
+> >> \usepackage[nogin]{Sweave}
+> >> \begin{document}
+> >> \begin{figure}[ht]
+> >> \centering
+> >> <<inline,echo=F,results=tex>>=
+> >>
+> >>  require(tikzDevice)
+> >>  tf <- tempfile()
+> >>  tikz(tf,width=5,height=5)
+> >>    x <- rnorm(100)
+> >>    plot(x)
+> >>  #Suppress "null device 1" from being printed
+> >>  dummy <- dev.off()
+> >>  cat(readLines(tf),sep='\n')
+> >>
+> >> @
+> >> \caption{caption}
+> >> \label{fig:inline}
+> >> \end{figure}
+> >> \end{document}
+> >>
+> >>
+> >> -Cameron
+> >>
+> >>
+> >>
+> >> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+> >> <ggrothendieck at gmail.com> wrote:
+> >> > I would like to create a single file that has my latex and tikzDevice
+> >> > output
+> >> > as opposed to outputting the tikZ output into a separate file and
+> using
+> >> > \input .  The latex would be generated using cat statements in R.
+> >> >
+> >> > Can that be done?  If so, can you provide a small example.
+> >> >
+> >> >
+> >
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091206/a2462e0a/attachment-0001.htm 
+
+From ggrothendieck at gmail.com  Sun Dec  6 21:25:31 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sun, 6 Dec 2009 15:25:31 -0500
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <971536df0912061217r7f3f8d6eqf93d26c7e2b4b63c@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com> 
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com> 
+	<971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com> 
+	<28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com> 
+	<971536df0912061217r7f3f8d6eqf93d26c7e2b4b63c@mail.gmail.com>
+Message-ID: <971536df0912061225t4988ee1asd31857d522e6d714@mail.gmail.com>
+
+And yet another comment.  There has been a recent discussion about allowing
+devices to output to connections on r-devel and apparently this has
+languished for years despite Jeffrey Horner posting code which would have
+allowed it 3 years ago.  Would it be a problem for tikz to handle that even
+if the other devices don't?  For example, Hadley Wickham had posted this
+proposed functionality:
+
+rc <- rawConnection("raw.img", "w")
+png(rc)
+plot(1:10)
+dev.off()
+close(rc)
+
+where in this case png() would be replaced with tikz().
+
+On Sun, Dec 6, 2009 at 3:17 PM, Gabor Grothendieck
+<ggrothendieck at gmail.com>wrote:
+
+> Great. Just one other related comment.  I think I would likely use the
+> tikz(..., append=TRUE) style but some might prefer to use sink.  That could
+> be done if it were possible to write the output to stdout like this.   If
+> its not a problem you might want to add that too.
+>
+> sink("myfile.tex")
+>
+> cat("\\documentclass{article}
+> \\usepackage{tikz}
+> \begin{document}
+> \\begin{figure}[ht]
+> \\centering
+> ")
+> # "" or "stdout" or default writes to stdout
+> tikz(width=5, height=5)
+>
+> x <- rnorm(100)
+> plot(x)
+> dev.off()
+> cat("\\caption{caption}
+> \\label{fig:inline}
+> \\end{figure}
+> \\end{document}
+> ")
+> sink()
+>
+>
+>
+>
+> On Sun, Dec 6, 2009 at 3:04 PM, Cameron Bracken <cameron.bracken at gmail.com
+> > wrote:
+>
+>> I liked this idea so much that I implemented it right away. You can
+>> get it from the master branch of my github fork until the next release
+>>
+>> http://github.com/cameronbracken/rtikzdevice/network
+>>
+>> Instead of "append" i called it "console."  It works nearly as you
+>> envisioned:
+>>
+>> cat("\\documentclass{article}
+>> \\usepackage{tikz}
+>>
+>> \\begin{document}
+>> \\begin{figure}[ht]
+>> \\centering
+>> ", file = "myfile.tex")
+>>
+>> sink("myfile.tex",append=T)
+>> tikz(console=T, width=5, height=5)
+>>
+>> x <- rnorm(100)
+>> plot(x)
+>> quiet <- dev.off()
+>> sink()
+>>
+>> cat("\\caption{caption}
+>>
+>> \\label{fig:inline}
+>> \\end{figure}
+>> \\end{document}
+>> ", file = "myfile.tex", append = TRUE)
+>>
+>> The following will now produce a self contained tex file:
+>>
+>> \documentclass{article}
+>> \usepackage{tikz}
+>> \usepackage[nogin]{Sweave}
+>> \begin{document}
+>> \begin{figure}[ht]
+>> \centering
+>> <<inline,echo=F,results=tex>>=
+>>
+>>  require(tikzDevice)
+>>   tikz(console=T,width=5,height=5)
+>>     x <- rnorm(100)
+>>    plot(x)
+>>   dummy <- dev.off()
+>>
+>> @
+>> \caption{caption}
+>> \label{fig:inline}
+>> \end{figure}
+>> \end{document}
+>>
+>>
+>> -Cameron
+>>
+>>
+>> On Sun, Dec 6, 2009 at 9:46 AM, Gabor Grothendieck
+>> <ggrothendieck at gmail.com> wrote:
+>> > If you able to provide this feature (i.e. incorporate the tikz tex
+>> directly
+>> > into the current file rather than writing out a temporary file and
+>> reading
+>> > it back in) then that would be useful since one of the key potential
+>> > advantages of tikz and pgf are the ability to have a single file rather
+>> than
+>> > multiple files.  Perhaps an append=TRUE argument like this:
+>> >
+>> > cat("\\documentclass{article}
+>> > \\usepackage{tikz}
+>> > \begin{document}
+>> > \\begin{figure}[ht]
+>> > \\centering
+>> > ", file = "myfile.tex")
+>> > tikz("myfile.tex", width=5, height=5, append = TRUE)
+>> > x <- rnorm(100)
+>> > plot(x)
+>> > dev.off()
+>> > cat("\\caption{caption}
+>> > \\label{fig:inline}
+>> > \\end{figure}
+>> > \\end{document}
+>> > ", file = "myfile.tex", append = TRUE)
+>> >
+>> > On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken <
+>> cameron.bracken at gmail.com>
+>> > wrote:
+>> >>
+>> >> Interesting Idea.  This should work with plain Sweave.  It is not very
+>> >> efficient and would be very slow for large files since it must write
+>> >> out then read in then write out.
+>> >>
+>> >> \documentclass{article}
+>> >> \usepackage{tikz}
+>> >> \usepackage[nogin]{Sweave}
+>> >> \begin{document}
+>> >> \begin{figure}[ht]
+>> >> \centering
+>> >> <<inline,echo=F,results=tex>>=
+>> >>
+>> >>  require(tikzDevice)
+>> >>  tf <- tempfile()
+>> >>  tikz(tf,width=5,height=5)
+>> >>    x <- rnorm(100)
+>> >>    plot(x)
+>> >>  #Suppress "null device 1" from being printed
+>> >>  dummy <- dev.off()
+>> >>  cat(readLines(tf),sep='\n')
+>> >>
+>> >> @
+>> >> \caption{caption}
+>> >> \label{fig:inline}
+>> >> \end{figure}
+>> >> \end{document}
+>> >>
+>> >>
+>> >> -Cameron
+>> >>
+>> >>
+>> >>
+>> >> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+>> >> <ggrothendieck at gmail.com> wrote:
+>> >> > I would like to create a single file that has my latex and tikzDevice
+>> >> > output
+>> >> > as opposed to outputting the tikZ output into a separate file and
+>> using
+>> >> > \input .  The latex would be generated using cat statements in R.
+>> >> >
+>> >> > Can that be done?  If so, can you provide a small example.
+>> >> >
+>> >> >
+>> >
+>> >
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091206/80517365/attachment.htm 
+
+From ggrothendieck at gmail.com  Sun Dec  6 21:28:32 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sun, 6 Dec 2009 15:28:32 -0500
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <971536df0912061225t4988ee1asd31857d522e6d714@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com> 
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com> 
+	<971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com> 
+	<28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com> 
+	<971536df0912061217r7f3f8d6eqf93d26c7e2b4b63c@mail.gmail.com> 
+	<971536df0912061225t4988ee1asd31857d522e6d714@mail.gmail.com>
+Message-ID: <971536df0912061228s43b36646n56c52bdb67cc2462@mail.gmail.com>
+
+img.raw is intended to represent the name of a raw R object, not a file
+name.
+
+On Sun, Dec 6, 2009 at 3:25 PM, Gabor Grothendieck
+<ggrothendieck at gmail.com>wrote:
+
+> And yet another comment.  There has been a recent discussion about allowing
+> devices to output to connections on r-devel and apparently this has
+> languished for years despite Jeffrey Horner posting code which would have
+> allowed it 3 years ago.  Would it be a problem for tikz to handle that even
+> if the other devices don't?  For example, Hadley Wickham had posted this
+> proposed functionality:
+>
+> rc <- rawConnection("raw.img", "w")
+> png(rc)
+> plot(1:10)
+> dev.off()
+> close(rc)
+>
+> where in this case png() would be replaced with tikz().
+>
+>
+> On Sun, Dec 6, 2009 at 3:17 PM, Gabor Grothendieck <
+> ggrothendieck at gmail.com> wrote:
+>
+>> Great. Just one other related comment.  I think I would likely use the
+>> tikz(..., append=TRUE) style but some might prefer to use sink.  That could
+>> be done if it were possible to write the output to stdout like this.   If
+>> its not a problem you might want to add that too.
+>>
+>> sink("myfile.tex")
+>>
+>> cat("\\documentclass{article}
+>> \\usepackage{tikz}
+>> \begin{document}
+>> \\begin{figure}[ht]
+>> \\centering
+>> ")
+>> # "" or "stdout" or default writes to stdout
+>> tikz(width=5, height=5)
+>>
+>> x <- rnorm(100)
+>> plot(x)
+>> dev.off()
+>> cat("\\caption{caption}
+>> \\label{fig:inline}
+>> \\end{figure}
+>> \\end{document}
+>> ")
+>> sink()
+>>
+>>
+>>
+>>
+>> On Sun, Dec 6, 2009 at 3:04 PM, Cameron Bracken <
+>> cameron.bracken at gmail.com> wrote:
+>>
+>>> I liked this idea so much that I implemented it right away. You can
+>>> get it from the master branch of my github fork until the next release
+>>>
+>>> http://github.com/cameronbracken/rtikzdevice/network
+>>>
+>>> Instead of "append" i called it "console."  It works nearly as you
+>>> envisioned:
+>>>
+>>> cat("\\documentclass{article}
+>>> \\usepackage{tikz}
+>>>
+>>> \\begin{document}
+>>> \\begin{figure}[ht]
+>>> \\centering
+>>> ", file = "myfile.tex")
+>>>
+>>> sink("myfile.tex",append=T)
+>>> tikz(console=T, width=5, height=5)
+>>>
+>>> x <- rnorm(100)
+>>> plot(x)
+>>> quiet <- dev.off()
+>>> sink()
+>>>
+>>> cat("\\caption{caption}
+>>>
+>>> \\label{fig:inline}
+>>> \\end{figure}
+>>> \\end{document}
+>>> ", file = "myfile.tex", append = TRUE)
+>>>
+>>> The following will now produce a self contained tex file:
+>>>
+>>> \documentclass{article}
+>>> \usepackage{tikz}
+>>> \usepackage[nogin]{Sweave}
+>>> \begin{document}
+>>> \begin{figure}[ht]
+>>> \centering
+>>> <<inline,echo=F,results=tex>>=
+>>>
+>>>  require(tikzDevice)
+>>>   tikz(console=T,width=5,height=5)
+>>>     x <- rnorm(100)
+>>>    plot(x)
+>>>   dummy <- dev.off()
+>>>
+>>> @
+>>> \caption{caption}
+>>> \label{fig:inline}
+>>> \end{figure}
+>>> \end{document}
+>>>
+>>>
+>>> -Cameron
+>>>
+>>>
+>>> On Sun, Dec 6, 2009 at 9:46 AM, Gabor Grothendieck
+>>> <ggrothendieck at gmail.com> wrote:
+>>> > If you able to provide this feature (i.e. incorporate the tikz tex
+>>> directly
+>>> > into the current file rather than writing out a temporary file and
+>>> reading
+>>> > it back in) then that would be useful since one of the key potential
+>>> > advantages of tikz and pgf are the ability to have a single file rather
+>>> than
+>>> > multiple files.  Perhaps an append=TRUE argument like this:
+>>> >
+>>> > cat("\\documentclass{article}
+>>> > \\usepackage{tikz}
+>>> > \begin{document}
+>>> > \\begin{figure}[ht]
+>>> > \\centering
+>>> > ", file = "myfile.tex")
+>>> > tikz("myfile.tex", width=5, height=5, append = TRUE)
+>>> > x <- rnorm(100)
+>>> > plot(x)
+>>> > dev.off()
+>>> > cat("\\caption{caption}
+>>> > \\label{fig:inline}
+>>> > \\end{figure}
+>>> > \\end{document}
+>>> > ", file = "myfile.tex", append = TRUE)
+>>> >
+>>> > On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken <
+>>> cameron.bracken at gmail.com>
+>>> > wrote:
+>>> >>
+>>> >> Interesting Idea.  This should work with plain Sweave.  It is not very
+>>> >> efficient and would be very slow for large files since it must write
+>>> >> out then read in then write out.
+>>> >>
+>>> >> \documentclass{article}
+>>> >> \usepackage{tikz}
+>>> >> \usepackage[nogin]{Sweave}
+>>> >> \begin{document}
+>>> >> \begin{figure}[ht]
+>>> >> \centering
+>>> >> <<inline,echo=F,results=tex>>=
+>>> >>
+>>> >>  require(tikzDevice)
+>>> >>  tf <- tempfile()
+>>> >>  tikz(tf,width=5,height=5)
+>>> >>    x <- rnorm(100)
+>>> >>    plot(x)
+>>> >>  #Suppress "null device 1" from being printed
+>>> >>  dummy <- dev.off()
+>>> >>  cat(readLines(tf),sep='\n')
+>>> >>
+>>> >> @
+>>> >> \caption{caption}
+>>> >> \label{fig:inline}
+>>> >> \end{figure}
+>>> >> \end{document}
+>>> >>
+>>> >>
+>>> >> -Cameron
+>>> >>
+>>> >>
+>>> >>
+>>> >> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+>>> >> <ggrothendieck at gmail.com> wrote:
+>>> >> > I would like to create a single file that has my latex and
+>>> tikzDevice
+>>> >> > output
+>>> >> > as opposed to outputting the tikZ output into a separate file and
+>>> using
+>>> >> > \input .  The latex would be generated using cat statements in R.
+>>> >> >
+>>> >> > Can that be done?  If so, can you provide a small example.
+>>> >> >
+>>> >> >
+>>> >
+>>> >
+>>>
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091206/dc6d8200/attachment.htm 
+
+From cameron.bracken at gmail.com  Sun Dec  6 21:47:40 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Sun, 6 Dec 2009 13:47:40 -0700
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <971536df0912061228s43b36646n56c52bdb67cc2462@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com>
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com>
+	<971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com>
+	<28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com>
+	<971536df0912061217r7f3f8d6eqf93d26c7e2b4b63c@mail.gmail.com>
+	<971536df0912061225t4988ee1asd31857d522e6d714@mail.gmail.com>
+	<971536df0912061228s43b36646n56c52bdb67cc2462@mail.gmail.com>
+Message-ID: <28152c800912061247k6e6c3106p672f909f4d09e355@mail.gmail.com>
+
+Now if you call tikz with an empty file name
+
+tikz('')
+
+it will dump to the console. It cant be called with no file name
+because that will default to the standard Rplots.tex file. The changes
+are on Github.
+
+As for the rawConnection functionality, I do not know much about this
+sort of R programming but I suppose it would be possible. Am I right
+in thinking that afterward you might then
+
+print(rc)
+
+to output to a file?  It would certainly not be trivial on the C level
+but I believe it could be done.
+
+-Cameron
+
+
+
+On Sun, Dec 6, 2009 at 1:28 PM, Gabor Grothendieck
+<ggrothendieck at gmail.com> wrote:
+> img.raw is intended to represent the name of a raw R object, not a file
+> name.
+>
+> On Sun, Dec 6, 2009 at 3:25 PM, Gabor Grothendieck <ggrothendieck at gmail.com>
+> wrote:
+>>
+>> And yet another comment.? There has been a recent discussion about
+>> allowing devices to output to connections on r-devel and apparently this has
+>> languished for years despite Jeffrey Horner posting code which would have
+>> allowed it 3 years ago.? Would it be a problem for tikz to handle that even
+>> if the other devices don't?? For example, Hadley Wickham had posted this
+>> proposed functionality:
+>>
+>> rc <- rawConnection("raw.img", "w")
+>> png(rc)
+>> plot(1:10)
+>> dev.off()
+>> close(rc)
+>>
+>> where in this case png() would be replaced with tikz().
+>>
+>> On Sun, Dec 6, 2009 at 3:17 PM, Gabor Grothendieck
+>> <ggrothendieck at gmail.com> wrote:
+>>>
+>>> Great. Just one other related comment.? I think I would likely use the
+>>> tikz(..., append=TRUE) style but some might prefer to use sink.? That could
+>>> be done if it were possible to write the output to stdout like this.?? If
+>>> its not a problem you might want to add that too.
+>>>
+>>> sink("myfile.tex")
+>>> cat("\\documentclass{article}
+>>> \\usepackage{tikz}
+>>> \begin{document}
+>>> \\begin{figure}[ht]
+>>> \\centering
+>>> ")
+>>> # "" or "stdout" or default writes to stdout
+>>> tikz(width=5, height=5)
+>>> x <- rnorm(100)
+>>> plot(x)
+>>> dev.off()
+>>> cat("\\caption{caption}
+>>> \\label{fig:inline}
+>>> \\end{figure}
+>>> \\end{document}
+>>> ")
+>>> sink()
+>>>
+>>>
+>>>
+>>> On Sun, Dec 6, 2009 at 3:04 PM, Cameron Bracken
+>>> <cameron.bracken at gmail.com> wrote:
+>>>>
+>>>> I liked this idea so much that I implemented it right away. You can
+>>>> get it from the master branch of my github fork until the next release
+>>>>
+>>>> http://github.com/cameronbracken/rtikzdevice/network
+>>>>
+>>>> Instead of "append" i called it "console." ?It works nearly as you
+>>>> envisioned:
+>>>>
+>>>> cat("\\documentclass{article}
+>>>> \\usepackage{tikz}
+>>>>
+>>>> \\begin{document}
+>>>> \\begin{figure}[ht]
+>>>> \\centering
+>>>> ", file = "myfile.tex")
+>>>>
+>>>> sink("myfile.tex",append=T)
+>>>> tikz(console=T, width=5, height=5)
+>>>>
+>>>> x <- rnorm(100)
+>>>> plot(x)
+>>>> quiet <- dev.off()
+>>>> sink()
+>>>>
+>>>> cat("\\caption{caption}
+>>>>
+>>>> \\label{fig:inline}
+>>>> \\end{figure}
+>>>> \\end{document}
+>>>> ", file = "myfile.tex", append = TRUE)
+>>>>
+>>>> The following will now produce a self contained tex file:
+>>>>
+>>>> \documentclass{article}
+>>>> \usepackage{tikz}
+>>>> \usepackage[nogin]{Sweave}
+>>>> \begin{document}
+>>>> \begin{figure}[ht]
+>>>> \centering
+>>>> <<inline,echo=F,results=tex>>=
+>>>>
+>>>> ?require(tikzDevice)
+>>>> ?tikz(console=T,width=5,height=5)
+>>>> ? ?x <- rnorm(100)
+>>>> ? ?plot(x)
+>>>> ?dummy <- dev.off()
+>>>>
+>>>> @
+>>>> \caption{caption}
+>>>> \label{fig:inline}
+>>>> \end{figure}
+>>>> \end{document}
+>>>>
+>>>>
+>>>> -Cameron
+>>>>
+>>>>
+>>>> On Sun, Dec 6, 2009 at 9:46 AM, Gabor Grothendieck
+>>>> <ggrothendieck at gmail.com> wrote:
+>>>> > If you able to provide this feature (i.e. incorporate the tikz tex
+>>>> > directly
+>>>> > into the current file rather than writing out a temporary file and
+>>>> > reading
+>>>> > it back in) then that would be useful since one of the key potential
+>>>> > advantages of tikz and pgf are the ability to have a single file
+>>>> > rather than
+>>>> > multiple files.? Perhaps an append=TRUE argument like this:
+>>>> >
+>>>> > cat("\\documentclass{article}
+>>>> > \\usepackage{tikz}
+>>>> > \begin{document}
+>>>> > \\begin{figure}[ht]
+>>>> > \\centering
+>>>> > ", file = "myfile.tex")
+>>>> > tikz("myfile.tex", width=5, height=5, append = TRUE)
+>>>> > x <- rnorm(100)
+>>>> > plot(x)
+>>>> > dev.off()
+>>>> > cat("\\caption{caption}
+>>>> > \\label{fig:inline}
+>>>> > \\end{figure}
+>>>> > \\end{document}
+>>>> > ", file = "myfile.tex", append = TRUE)
+>>>> >
+>>>> > On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken
+>>>> > <cameron.bracken at gmail.com>
+>>>> > wrote:
+>>>> >>
+>>>> >> Interesting Idea. ?This should work with plain Sweave. ?It is not
+>>>> >> very
+>>>> >> efficient and would be very slow for large files since it must write
+>>>> >> out then read in then write out.
+>>>> >>
+>>>> >> \documentclass{article}
+>>>> >> \usepackage{tikz}
+>>>> >> \usepackage[nogin]{Sweave}
+>>>> >> \begin{document}
+>>>> >> \begin{figure}[ht]
+>>>> >> \centering
+>>>> >> <<inline,echo=F,results=tex>>=
+>>>> >>
+>>>> >> ?require(tikzDevice)
+>>>> >> ?tf <- tempfile()
+>>>> >> ?tikz(tf,width=5,height=5)
+>>>> >> ? ?x <- rnorm(100)
+>>>> >> ? ?plot(x)
+>>>> >> ?#Suppress "null device 1" from being printed
+>>>> >> ?dummy <- dev.off()
+>>>> >> ?cat(readLines(tf),sep='\n')
+>>>> >>
+>>>> >> @
+>>>> >> \caption{caption}
+>>>> >> \label{fig:inline}
+>>>> >> \end{figure}
+>>>> >> \end{document}
+>>>> >>
+>>>> >>
+>>>> >> -Cameron
+>>>> >>
+>>>> >>
+>>>> >>
+>>>> >> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+>>>> >> <ggrothendieck at gmail.com> wrote:
+>>>> >> > I would like to create a single file that has my latex and
+>>>> >> > tikzDevice
+>>>> >> > output
+>>>> >> > as opposed to outputting the tikZ output into a separate file and
+>>>> >> > using
+>>>> >> > \input .? The latex would be generated using cat statements in R.
+>>>> >> >
+>>>> >> > Can that be done?? If so, can you provide a small example.
+>>>> >> >
+>>>> >> >
+>>>> >
+>>>> >
+>>>
+>>
+>
+>
+
+From ggrothendieck at gmail.com  Sun Dec  6 22:13:56 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sun, 6 Dec 2009 16:13:56 -0500
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <28152c800912061247k6e6c3106p672f909f4d09e355@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com> 
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com> 
+	<971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com> 
+	<28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com> 
+	<971536df0912061217r7f3f8d6eqf93d26c7e2b4b63c@mail.gmail.com> 
+	<971536df0912061225t4988ee1asd31857d522e6d714@mail.gmail.com> 
+	<971536df0912061228s43b36646n56c52bdb67cc2462@mail.gmail.com> 
+	<28152c800912061247k6e6c3106p672f909f4d09e355@mail.gmail.com>
+Message-ID: <971536df0912061313s71e22021tf24b69a33d4c368b@mail.gmail.com>
+
+Yes, I think that is the implication.  The basic desire is to be able to
+store the output in a variable (which might possibly be manipulated) and
+then print it out or embed it in a file later.
+
+On Sun, Dec 6, 2009 at 3:47 PM, Cameron Bracken
+<cameron.bracken at gmail.com>wrote:
+
+> Now if you call tikz with an empty file name
+>
+> tikz('')
+>
+> it will dump to the console. It cant be called with no file name
+> because that will default to the standard Rplots.tex file. The changes
+> are on Github.
+>
+> As for the rawConnection functionality, I do not know much about this
+> sort of R programming but I suppose it would be possible. Am I right
+> in thinking that afterward you might then
+>
+> print(rc)
+>
+> to output to a file?  It would certainly not be trivial on the C level
+> but I believe it could be done.
+>
+> -Cameron
+>
+>
+>
+> On Sun, Dec 6, 2009 at 1:28 PM, Gabor Grothendieck
+> <ggrothendieck at gmail.com> wrote:
+> > img.raw is intended to represent the name of a raw R object, not a file
+> > name.
+> >
+> > On Sun, Dec 6, 2009 at 3:25 PM, Gabor Grothendieck <
+> ggrothendieck at gmail.com>
+> > wrote:
+> >>
+> >> And yet another comment.  There has been a recent discussion about
+> >> allowing devices to output to connections on r-devel and apparently this
+> has
+> >> languished for years despite Jeffrey Horner posting code which would
+> have
+> >> allowed it 3 years ago.  Would it be a problem for tikz to handle that
+> even
+> >> if the other devices don't?  For example, Hadley Wickham had posted this
+> >> proposed functionality:
+> >>
+> >> rc <- rawConnection("raw.img", "w")
+> >> png(rc)
+> >> plot(1:10)
+> >> dev.off()
+> >> close(rc)
+> >>
+> >> where in this case png() would be replaced with tikz().
+> >>
+> >> On Sun, Dec 6, 2009 at 3:17 PM, Gabor Grothendieck
+> >> <ggrothendieck at gmail.com> wrote:
+> >>>
+> >>> Great. Just one other related comment.  I think I would likely use the
+> >>> tikz(..., append=TRUE) style but some might prefer to use sink.  That
+> could
+> >>> be done if it were possible to write the output to stdout like this.
+> If
+> >>> its not a problem you might want to add that too.
+> >>>
+> >>> sink("myfile.tex")
+> >>> cat("\\documentclass{article}
+> >>> \\usepackage{tikz}
+> >>> \begin{document}
+> >>> \\begin{figure}[ht]
+> >>> \\centering
+> >>> ")
+> >>> # "" or "stdout" or default writes to stdout
+> >>> tikz(width=5, height=5)
+> >>> x <- rnorm(100)
+> >>> plot(x)
+> >>> dev.off()
+> >>> cat("\\caption{caption}
+> >>> \\label{fig:inline}
+> >>> \\end{figure}
+> >>> \\end{document}
+> >>> ")
+> >>> sink()
+> >>>
+> >>>
+> >>>
+> >>> On Sun, Dec 6, 2009 at 3:04 PM, Cameron Bracken
+> >>> <cameron.bracken at gmail.com> wrote:
+> >>>>
+> >>>> I liked this idea so much that I implemented it right away. You can
+> >>>> get it from the master branch of my github fork until the next release
+> >>>>
+> >>>> http://github.com/cameronbracken/rtikzdevice/network
+> >>>>
+> >>>> Instead of "append" i called it "console."  It works nearly as you
+> >>>> envisioned:
+> >>>>
+> >>>> cat("\\documentclass{article}
+> >>>> \\usepackage{tikz}
+> >>>>
+> >>>> \\begin{document}
+> >>>> \\begin{figure}[ht]
+> >>>> \\centering
+> >>>> ", file = "myfile.tex")
+> >>>>
+> >>>> sink("myfile.tex",append=T)
+> >>>> tikz(console=T, width=5, height=5)
+> >>>>
+> >>>> x <- rnorm(100)
+> >>>> plot(x)
+> >>>> quiet <- dev.off()
+> >>>> sink()
+> >>>>
+> >>>> cat("\\caption{caption}
+> >>>>
+> >>>> \\label{fig:inline}
+> >>>> \\end{figure}
+> >>>> \\end{document}
+> >>>> ", file = "myfile.tex", append = TRUE)
+> >>>>
+> >>>> The following will now produce a self contained tex file:
+> >>>>
+> >>>> \documentclass{article}
+> >>>> \usepackage{tikz}
+> >>>> \usepackage[nogin]{Sweave}
+> >>>> \begin{document}
+> >>>> \begin{figure}[ht]
+> >>>> \centering
+> >>>> <<inline,echo=F,results=tex>>=
+> >>>>
+> >>>>  require(tikzDevice)
+> >>>>  tikz(console=T,width=5,height=5)
+> >>>>    x <- rnorm(100)
+> >>>>    plot(x)
+> >>>>  dummy <- dev.off()
+> >>>>
+> >>>> @
+> >>>> \caption{caption}
+> >>>> \label{fig:inline}
+> >>>> \end{figure}
+> >>>> \end{document}
+> >>>>
+> >>>>
+> >>>> -Cameron
+> >>>>
+> >>>>
+> >>>> On Sun, Dec 6, 2009 at 9:46 AM, Gabor Grothendieck
+> >>>> <ggrothendieck at gmail.com> wrote:
+> >>>> > If you able to provide this feature (i.e. incorporate the tikz tex
+> >>>> > directly
+> >>>> > into the current file rather than writing out a temporary file and
+> >>>> > reading
+> >>>> > it back in) then that would be useful since one of the key potential
+> >>>> > advantages of tikz and pgf are the ability to have a single file
+> >>>> > rather than
+> >>>> > multiple files.  Perhaps an append=TRUE argument like this:
+> >>>> >
+> >>>> > cat("\\documentclass{article}
+> >>>> > \\usepackage{tikz}
+> >>>> > \begin{document}
+> >>>> > \\begin{figure}[ht]
+> >>>> > \\centering
+> >>>> > ", file = "myfile.tex")
+> >>>> > tikz("myfile.tex", width=5, height=5, append = TRUE)
+> >>>> > x <- rnorm(100)
+> >>>> > plot(x)
+> >>>> > dev.off()
+> >>>> > cat("\\caption{caption}
+> >>>> > \\label{fig:inline}
+> >>>> > \\end{figure}
+> >>>> > \\end{document}
+> >>>> > ", file = "myfile.tex", append = TRUE)
+> >>>> >
+> >>>> > On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken
+> >>>> > <cameron.bracken at gmail.com>
+> >>>> > wrote:
+> >>>> >>
+> >>>> >> Interesting Idea.  This should work with plain Sweave.  It is not
+> >>>> >> very
+> >>>> >> efficient and would be very slow for large files since it must
+> write
+> >>>> >> out then read in then write out.
+> >>>> >>
+> >>>> >> \documentclass{article}
+> >>>> >> \usepackage{tikz}
+> >>>> >> \usepackage[nogin]{Sweave}
+> >>>> >> \begin{document}
+> >>>> >> \begin{figure}[ht]
+> >>>> >> \centering
+> >>>> >> <<inline,echo=F,results=tex>>=
+> >>>> >>
+> >>>> >>  require(tikzDevice)
+> >>>> >>  tf <- tempfile()
+> >>>> >>  tikz(tf,width=5,height=5)
+> >>>> >>    x <- rnorm(100)
+> >>>> >>    plot(x)
+> >>>> >>  #Suppress "null device 1" from being printed
+> >>>> >>  dummy <- dev.off()
+> >>>> >>  cat(readLines(tf),sep='\n')
+> >>>> >>
+> >>>> >> @
+> >>>> >> \caption{caption}
+> >>>> >> \label{fig:inline}
+> >>>> >> \end{figure}
+> >>>> >> \end{document}
+> >>>> >>
+> >>>> >>
+> >>>> >> -Cameron
+> >>>> >>
+> >>>> >>
+> >>>> >>
+> >>>> >> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+> >>>> >> <ggrothendieck at gmail.com> wrote:
+> >>>> >> > I would like to create a single file that has my latex and
+> >>>> >> > tikzDevice
+> >>>> >> > output
+> >>>> >> > as opposed to outputting the tikZ output into a separate file and
+> >>>> >> > using
+> >>>> >> > \input .  The latex would be generated using cat statements in R.
+> >>>> >> >
+> >>>> >> > Can that be done?  If so, can you provide a small example.
+> >>>> >> >
+> >>>> >> >
+> >>>> >
+> >>>> >
+> >>>
+> >>
+> >
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091206/dd222f2a/attachment.htm 
+
+From ggrothendieck at gmail.com  Sun Dec  6 22:29:25 2009
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Sun, 6 Dec 2009 16:29:25 -0500
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <971536df0912061313s71e22021tf24b69a33d4c368b@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com> 
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com> 
+	<971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com> 
+	<28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com> 
+	<971536df0912061217r7f3f8d6eqf93d26c7e2b4b63c@mail.gmail.com> 
+	<971536df0912061225t4988ee1asd31857d522e6d714@mail.gmail.com> 
+	<971536df0912061228s43b36646n56c52bdb67cc2462@mail.gmail.com> 
+	<28152c800912061247k6e6c3106p672f909f4d09e355@mail.gmail.com> 
+	<971536df0912061313s71e22021tf24b69a33d4c368b@mail.gmail.com>
+Message-ID: <971536df0912061329w79516794t557b7e89d81109d8@mail.gmail.com>
+
+Just thought I would add that there seemed to be a lot of interest in the
+connection feature on that r-devel thread and since no other device can
+output to an R variable (other than by writing out a file and reading it
+back in) it might be that some users would use tikzDevice for this feature
+alone regardless of whether it was implemented in terms of connections or
+otherwise.
+
+On Sun, Dec 6, 2009 at 4:13 PM, Gabor Grothendieck
+<ggrothendieck at gmail.com>wrote:
+
+> Yes, I think that is the implication.  The basic desire is to be able to
+> store the output in a variable (which might possibly be manipulated) and
+> then print it out or embed it in a file later.
+>
+>
+> On Sun, Dec 6, 2009 at 3:47 PM, Cameron Bracken <cameron.bracken at gmail.com
+> > wrote:
+>
+>> Now if you call tikz with an empty file name
+>>
+>> tikz('')
+>>
+>> it will dump to the console. It cant be called with no file name
+>> because that will default to the standard Rplots.tex file. The changes
+>> are on Github.
+>>
+>> As for the rawConnection functionality, I do not know much about this
+>> sort of R programming but I suppose it would be possible. Am I right
+>> in thinking that afterward you might then
+>>
+>> print(rc)
+>>
+>> to output to a file?  It would certainly not be trivial on the C level
+>> but I believe it could be done.
+>>
+>> -Cameron
+>>
+>>
+>>
+>> On Sun, Dec 6, 2009 at 1:28 PM, Gabor Grothendieck
+>> <ggrothendieck at gmail.com> wrote:
+>> > img.raw is intended to represent the name of a raw R object, not a file
+>> > name.
+>> >
+>> > On Sun, Dec 6, 2009 at 3:25 PM, Gabor Grothendieck <
+>> ggrothendieck at gmail.com>
+>> > wrote:
+>> >>
+>> >> And yet another comment.  There has been a recent discussion about
+>> >> allowing devices to output to connections on r-devel and apparently
+>> this has
+>> >> languished for years despite Jeffrey Horner posting code which would
+>> have
+>> >> allowed it 3 years ago.  Would it be a problem for tikz to handle that
+>> even
+>> >> if the other devices don't?  For example, Hadley Wickham had posted
+>> this
+>> >> proposed functionality:
+>> >>
+>> >> rc <- rawConnection("raw.img", "w")
+>> >> png(rc)
+>> >> plot(1:10)
+>> >> dev.off()
+>> >> close(rc)
+>> >>
+>> >> where in this case png() would be replaced with tikz().
+>> >>
+>> >> On Sun, Dec 6, 2009 at 3:17 PM, Gabor Grothendieck
+>> >> <ggrothendieck at gmail.com> wrote:
+>> >>>
+>> >>> Great. Just one other related comment.  I think I would likely use the
+>> >>> tikz(..., append=TRUE) style but some might prefer to use sink.  That
+>> could
+>> >>> be done if it were possible to write the output to stdout like this.
+>> If
+>> >>> its not a problem you might want to add that too.
+>> >>>
+>> >>> sink("myfile.tex")
+>> >>> cat("\\documentclass{article}
+>> >>> \\usepackage{tikz}
+>> >>> \begin{document}
+>> >>> \\begin{figure}[ht]
+>> >>> \\centering
+>> >>> ")
+>> >>> # "" or "stdout" or default writes to stdout
+>> >>> tikz(width=5, height=5)
+>> >>> x <- rnorm(100)
+>> >>> plot(x)
+>> >>> dev.off()
+>> >>> cat("\\caption{caption}
+>> >>> \\label{fig:inline}
+>> >>> \\end{figure}
+>> >>> \\end{document}
+>> >>> ")
+>> >>> sink()
+>> >>>
+>> >>>
+>> >>>
+>> >>> On Sun, Dec 6, 2009 at 3:04 PM, Cameron Bracken
+>> >>> <cameron.bracken at gmail.com> wrote:
+>> >>>>
+>> >>>> I liked this idea so much that I implemented it right away. You can
+>> >>>> get it from the master branch of my github fork until the next
+>> release
+>> >>>>
+>> >>>> http://github.com/cameronbracken/rtikzdevice/network
+>> >>>>
+>> >>>> Instead of "append" i called it "console."  It works nearly as you
+>> >>>> envisioned:
+>> >>>>
+>> >>>> cat("\\documentclass{article}
+>> >>>> \\usepackage{tikz}
+>> >>>>
+>> >>>> \\begin{document}
+>> >>>> \\begin{figure}[ht]
+>> >>>> \\centering
+>> >>>> ", file = "myfile.tex")
+>> >>>>
+>> >>>> sink("myfile.tex",append=T)
+>> >>>> tikz(console=T, width=5, height=5)
+>> >>>>
+>> >>>> x <- rnorm(100)
+>> >>>> plot(x)
+>> >>>> quiet <- dev.off()
+>> >>>> sink()
+>> >>>>
+>> >>>> cat("\\caption{caption}
+>> >>>>
+>> >>>> \\label{fig:inline}
+>> >>>> \\end{figure}
+>> >>>> \\end{document}
+>> >>>> ", file = "myfile.tex", append = TRUE)
+>> >>>>
+>> >>>> The following will now produce a self contained tex file:
+>> >>>>
+>> >>>> \documentclass{article}
+>> >>>> \usepackage{tikz}
+>> >>>> \usepackage[nogin]{Sweave}
+>> >>>> \begin{document}
+>> >>>> \begin{figure}[ht]
+>> >>>> \centering
+>> >>>> <<inline,echo=F,results=tex>>=
+>> >>>>
+>> >>>>  require(tikzDevice)
+>> >>>>  tikz(console=T,width=5,height=5)
+>> >>>>    x <- rnorm(100)
+>> >>>>    plot(x)
+>> >>>>  dummy <- dev.off()
+>> >>>>
+>> >>>> @
+>> >>>> \caption{caption}
+>> >>>> \label{fig:inline}
+>> >>>> \end{figure}
+>> >>>> \end{document}
+>> >>>>
+>> >>>>
+>> >>>> -Cameron
+>> >>>>
+>> >>>>
+>> >>>> On Sun, Dec 6, 2009 at 9:46 AM, Gabor Grothendieck
+>> >>>> <ggrothendieck at gmail.com> wrote:
+>> >>>> > If you able to provide this feature (i.e. incorporate the tikz tex
+>> >>>> > directly
+>> >>>> > into the current file rather than writing out a temporary file and
+>> >>>> > reading
+>> >>>> > it back in) then that would be useful since one of the key
+>> potential
+>> >>>> > advantages of tikz and pgf are the ability to have a single file
+>> >>>> > rather than
+>> >>>> > multiple files.  Perhaps an append=TRUE argument like this:
+>> >>>> >
+>> >>>> > cat("\\documentclass{article}
+>> >>>> > \\usepackage{tikz}
+>> >>>> > \begin{document}
+>> >>>> > \\begin{figure}[ht]
+>> >>>> > \\centering
+>> >>>> > ", file = "myfile.tex")
+>> >>>> > tikz("myfile.tex", width=5, height=5, append = TRUE)
+>> >>>> > x <- rnorm(100)
+>> >>>> > plot(x)
+>> >>>> > dev.off()
+>> >>>> > cat("\\caption{caption}
+>> >>>> > \\label{fig:inline}
+>> >>>> > \\end{figure}
+>> >>>> > \\end{document}
+>> >>>> > ", file = "myfile.tex", append = TRUE)
+>> >>>> >
+>> >>>> > On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken
+>> >>>> > <cameron.bracken at gmail.com>
+>> >>>> > wrote:
+>> >>>> >>
+>> >>>> >> Interesting Idea.  This should work with plain Sweave.  It is not
+>> >>>> >> very
+>> >>>> >> efficient and would be very slow for large files since it must
+>> write
+>> >>>> >> out then read in then write out.
+>> >>>> >>
+>> >>>> >> \documentclass{article}
+>> >>>> >> \usepackage{tikz}
+>> >>>> >> \usepackage[nogin]{Sweave}
+>> >>>> >> \begin{document}
+>> >>>> >> \begin{figure}[ht]
+>> >>>> >> \centering
+>> >>>> >> <<inline,echo=F,results=tex>>=
+>> >>>> >>
+>> >>>> >>  require(tikzDevice)
+>> >>>> >>  tf <- tempfile()
+>> >>>> >>  tikz(tf,width=5,height=5)
+>> >>>> >>    x <- rnorm(100)
+>> >>>> >>    plot(x)
+>> >>>> >>  #Suppress "null device 1" from being printed
+>> >>>> >>  dummy <- dev.off()
+>> >>>> >>  cat(readLines(tf),sep='\n')
+>> >>>> >>
+>> >>>> >> @
+>> >>>> >> \caption{caption}
+>> >>>> >> \label{fig:inline}
+>> >>>> >> \end{figure}
+>> >>>> >> \end{document}
+>> >>>> >>
+>> >>>> >>
+>> >>>> >> -Cameron
+>> >>>> >>
+>> >>>> >>
+>> >>>> >>
+>> >>>> >> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+>> >>>> >> <ggrothendieck at gmail.com> wrote:
+>> >>>> >> > I would like to create a single file that has my latex and
+>> >>>> >> > tikzDevice
+>> >>>> >> > output
+>> >>>> >> > as opposed to outputting the tikZ output into a separate file
+>> and
+>> >>>> >> > using
+>> >>>> >> > \input .  The latex would be generated using cat statements in
+>> R.
+>> >>>> >> >
+>> >>>> >> > Can that be done?  If so, can you provide a small example.
+>> >>>> >> >
+>> >>>> >> >
+>> >>>> >
+>> >>>> >
+>> >>>
+>> >>
+>> >
+>> >
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/tikzdevice-bugs/attachments/20091206/406cb2ca/attachment-0001.htm 
+
+From cameron.bracken at gmail.com  Mon Dec  7 00:14:32 2009
+From: cameron.bracken at gmail.com (Cameron Bracken)
+Date: Sun, 6 Dec 2009 16:14:32 -0700
+Subject: [Tikzdevice-bugs] Single file with tikzDevice
+In-Reply-To: <971536df0912061329w79516794t557b7e89d81109d8@mail.gmail.com>
+References: <971536df0912060802g16e8384al5ce1bbf4296a7679@mail.gmail.com>
+	<28152c800912060834t5fb4e6d1v238ee784f17a7ea4@mail.gmail.com>
+	<971536df0912060846g7276fb99t5d65e0adf2ff177@mail.gmail.com>
+	<28152c800912061204s5bc6a2d7vac94cf7e18c89001@mail.gmail.com>
+	<971536df0912061217r7f3f8d6eqf93d26c7e2b4b63c@mail.gmail.com>
+	<971536df0912061225t4988ee1asd31857d522e6d714@mail.gmail.com>
+	<971536df0912061228s43b36646n56c52bdb67cc2462@mail.gmail.com>
+	<28152c800912061247k6e6c3106p672f909f4d09e355@mail.gmail.com>
+	<971536df0912061313s71e22021tf24b69a33d4c368b@mail.gmail.com>
+	<971536df0912061329w79516794t557b7e89d81109d8@mail.gmail.com>
+Message-ID: <28152c800912061514l43028ffen5094c1891a3afcf0@mail.gmail.com>
+
+I agree that would be a great feature.  This is actually very
+relevant. Charlie and I have been making plans for an object oriented
+Sweave system along the lines of ggplot2.  This would play right in.
+
+p <- document + tikzOutput + codeHighlighting
+print(p)
+
+-Cameron
+
+
+
+On Sun, Dec 6, 2009 at 2:29 PM, Gabor Grothendieck
+<ggrothendieck at gmail.com> wrote:
+> Just thought I would add that there seemed to be a lot of interest in the
+> connection feature on that r-devel thread and since no other device can
+> output to an R variable (other than by writing out a file and reading it
+> back in) it might be that some users would use tikzDevice for this feature
+> alone regardless of whether it was implemented in terms of connections or
+> otherwise.
+>
+> On Sun, Dec 6, 2009 at 4:13 PM, Gabor Grothendieck <ggrothendieck at gmail.com>
+> wrote:
+>>
+>> Yes, I think that is the implication.? The basic desire is to be able to
+>> store the output in a variable (which might possibly be manipulated) and
+>> then print it out or embed it in a file later.
+>>
+>> On Sun, Dec 6, 2009 at 3:47 PM, Cameron Bracken
+>> <cameron.bracken at gmail.com> wrote:
+>>>
+>>> Now if you call tikz with an empty file name
+>>>
+>>> tikz('')
+>>>
+>>> it will dump to the console. It cant be called with no file name
+>>> because that will default to the standard Rplots.tex file. The changes
+>>> are on Github.
+>>>
+>>> As for the rawConnection functionality, I do not know much about this
+>>> sort of R programming but I suppose it would be possible. Am I right
+>>> in thinking that afterward you might then
+>>>
+>>> print(rc)
+>>>
+>>> to output to a file? ?It would certainly not be trivial on the C level
+>>> but I believe it could be done.
+>>>
+>>> -Cameron
+>>>
+>>>
+>>>
+>>> On Sun, Dec 6, 2009 at 1:28 PM, Gabor Grothendieck
+>>> <ggrothendieck at gmail.com> wrote:
+>>> > img.raw is intended to represent the name of a raw R object, not a file
+>>> > name.
+>>> >
+>>> > On Sun, Dec 6, 2009 at 3:25 PM, Gabor Grothendieck
+>>> > <ggrothendieck at gmail.com>
+>>> > wrote:
+>>> >>
+>>> >> And yet another comment.? There has been a recent discussion about
+>>> >> allowing devices to output to connections on r-devel and apparently
+>>> >> this has
+>>> >> languished for years despite Jeffrey Horner posting code which would
+>>> >> have
+>>> >> allowed it 3 years ago.? Would it be a problem for tikz to handle that
+>>> >> even
+>>> >> if the other devices don't?? For example, Hadley Wickham had posted
+>>> >> this
+>>> >> proposed functionality:
+>>> >>
+>>> >> rc <- rawConnection("raw.img", "w")
+>>> >> png(rc)
+>>> >> plot(1:10)
+>>> >> dev.off()
+>>> >> close(rc)
+>>> >>
+>>> >> where in this case png() would be replaced with tikz().
+>>> >>
+>>> >> On Sun, Dec 6, 2009 at 3:17 PM, Gabor Grothendieck
+>>> >> <ggrothendieck at gmail.com> wrote:
+>>> >>>
+>>> >>> Great. Just one other related comment.? I think I would likely use
+>>> >>> the
+>>> >>> tikz(..., append=TRUE) style but some might prefer to use sink.? That
+>>> >>> could
+>>> >>> be done if it were possible to write the output to stdout like
+>>> >>> this.?? If
+>>> >>> its not a problem you might want to add that too.
+>>> >>>
+>>> >>> sink("myfile.tex")
+>>> >>> cat("\\documentclass{article}
+>>> >>> \\usepackage{tikz}
+>>> >>> \begin{document}
+>>> >>> \\begin{figure}[ht]
+>>> >>> \\centering
+>>> >>> ")
+>>> >>> # "" or "stdout" or default writes to stdout
+>>> >>> tikz(width=5, height=5)
+>>> >>> x <- rnorm(100)
+>>> >>> plot(x)
+>>> >>> dev.off()
+>>> >>> cat("\\caption{caption}
+>>> >>> \\label{fig:inline}
+>>> >>> \\end{figure}
+>>> >>> \\end{document}
+>>> >>> ")
+>>> >>> sink()
+>>> >>>
+>>> >>>
+>>> >>>
+>>> >>> On Sun, Dec 6, 2009 at 3:04 PM, Cameron Bracken
+>>> >>> <cameron.bracken at gmail.com> wrote:
+>>> >>>>
+>>> >>>> I liked this idea so much that I implemented it right away. You can
+>>> >>>> get it from the master branch of my github fork until the next
+>>> >>>> release
+>>> >>>>
+>>> >>>> http://github.com/cameronbracken/rtikzdevice/network
+>>> >>>>
+>>> >>>> Instead of "append" i called it "console." ?It works nearly as you
+>>> >>>> envisioned:
+>>> >>>>
+>>> >>>> cat("\\documentclass{article}
+>>> >>>> \\usepackage{tikz}
+>>> >>>>
+>>> >>>> \\begin{document}
+>>> >>>> \\begin{figure}[ht]
+>>> >>>> \\centering
+>>> >>>> ", file = "myfile.tex")
+>>> >>>>
+>>> >>>> sink("myfile.tex",append=T)
+>>> >>>> tikz(console=T, width=5, height=5)
+>>> >>>>
+>>> >>>> x <- rnorm(100)
+>>> >>>> plot(x)
+>>> >>>> quiet <- dev.off()
+>>> >>>> sink()
+>>> >>>>
+>>> >>>> cat("\\caption{caption}
+>>> >>>>
+>>> >>>> \\label{fig:inline}
+>>> >>>> \\end{figure}
+>>> >>>> \\end{document}
+>>> >>>> ", file = "myfile.tex", append = TRUE)
+>>> >>>>
+>>> >>>> The following will now produce a self contained tex file:
+>>> >>>>
+>>> >>>> \documentclass{article}
+>>> >>>> \usepackage{tikz}
+>>> >>>> \usepackage[nogin]{Sweave}
+>>> >>>> \begin{document}
+>>> >>>> \begin{figure}[ht]
+>>> >>>> \centering
+>>> >>>> <<inline,echo=F,results=tex>>=
+>>> >>>>
+>>> >>>> ?require(tikzDevice)
+>>> >>>> ?tikz(console=T,width=5,height=5)
+>>> >>>> ? ?x <- rnorm(100)
+>>> >>>> ? ?plot(x)
+>>> >>>> ?dummy <- dev.off()
+>>> >>>>
+>>> >>>> @
+>>> >>>> \caption{caption}
+>>> >>>> \label{fig:inline}
+>>> >>>> \end{figure}
+>>> >>>> \end{document}
+>>> >>>>
+>>> >>>>
+>>> >>>> -Cameron
+>>> >>>>
+>>> >>>>
+>>> >>>> On Sun, Dec 6, 2009 at 9:46 AM, Gabor Grothendieck
+>>> >>>> <ggrothendieck at gmail.com> wrote:
+>>> >>>> > If you able to provide this feature (i.e. incorporate the tikz tex
+>>> >>>> > directly
+>>> >>>> > into the current file rather than writing out a temporary file and
+>>> >>>> > reading
+>>> >>>> > it back in) then that would be useful since one of the key
+>>> >>>> > potential
+>>> >>>> > advantages of tikz and pgf are the ability to have a single file
+>>> >>>> > rather than
+>>> >>>> > multiple files.? Perhaps an append=TRUE argument like this:
+>>> >>>> >
+>>> >>>> > cat("\\documentclass{article}
+>>> >>>> > \\usepackage{tikz}
+>>> >>>> > \begin{document}
+>>> >>>> > \\begin{figure}[ht]
+>>> >>>> > \\centering
+>>> >>>> > ", file = "myfile.tex")
+>>> >>>> > tikz("myfile.tex", width=5, height=5, append = TRUE)
+>>> >>>> > x <- rnorm(100)
+>>> >>>> > plot(x)
+>>> >>>> > dev.off()
+>>> >>>> > cat("\\caption{caption}
+>>> >>>> > \\label{fig:inline}
+>>> >>>> > \\end{figure}
+>>> >>>> > \\end{document}
+>>> >>>> > ", file = "myfile.tex", append = TRUE)
+>>> >>>> >
+>>> >>>> > On Sun, Dec 6, 2009 at 11:34 AM, Cameron Bracken
+>>> >>>> > <cameron.bracken at gmail.com>
+>>> >>>> > wrote:
+>>> >>>> >>
+>>> >>>> >> Interesting Idea. ?This should work with plain Sweave. ?It is not
+>>> >>>> >> very
+>>> >>>> >> efficient and would be very slow for large files since it must
+>>> >>>> >> write
+>>> >>>> >> out then read in then write out.
+>>> >>>> >>
+>>> >>>> >> \documentclass{article}
+>>> >>>> >> \usepackage{tikz}
+>>> >>>> >> \usepackage[nogin]{Sweave}
+>>> >>>> >> \begin{document}
+>>> >>>> >> \begin{figure}[ht]
+>>> >>>> >> \centering
+>>> >>>> >> <<inline,echo=F,results=tex>>=
+>>> >>>> >>
+>>> >>>> >> ?require(tikzDevice)
+>>> >>>> >> ?tf <- tempfile()
+>>> >>>> >> ?tikz(tf,width=5,height=5)
+>>> >>>> >> ? ?x <- rnorm(100)
+>>> >>>> >> ? ?plot(x)
+>>> >>>> >> ?#Suppress "null device 1" from being printed
+>>> >>>> >> ?dummy <- dev.off()
+>>> >>>> >> ?cat(readLines(tf),sep='\n')
+>>> >>>> >>
+>>> >>>> >> @
+>>> >>>> >> \caption{caption}
+>>> >>>> >> \label{fig:inline}
+>>> >>>> >> \end{figure}
+>>> >>>> >> \end{document}
+>>> >>>> >>
+>>> >>>> >>
+>>> >>>> >> -Cameron
+>>> >>>> >>
+>>> >>>> >>
+>>> >>>> >>
+>>> >>>> >> On Sun, Dec 6, 2009 at 9:02 AM, Gabor Grothendieck
+>>> >>>> >> <ggrothendieck at gmail.com> wrote:
+>>> >>>> >> > I would like to create a single file that has my latex and
+>>> >>>> >> > tikzDevice
+>>> >>>> >> > output
+>>> >>>> >> > as opposed to outputting the tikZ output into a separate file
+>>> >>>> >> > and
+>>> >>>> >> > using
+>>> >>>> >> > \input .? The latex would be generated using cat statements in
+>>> >>>> >> > R.
+>>> >>>> >> >
+>>> >>>> >> > Can that be done?? If so, can you provide a small example.
+>>> >>>> >> >
+>>> >>>> >> >
+>>> >>>> >
+>>> >>>> >
+>>> >>>
+>>> >>
+>>> >
+>>> >
+>>
+>
+>
+

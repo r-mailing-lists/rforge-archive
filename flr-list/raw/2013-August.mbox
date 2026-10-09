@@ -1,0 +1,756 @@
+From clu at aqua.dtu.dk  Thu Aug  8 12:19:30 2013
+From: clu at aqua.dtu.dk (Clara Ulrich)
+Date: Thu, 8 Aug 2013 10:19:30 +0000
+Subject: [FLR-list] FLSR sigma2
+Message-ID: <E9A34AEDB848DF4DB064BCFF820ED55919B1D1@ait-pex02mbx05.win.dtu.dk>
+
+Hi all, 
+
+I feel that my FLR brain is smelting away, I just do not use it enough anymore to keep a sharp up-to-date knowledge ;-( And indeed, trying to re-run some 2 years old from R2.8.1 I get some bugs of course. 
+
+Is there nothing like a sigma2 in the FLSR parameters anymore? Is this stored something else?
+
+Thanks
+Clara
+
+
+
+From iago.mosqueira-sanchez at jrc.ec.europa.eu  Thu Aug  8 13:35:58 2013
+From: iago.mosqueira-sanchez at jrc.ec.europa.eu (Iago MOSQUEIRA (JRC))
+Date: Thu, 08 Aug 2013 13:35:58 +0200
+Subject: [FLR-list] FLSR sigma2
+In-Reply-To: <E9A34AEDB848DF4DB064BCFF820ED55919B1D1@ait-pex02mbx05.win.dtu.dk>
+References: <E9A34AEDB848DF4DB064BCFF820ED55919B1D1@ait-pex02mbx05.win.dtu.dk>
+Message-ID: <5203829E.7000406@jrc.ec.europa.eu>
+
+On 08/08/2013 12:19 PM, Clara Ulrich wrote:
+> Hi all, 
+> 
+> I feel that my FLR brain is smelting away, I just do not use it enough anymore to keep a sharp up-to-date knowledge ;-( And indeed, trying to re-run some 2 years old from R2.8.1 I get some bugs of course. 
+> 
+> Is there nothing like a sigma2 in the FLSR parameters anymore? Is this stored something else?
+> 
+> Thanks
+> Clara
+
+Hi,
+
+But FLRing is like cycling, never to be forgotten...
+
+The formulation of the likelihood that has been used for the last 2-3
+years does not have sigma2 as an estimated parameter, but is instead
+calculated, as it was just a nuisance parameter that made life more
+dificult forn the optimizer
+
+> getMethod('loglAR1', c('FLQuant', 'FLQuant'))
+
+
+Method Definition:
+
+function (obs, hat, ...)
+{
+    .local <- function (obs, hat, rho = 0)
+    {
+        n <- dim(obs)[2]
+        rsdl <- (obs[, -1] - rho * obs[, -n] - hat[, -1] + rho *
+            hat[, -n])
+        s2 <- sum(rsdl^2, na.rm = T)
+        s1 <- s2
+        if (!all(is.na(rsdl[, 1])))
+            s1 <- s1 + (1 - rho^2) * (obs[, 1] - hat[, 1])^2
+        sigma2 <- sigma(obs, hat)^2
+        n <- length(obs[!is.na(obs)])
+        sigma2.a <- (1 - rho^2) * sigma2
+        res <- (log(1/(2 * pi)) - n * log(sigma2.a) + log(1 -
+            rho^2) - s1/(2 * sigma2.a))/2
+        if (!is.finite(res))
+            res <- -1e+100
+        return(res)
+    }
+    .local(obs, hat, ...)
+}
+<environment: namespace:FLCore>
+
+which class sigma()
+
+> getMethod('sigma', c('FLArray'))
+Method Definition:
+
+function (object, ...)
+{
+    .local <- function (object, hat = rep(0, length(object)))
+    {
+        if (all(is.na(hat)))
+            return(Inf)
+        SS <- sum((object - hat)^2, na.rm = TRUE)
+        return((SS/length(hat[!is.na(hat)]))^0.5)
+    }
+    .local(object, ...)
+}
+<environment: namespace:FLCore>
+
+Signatures:
+        object
+target  "FLArray"
+defined "FLArray"
+
+which calculates it from SS.
+
+
+Iago
+
+
+
+-- 
+Dr Iago Mosqueira
+
+European Commission ? Joint Research Center
+Institute for the Protection and Security of the Citizen (IPSC)
+Maritime Affairs Unit FISHREG ? Scientific Support to Fisheries
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Office : +39 0332 785413
+Fax: +39 0332 789658
+
+iago.mosqueira at jrc.ec.europa.eu
+
+http://fishreg.jrc.ec.europa.eu/home
+
+
+From clu at aqua.dtu.dk  Thu Aug  8 13:59:56 2013
+From: clu at aqua.dtu.dk (Clara Ulrich)
+Date: Thu, 8 Aug 2013 11:59:56 +0000
+Subject: [FLR-list] FLSR sigma2
+In-Reply-To: <5203829E.7000406@jrc.ec.europa.eu>
+References: <E9A34AEDB848DF4DB064BCFF820ED55919B1D1@ait-pex02mbx05.win.dtu.dk>
+ <5203829E.7000406@jrc.ec.europa.eu>
+Message-ID: <E9A34AEDB848DF4DB064BCFF820ED55919C247@ait-pex02mbx05.win.dtu.dk>
+
+Ok thanks for quick answer!
+
+And I don't know why but I still find it easier to remember how to bike - probably because bike's design and functioning hasn't changed that much from when I was a child, much less new fancy features popping up;-)
+Clara
+
+-----Original Message-----
+From: flr-list-bounces at r-forge.wu-wien.ac.at [mailto:flr-list-bounces at r-forge.wu-wien.ac.at] On Behalf Of Iago MOSQUEIRA (JRC)
+Sent: 08 August 2013 13:36
+To: flr-list at r-forge.wu-wien.ac.at
+Subject: Re: [FLR-list] FLSR sigma2
+
+On 08/08/2013 12:19 PM, Clara Ulrich wrote:
+> Hi all,
+> 
+> I feel that my FLR brain is smelting away, I just do not use it enough anymore to keep a sharp up-to-date knowledge ;-( And indeed, trying to re-run some 2 years old from R2.8.1 I get some bugs of course. 
+> 
+> Is there nothing like a sigma2 in the FLSR parameters anymore? Is this stored something else?
+> 
+> Thanks
+> Clara
+
+Hi,
+
+But FLRing is like cycling, never to be forgotten...
+
+The formulation of the likelihood that has been used for the last 2-3 years does not have sigma2 as an estimated parameter, but is instead calculated, as it was just a nuisance parameter that made life more dificult forn the optimizer
+
+> getMethod('loglAR1', c('FLQuant', 'FLQuant'))
+
+
+Method Definition:
+
+function (obs, hat, ...)
+{
+    .local <- function (obs, hat, rho = 0)
+    {
+        n <- dim(obs)[2]
+        rsdl <- (obs[, -1] - rho * obs[, -n] - hat[, -1] + rho *
+            hat[, -n])
+        s2 <- sum(rsdl^2, na.rm = T)
+        s1 <- s2
+        if (!all(is.na(rsdl[, 1])))
+            s1 <- s1 + (1 - rho^2) * (obs[, 1] - hat[, 1])^2
+        sigma2 <- sigma(obs, hat)^2
+        n <- length(obs[!is.na(obs)])
+        sigma2.a <- (1 - rho^2) * sigma2
+        res <- (log(1/(2 * pi)) - n * log(sigma2.a) + log(1 -
+            rho^2) - s1/(2 * sigma2.a))/2
+        if (!is.finite(res))
+            res <- -1e+100
+        return(res)
+    }
+    .local(obs, hat, ...)
+}
+<environment: namespace:FLCore>
+
+which class sigma()
+
+> getMethod('sigma', c('FLArray'))
+Method Definition:
+
+function (object, ...)
+{
+    .local <- function (object, hat = rep(0, length(object)))
+    {
+        if (all(is.na(hat)))
+            return(Inf)
+        SS <- sum((object - hat)^2, na.rm = TRUE)
+        return((SS/length(hat[!is.na(hat)]))^0.5)
+    }
+    .local(object, ...)
+}
+<environment: namespace:FLCore>
+
+Signatures:
+        object
+target  "FLArray"
+defined "FLArray"
+
+which calculates it from SS.
+
+
+Iago
+
+
+
+--
+Dr Iago Mosqueira
+
+European Commission - Joint Research Center Institute for the Protection and Security of the Citizen (IPSC) Maritime Affairs Unit FISHREG - Scientific Support to Fisheries TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Office : +39 0332 785413
+Fax: +39 0332 789658
+
+iago.mosqueira at jrc.ec.europa.eu
+
+http://fishreg.jrc.ec.europa.eu/home
+
+_______________________________________________
+flr-list mailing list
+flr-list at flr-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+From lauriekell at gmail.com  Thu Aug  8 14:24:25 2013
+From: lauriekell at gmail.com (Laurie)
+Date: Thu, 08 Aug 2013 14:24:25 +0200
+Subject: [FLR-list] FLSR sigma2
+In-Reply-To: <E9A34AEDB848DF4DB064BCFF820ED55919C247@ait-pex02mbx05.win.dtu.dk>
+References: <E9A34AEDB848DF4DB064BCFF820ED55919B1D1@ait-pex02mbx05.win.dtu.dk>
+ <5203829E.7000406@jrc.ec.europa.eu>
+ <E9A34AEDB848DF4DB064BCFF820ED55919C247@ait-pex02mbx05.win.dtu.dk>
+Message-ID: <52038DF9.6070001@gmail.com>
+
+Probably why for the last two years a Britain has won the Tour De France!
+Laurie
+
+On 08/08/13 13:59, Clara Ulrich wrote:
+> Ok thanks for quick answer!
+>
+> And I don't know why but I still find it easier to remember how to bike - probably because bike's design and functioning hasn't changed that much from when I was a child, much less new fancy features popping up;-)
+> Clara
+>
+> -----Original Message-----
+> From: flr-list-bounces at r-forge.wu-wien.ac.at [mailto:flr-list-bounces at r-forge.wu-wien.ac.at] On Behalf Of Iago MOSQUEIRA (JRC)
+> Sent: 08 August 2013 13:36
+> To: flr-list at r-forge.wu-wien.ac.at
+> Subject: Re: [FLR-list] FLSR sigma2
+>
+> On 08/08/2013 12:19 PM, Clara Ulrich wrote:
+>> Hi all,
+>>
+>> I feel that my FLR brain is smelting away, I just do not use it enough anymore to keep a sharp up-to-date knowledge ;-( And indeed, trying to re-run some 2 years old from R2.8.1 I get some bugs of course.
+>>
+>> Is there nothing like a sigma2 in the FLSR parameters anymore? Is this stored something else?
+>>
+>> Thanks
+>> Clara
+> Hi,
+>
+> But FLRing is like cycling, never to be forgotten...
+>
+> The formulation of the likelihood that has been used for the last 2-3 years does not have sigma2 as an estimated parameter, but is instead calculated, as it was just a nuisance parameter that made life more dificult forn the optimizer
+>
+>> getMethod('loglAR1', c('FLQuant', 'FLQuant'))
+>
+> Method Definition:
+>
+> function (obs, hat, ...)
+> {
+>      .local <- function (obs, hat, rho = 0)
+>      {
+>          n <- dim(obs)[2]
+>          rsdl <- (obs[, -1] - rho * obs[, -n] - hat[, -1] + rho *
+>              hat[, -n])
+>          s2 <- sum(rsdl^2, na.rm = T)
+>          s1 <- s2
+>          if (!all(is.na(rsdl[, 1])))
+>              s1 <- s1 + (1 - rho^2) * (obs[, 1] - hat[, 1])^2
+>          sigma2 <- sigma(obs, hat)^2
+>          n <- length(obs[!is.na(obs)])
+>          sigma2.a <- (1 - rho^2) * sigma2
+>          res <- (log(1/(2 * pi)) - n * log(sigma2.a) + log(1 -
+>              rho^2) - s1/(2 * sigma2.a))/2
+>          if (!is.finite(res))
+>              res <- -1e+100
+>          return(res)
+>      }
+>      .local(obs, hat, ...)
+> }
+> <environment: namespace:FLCore>
+>
+> which class sigma()
+>
+>> getMethod('sigma', c('FLArray'))
+> Method Definition:
+>
+> function (object, ...)
+> {
+>      .local <- function (object, hat = rep(0, length(object)))
+>      {
+>          if (all(is.na(hat)))
+>              return(Inf)
+>          SS <- sum((object - hat)^2, na.rm = TRUE)
+>          return((SS/length(hat[!is.na(hat)]))^0.5)
+>      }
+>      .local(object, ...)
+> }
+> <environment: namespace:FLCore>
+>
+> Signatures:
+>          object
+> target  "FLArray"
+> defined "FLArray"
+>
+> which calculates it from SS.
+>
+>
+> Iago
+>
+>
+>
+> --
+> Dr Iago Mosqueira
+>
+> European Commission - Joint Research Center Institute for the Protection and Security of the Citizen (IPSC) Maritime Affairs Unit FISHREG - Scientific Support to Fisheries TP 051, Via Enrico Fermi 2749
+> I-21027 Ispra (VA), Italy
+>
+> Office : +39 0332 785413
+> Fax: +39 0332 789658
+>
+> iago.mosqueira at jrc.ec.europa.eu
+>
+> http://fishreg.jrc.ec.europa.eu/home
+>
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+
+From clu at aqua.dtu.dk  Thu Aug  8 15:14:23 2013
+From: clu at aqua.dtu.dk (Clara Ulrich)
+Date: Thu, 8 Aug 2013 13:14:23 +0000
+Subject: [FLR-list] FLSR sigma2
+In-Reply-To: <52038DF9.6070001@gmail.com>
+References: <E9A34AEDB848DF4DB064BCFF820ED55919B1D1@ait-pex02mbx05.win.dtu.dk>
+ <5203829E.7000406@jrc.ec.europa.eu>
+ <E9A34AEDB848DF4DB064BCFF820ED55919C247@ait-pex02mbx05.win.dtu.dk>
+ <52038DF9.6070001@gmail.com>
+Message-ID: <E9A34AEDB848DF4DB064BCFF820ED55919C281@ait-pex02mbx05.win.dtu.dk>
+
+Ah ah, yes, that might be the reason! We still haven't found the mystery of these round wheels!
+
+-----Original Message-----
+From: flr-list-bounces at r-forge.wu-wien.ac.at [mailto:flr-list-bounces at r-forge.wu-wien.ac.at] On Behalf Of Laurie
+Sent: 08 August 2013 14:24
+To: flr-list at r-forge.wu-wien.ac.at
+Subject: Re: [FLR-list] FLSR sigma2
+
+Probably why for the last two years a Britain has won the Tour De France!
+Laurie
+
+On 08/08/13 13:59, Clara Ulrich wrote:
+> Ok thanks for quick answer!
+>
+> And I don't know why but I still find it easier to remember how to 
+> bike - probably because bike's design and functioning hasn't changed 
+> that much from when I was a child, much less new fancy features 
+> popping up;-) Clara
+>
+> -----Original Message-----
+> From: flr-list-bounces at r-forge.wu-wien.ac.at 
+> [mailto:flr-list-bounces at r-forge.wu-wien.ac.at] On Behalf Of Iago 
+> MOSQUEIRA (JRC)
+> Sent: 08 August 2013 13:36
+> To: flr-list at r-forge.wu-wien.ac.at
+> Subject: Re: [FLR-list] FLSR sigma2
+>
+> On 08/08/2013 12:19 PM, Clara Ulrich wrote:
+>> Hi all,
+>>
+>> I feel that my FLR brain is smelting away, I just do not use it enough anymore to keep a sharp up-to-date knowledge ;-( And indeed, trying to re-run some 2 years old from R2.8.1 I get some bugs of course.
+>>
+>> Is there nothing like a sigma2 in the FLSR parameters anymore? Is this stored something else?
+>>
+>> Thanks
+>> Clara
+> Hi,
+>
+> But FLRing is like cycling, never to be forgotten...
+>
+> The formulation of the likelihood that has been used for the last 2-3 
+> years does not have sigma2 as an estimated parameter, but is instead 
+> calculated, as it was just a nuisance parameter that made life more 
+> dificult forn the optimizer
+>
+>> getMethod('loglAR1', c('FLQuant', 'FLQuant'))
+>
+> Method Definition:
+>
+> function (obs, hat, ...)
+> {
+>      .local <- function (obs, hat, rho = 0)
+>      {
+>          n <- dim(obs)[2]
+>          rsdl <- (obs[, -1] - rho * obs[, -n] - hat[, -1] + rho *
+>              hat[, -n])
+>          s2 <- sum(rsdl^2, na.rm = T)
+>          s1 <- s2
+>          if (!all(is.na(rsdl[, 1])))
+>              s1 <- s1 + (1 - rho^2) * (obs[, 1] - hat[, 1])^2
+>          sigma2 <- sigma(obs, hat)^2
+>          n <- length(obs[!is.na(obs)])
+>          sigma2.a <- (1 - rho^2) * sigma2
+>          res <- (log(1/(2 * pi)) - n * log(sigma2.a) + log(1 -
+>              rho^2) - s1/(2 * sigma2.a))/2
+>          if (!is.finite(res))
+>              res <- -1e+100
+>          return(res)
+>      }
+>      .local(obs, hat, ...)
+> }
+> <environment: namespace:FLCore>
+>
+> which class sigma()
+>
+>> getMethod('sigma', c('FLArray'))
+> Method Definition:
+>
+> function (object, ...)
+> {
+>      .local <- function (object, hat = rep(0, length(object)))
+>      {
+>          if (all(is.na(hat)))
+>              return(Inf)
+>          SS <- sum((object - hat)^2, na.rm = TRUE)
+>          return((SS/length(hat[!is.na(hat)]))^0.5)
+>      }
+>      .local(object, ...)
+> }
+> <environment: namespace:FLCore>
+>
+> Signatures:
+>          object
+> target  "FLArray"
+> defined "FLArray"
+>
+> which calculates it from SS.
+>
+>
+> Iago
+>
+>
+>
+> --
+> Dr Iago Mosqueira
+>
+> European Commission - Joint Research Center Institute for the 
+> Protection and Security of the Citizen (IPSC) Maritime Affairs Unit 
+> FISHREG - Scientific Support to Fisheries TP 051, Via Enrico Fermi 
+> 2749
+> I-21027 Ispra (VA), Italy
+>
+> Office : +39 0332 785413
+> Fax: +39 0332 789658
+>
+> iago.mosqueira at jrc.ec.europa.eu
+>
+> http://fishreg.jrc.ec.europa.eu/home
+>
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+_______________________________________________
+flr-list mailing list
+flr-list at flr-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+
+From iago.mosqueira at gmail.com  Thu Aug  8 15:17:22 2013
+From: iago.mosqueira at gmail.com (Iago Mosqueira)
+Date: Thu, 08 Aug 2013 15:17:22 +0200
+Subject: [FLR-list] FLSR sigma2
+In-Reply-To: <E9A34AEDB848DF4DB064BCFF820ED55919C281@ait-pex02mbx05.win.dtu.dk>
+References: <E9A34AEDB848DF4DB064BCFF820ED55919B1D1@ait-pex02mbx05.win.dtu.dk>
+ <5203829E.7000406@jrc.ec.europa.eu>
+ <E9A34AEDB848DF4DB064BCFF820ED55919C247@ait-pex02mbx05.win.dtu.dk>
+ <52038DF9.6070001@gmail.com>
+ <E9A34AEDB848DF4DB064BCFF820ED55919C281@ait-pex02mbx05.win.dtu.dk>
+Message-ID: <52039A62.6090307@gmail.com>
+
+
+Off-topic now, but...
+
+Well, it is a big question still
+
+http://www.newstatesman.com/2013/07/mysteries-bicycle
+
+
+Iago
+
+On 08/08/2013 03:14 PM, Clara Ulrich wrote:
+> Ah ah, yes, that might be the reason! We still haven't found the mystery of these round wheels!
+> 
+> -----Original Message-----
+> From: flr-list-bounces at r-forge.wu-wien.ac.at [mailto:flr-list-bounces at r-forge.wu-wien.ac.at] On Behalf Of Laurie
+> Sent: 08 August 2013 14:24
+> To: flr-list at r-forge.wu-wien.ac.at
+> Subject: Re: [FLR-list] FLSR sigma2
+> 
+> Probably why for the last two years a Britain has won the Tour De France!
+> Laurie
+> 
+> On 08/08/13 13:59, Clara Ulrich wrote:
+>> Ok thanks for quick answer!
+>>
+>> And I don't know why but I still find it easier to remember how to 
+>> bike - probably because bike's design and functioning hasn't changed 
+>> that much from when I was a child, much less new fancy features 
+>> popping up;-) Clara
+>>
+>> -----Original Message-----
+>> From: flr-list-bounces at r-forge.wu-wien.ac.at 
+>> [mailto:flr-list-bounces at r-forge.wu-wien.ac.at] On Behalf Of Iago 
+>> MOSQUEIRA (JRC)
+>> Sent: 08 August 2013 13:36
+>> To: flr-list at r-forge.wu-wien.ac.at
+>> Subject: Re: [FLR-list] FLSR sigma2
+>>
+>> On 08/08/2013 12:19 PM, Clara Ulrich wrote:
+>>> Hi all,
+>>>
+>>> I feel that my FLR brain is smelting away, I just do not use it enough anymore to keep a sharp up-to-date knowledge ;-( And indeed, trying to re-run some 2 years old from R2.8.1 I get some bugs of course.
+>>>
+>>> Is there nothing like a sigma2 in the FLSR parameters anymore? Is this stored something else?
+>>>
+>>> Thanks
+>>> Clara
+>> Hi,
+>>
+>> But FLRing is like cycling, never to be forgotten...
+>>
+>> The formulation of the likelihood that has been used for the last 2-3 
+>> years does not have sigma2 as an estimated parameter, but is instead 
+>> calculated, as it was just a nuisance parameter that made life more 
+>> dificult forn the optimizer
+>>
+>>> getMethod('loglAR1', c('FLQuant', 'FLQuant'))
+>>
+>> Method Definition:
+>>
+>> function (obs, hat, ...)
+>> {
+>>      .local <- function (obs, hat, rho = 0)
+>>      {
+>>          n <- dim(obs)[2]
+>>          rsdl <- (obs[, -1] - rho * obs[, -n] - hat[, -1] + rho *
+>>              hat[, -n])
+>>          s2 <- sum(rsdl^2, na.rm = T)
+>>          s1 <- s2
+>>          if (!all(is.na(rsdl[, 1])))
+>>              s1 <- s1 + (1 - rho^2) * (obs[, 1] - hat[, 1])^2
+>>          sigma2 <- sigma(obs, hat)^2
+>>          n <- length(obs[!is.na(obs)])
+>>          sigma2.a <- (1 - rho^2) * sigma2
+>>          res <- (log(1/(2 * pi)) - n * log(sigma2.a) + log(1 -
+>>              rho^2) - s1/(2 * sigma2.a))/2
+>>          if (!is.finite(res))
+>>              res <- -1e+100
+>>          return(res)
+>>      }
+>>      .local(obs, hat, ...)
+>> }
+>> <environment: namespace:FLCore>
+>>
+>> which class sigma()
+>>
+>>> getMethod('sigma', c('FLArray'))
+>> Method Definition:
+>>
+>> function (object, ...)
+>> {
+>>      .local <- function (object, hat = rep(0, length(object)))
+>>      {
+>>          if (all(is.na(hat)))
+>>              return(Inf)
+>>          SS <- sum((object - hat)^2, na.rm = TRUE)
+>>          return((SS/length(hat[!is.na(hat)]))^0.5)
+>>      }
+>>      .local(object, ...)
+>> }
+>> <environment: namespace:FLCore>
+>>
+>> Signatures:
+>>          object
+>> target  "FLArray"
+>> defined "FLArray"
+>>
+>> which calculates it from SS.
+>>
+>>
+>> Iago
+>>
+>>
+>>
+>> --
+>> Dr Iago Mosqueira
+>>
+>> European Commission - Joint Research Center Institute for the 
+>> Protection and Security of the Citizen (IPSC) Maritime Affairs Unit 
+>> FISHREG - Scientific Support to Fisheries TP 051, Via Enrico Fermi 
+>> 2749
+>> I-21027 Ispra (VA), Italy
+>>
+>> Office : +39 0332 785413
+>> Fax: +39 0332 789658
+>>
+>> iago.mosqueira at jrc.ec.europa.eu
+>>
+>> http://fishreg.jrc.ec.europa.eu/home
+>>
+>> _______________________________________________
+>> flr-list mailing list
+>> flr-list at flr-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>> _______________________________________________
+>> flr-list mailing list
+>> flr-list at flr-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+> 
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+> _______________________________________________
+> flr-list mailing list
+> flr-list at flr-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+> 
+
+
+From iago.mosqueira-sanchez at jrc.ec.europa.eu  Thu Aug  8 15:26:48 2013
+From: iago.mosqueira-sanchez at jrc.ec.europa.eu (Iago MOSQUEIRA (JRC))
+Date: Thu, 08 Aug 2013 15:26:48 +0200
+Subject: [FLR-list] bug in areaSums()
+In-Reply-To: <8FE8A24E425793428F3C772FA61961A51FE42585@SCOMP0936.wurnet.nl>
+References: <8FE8A24E425793428F3C772FA61961A51FE42585@SCOMP0936.wurnet.nl>
+Message-ID: <52039C98.2040606@jrc.ec.europa.eu>
+
+On 07/31/2013 04:53 PM, Hintzen, Niels wrote:
+> Hi,
+> 
+>  
+> 
+> Using FLCore under R2.13.2 on windows machine under 32 bits. Version
+> 2.4, build 2011-10-05 12:21:01, and I just came across a bug I assume in
+> areaSums()
+> 
+>  
+> 
+> The function sums over area but also over iters, while that should not
+> be the case.
+> 
+>  
+> 
+> See e.g.
+> 
+>  
+> 
+> library(FLCore)
+> 
+> data(ple4)
+> 
+>  
+> 
+> dmns      <- dimnames(ple4 at stock.n)
+> 
+> dmns$area <- 1:3
+> 
+> ple       <- FLStock(stock.n=FLQuant(dimnames=dmns))
+> 
+> for(iArea in dmns$area)
+> 
+>   ple[,,,,iArea] <- ple4
+> 
+> ple       <- propagate(ple,iter=10)
+> 
+>  
+> 
+> dim(ple at harvest) #still 10 iters
+> 
+> dim(areaSums(ple at harvest)) #only 1 iter...
+> 
+>  
+> 
+>  
+> 
+> Is this solved in later versions already, because then I?ll fix it for
+> my own code for now.
+> 
+>  
+> 
+> Cheers, Niels
+
+Hi,
+
+Yes, this has been fixed in the development version now at
+
+https://github.com/flr/FLCore
+
+> dim(ple at harvest) #still 10 iters
+[1] 10 52  1  1  3 10
+> dim(areaSums(ple at harvest)) #only 1 iter...
+[1] 10 52  1  1  1 10
+
+Thanks,
+
+
+Iago
+
+-- 
+Dr Iago Mosqueira
+
+European Commission ? Joint Research Center
+Institute for the Protection and Security of the Citizen (IPSC)
+Maritime Affairs Unit FISHREG ? Scientific Support to Fisheries
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Office : +39 0332 785413
+Fax: +39 0332 789658
+
+iago.mosqueira at jrc.ec.europa.eu
+
+http://fishreg.jrc.ec.europa.eu/home
+
+

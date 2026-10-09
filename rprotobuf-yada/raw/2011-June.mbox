@@ -1,0 +1,139 @@
+From murray at stokely.org  Wed Jun  1 22:32:22 2011
+From: murray at stokely.org (Murray Stokely)
+Date: Wed, 1 Jun 2011 16:32:22 -0400
+Subject: [Rprotobuf-yada] Writing R data.frames out to serialized lists of
+	protocol buffers
+Message-ID: <BANLkTim8U5DaR5WO=Rqmf0rqTeL6if=QEA@mail.gmail.com>
+
+I have an application where I need to save R data.frames in serialized
+protocol buffers.  I think there might be some existing code that does
+this, but I couldn't find it so I wrote a few functions to :
+
+1) create an ephemeral protocol buffer that defines a schema for the
+provided data.frame
+
+and
+
+2) converts the column-oriented R data.frame into a row-oriented list
+of protocol buffers using this ephemeral schema.
+
+Step (2) is done in R code right now but should really be done in C++
+to get much better performance.  Is there any existing code that does
+this?  The approach I am using is basically :
+
+# Map from R types to protocol buffer types
+kTypeConversions <- list(numeric="double",
+                      integer="int32",
+                      character="string",
+                      factor="string",
+                      logical="int32")
+
+kTypeConversionFunctions <- list(numeric=as.numeric,
+                                 integer=as.integer,
+                                 character=as.character,
+                                 factor=as.character,
+                                 logical=as.integer)
+
+
+.RToProtoBufIdentifier <- function(identifier) {
+  # Convert an R identifier name to a name suitable for use in a Protocol Buffer
+  #
+  # Args:
+  #   identifier:   A character vector of names used in R.
+  # Returns:
+  #   A character vector of identifiers suitable for using in a protocol buffer.
+
+  # First make sure the column names are at least valid R identifiers.
+  ret.val <- make.names(identifier, unique=TRUE)
+  # R names may start with '.', but protobuf identifiers can't start with '_'.
+  ret.val <- gsub("^\\.", "hidden_", ret.val, fixed=FALSE)
+  # Now convert any remaining '.'s to '_' since '.' is not valid in protobufs.
+  return(gsub(".", "_", ret.val, fixed=TRUE))
+}
+
+.WriteProtobufDescriptionFile <- function(x, file,
+                                          msg.name="Rdataframe_proto") {
+  # Write out a Protocol Buffer Description for a Dataframe
+  #
+  # Args:
+  #   x:         An R data.frame
+  #   msg.name:  The name to use for this protocol message.
+  #   file:      A connection or a character filename for writing proto def.
+  field.names <- .RToProtoBufIdentifier(names(x))
+  stopifnot(anyDuplicated(field.names) == 0)
+
+  if (is.character(file)) {
+    file <- file(file, "wt")
+    on.exit(close(file))
+  }
+  if (!isOpen(file)) {
+    open(file, "wt")
+    on.exit(close(file))
+  }
+  cat('syntax = "proto2";\n', file=file)
+  cat("message", msg.name, "{\n", file=file)
+
+  num <- 1
+  # TODO(mstokely): Vectorize this if performance becomes an issue.
+  for (column in x) {
+    field.type <- kTypeConversions[[class(column)]]
+    stopifnot(!is.null(field.type))
+    cat("  optional", field.type, field.names[num], "=", num, ";\n",
+        file=file)
+    num <- num + 1
+  }
+  cat("}\n", file=file)
+  return(invisible())
+}
+
+
+.DataFrameToProtoBufs <- function(x, proto.file, proto.class) {
+  # Returns a list of RProtoBuf protocol messages corresponding to rows of x.
+  #
+  # Then names of the columns in the provided data frames must match the
+  # fields of the provided protocol buffer exactly.
+  #
+  # Args:
+  #   x:            An R data.frame
+  #   proto.file:   The .proto filename containing the proto buffer definition.
+  #   proto.class:  An RProtoBuf protocol descriptor describing each row of x.
+  # Returns:
+  #   A list of RProtoBuf protocol messages.
+  names(x) <- .RToProtoBufIdentifier(names(x))
+
+  proto.descriptor <- P(proto.class, proto.file)
+
+  # Convert column types as needed.
+  for (col in 1:ncol(x)) {
+    type.converter <- kTypeConversionFunctions[[class(x[[col]])]]
+    x[[col]] <- type.converter(x[[col]])
+  }
+
+  # TODO(mstokely): Consider rewriting in C++ for performance.
+  # TODO(mstokely): Or, combine these two functions to avoid overhead of
+  # building up long intermediate list of rows.
+  ExtractRow <- function(row.num, x) {
+    # Extracts a row from a data frame (a column-oriented structure).
+    # For each column of x, return row.num element.
+    return(lapply(x, '[', row.num))
+    # We use this to provide a named list structure as opposed to a data.frame
+    # subset with return(x[row.num,]) which would require changes below.
+  }
+
+  CreateProtoBufFromRow <- function(row, proto.descriptor) {
+    # Calls new(proto.descriptor, column1=value1, ...) with
+    # non-NA named arguments from the row used to set the fields of the
+    # protocol buffer (NA arguments omitted, as all are optional.)
+    return (do.call(new, c(list(quote(proto.descriptor)),
+                           row[!is.na(row)])))
+  }
+
+
+  # Convert data frame (column-oriented) to a list of rows, where each
+  # row is a named list of columns.
+   data.by.rows <- lapply(seq_len(nrow(x)), ExtractRow, x)
+
+  # For each row, create a protocol buffer.
+  return(lapply(data.by.rows, CreateProtoBufFromRow, proto.descriptor))
+}
+

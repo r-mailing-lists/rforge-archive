@@ -1,0 +1,1229 @@
+From twutz at bgc-jena.mpg.de  Fri Apr 16 19:41:31 2010
+From: twutz at bgc-jena.mpg.de (Thomas Wutzler)
+Date: Fri, 16 Apr 2010 19:41:31 +0200
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+Message-ID: <4BC8A14B.4040601@bgc-jena.mpg.de>
+
+Dear Keith Ponting and Toby Dylan Hocking
+
+thanks very much for this package!
+It reduces redundancies and helps very much to keep documentation and
+code consistent.
+
+I two questions or a feature suggestions:
+
+1) I use source formatting that uses tabs and and current version bof
+inlinedocs reaks when trying to extract the parameter names with tabs
+before, because the label is not correctly parsed. Also I would like to
+allow indented comments like
+
+traceback.curr <- function(
+	### prints the current function calls, deepest on top
+	collapse=NULL
+	### an optional character string to separate the results.
+	,someOtherArgument
+){}
+
+(there are tabs not spaces in the real file)
+
+Therefore, I suggest the following changes
+prefix <- "^[ \t]*###[ \t]" #changed the pattern to handle tabs
+
+in extract_doc_chunk, line 14 in the stable version
+add support for \t and , and remove trainling spaces
+
+lab <- if (end + 1 == length(code))
+            "value"
+        else if (start == 2)
+            "description"
+        else if (0 == length(grep("^\\s*#", code[start - 1], perl =
+TRUE))) {
+	    #strip leading white spaces and brackets and ,
+            arg <- gsub("^[ \t(,]*", "", code[start - 1])
+            arg <- gsub("^([^=,]*)[=,].*", "\\1", arg)
+	    #remove trailing whitespaces
+            arg <- gsub("^(.*)[ \t]+$*", "\\1", arg)
+            arg <- gsub("...", "\\dots", arg, fix = TRUE)
+            paste("item{", arg, "}", sep = "")
+        }
+        else {
+            next
+        }
+
+
+2) Is it already possible somehow to parse for S3 methods and insert the
+\method markup instead of the full name.
+
+R CMD check  on 2.10.1 complains:
+The \usage entries for S3 methods should use the \method markup and not
+their full name.
+
+
+Thanks again for your work !!
+
+Best regards
+Thomas Wutzler
+
+
+From Toby.Hocking at inria.fr  Fri Apr 16 20:34:10 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Fri, 16 Apr 2010 20:34:10 +0200 (CEST)
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <4BC8A14B.4040601@bgc-jena.mpg.de>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+Message-ID: <20100416.203410.170221240.Toby.Hocking@inria.fr>
+
+Thanks for your input, and I'm glad you like inlinedocs!
+
+I suffer from the S3 method warnings, and I was planning to address
+this at some point, but I just haven't got around to it yet since it
+only causes NOTE and not WARNING with R CMD check. 
+
+I never encountered the problem with indented ### comments since ESS
+makes sure they always start at the beginning of the line. However it
+seems like it wouldn't hurt to add the feature you request.
+
+The easiest thing would be if you could sign up for an account with
+R-Forge, then request to be added to the inlinedocs group. Then I will
+grant you svn access and you can add these features directly to the
+development version.
+
+However I will be away from mail/internet this weekend so, make the
+request, have a nice weekend, and i will probably be able to add you
+into the project on monday.
+
+From Toby.Hocking at inria.fr  Mon Apr 19 10:54:08 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Mon, 19 Apr 2010 10:54:08 +0200 (CEST)
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <4BC8A14B.4040601@bgc-jena.mpg.de>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+Message-ID: <20100419.105408.192848482.Toby.Hocking@inria.fr>
+
+Hi Thomas, I just approved your membership in the inlinedocs
+project. So feel free to check out a copy of the svn repos and add the
+features that you talked about. Keith and I have set up some test
+examples in inlinedocs/pkg/inlinedocs/tests, so make sure that the
+package works on these test examples before checking in the new
+code. All you have to do is run R CMD check on the inlinedocs package
+and it should automatically compare the package's existing output to
+the new output after your changes. I suppose that the change for
+support of documenting S3 methods will show up as a difference, so
+that should be fine.
+
+Happy coding and feel free to ask if you have questions about anything.
+
+From k.ponting at aurix.com  Mon Apr 19 11:14:41 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Mon, 19 Apr 2010 05:14:41 -0400
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <4BC8A14B.4040601@bgc-jena.mpg.de>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A810026B922F@BE02.exg3.exghost.com>
+
+Hello Thomas,
+
+I added some support for S3 methods but only when they are declared via
+the useful setMethodS3/setConstructorS3 from the R.oo package, so
+somewhat limited support for S3 methods is present. 
+
+If you are looking to extend this, then note that there are two slightly
+different ways of analysing package code used within inlinedocs, either
+of which might be a good place to start - I do not know enough about
+general use of S3 methods to comment further:
+1) sys.source the file into an environment and inspect that environment,
+which is very good for standard function definitions;
+2) parse the package source file(s) (via extract.file.parse) and inspect
+the parse tree - this was necessary to handle S4 setClass and the
+set{Method,Constructor}S3 calls.
+There are various comments such as "not sure what to do with these yet"
+which I left in the source of extract.file.parse for some of the S4
+class calls, such as setMethod.
+
+I'm glad you like inlinedocs.
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+> -----Original Message-----
+> From: inlinedocs-support-bounces at lists.r-forge.r-project.org
+> [mailto:inlinedocs-support-bounces at lists.r-forge.r-project.org] On
+> Behalf Of Thomas Wutzler
+> Sent: 16 April 2010 18:42
+> To: inlinedocs-support at lists.r-forge.r-project.org
+> Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+> 
+> Dear Keith Ponting and Toby Dylan Hocking
+> 
+> thanks very much for this package!
+> It reduces redundancies and helps very much to keep documentation and
+> code consistent.
+> 
+> I two questions or a feature suggestions:
+> 
+> 1) I use source formatting that uses tabs and and current version bof
+> inlinedocs reaks when trying to extract the parameter names with tabs
+> before, because the label is not correctly parsed. Also I would like
+to
+> allow indented comments like
+> 
+> traceback.curr <- function(
+> 	### prints the current function calls, deepest on top
+> 	collapse=NULL
+> 	### an optional character string to separate the results.
+> 	,someOtherArgument
+> ){}
+> 
+> (there are tabs not spaces in the real file)
+> 
+> Therefore, I suggest the following changes prefix <- "^[ \t]*###[ \t]"
+> #changed the pattern to handle tabs
+> 
+> in extract_doc_chunk, line 14 in the stable version add support for \t
+> and , and remove trainling spaces
+> 
+> lab <- if (end + 1 == length(code))
+>             "value"
+>         else if (start == 2)
+>             "description"
+>         else if (0 == length(grep("^\\s*#", code[start - 1], perl =
+> TRUE))) {
+> 	    #strip leading white spaces and brackets and ,
+>             arg <- gsub("^[ \t(,]*", "", code[start - 1])
+>             arg <- gsub("^([^=,]*)[=,].*", "\\1", arg)
+> 	    #remove trailing whitespaces
+>             arg <- gsub("^(.*)[ \t]+$*", "\\1", arg)
+>             arg <- gsub("...", "\\dots", arg, fix = TRUE)
+>             paste("item{", arg, "}", sep = "")
+>         }
+>         else {
+>             next
+>         }
+> 
+> 
+> 2) Is it already possible somehow to parse for S3 methods and insert
+the
+> \method markup instead of the full name.
+> 
+> R CMD check  on 2.10.1 complains:
+> The \usage entries for S3 methods should use the \method markup and
+not
+> their full name.
+> 
+> 
+> Thanks again for your work !!
+> 
+> Best regards
+> Thomas Wutzler
+> 
+> _______________________________________________
+> Inlinedocs-support mailing list
+> Inlinedocs-support at lists.r-forge.r-project.org
+>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/inlinedocs-
+> support
+
+From twutz at bgc-jena.mpg.de  Tue Apr 20 16:10:26 2010
+From: twutz at bgc-jena.mpg.de (Thomas Wutzler)
+Date: Tue, 20 Apr 2010 16:10:26 +0200
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <20100416.203410.170221240.Toby.Hocking@inria.fr>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+	<20100416.203410.170221240.Toby.Hocking@inria.fr>
+Message-ID: <4BCDB5D2.6040209@bgc-jena.mpg.de>
+
+Dear Toby,
+
+I implemented the indentation changes.
+
+Is there any reason why you do not support "##examples<<" with the
+package (yet)?
+I could try to adapt inlinedocs as well.
+
+Best regards
+Thomas
+
+Toby Dylan Hocking wrote:
+> Thanks for your input, and I'm glad you like inlinedocs!
+> 
+> I suffer from the S3 method warnings, and I was planning to address
+> this at some point, but I just haven't got around to it yet since it
+> only causes NOTE and not WARNING with R CMD check. 
+> 
+> I never encountered the problem with indented ### comments since ESS
+> makes sure they always start at the beginning of the line. However it
+> seems like it wouldn't hurt to add the feature you request.
+> 
+> The easiest thing would be if you could sign up for an account with
+> R-Forge, then request to be added to the inlinedocs group. Then I will
+> grant you svn access and you can add these features directly to the
+> development version.
+> 
+> However I will be away from mail/internet this weekend so, make the
+> request, have a nice weekend, and i will probably be able to add you
+> into the project on monday.
+
+From Toby.Hocking at inria.fr  Wed Apr 21 08:57:41 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Wed, 21 Apr 2010 08:57:41 +0200 (CEST)
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <4BCDB5D2.6040209@bgc-jena.mpg.de>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+	<20100416.203410.170221240.Toby.Hocking@inria.fr>
+	<4BCDB5D2.6040209@bgc-jena.mpg.de>
+Message-ID: <20100421.085741.247502462.Toby.Hocking@inria.fr>
+
+Great, thanks for the contributions.
+
+Yes, I have given some thought to adding examples inline in the code,
+but I don't like it, because when the example code is commented, it is
+harder to edit and test. Of course I am willing to listen to a
+compelling argument if you have one, but at this time, I wouldn't like
+to encourage the ##examples<< syntax.
+
+Instead, I prefer to add a corresponding file in the tests
+subdirectory, and take the examples from this.
+
+From twutz at bgc-jena.mpg.de  Wed Apr 21 12:37:36 2010
+From: twutz at bgc-jena.mpg.de (Thomas Wutzler)
+Date: Wed, 21 Apr 2010 12:37:36 +0200
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <20100421.085741.247502462.Toby.Hocking@inria.fr>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>	<20100416.203410.170221240.Toby.Hocking@inria.fr>	<4BCDB5D2.6040209@bgc-jena.mpg.de>
+	<20100421.085741.247502462.Toby.Hocking@inria.fr>
+Message-ID: <4BCED570.3070103@bgc-jena.mpg.de>
+
+Hello Toby,
+
+> Yes, I have given some thought to adding examples inline in the code,
+> but I don't like it, because when the example code is commented, it is
+> harder to edit and test. 
+I agree.
+However, for simple examples it would be very nice, to have it directly
+documented in the function.
+It would be quickly implemented.
+
+> Instead, I prefer to add a corresponding file in the tests
+> subdirectory, and take the examples from this.
+I also thought about this.
+Why not allow both ways?
+
+One could think about naming conventions: e.g. for function myFunction
+include the body of .example.myFunction into the examples section of
+myFunction.
+With using NAMESPACE to exclude .example*, one could code
+.example.myFunction directly below myFunction.
+On R CMD check the examples are tested anyway.
+
+I also thought about the possibility of an include directive
+##examplesUtest<< testFunctionName
+to include teh body of a testFunction from RUnit (or svUnit).
+testFunctionName is then a method in the corresponding TestUnit
+(unitTests/runitmyFunction.R)
+
+Yours,
+Thomas
+
+From k.ponting at aurix.com  Thu Apr 22 12:20:48 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Thu, 22 Apr 2010 06:20:48 -0400
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <0368DB7855FE094FBFF313BE6BC5A810026B922F@BE02.exg3.exghost.com>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+	<0368DB7855FE094FBFF313BE6BC5A810026B922F@BE02.exg3.exghost.com>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A81002762805@BE02.exg3.exghost.com>
+
+I have just committed a revision to the setMethodS3 handling which
+eliminates the warnings under R2.10.1, with the following notes:
+
+Further fixes for S3 methods declared with setMethodS3
+
+1) automatically generates \method{}{} markup which should be correct if
+and only if the generic name is everything up to but not including the
+first period in the function name. Thus this will not work properly if a
+generic function has a name like "my.generic" so that the specific
+function
+is "my.generic.my_type".
+
+2) fix for behaviour of package.skeleton, which, as used within this
+package, for a function "[[.Distribution" generates a file with name
+"z[[.Distribution.Rd"
+
+3) prints S3method calls suitable for inclusion in a NAMESPACE file
+
+The mechanism depends on the parse of the source file picking up and
+setting the "created" field to "setMethodS3". Something similar might
+work
+for other ways of creating S3 generics, but I am not currently clear how
+to
+pick those up reliably.
+
+
+Keith
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+
+> -----Original Message-----
+> From: inlinedocs-support-bounces at lists.r-forge.r-project.org
+> [mailto:inlinedocs-support-bounces at lists.r-forge.r-project.org] On
+> Behalf Of Keith Ponting
+> Sent: 19 April 2010 10:15
+> To: Thomas Wutzler
+> Cc: inlinedocs-support at r-forge.wu-wien.ac.at
+> Subject: Re: [inlinedocs] tabs before comments and symbols, S3 methods
+> 
+> Hello Thomas,
+> 
+> I added some support for S3 methods but only when they are declared
+via
+> the useful setMethodS3/setConstructorS3 from the R.oo package, so
+> somewhat limited support for S3 methods is present.
+> 
+> If you are looking to extend this, then note that there are two
+slightly
+> different ways of analysing package code used within inlinedocs,
+either
+> of which might be a good place to start - I do not know enough about
+> general use of S3 methods to comment further:
+> 1) sys.source the file into an environment and inspect that
+environment,
+> which is very good for standard function definitions;
+> 2) parse the package source file(s) (via extract.file.parse) and
+inspect
+> the parse tree - this was necessary to handle S4 setClass and the
+> set{Method,Constructor}S3 calls.
+> There are various comments such as "not sure what to do with these
+yet"
+> which I left in the source of extract.file.parse for some of the S4
+> class calls, such as setMethod.
+> 
+> I'm glad you like inlinedocs.
+> 
+> Keith Ponting
+> Aurix Ltd, Malvern WR14 3SZ  UK
+> > -----Original Message-----
+> > From: inlinedocs-support-bounces at lists.r-forge.r-project.org
+> > [mailto:inlinedocs-support-bounces at lists.r-forge.r-project.org] On
+> > Behalf Of Thomas Wutzler
+> > Sent: 16 April 2010 18:42
+> > To: inlinedocs-support at lists.r-forge.r-project.org
+> > Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+> >
+> > Dear Keith Ponting and Toby Dylan Hocking
+> >
+> > thanks very much for this package!
+> > It reduces redundancies and helps very much to keep documentation
+and
+> > code consistent.
+> >
+> > I two questions or a feature suggestions:
+> >
+> > 1) I use source formatting that uses tabs and and current version
+bof
+> > inlinedocs reaks when trying to extract the parameter names with
+tabs
+> > before, because the label is not correctly parsed. Also I would like
+> to
+> > allow indented comments like
+> >
+> > traceback.curr <- function(
+> > 	### prints the current function calls, deepest on top
+> > 	collapse=NULL
+> > 	### an optional character string to separate the results.
+> > 	,someOtherArgument
+> > ){}
+> >
+> > (there are tabs not spaces in the real file)
+> >
+> > Therefore, I suggest the following changes prefix <- "^[ \t]*###[
+\t]"
+> > #changed the pattern to handle tabs
+> >
+> > in extract_doc_chunk, line 14 in the stable version add support for
+\t
+> > and , and remove trainling spaces
+> >
+> > lab <- if (end + 1 == length(code))
+> >             "value"
+> >         else if (start == 2)
+> >             "description"
+> >         else if (0 == length(grep("^\\s*#", code[start - 1], perl =
+> > TRUE))) {
+> > 	    #strip leading white spaces and brackets and ,
+> >             arg <- gsub("^[ \t(,]*", "", code[start - 1])
+> >             arg <- gsub("^([^=,]*)[=,].*", "\\1", arg)
+> > 	    #remove trailing whitespaces
+> >             arg <- gsub("^(.*)[ \t]+$*", "\\1", arg)
+> >             arg <- gsub("...", "\\dots", arg, fix = TRUE)
+> >             paste("item{", arg, "}", sep = "")
+> >         }
+> >         else {
+> >             next
+> >         }
+> >
+> >
+> > 2) Is it already possible somehow to parse for S3 methods and insert
+> the
+> > \method markup instead of the full name.
+> >
+> > R CMD check  on 2.10.1 complains:
+> > The \usage entries for S3 methods should use the \method markup and
+> not
+> > their full name.
+> >
+> >
+> > Thanks again for your work !!
+> >
+> > Best regards
+> > Thomas Wutzler
+> >
+> > _______________________________________________
+> > Inlinedocs-support mailing list
+> > Inlinedocs-support at lists.r-forge.r-project.org
+> >
+>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/inlinedocs-
+> > support
+> _______________________________________________
+> Inlinedocs-support mailing list
+> Inlinedocs-support at lists.r-forge.r-project.org
+>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/inlinedocs-
+> support
+
+From Toby.Hocking at inria.fr  Thu Apr 22 14:40:21 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Thu, 22 Apr 2010 14:40:21 +0200 (CEST)
+Subject: [inlinedocs] new inline example ideas
+In-Reply-To: <4BCED570.3070103@bgc-jena.mpg.de>
+References: <4BCDB5D2.6040209@bgc-jena.mpg.de>
+	<20100421.085741.247502462.Toby.Hocking@inria.fr>
+	<4BCED570.3070103@bgc-jena.mpg.de>
+Message-ID: <20100422.144021.103113288.Toby.Hocking@inria.fr>
+
+First let me say that I can see where you're coming from. It would be
+beneficial to write examples right next to the function. In fact, this
+is the point of the inlinedocs package. However, putting them in
+comments using ##examples<< is not a solution I would be willing to
+use. How about the following solution, adapted from the fermat example
+(just look at the last few lines):
+
+is.pseudoprime <- function#Check an integer for pseudo-primality to an arbitrary precision.
+### A number is pseudo-prime if it is probably prime, the basis of
+### which is the probabalistic Fermat test; if it passes two such
+### tests, the chances are better than 3 out of 4 that \eqn{n} is
+### prime.
+##references<< Abelson, Hal; Jerry Sussman, and Julie
+##Sussman. Structure and Interpretation of Computer
+##Programs. Cambridge: MIT Press, 1984.
+(n, ##<< the integer to test for pseudoprimality.
+ times ##<< the number of Fermat tests to perform
+){
+  result <- if(times==0)TRUE
+  ##seealso<< \code{\link{fermat.test}}
+  else if(fermat.test(n)) is.pseudoprime(n,times-1)
+  else FALSE
+  return(result)
+### Whether the number is pseudoprime
+  is.pseudoprime(13,4)
+}
+
+here we have a return() line explicitly in the function definition, so
+the code after it will never be executed when you actually use
+is.pseudoprime in your package. However, we will be able to parse the
+lines after it to use for examples. Kind of tricky, huh? I just got
+this idea and I like it!
+
+advantages: 
+- example code is not commented, so easily testable and correctly highlighted
+- example code is right next to the corresponding function
+
+disadvantages:
+- need to use explicit return
+
+any other ideas?
+
+From k.ponting at aurix.com  Fri Apr 23 10:16:38 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Fri, 23 Apr 2010 04:16:38 -0400
+Subject: [inlinedocs] new inline example ideas
+In-Reply-To: <20100422.144021.103113288.Toby.Hocking@inria.fr>
+References: <4BCDB5D2.6040209@bgc-jena.mpg.de><20100421.085741.247502462.Toby.Hocking@inria.fr><4BCED570.3070103@bgc-jena.mpg.de>
+	<20100422.144021.103113288.Toby.Hocking@inria.fr>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A81002762BFC@BE02.exg3.exghost.com>
+
+An interesting idea. One or two ramifications:
+
+1) One thing that I like about the current mechanism (examples in tests
+subdir) is that when the examples are run by R CMD check they are
+automatically cross-checked against  a reference output (assuming that
+exists). We could maintain this by checking whether
+tests/is.pseudoprime.Rout.save exists and if so write the example into
+tests/is.pseudoprime.R - we might want to do a diff/confirm overwrite if
+that file already exists!
+
+2) I think (but am not sure) that there would not be a problem with the
+compilation in R CMD build (which checks for visible bindings) as all
+the objects used in the examples should have visible bindings - but
+maybe calls to library might get complained about? Yes, they do - if you
+put a library(grid) call after the return statement you get a warning
+like: 
+* checking for unstated dependencies in R code ... WARNING
+'library' or 'require' calls not declared from:
+  grid
+See the information on DESCRIPTION files in the chapter 'Creating R
+packages' of the 'Writing R Extensions' manual.
+
+3) In memory images of the functions would include the example code,
+which might be useful or a pain, but if the latter then the present
+system would be fine.
+
+4) We need to be a little careful how the ### value line gets picked up
+- IIRC the current code looks for ### lines immediately preceding the
+function final }
+
+5) The help markup includes \dontrun (which need not be legal R code)
+\dontshow and \donttest  - if we are doing a bit of parsing to extract
+the examples then, based on the example given in Writing R extensions
+which is:
+          x <- runif(10)       # Shown and run.
+          \dontrun{plot(x)}    # Only shown.
+          \dontshow{log(x)}    # Only run.
+We could do something like the following at the end of the function,
+extending the ##<< markup to suck in everything including the following
+code lines:
+
+  return(result)
+### A pseudo-random sample from the uniform distribution
+  ##example<<
+  x <- runif(10)
+  ##dontrun<< ... some bit of non-R code to show in example ...
+  ##continuing over several lines, but valid R code can be included:
+  plot(x)
+  ##dontshow<<
+  log(x)
+  ##end<<
+  ## and this bit does not get into the examples (don't yet know why we
+might want it, but always keep options open)
+}
+
+the idea is that that lot would generate:
+
+  x <- runif(10)
+  \dontrun{ .. some bit of non-R code to show in example ...
+continuing over several lines, but valid R code can be included:
+  plot(x)}
+  \dontshow{log(x)}
+
+
+The point about library calls could then be answered by using
+##example<< library(grid)
+We could even answer the uncertainty about overwriting in 1) above by
+having ##test<< as an alternative - chunks introduced by that would be
+copied into the relevant tests file, whereas chunks with ##example<<
+would only end up in the examples section of the documentation.
+
+Keith
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+
+
+> -----Original Message-----
+> From: inlinedocs-support-bounces at lists.r-forge.r-project.org
+> [mailto:inlinedocs-support-bounces at lists.r-forge.r-project.org] On
+> Behalf Of Toby Dylan Hocking
+> Sent: 22 April 2010 13:40
+> To: twutz at bgc-jena.mpg.de
+> Cc: inlinedocs-support at r-forge.wu-wien.ac.at
+> Subject: [inlinedocs] new inline example ideas
+> 
+> First let me say that I can see where you're coming from. It would be
+> beneficial to write examples right next to the function. In fact, this
+> is the point of the inlinedocs package. However, putting them in
+> comments using ##examples<< is not a solution I would be willing to
+use.
+> How about the following solution, adapted from the fermat example
+(just
+> look at the last few lines):
+> 
+> is.pseudoprime <- function#Check an integer for pseudo-primality to an
+> arbitrary precision.
+> ### A number is pseudo-prime if it is probably prime, the basis of ###
+> which is the probabalistic Fermat test; if it passes two such ###
+tests,
+> the chances are better than 3 out of 4 that \eqn{n} is ### prime.
+> ##references<< Abelson, Hal; Jerry Sussman, and Julie ##Sussman.
+> Structure and Interpretation of Computer ##Programs. Cambridge: MIT
+> Press, 1984.
+> (n, ##<< the integer to test for pseudoprimality.
+>  times ##<< the number of Fermat tests to perform ){
+>   result <- if(times==0)TRUE
+>   ##seealso<< \code{\link{fermat.test}}
+>   else if(fermat.test(n)) is.pseudoprime(n,times-1)
+>   else FALSE
+>   return(result)
+> ### Whether the number is pseudoprime
+>   is.pseudoprime(13,4)
+> }
+> 
+> here we have a return() line explicitly in the function definition, so
+> the code after it will never be executed when you actually use
+> is.pseudoprime in your package. However, we will be able to parse the
+> lines after it to use for examples. Kind of tricky, huh? I just got
+this
+> idea and I like it!
+> 
+> advantages:
+> - example code is not commented, so easily testable and correctly
+> highlighted
+> - example code is right next to the corresponding function
+> 
+> disadvantages:
+> - need to use explicit return
+> 
+> any other ideas?
+> _______________________________________________
+> Inlinedocs-support mailing list
+> Inlinedocs-support at lists.r-forge.r-project.org
+>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/inlinedocs-
+> support
+
+From Toby.Hocking at inria.fr  Fri Apr 23 15:22:08 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Fri, 23 Apr 2010 15:22:08 +0200 (CEST)
+Subject: [inlinedocs] new inline example ideas
+In-Reply-To: <0368DB7855FE094FBFF313BE6BC5A81002762BFC@BE02.exg3.exghost.com>
+References: <4BCED570.3070103@bgc-jena.mpg.de>
+	<20100422.144021.103113288.Toby.Hocking@inria.fr>
+	<0368DB7855FE094FBFF313BE6BC5A81002762BFC@BE02.exg3.exghost.com>
+Message-ID: <20100423.152208.245832057.Toby.Hocking@inria.fr>
+
+ok, you bring up some interesting points.
+
+1) I suppose it would be possible to have tests and examples that are
+different for the same function, so it would be nice to have the
+option to do examples inline right after the function definition, and
+a tests separately in tests/fun.R. Then we could say
+package.skeleton.dx(tests="write") to write test files if they don't
+exist, and package.skeleton.dx(tests="overwrite") to overwrite
+existing test files. And default of tests="dontwrite"
+
+2) I don't think there should be any problem with library() calls in
+example code. Already I add a suggests: line in my DESCRIPTION for
+packages I use in examples. You don't? I don't think it hurts anything
+to add a package to Suggests.
+
+3) I don't think in memory images of example code is a problem.
+
+4) Yes of course we will have to rework the parser for the ### return
+value, but this will not be too difficult. We can just look for a ###
+line after the return() line.
+
+5) To keep the syntax simple I prefer to not have to explicitly start
+the example with ##example<<, but you do bring up a valid point about
+dontrun and dontshow, both of which I don't use very often. But I
+think the whole point of inlinedocs is that everything should be
+simple and transparent, so it WILL be run and it WILL be shown. I feel
+OK not supporting dontrun and dontshow. Do you use these often? Will
+it be a problem?
+
+From k.ponting at aurix.com  Mon Apr 26 11:17:43 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Mon, 26 Apr 2010 05:17:43 -0400
+Subject: [inlinedocs] new inline example ideas
+In-Reply-To: <20100423.152208.245832057.Toby.Hocking@inria.fr>
+References: <4BCED570.3070103@bgc-jena.mpg.de><20100422.144021.103113288.Toby.Hocking@inria.fr><0368DB7855FE094FBFF313BE6BC5A81002762BFC@BE02.exg3.exghost.com>
+	<20100423.152208.245832057.Toby.Hocking@inria.fr>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A8100276308F@BE02.exg3.exghost.com>
+
+> -----Original Message-----
+> From: inlinedocs-support-bounces at lists.r-forge.r-project.org
+> [mailto:inlinedocs-support-bounces at lists.r-forge.r-project.org] On
+> Behalf Of Toby Dylan Hocking
+> Sent: 23 April 2010 14:22
+> To: inlinedocs-support at r-forge.wu-wien.ac.at
+> Subject: Re: [inlinedocs] new inline example ideas
+> 
+> ok, you bring up some interesting points.
+> 
+> 1) I suppose it would be possible to have tests and examples that are
+> different for the same function, so it would be nice to have the
+option
+> to do examples inline right after the function definition, and a tests
+> separately in tests/fun.R. Then we could say
+> package.skeleton.dx(tests="write") to write test files if they don't
+> exist, and package.skeleton.dx(tests="overwrite") to overwrite
+existing
+> test files. And default of tests="dontwrite"
+
+[KMP:] That sounds good to me. If both exist, which go in the docs and
+which comes first in the docs? - the one from the function definition as
+being likely to be simpler?
+
+> 
+> 2) I don't think there should be any problem with library() calls in
+> example code. Already I add a suggests: line in my DESCRIPTION for
+> packages I use in examples. You don't? I don't think it hurts anything
+> to add a package to Suggests.
+
+[KMP:] (I had forgotten suggests :-( Thus far my collection of packages
+is sufficiently tree-like that everything needed has been in depends.)
+The more general thought was thinking aloud as to whether anything legal
+in an example would trigger warnings from the R function check, but I
+suppose if that becomes a problem the answer is to use separate
+example/test files as at present.
+
+> 
+> 3) I don't think in memory images of example code is a problem.
+> 
+> 4) Yes of course we will have to rework the parser for the ### return
+> value, but this will not be too difficult. We can just look for a ###
+> line after the return() line.
+
+[KMP:] And in this case the Emacs left margin indentation of that line
+makes quite a nice punctuation to emphasise the break from real function
+to example.
+
+> 
+> 5) To keep the syntax simple I prefer to not have to explicitly start
+> the example with ##example<<, but you do bring up a valid point about
+> dontrun and dontshow, both of which I don't use very often. But I
+think
+> the whole point of inlinedocs is that everything should be simple and
+> transparent, so it WILL be run and it WILL be shown. I feel OK not
+> supporting dontrun and dontshow. Do you use these often? Will it be a
+> problem?
+
+[KMP:] I have never (yet) used dontrun or dontshow, but have come close
+on occasion - maybe leave those out on a first implementation and wait
+until if/when someone wants them? 
+
+Keith
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+
+
+From Toby.Hocking at inria.fr  Mon Apr 26 13:09:44 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Mon, 26 Apr 2010 13:09:44 +0200 (CEST)
+Subject: [inlinedocs] new inline example ideas
+In-Reply-To: <0368DB7855FE094FBFF313BE6BC5A8100276308F@BE02.exg3.exghost.com>
+References: <0368DB7855FE094FBFF313BE6BC5A81002762BFC@BE02.exg3.exghost.com>
+	<20100423.152208.245832057.Toby.Hocking@inria.fr>
+	<0368DB7855FE094FBFF313BE6BC5A8100276308F@BE02.exg3.exghost.com>
+Message-ID: <20100426.130944.239086626.Toby.Hocking@inria.fr>
+
+OK, if both tests/FUN.R and inline ex for FUN exists, I think we
+should just use the inline example.
+
+If there are no further comments/objections I will work on the
+implementation this week.
+
+From k.ponting at aurix.com  Wed Apr 28 10:21:29 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Wed, 28 Apr 2010 04:21:29 -0400
+Subject: [inlinedocs] new inline example ideas
+In-Reply-To: <20100426.130944.239086626.Toby.Hocking@inria.fr>
+References: <0368DB7855FE094FBFF313BE6BC5A81002762BFC@BE02.exg3.exghost.com><20100423.152208.245832057.Toby.Hocking@inria.fr><0368DB7855FE094FBFF313BE6BC5A8100276308F@BE02.exg3.exghost.com>
+	<20100426.130944.239086626.Toby.Hocking@inria.fr>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A81002803176@BE02.exg3.exghost.com>
+
+That sounds fine to me.
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+
+
+> -----Original Message-----
+> From: inlinedocs-support-bounces at lists.r-forge.r-project.org
+> [mailto:inlinedocs-support-bounces at lists.r-forge.r-project.org] On
+> Behalf Of Toby Dylan Hocking
+> Sent: 26 April 2010 12:10
+> To: inlinedocs-support at r-forge.wu-wien.ac.at
+> Subject: Re: [inlinedocs] new inline example ideas
+> 
+> OK, if both tests/FUN.R and inline ex for FUN exists, I think we
+should
+> just use the inline example.
+> 
+> If there are no further comments/objections I will work on the
+> implementation this week.
+> _______________________________________________
+> Inlinedocs-support mailing list
+> Inlinedocs-support at lists.r-forge.r-project.org
+>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/inlinedocs-
+> support
+
+From Toby.Hocking at inria.fr  Thu Apr 29 23:44:08 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Thu, 29 Apr 2010 23:44:08 +0200 (CEST)
+Subject: [inlinedocs] Fw: inlinedocs
+Message-ID: <20100429.234408.190382633.Toby.Hocking@inria.fr>
+
+forwarded question regarding S4 classes, I thought you would be able
+to give a more sensible answer, Keith.
+-------------- next part --------------
+An embedded message was scrubbed...
+From: =?UTF-8?B?Smlt?= <jbullard at pacificbiosciences.com>
+Subject: =?UTF-8?B?aW5saW5lZG9jcw==?=
+Date: Thu, 29 Apr 2010 18:38:25 +0200 (CEST)
+Size: 1392
+URL: <http://lists.r-forge.r-project.org/pipermail/inlinedocs-support/attachments/20100429/c9028626/attachment.eml>
+
+From k.ponting at aurix.com  Fri Apr 30 10:37:53 2010
+From: k.ponting at aurix.com (Keith Ponting)
+Date: Fri, 30 Apr 2010 04:37:53 -0400
+Subject: [inlinedocs] inlinedocs
+In-Reply-To: <20100429163825.72F879C2BE@r-forge.r-project.org>
+References: <20100429163825.72F879C2BE@r-forge.r-project.org>
+Message-ID: <0368DB7855FE094FBFF313BE6BC5A810028038F7@BE02.exg3.exghost.com>
+
+Hi Jim, welcome to inlinedocs!
+
+All packages must have a DESCRIPTION, so package.skeleton.dx generates a DESCRIPTION file if one does not exist. Otherwise IIRC everything package.skeleton.dx does goes into the "man" subdirectory.
+
+NAMESPACE is different - not all packages have to have namespaces, although I am tending to use them more and more. Therefore we cannot high-handedly insist on generating one.
+
+It would be useful and relatively trivial to add a "namespace" option to package.skeleton.dx, pass it to the embedded package.skeleton call and then copy the generated file into the correct place in the package source if it does not exist. 
+
+The question is what to do about maintenance -- suppose I add a new class - it would be nice to automatically update the NAMESPACE file, but then what if I have separately edited the generated NAMESPACE file? Should we try and merge automatically, or warn the user and print a diff? I think my preferred route would be something like:
+1) copy the generated NAMESPACE file to both <package>/NAMESPACE and <package>/NAMESPACE.autogenerated;
+2) if those two files are still identical next time package.skeleton.dx is run with namespace=TRUE, then overwrite again;
+3) otherwise print a warning message to the user showing the differences between autogenerated and existing NAMESPACE file.
+
+There is also an incompleteness in the current handling of S4 class methods - I implemented something to cover the basic class definitions, but for each generic method the documentation might need to go in at least two places. For example, if I have a "show" method on class "results", then that is referred to both in "results-class.Rd" and in "show-methods.Rd". Both of these are generated by package.skeleton, so it might be useful to tuck the documentation into both places. However in my migration from S3 to S4 I have tended to write functions with S3-class-like names (e.g.) "show.results" then call setMethod("show","results",show.results) as opposed to writing the function definition inside that setMethod call, so that my documentation happily ends up under show.results. Therefore I am not sure which of the various options documented at the end of help("Documentation", package = "methods") are likely to be most sensible/useful...
+
+Keith
+
+Keith Ponting
+Aurix Ltd, Malvern WR14 3SZ  UK
+
+
+> -----Original Message-----
+> From: Jim [mailto:jbullard at pacificbiosciences.com]
+> Sent: 29 April 2010 17:38
+> To: toby.hocking at inria.fr
+> Subject: inlinedocs
+> 
+> Hi, I have started using your package inlinedocs and am having problems
+> with S4 classes and generics. One thing I noticed is that in the auto-
+> generated directory under pkgname/R/pkgname there is no NAMESPACE file.
+> Is there a reason why this is not included?
+> 
+> 
+> 
+> I am the developer of the h5r package.
+> 
+> 
+> 
+> thanks, jim
+
+From twutz at bgc-jena.mpg.de  Fri Apr 30 11:15:34 2010
+From: twutz at bgc-jena.mpg.de (Thomas Wutzler)
+Date: Fri, 30 Apr 2010 11:15:34 +0200
+Subject: [inlinedocs] new inline example ideas
+In-Reply-To: <20100422.144021.103113288.Toby.Hocking@inria.fr>
+References: <4BCDB5D2.6040209@bgc-jena.mpg.de>	<20100421.085741.247502462.Toby.Hocking@inria.fr>	<4BCED570.3070103@bgc-jena.mpg.de>
+	<20100422.144021.103113288.Toby.Hocking@inria.fr>
+Message-ID: <4BDA9FB6.8070809@bgc-jena.mpg.de>
+
+Hello Toby and Keith,
+
+interesting idea.
+However, I think that such code would be confusing for people reading it
+and do not know about inlinedocs. Also larger examples might clutter the
+code and complicate inspecting a function from within a session (e.g.
+body(apply)).
+
+In addition, there will be potential problems with tools that check code
+coverage of tests (RUnit has some attempts to do so).
+
+I prefer to put small examples in comments and in addition to have
+another mechanism to attach larger examples from uncommented source code
+residing somewhere else. For the latter I would like to link it
+explicitly (visibly documented) in an inlinedocs comment inside a
+function of the sort similar to
+##examplesInclude<< someLocation
+
+Where can I find documentation/examples of the current test-subdir based
+mechanism?
+
+Yours,
+Thomas
+
+Toby Dylan Hocking wrote:
+> First let me say that I can see where you're coming from. It would be
+> beneficial to write examples right next to the function. In fact, this
+> is the point of the inlinedocs package. However, putting them in
+> comments using ##examples<< is not a solution I would be willing to
+> use. How about the following solution, adapted from the fermat example
+> (just look at the last few lines):
+> 
+> is.pseudoprime <- function#Check an integer for pseudo-primality to an arbitrary precision.
+> ### A number is pseudo-prime if it is probably prime, the basis of
+> ### which is the probabalistic Fermat test; if it passes two such
+> ### tests, the chances are better than 3 out of 4 that \eqn{n} is
+> ### prime.
+> ##references<< Abelson, Hal; Jerry Sussman, and Julie
+> ##Sussman. Structure and Interpretation of Computer
+> ##Programs. Cambridge: MIT Press, 1984.
+> (n, ##<< the integer to test for pseudoprimality.
+>  times ##<< the number of Fermat tests to perform
+> ){
+>   result <- if(times==0)TRUE
+>   ##seealso<< \code{\link{fermat.test}}
+>   else if(fermat.test(n)) is.pseudoprime(n,times-1)
+>   else FALSE
+>   return(result)
+> ### Whether the number is pseudoprime
+>   is.pseudoprime(13,4)
+> }
+> 
+> here we have a return() line explicitly in the function definition, so
+> the code after it will never be executed when you actually use
+> is.pseudoprime in your package. However, we will be able to parse the
+> lines after it to use for examples. Kind of tricky, huh? I just got
+> this idea and I like it!
+> 
+> advantages: 
+> - example code is not commented, so easily testable and correctly highlighted
+> - example code is right next to the corresponding function
+> 
+> disadvantages:
+> - need to use explicit return
+> 
+> any other ideas?
+
+From twutz at bgc-jena.mpg.de  Fri Apr 30 14:44:44 2010
+From: twutz at bgc-jena.mpg.de (Thomas Wutzler)
+Date: Fri, 30 Apr 2010 14:44:44 +0200
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <0368DB7855FE094FBFF313BE6BC5A81002762805@BE02.exg3.exghost.com>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+	<0368DB7855FE094FBFF313BE6BC5A810026B922F@BE02.exg3.exghost.com>
+	<0368DB7855FE094FBFF313BE6BC5A81002762805@BE02.exg3.exghost.com>
+Message-ID: <4BDAD0BC.5030809@bgc-jena.mpg.de>
+
+Dear Keith,
+
+thanks to you for implementing the setMethodS3 support.
+
+I tried to understand how it is applied and added a test project sillyS3
+to the test directory, which discussion can be based upon.
+
+In the code of extract.file.parse you comment
+      ##details<< The \code{setMethodS3} calls introduce additional
+      ## complexity: they will define an additional S3 generic (which
+      ## needs documentation to avoid warnings at package build time)
+      ## unless one already exists. This also is handled by "linking"
+      ## documentation. A previously unseen generic is linked to the
+      ## first defining instances, subsequent definitions of that gen.
+      ## also link back to the first defining instance.
+
+I do not quite understand.
+What is an "linking documentation", "unseen generic", and what an "first
+defining instance"?
+
+In the sillyS3 toy example, I see that the parse result includes an
+entry for the generic function. However, it does not (yet?) effect the
+generated documentation. Hence R CMD check complains about an
+undocumented function.
+
+I would be glad about some guidance.
+
+Best regards
+Thomas
+
+
+
+
+
+
+
+
+From twutz at bgc-jena.mpg.de  Fri Apr 30 15:20:52 2010
+From: twutz at bgc-jena.mpg.de (Thomas Wutzler)
+Date: Fri, 30 Apr 2010 15:20:52 +0200
+Subject: [inlinedocs] tabs before comments and symbols, S3 methods
+In-Reply-To: <0368DB7855FE094FBFF313BE6BC5A81002762805@BE02.exg3.exghost.com>
+References: <4BC8A14B.4040601@bgc-jena.mpg.de>
+	<0368DB7855FE094FBFF313BE6BC5A810026B922F@BE02.exg3.exghost.com>
+	<0368DB7855FE094FBFF313BE6BC5A81002762805@BE02.exg3.exghost.com>
+Message-ID: <4BDAD934.30001@bgc-jena.mpg.de>
+
+Dear Keith,
+
+> 1) automatically generates \method{}{} markup which should be correct if
+> and only if the generic name is everything up to but not including the
+> first period in the function name. Thus this will not work properly if a
+> generic function has a name like "my.generic" so that the specific
+> function
+> is "my.generic.my_type".
+How about the following pattern?
+"^(.*)\\.([^\\.]+)$"
+
+This allows generics including a dot . e.g. "as.data.frame" (I
+encountered exactly this case)
+But it does not allow for objects names with a dot.
+
+Thomas
+
+
+
+From Toby.Hocking at inria.fr  Fri Apr 30 16:11:29 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Fri, 30 Apr 2010 16:11:29 +0200 (CEST)
+Subject: [inlinedocs] new inline example ideas
+In-Reply-To: <4BDA9FB6.8070809@bgc-jena.mpg.de>
+References: <4BCED570.3070103@bgc-jena.mpg.de>
+	<20100422.144021.103113288.Toby.Hocking@inria.fr>
+	<4BDA9FB6.8070809@bgc-jena.mpg.de>
+Message-ID: <20100430.161129.140384706.Toby.Hocking@inria.fr>
+
+Hi Thomas, and thanks for the input. First of all, let's adopt a
+standard naming scheme for discussing the 3 different methods for
+writing examples:
+
+tests-folder          (current method)
+examples-after-return (new method I proposed last week)
+##examples<<          (writing examples in comments)
+
+I will respond point by point.
+
+You can find a simple example of the tests-folder method in
+inlinedocs/tests/fermat, which is a simple package with a tests/
+subdirectory and a simple example. When you run package.skeleton.dx()
+on it, you should get a man/is.pseudoprime.Rd file with an example.
+
+Yes, I agree that my proposed examples-after-return style of inline
+examples would be confusing at first.
+
+I don't use RUnit, but I just read its vignette and I don't think this
+should pose any problems. For the code inspection that it claims to do
+I suspect that the code in examples-after-return will just not get
+executed.
+
+Your proposed ##examplesInclude<<filename method is redundant with the
+current tests/ subdirectory method. Essentially it is a question of
+convention over configuration. Right now we have the convention of
+getting examples from tests/FUN.R. Or do we want to allow
+configuration of which file has tests for each function? I prefer
+convention over configuration here, and I would not like to support
+##examplesInclude<<
+
+As for the examples-after-return method, here are the pros and cons:
+
+Advantages
+1. examples very close to function definition
+2. you don't have to repeat the function name to
+   define the examples for it
+3. example code is not commented
+
+Disadvantages
+1. need to use explicit return
+2. may be confusing
+
+The current method of examples using the test subdirectory is only
+there because it was easy to implement and I didn't have any other
+ideas. However the whole point of inlinedocs is to write your code and
+documentation right next to each other. With that in mind, I believe
+the new examples-after-return approach is the most aligned with the
+spirit of the package.
+
+That being said, it seems like the ##examples<< method is also aligned
+with the spirit of the package. In particular it has advantages 1. and
+2. but the disadvantage that code is commented. It should be easy to
+implement, so I say go for it if you like. It seems less sustainable,
+though, so I don't plan on using it.
+
+From JBullard at pacificbiosciences.com  Fri Apr 30 17:14:45 2010
+From: JBullard at pacificbiosciences.com (James Bullard)
+Date: Fri, 30 Apr 2010 08:14:45 -0700
+Subject: [inlinedocs] inlinedocs
+In-Reply-To: <0368DB7855FE094FBFF313BE6BC5A810028038F7@BE02.exg3.exghost.com>
+References: <20100429163825.72F879C2BE@r-forge.r-project.org>
+	<0368DB7855FE094FBFF313BE6BC5A810028038F7@BE02.exg3.exghost.com>
+Message-ID: <1272640485.24619.25.camel@mp-1246>
+
+Hi Keith, 
+
+Thanks for the response. I make heavy use of NAMESPACES and S4 and I
+have been actively looking for something to use for auto-doc generation.
+I like the simplicity of inlinedocs.
+
+In my opinion, no one should ever modify the generated files; similar to
+javadoc and pydoc - once you can modify the generated versions then
+you've lost one of the main benefits of the tool - consistency. I think
+that you should just copy a NAMESPACE file over if it exists. 
+
+As for the S4 handling. The documentation scheme within R is nearly
+unmanageable so a tool to facilitate this is great. In response to your
+point below, I tend to define the method directly in the setMethod call,
+or at least I hide it behind the NAMESPACE.
+
+Another thing that I do is create new generics. Currently, the
+documentation engine dies because it doesn't know where the generic is.
+The work around is to actually load the package which you are trying to
+generate documentation for - not exactly appealing, but in most cases
+this is probably okay - indeed R CMD check does this same thing. 
+
+ Error in methods::promptMethods(item, filename = file.path(docs_dir,
+sprintf("%s-methods.Rd",  : 
+  No generic function found corresponding to "getAlignments"
+
+
+Let me know how I can help, one thing I could easily do is put together
+a small package with these use-cases and that might facilitate the
+construction of these things -- if these are issues that you don't care
+about then let me know and I'll try to see if there is something else,
+or if I can roll this into your tool.
+
+thanks again, jim
+
+
+On Fri, 2010-04-30 at 04:37 -0400, Keith Ponting wrote:
+> Hi Jim, welcome to inlinedocs!
+> 
+> All packages must have a DESCRIPTION, so package.skeleton.dx generates a DESCRIPTION file if one does not exist. Otherwise IIRC everything package.skeleton.dx does goes into the "man" subdirectory.
+> 
+> NAMESPACE is different - not all packages have to have namespaces, although I am tending to use them more and more. Therefore we cannot high-handedly insist on generating one.
+> 
+> It would be useful and relatively trivial to add a "namespace" option to package.skeleton.dx, pass it to the embedded package.skeleton call and then copy the generated file into the correct place in the package source if it does not exist. 
+> 
+> The question is what to do about maintenance -- suppose I add a new class - it would be nice to automatically update the NAMESPACE file, but then what if I have separately edited the generated NAMESPACE file? Should we try and merge automatically, or warn the user and print a diff? I think my preferred route would be something like:
+> 1) copy the generated NAMESPACE file to both <package>/NAMESPACE and <package>/NAMESPACE.autogenerated;
+> 2) if those two files are still identical next time package.skeleton.dx is run with namespace=TRUE, then overwrite again;
+> 3) otherwise print a warning message to the user showing the differences between autogenerated and existing NAMESPACE file.
+> 
+> There is also an incompleteness in the current handling of S4 class methods - I implemented something to cover the basic class definitions, but for each generic method the documentation might need to go in at least two places. For example, if I have a "show" method on class "results", then that is referred to both in "results-class.Rd" and in "show-methods.Rd". Both of these are generated by package.skeleton, so it might be useful to tuck the documentation into both places. However in my migration from S3 to S4 I have tended to write functions with S3-class-like names (e.g.) "show.results" then call setMethod("show","results",show.results) as opposed to writing the function definition inside that setMethod call, so that my documentation happily ends up under show.results. Therefore I am not sure which of the various options documented at the end of help("Documentation", package = "methods") are likely to be most sensible/useful...
+> 
+> Keith
+> 
+> Keith Ponting
+> Aurix Ltd, Malvern WR14 3SZ  UK
+> 
+> 
+> > -----Original Message-----
+> > From: Jim [mailto:jbullard at pacificbiosciences.com]
+> > Sent: 29 April 2010 17:38
+> > To: toby.hocking at inria.fr
+> > Subject: inlinedocs
+> > 
+> > Hi, I have started using your package inlinedocs and am having problems
+> > with S4 classes and generics. One thing I noticed is that in the auto-
+> > generated directory under pkgname/R/pkgname there is no NAMESPACE file.
+> > Is there a reason why this is not included?
+> > 
+> > 
+> > 
+> > I am the developer of the h5r package.
+> > 
+> > 
+> > 
+> > thanks, jim
+
+

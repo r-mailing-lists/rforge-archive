@@ -1,0 +1,2541 @@
+From brian at braverock.com  Wed Aug 14 14:27:51 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Wed, 14 Aug 2013 07:27:51 -0500
+Subject: [GSoC-PortA] factor constraints
+Message-ID: <520B77C7.6040306@braverock.com>
+
+I see several commits in the past few days about factor and exposure 
+constraints.
+
+That's fantastic.
+
+Now we need to make sure they will work with the global numeric solvers too.
+
+For that to happen, we need to handle them in the constrained.objective 
+function as well.
+
+I'm thinking that we can always check them and account for them in 
+constrained.objective.  In all the 'special case' optimizations designed 
+for LP/QP etc solvers, we'll be using a different objective function anyway.
+
+Regards,
+
+Brian
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+
+
+From rossbennett34 at gmail.com  Wed Aug 14 19:45:59 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Wed, 14 Aug 2013 10:45:59 -0700
+Subject: [GSoC-PortA] factor constraints
+In-Reply-To: <520B77C7.6040306@braverock.com>
+References: <520B77C7.6040306@braverock.com>
+Message-ID: <CAEESW=V659OHtfuuyr3D-O6yR-XWxN+O=Z4JVMbm_UaC9kLg8Q@mail.gmail.com>
+
+Brian,
+
+Thanks for the note. In a recent commit (r2783) I added a block of code to
+constrained_objective that adds to the penalty term for weights that
+violate the factor exposure constraint.
+
+In commit r2784 I added DEoptim and random portfolios to the factor
+exposure testing script. The examples compare group constraints and
+industry exposure constraints that are the equivalent. The group
+constraints are satisfied based on the fn_map function, but the industry
+exposure constraints are handled using the penalty in
+constrained_objective. Because of this I am getting different optimal
+weights which I think should be expected, but I'm not entirely sure this is
+ok. Although the weights are different, they do satisfy the constraints.
+The objective measures (mean in the examples) are close - I am getting
+about 0.0077 using group constraints and anywhere from 0.0075 to 0.0076
+using factor exposure constraints.
+
+Let me know if you have any other suggestions or if there is a better way
+to handle the factor exposure constraint for the global numeric solvers.
+
+Thanks,
+Ross
+
+
+On Wed, Aug 14, 2013 at 5:27 AM, Brian G. Peterson <brian at braverock.com>wrote:
+
+> I see several commits in the past few days about factor and exposure
+> constraints.
+>
+> That's fantastic.
+>
+> Now we need to make sure they will work with the global numeric solvers
+> too.
+>
+> For that to happen, we need to handle them in the constrained.objective
+> function as well.
+>
+> I'm thinking that we can always check them and account for them in
+> constrained.objective.  In all the 'special case' optimizations designed
+> for LP/QP etc solvers, we'll be using a different objective function anyway.
+>
+> Regards,
+>
+> Brian
+>
+> --
+> Brian G. Peterson
+> http://braverock.com/brian/
+> Ph: 773-459-4973
+> IM: bgpbraverock
+>
+> ______________________________**_________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-**project.org<GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-**project.org/cgi-bin/mailman/**listinfo/gsoc-porta<http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130814/6e561d1a/attachment.html>
+
+From rossbennett34 at gmail.com  Wed Aug 14 20:33:09 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Wed, 14 Aug 2013 11:33:09 -0700
+Subject: [GSoC-PortA] Adaptive Penalty Methods
+Message-ID: <CAEESW=XMrG_4av=iFN51WaQ8aEiDunDMfJv2U+3T-i1EkBsGSQ@mail.gmail.com>
+
+I am starting to work on the adaptive penalty methods section and I have a
+few thoughts and questions.
+
+Any guidance would be greatly appreciated.
+
+Currently there is just a fixed penalty (default of 10,000) that is applied
+in constrained_objective for both the constraints and objectives.
+
+Adaptive Penalty for Constraints
+Constraints are penalized in constrained_objective for anything that isn't
+transformed in fn_map. We use the same penalty term for constraints and
+objectives. Should we have separate penalty variables for constraints and
+objectives (e.g. constr_penalty  and obj_penalty)?
+
+The design thoughts vignettes also includes discussion of relaxing
+constraints.
+We can relax constraints in fn_map, the basic premise goes like this:
+ - Try to transform the set of weights to satisfy the constraint
+ - If we reach max_permutations, then relax the constraint by a random
+amount
+ - Attempt to relax the constraints up to 5 (this could easily be changed)
+times
+ - If the weights still do not satisfy the constraint after 5 attempts,
+then penalize in constrained_objective
+
+This relaxation technique only works for DEoptim and random portfolios,
+because they support a mapping function, so I will have to be able to relax
+the constraints for the pso and GenSA solvers. If we use normalize=TRUE,
+then we can relax constraints via fn_map which is called on the weights
+inside constrained_objective so we are transforming the weights outside
+those solvers.
+
+Do we need to relax constraints for the ROI solvers or are we simply at the
+mercy of the solvers in this case?
+
+Adaptive Penalty for Objectives
+ For example, with DEoptim the iterations are tracked inside DEoptim (and
+even printed to the screen), but how can we track the iterations in
+constrained_objective to know the iteration number to apply and adaptive
+penalty inside the function? How do we set limits on the penalty so it
+doesn't increase to infinity with a large number of iterations?
+
+Thanks,
+Ross
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130814/e0e5d2f6/attachment.html>
+
+From brian at braverock.com  Fri Aug 16 15:54:40 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Fri, 16 Aug 2013 08:54:40 -0500
+Subject: [GSoC-PortA] v1->v2 migration guide
+Message-ID: <520E2F20.2060104@braverock.com>
+
+Ross,
+
+You continue to make good functional progress.  By all means keep it up!
+
+I'd like to talk about a 'migration guide' from v1 to v2 objects.
+
+Many real-world portfolio optimization problems we've seen are quite 
+complex.  They typically involve multiple different benchmark 
+optimizations along with one or more different target object 
+constructions, to be employed based on the portfolio manager's views, or 
+based on market regime.
+
+Good examples of this approach can be seen in our 2012 seminar slides 
+and scipt, which you're familiar with, or in something like the EDHEC 
+Smart Beta project.
+
+What I'd like your thoughts on is developing an example of converting a 
+v1 constraints specification of any reasonable complexity to a v2 
+portfolio specification.  I know you have some helper functions for 
+doing that, but the documentation is still rather sparse.
+
+My thoughts run along these lines:
+- generate a basic PortfolioAnalytics-package.Rd file either manually or 
+via roxygen comments that will describe the structure of the portfolio 
+specification, constraints, and objectives, with links to the relevant 
+functions.  maybe condense soeme generic text from the optimization 
+overview vignette
+
+- put more detail in the documentation for those functions.  most of 
+them are one-liners beyond the required @param info
+
+- perhaps take a look at the 2012 seminar script, and rework one or more 
+of those portfolios for discussion on this list, with notes that we can 
+add back into the documentation somewhere.
+
+What do you think?
+
+Cheers,
+
+Brian
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+
+From rossbennett34 at gmail.com  Fri Aug 16 17:52:18 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Fri, 16 Aug 2013 08:52:18 -0700
+Subject: [GSoC-PortA] v1->v2 migration guide
+In-Reply-To: <520E2F20.2060104@braverock.com>
+References: <520E2F20.2060104@braverock.com>
+Message-ID: <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+
+Brian,
+
+Thanks for the note. See my comments inline below.
+
+
+On Fri, Aug 16, 2013 at 6:54 AM, Brian G. Peterson <brian at braverock.com>wrote:
+
+> Ross,
+>
+> You continue to make good functional progress.  By all means keep it up!
+>
+> I'd like to talk about a 'migration guide' from v1 to v2 objects.
+>
+> Many real-world portfolio optimization problems we've seen are quite
+> complex.  They typically involve multiple different benchmark optimizations
+> along with one or more different target object constructions, to be
+> employed based on the portfolio manager's views, or based on market regime.
+>
+> Good examples of this approach can be seen in our 2012 seminar slides and
+> scipt, which you're familiar with, or in something like the EDHEC Smart
+> Beta project.
+>
+> What I'd like your thoughts on is developing an example of converting a v1
+> constraints specification of any reasonable complexity to a v2 portfolio
+> specification.  I know you have some helper functions for doing that, but
+> the documentation is still rather sparse.
+>
+Are you looking for an example of how the user would go about doing this
+manually or how this is done behind the scenes with the helper functions?
+Or both?
+
+>
+> My thoughts run along these lines:
+> - generate a basic PortfolioAnalytics-package.Rd file either manually or
+> via roxygen comments that will describe the structure of the portfolio
+> specification, constraints, and objectives, with links to the relevant
+> functions.  maybe condense soeme generic text from the optimization
+> overview vignette
+>
+I have been progressively adding to the portfolio_vignette file in the
+sandbox folder. I am thinking this could serve as the primary vignette
+because I have examples for creating the portfolio object, constraints, and
+objectives. I still have work to do to improve the objectives section. I
+can add a section that discusses the v1 to v2 migration.
+
+I also think it would be helpful to have something similar to the
+PerformanceAnalytics.pdf reference manual. Is the reference manual
+automaticaly generated by .Rd files with roxygen. It would be good to have
+both the reference manual and a vignette with complete examples.
+
+
+> - put more detail in the documentation for those functions.  most of them
+> are one-liners beyond the required @param info
+>
+I'll beef up the documentation for those functions.
+
+
+> - perhaps take a look at the 2012 seminar script, and rework one or more
+> of those portfolios for discussion on this list, with notes that we can add
+> back into the documentation somewhere.
+>
+Sounds good, I can rework several of the examples.
+
+
+>
+> What do you think?
+>
+> Cheers,
+>
+> Brian
+>
+> --
+> Brian G. Peterson
+> http://braverock.com/brian/
+> Ph: 773-459-4973
+> IM: bgpbraverock
+> ______________________________**_________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-**project.org<GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-**project.org/cgi-bin/mailman/**listinfo/gsoc-porta<http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130816/7c211f26/attachment.html>
+
+From brian at braverock.com  Fri Aug 16 18:36:55 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Fri, 16 Aug 2013 11:36:55 -0500
+Subject: [GSoC-PortA] v1->v2 migration guide
+In-Reply-To: <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+Message-ID: <520E5527.2070508@braverock.com>
+
+Comments in-line.
+
+On 08/16/2013 10:52 AM, Ross Bennett wrote:
+<...>
+>     What I'd like your thoughts on is developing an example of
+>     converting a v1 constraints specification of any reasonable
+>     complexity to a v2 portfolio specification.  I know you have some
+>     helper functions for doing that, but the documentation is still
+>     rather sparse.
+>
+> Are you looking for an example of how the user would go about doing this
+> manually or how this is done behind the scenes with the helper
+> functions? Or both?
+
+I think it's reasonable to say in the documentation (the roxygen 
+comments) that attempts will be made to detect and automatically convert 
+v1 style objects. The mechanics of the automatic conversion aren't 
+important to the user.
+
+>     My thoughts run along these lines:
+>     - generate a basic PortfolioAnalytics-package.Rd file either
+>     manually or via roxygen comments that will describe the structure of
+>     the portfolio specification, constraints, and objectives, with links
+>     to the relevant functions.  maybe condense soeme generic text from
+>     the optimization overview vignette
+>
+> I have been progressively adding to the portfolio_vignette file in the
+> sandbox folder. I am thinking this could serve as the primary vignette
+> because I have examples for creating the portfolio object, constraints,
+> and objectives. I still have work to do to improve the objectives
+> section. I can add a section that discusses the v1 to v2 migration.
+
+I like your idea of using the new portfolio_vignette as the primary. 
+The CVaR vignette is still valuable, but it should be secondary to the 
+one you've been working on.
+
+I've moved that out of sandbox to a vignettes/ dir in the package. 
+Should be the most recent commit r2798
+
+
+> I also think it would be helpful to have something similar to the
+> PerformanceAnalytics.pdf reference manual. Is the reference manual
+> automaticaly generated by .Rd files with roxygen. It would be good to
+> have both the reference manual and a vignette with complete examples.
+
+
+I've attached the reference manual built from this morning's code.
+
+As you can see, it jumps right in to function documentation.  Addition 
+of a PortfolioAnalytics-package.Rd file would be placed at the beginning 
+of the manual, which would help anyone reading it get started.
+
+I think we'll also want to consider collapsing some of the v1/v2 
+functions into the documentation for the main functions e.g. contraint, 
+objective, etc.  This can be done with the @rdname tag as a single line 
+comment before the v1/v2 functions, and then we can put the text and all 
+the @param and other tags in front of the main wrapper function.
+
+>     - put more detail in the documentation for those functions.  most of
+>     them are one-liners beyond the required @param info
+>
+> I'll beef up the documentation for those functions.
+
+Thanks.
+
+>     - perhaps take a look at the 2012 seminar script, and rework one or
+>     more of those portfolios for discussion on this list, with notes
+>     that we can add back into the documentation somewhere.
+>
+> Sounds good, I can rework several of the examples.
+
+Excellent.
+
+Regards,
+
+
+   - Brian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: PortfolioAnalytics.pdf
+Type: application/pdf
+Size: 250033 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130816/cec23b61/attachment-0001.pdf>
+
+From rossbennett34 at gmail.com  Sat Aug 17 02:09:10 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Fri, 16 Aug 2013 17:09:10 -0700
+Subject: [GSoC-PortA] Objective Function: mean vs. pamean
+Message-ID: <CAEESW=WRczB3O=h0WYyLA5EwX+-g8HTQQ-0ERT3REEa0O1zHJA@mail.gmail.com>
+
+All,
+
+This isn't critical or important, but thought I would put this out there to
+the group. I was running some of the examples from the 2012 workshop script
+and noticed that any optimization I ran with pamean was really slow.
+
+In commit r2802 I added a testing script sandbox/testing_mean_vs_pamean.R
+that has a simple example comparing the two. In my simple benchmark, pamean
+is about 50 times slower. Intuitively I would expect pamean to be slower,
+but not *that* much slower.
+
+Is this normal? Any idea why this is so slow?
+
+Thanks,
+Ross
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130816/42dbff10/attachment.html>
+
+From brian at braverock.com  Sat Aug 17 02:11:29 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Fri, 16 Aug 2013 19:11:29 -0500
+Subject: [GSoC-PortA] Objective Function: mean vs. pamean
+In-Reply-To: <CAEESW=WRczB3O=h0WYyLA5EwX+-g8HTQQ-0ERT3REEa0O1zHJA@mail.gmail.com>
+References: <CAEESW=WRczB3O=h0WYyLA5EwX+-g8HTQQ-0ERT3REEa0O1zHJA@mail.gmail.com>
+Message-ID: <520EBFB1.5090606@braverock.com>
+
+On 08/16/2013 07:09 PM, Ross Bennett wrote:
+> All,
+>
+> This isn't critical or important, but thought I would put this out there
+> to the group. I was running some of the examples from the 2012 workshop
+> script and noticed that any optimization I ran with pamean was really slow.
+>
+> In commit r2802 I added a testing script
+> sandbox/testing_mean_vs_pamean.R that has a simple example comparing the
+> two. In my simple benchmark, pamean is about 50 times slower.
+> Intuitively I would expect pamean to be slower, but not *that* much slower.
+>
+> Is this normal? Any idea why this is so slow?
+
+
+I've never timed it.
+
+It was a simple example of an annualized mean function.
+
+I'm sure it could be easily improved if we took a closer look at it.
+
+Thanks for the heads up.
+
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+
+From peter at braverock.com  Sat Aug 17 16:29:36 2013
+From: peter at braverock.com (=?utf-8?B?UGV0ZXIgQ2FybA==?=)
+Date: Sat, 17 Aug 2013 09:29:36 -0500
+Subject: [GSoC-PortA] =?utf-8?q?Objective_Function=3A_mean_vs=2E_pamean?=
+Message-ID: <201308171429.r7HETQU0011819@ethos.braverock.com>
+
+We could either use multipliers in the objective fctn or annualized in post processing.  The latter has the issue of balancing against ES.  Good to know, though.  pcc
+
+Sent from my HTC Inspire? 4G on AT&T
+
+----- Reply message -----
+From: "Brian G. Peterson" <brian at braverock.com>
+To: <gsoc-porta at r-forge.wu-wien.ac.at>
+Subject: [GSoC-PortA] Objective Function: mean vs. pamean
+Date: Fri, Aug 16, 2013 7:11 pm
+
+
+On 08/16/2013 07:09 PM, Ross Bennett wrote:
+> All,
+>
+> This isn't critical or important, but thought I would put this out there
+> to the group. I was running some of the examples from the 2012 workshop
+> script and noticed that any optimization I ran with pamean was really slow.
+>
+> In commit r2802 I added a testing script
+> sandbox/testing_mean_vs_pamean.R that has a simple example comparing the
+> two. In my simple benchmark, pamean is about 50 times slower.
+> Intuitively I would expect pamean to be slower, but not *that* much slower.
+>
+> Is this normal? Any idea why this is so slow?
+
+
+I've never timed it.
+
+It was a simple example of an annualized mean function.
+
+I'm sure it could be easily improved if we took a closer look at it.
+
+Thanks for the heads up.
+
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+_______________________________________________
+GSoC-PortA mailing list
+GSoC-PortA at lists.r-forge.r-project.org
+http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130817/e5a0fb4c/attachment.html>
+
+From rossbennett34 at gmail.com  Sun Aug 18 07:53:16 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Sat, 17 Aug 2013 22:53:16 -0700
+Subject: [GSoC-PortA] v1->v2 migration guide
+In-Reply-To: <520E5527.2070508@braverock.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+Message-ID: <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+
+See comments inline below
+
+
+On Fri, Aug 16, 2013 at 9:36 AM, Brian G. Peterson <brian at braverock.com>wrote:
+
+> Comments in-line.
+>
+> On 08/16/2013 10:52 AM, Ross Bennett wrote:
+> <...>
+>
+>      What I'd like your thoughts on is developing an example of
+>>     converting a v1 constraints specification of any reasonable
+>>     complexity to a v2 portfolio specification.  I know you have some
+>>     helper functions for doing that, but the documentation is still
+>>     rather sparse.
+>>
+>> Are you looking for an example of how the user would go about doing this
+>> manually or how this is done behind the scenes with the helper
+>> functions? Or both?
+>>
+>
+> I think it's reasonable to say in the documentation (the roxygen comments)
+> that attempts will be made to detect and automatically convert v1 style
+> objects. The mechanics of the automatic conversion aren't important to the
+> user.
+
+I added to the optimize.portfolio documentation to explain the check for a
+v1 constraint object.
+
+
+>
+>      My thoughts run along these lines:
+>>     - generate a basic PortfolioAnalytics-package.Rd file either
+>>     manually or via roxygen comments that will describe the structure of
+>>     the portfolio specification, constraints, and objectives, with links
+>>     to the relevant functions.  maybe condense soeme generic text from
+>>     the optimization overview vignette
+>>
+>> I have been progressively adding to the portfolio_vignette file in the
+>> sandbox folder. I am thinking this could serve as the primary vignette
+>> because I have examples for creating the portfolio object, constraints,
+>> and objectives. I still have work to do to improve the objectives
+>> section. I can add a section that discusses the v1 to v2 migration.
+>>
+>
+> I like your idea of using the new portfolio_vignette as the primary. The
+> CVaR vignette is still valuable, but it should be secondary to the one
+> you've been working on.
+>
+> I've moved that out of sandbox to a vignettes/ dir in the package. Should
+> be the most recent commit r2798
+
+Thanks
+
+>
+>
+>
+>  I also think it would be helpful to have something similar to the
+>> PerformanceAnalytics.pdf reference manual. Is the reference manual
+>> automaticaly generated by .Rd files with roxygen. It would be good to
+>> have both the reference manual and a vignette with complete examples.
+>>
+>
+>
+> I've attached the reference manual built from this morning's code.
+>
+> As you can see, it jumps right in to function documentation.  Addition of
+> a PortfolioAnalytics-package.Rd file would be placed at the beginning of
+> the manual, which would help anyone reading it get started.
+>
+> I think we'll also want to consider collapsing some of the v1/v2 functions
+> into the documentation for the main functions e.g. contraint, objective,
+> etc.  This can be done with the @rdname tag as a single line comment before
+> the v1/v2 functions, and then we can put the text and all the @param and
+> other tags in front of the main wrapper function.
+
+
+I'm not entirely clear on this step. Take for example the add.objective
+functions. We have add.objective_v1.Rd, add.objective_v2.Rd, and
+add.objective.Rd files.
+
+add.objective_v2 has an @rdname and @alias tag
+
+add.objective is just the alias for add.objective_v2 and only has an
+@export tag.
+
+Are you saying the @param and other tags should go in front of the alias
+function?
+
+Should we keep _v1 documentation and export those functions for backwards
+compatibility.
+
+Can I just delete the _v2.Rd files in the man directory so we only have the
+_v1.Rd files and the unversioned Rd files?
+
+>
+>
+>      - put more detail in the documentation for those functions.  most of
+>>     them are one-liners beyond the required @param info
+>>
+>> I'll beef up the documentation for those functions.
+>>
+>
+> Thanks.
+>
+>
+>      - perhaps take a look at the 2012 seminar script, and rework one or
+>>     more of those portfolios for discussion on this list, with notes
+>>     that we can add back into the documentation somewhere.
+>>
+>> Sounds good, I can rework several of the examples.
+>>
+>
+> Excellent.
+>
+> Regards,
+>
+>
+>   - Brian
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130817/504d4195/attachment.html>
+
+From brian at braverock.com  Sun Aug 18 14:24:30 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Sun, 18 Aug 2013 07:24:30 -0500
+Subject: [GSoC-PortA] v1->v2 migration guide
+In-Reply-To: <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+Message-ID: <5210BCFE.7090605@braverock.com>
+
+On 08/18/2013 12:53 AM, Ross Bennett wrote:
+>     I think we'll also want to consider collapsing some of the v1/v2
+>     functions into the documentation for the main functions e.g.
+>     contraint, objective, etc.  This can be done with the @rdname tag as
+>     a single line comment before the v1/v2 functions, and then we can
+>     put the text and all the @param and other tags in front of the main
+>     wrapper function.
+>
+>
+> I'm not entirely clear on this step. Take for example the add.objective
+> functions. We have add.objective_v1.Rd, add.objective_v2.Rd, and
+> add.objective.Rd files.
+>
+> add.objective_v2 has an @rdname and @alias tag
+>
+> add.objective is just the alias for add.objective_v2 and only has an
+> @export tag.
+>
+> Are you saying the @param and other tags should go in front of the alias
+> function?
+>
+> Should we keep _v1 documentation and export those functions for
+> backwards compatibility.
+>
+> Can I just delete the _v2.Rd files in the man directory so we only have
+> the _v1.Rd files and the unversioned Rd files?
+
+
+Sorry if my instructions weren't particularly clear.
+
+I was advocating for having only one documentation entry for e.g. 
+add.constraint with add.constraint_v1 and add.constraint_v2 pointing to 
+the main entry (so they'll be in the index, but not in the TOC).  This 
+requires @rdname, @aliases, and occasionally @name tags on all the 
+functions that you want to share a single entry.  We can't simply delete 
+files we don't want, as they'll get recreated every time roxygenize is 
+called.
+
+I think it's fine to have both the _v1 and _v2 functions exported to the 
+NAMESPACE (although not actually necessary if we trap and correct any 
+old-style code).  I was suggesting that we combine the documentation, so 
+that as we add more text, it goes in only one place.
+
+I've taken a look at the code right now and tried to clean it up a bit 
+while I assume all of you west coast folks are still asleep.
+
+The new version of the pdf is attached, and my changes are contained in 
+svn r2816
+
+I think we should look closely at the descriptive text and parameters 
+for the print, summary, plot, chart, extractStats,  etc. functions and 
+see if we want to collapse their documentation too.
+
+I think a package intro for the start of the PDF should be pretty high 
+on the list.  with almost 80 pages of documentation, it's not fair to 
+the user to dump them into add.constraint as their first stop.
+
+Ross, I should be available all day today by phone or IM if any of the 
+changes I made to the .R roxygen comments and the knock-on compiled .Rd 
+files aren't clear.
+
+Regards,
+
+Brian
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: PortfolioAnalytics.pdf
+Type: application/pdf
+Size: 227783 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130818/53ba6d05/attachment-0001.pdf>
+
+From rossbennett34 at gmail.com  Sun Aug 18 20:35:43 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Sun, 18 Aug 2013 11:35:43 -0700
+Subject: [GSoC-PortA] v1->v2 migration guide
+In-Reply-To: <5210BCFE.7090605@braverock.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+Message-ID: <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+
+On Sun, Aug 18, 2013 at 5:24 AM, Brian G. Peterson <brian at braverock.com>wrote:
+
+> On 08/18/2013 12:53 AM, Ross Bennett wrote:
+>
+>>     I think we'll also want to consider collapsing some of the v1/v2
+>>     functions into the documentation for the main functions e.g.
+>>     contraint, objective, etc.  This can be done with the @rdname tag as
+>>     a single line comment before the v1/v2 functions, and then we can
+>>     put the text and all the @param and other tags in front of the main
+>>     wrapper function.
+>>
+>>
+>> I'm not entirely clear on this step. Take for example the add.objective
+>> functions. We have add.objective_v1.Rd, add.objective_v2.Rd, and
+>> add.objective.Rd files.
+>>
+>> add.objective_v2 has an @rdname and @alias tag
+>>
+>> add.objective is just the alias for add.objective_v2 and only has an
+>> @export tag.
+>>
+>> Are you saying the @param and other tags should go in front of the alias
+>> function?
+>>
+>> Should we keep _v1 documentation and export those functions for
+>> backwards compatibility.
+>>
+>> Can I just delete the _v2.Rd files in the man directory so we only have
+>> the _v1.Rd files and the unversioned Rd files?
+>>
+>
+>
+> Sorry if my instructions weren't particularly clear.
+>
+> I was advocating for having only one documentation entry for e.g.
+> add.constraint with add.constraint_v1 and add.constraint_v2 pointing to the
+> main entry (so they'll be in the index, but not in the TOC).  This requires
+> @rdname, @aliases, and occasionally @name tags on all the functions that
+> you want to share a single entry.  We can't simply delete files we don't
+> want, as they'll get recreated every time roxygenize is called.
+>
+> I think it's fine to have both the _v1 and _v2 functions exported to the
+> NAMESPACE (although not actually necessary if we trap and correct any
+> old-style code).
+
+
+I'll take a closer look at what else needs to be done so the _v1 and _v2
+functions don't have to be exported for backwards compatibility. I think I
+just need to change add.objective to accept a v1_constraint object.
+
+I was suggesting that we combine the documentation, so that as we add more
+> text, it goes in only one place.
+>
+> I've taken a look at the code right now and tried to clean it up a bit
+> while I assume all of you west coast folks are still asleep.
+>
+> The new version of the pdf is attached, and my changes are contained in
+> svn r2816
+>
+
+Thank you for cleaning up the code documentation. I think I am clear on
+everything you did and why now that I am seeing the code and the reference
+manual.
+
+
+>
+> I think we should look closely at the descriptive text and parameters for
+> the print, summary, plot, chart, extractStats,  etc. functions and see if
+> we want to collapse their documentation too.
+>
+
+I agree that would be good to do as well. Before we start doing that, I
+have a few thoughts on the chart functions. The plot function plots both
+the scatter and weights charts. If the user just wants to chart the weights
+or the scatter, they have to use chart.Weights.(DE, ROI, RP, etc.). I think
+it would be nice if the user just had to call chart.Weights(object) or
+chart.Scatter(object). Do you think this should be done?
+
+The PerformanceAnalytics packages already has a chart.Scatter function.
+Will we have any naming or masking issues if I make chart.Scatter a
+function for the different optimize.portfolio.objects?
+
+
+>
+> I think a package intro for the start of the PDF should be pretty high on
+> the list.  with almost 80 pages of documentation, it's not fair to the user
+> to dump them into add.constraint as their first stop.
+>
+
+I completely agree. I'll send a separate email with thoughts on the outline
+for the package intro building on the portfolio_vignette.
+
+
+>
+> Ross, I should be available all day today by phone or IM if any of the
+> changes I made to the .R roxygen comments and the knock-on compiled .Rd
+> files aren't clear.
+>
+> Regards,
+>
+>
+> Brian
+>
+> --
+> Brian G. Peterson
+> http://braverock.com/brian/
+> Ph: 773-459-4973
+> IM: bgpbraverock
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+>
+Thanks,
+Ross
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130818/40f6e870/attachment.html>
+
+From brian at braverock.com  Sun Aug 18 21:05:40 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Sun, 18 Aug 2013 14:05:40 -0500
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+Message-ID: <52111B04.1040109@braverock.com>
+
+On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>
+> The PerformanceAnalytics packages already has a chart.Scatter function.
+> Will we have any naming or masking issues if I make chart.Scatter a
+> function for the different optimize.portfolio.objects?
+
+It's easy to make chart.Weights a generic, but it will be much harder 
+with chart.Scatter.*
+
+Because Performanceanalytics is on CRAN and much more widely used, we'd 
+need to match the argument list, and create a chart.Scatter.default in 
+PerfA.  I don't see any way to match the argument list though.
+
+-- 
+Brian
+
+From rossbennett34 at gmail.com  Sun Aug 18 22:06:51 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Sun, 18 Aug 2013 13:06:51 -0700
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <52111B04.1040109@braverock.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+Message-ID: <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+
+Brian,
+
+Thanks for clarifying, I was worried that might be the case. I could add a
+new function named chart.RiskReward and make that our generic function and
+use an alias for the existing chart.Scatter.* functions. It could look
+something like this:
+
+chart.RiskReward.optimize.portfolio.ROI <- chart.Scatter.ROI
+chart.RiskReward.optimize.portfolio.random <- chart.Scatter.RP
+
+Would that be ok and worthwhile to do?
+
+Ross
+
+
+
+On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson <brian at braverock.com>wrote:
+
+> On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>
+>>
+>> The PerformanceAnalytics packages already has a chart.Scatter function.
+>> Will we have any naming or masking issues if I make chart.Scatter a
+>> function for the different optimize.portfolio.objects?
+>>
+>
+> It's easy to make chart.Weights a generic, but it will be much harder with
+> chart.Scatter.*
+>
+> Because Performanceanalytics is on CRAN and much more widely used, we'd
+> need to match the argument list, and create a chart.Scatter.default in
+> PerfA.  I don't see any way to match the argument list though.
+>
+> --
+> Brian
+> ______________________________**_________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-**project.org<GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-**project.org/cgi-bin/mailman/**listinfo/gsoc-porta<http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130818/524208fe/attachment.html>
+
+From brian at braverock.com  Sun Aug 18 22:21:39 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Sun, 18 Aug 2013 15:21:39 -0500
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+Message-ID: <52112CD3.8080406@braverock.com>
+
+Sounds good.  - Brian
+
+On 08/18/2013 03:06 PM, Ross Bennett wrote:
+> Brian,
+>
+> Thanks for clarifying, I was worried that might be the case. I could add
+> a new function named chart.RiskReward and make that our generic function
+> and use an alias for the existing chart.Scatter.* functions. It could
+> look something like this:
+>
+> chart.RiskReward.optimize.portfolio.ROI <- chart.Scatter.ROI
+> chart.RiskReward.optimize.portfolio.random <- chart.Scatter.RP
+>
+> Would that be ok and worthwhile to do?
+>
+> Ross
+>
+>
+>
+> On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson <brian at braverock.com
+> <mailto:brian at braverock.com>> wrote:
+>
+>     On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>
+>
+>         The PerformanceAnalytics packages already has a chart.Scatter
+>         function.
+>         Will we have any naming or masking issues if I make chart.Scatter a
+>         function for the different optimize.portfolio.objects?
+>
+>
+>     It's easy to make chart.Weights a generic, but it will be much
+>     harder with chart.Scatter.*
+>
+>     Because PerformanceAnalytics is on CRAN and much more widely used,
+>     we'd need to match the argument list, and create a
+>     chart.Scatter.default in PerfA.  I don't see any way to match the
+>     argument list though.
+>
+>     --
+>     Brian
+
+From rossbennett34 at gmail.com  Tue Aug 20 07:17:09 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Mon, 19 Aug 2013 22:17:09 -0700
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <52112CD3.8080406@braverock.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+ <52112CD3.8080406@braverock.com>
+Message-ID: <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+
+Brian,
+
+I have just a couple quick questions regarding chart.Weights and
+chart.RiskReward as generic functions and cleaning up the documentation as
+you did with the versioned functions.
+
+My plan is to use an alias for the chart.Weights.* functions for the
+different classes and then have a generic chart.Weights function with a
+call to UseMethod("chart.Weights"). The first argument is RP for
+chart.Weights.RP, DE for chart.Weights.DE, and so on. Should the arguments
+of the chart.Weights.* functions be the same?
+
+Should we have the @param and other tags only for one function? Would that
+go on the generic chart.Weights function?
+
+My approach would be the same for the chart.Scatter.* functions.
+
+Thanks,
+Ross
+
+
+On Sun, Aug 18, 2013 at 1:21 PM, Brian G. Peterson <brian at braverock.com>wrote:
+
+> Sounds good.  - Brian
+>
+>
+> On 08/18/2013 03:06 PM, Ross Bennett wrote:
+>
+>> Brian,
+>>
+>> Thanks for clarifying, I was worried that might be the case. I could add
+>> a new function named chart.RiskReward and make that our generic function
+>> and use an alias for the existing chart.Scatter.* functions. It could
+>> look something like this:
+>>
+>> chart.RiskReward.optimize.**portfolio.ROI <- chart.Scatter.ROI
+>> chart.RiskReward.optimize.**portfolio.random <- chart.Scatter.RP
+>>
+>> Would that be ok and worthwhile to do?
+>>
+>> Ross
+>>
+>>
+>>
+>> On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson <brian at braverock.com
+>> <mailto:brian at braverock.com>> wrote:
+>>
+>>     On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>>
+>>
+>>         The PerformanceAnalytics packages already has a chart.Scatter
+>>         function.
+>>         Will we have any naming or masking issues if I make chart.Scatter
+>> a
+>>         function for the different optimize.portfolio.objects?
+>>
+>>
+>>     It's easy to make chart.Weights a generic, but it will be much
+>>     harder with chart.Scatter.*
+>>
+>>     Because PerformanceAnalytics is on CRAN and much more widely used,
+>>
+>>     we'd need to match the argument list, and create a
+>>     chart.Scatter.default in PerfA.  I don't see any way to match the
+>>     argument list though.
+>>
+>>     --
+>>     Brian
+>>
+> ______________________________**_________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-**project.org<GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-**project.org/cgi-bin/mailman/**listinfo/gsoc-porta<http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130819/d15b8044/attachment.html>
+
+From brian at braverock.com  Tue Aug 20 13:44:28 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Tue, 20 Aug 2013 06:44:28 -0500
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+ <52112CD3.8080406@braverock.com>
+ <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+Message-ID: <5213569C.8020400@braverock.com>
+
+This plan is generally OK.  You do need to be aware of some 
+idiosyncrasies that only show up in 'R CMD check'.
+
+Note the difference in the arguments for
+?plot
+?plot.optimize.portfolio.DEoptim
+?plot.optimize.portfolio.ROI
+
+the arguments defines in the generic plot, x and ... *must* be present 
+in the correct order in the method.
+
+So as much as I hate 'x' as an argument, the language requires that the 
+first arg be the same 'x' as plot()
+
+methods can add more arguments, and you'll note that ours do, but the 
+args available in the generic must be available in all the methods.
+
+While we're talking about plotting methods, I wanted to talk a bit about 
+the code in chart.Scatter.ROI and a couple other places to generate and 
+calculate objective measures for optimization solvers that don't report 
+their path.
+
+I like this functionality, but I think we should make it optional, and 
+default to FALSE.
+
+I'd like, on all of the scatter charts, to add an option to chart the 
+assets in the portfolio, as is done in most commercial optimizers, and 
+most optimization charts that you see in R.
+
+I'd also like to allow to optionally plot of an efficient frontier if we 
+have a function that can calculate such a frontier.
+
+We already have optional arguments for neighboring portfolios in the 
+DEoptim and random charts.
+
+We've also done snail trail charts of the path of the DEoptim 
+convergence that might be nice to make an official chart option for 
+solvers that report their convergence path.
+
+As for the generics and the documentation, you're on the right track.  I 
+would put all the documentation and the @param stuff in the main 
+function that calls UseMethod, and use @alias and @rdname everywhere 
+else.  If you want to avoid the use of @name, define your wrapper 
+function, e.g.
+
+chart.Weights
+
+*first* in the file, and move all the documentation there.  Parse order 
+matters, so this will create a chart.Weights.Rd file and will let all 
+the other chart.Weights.* methods use
+
+#' @rdname chart.Weights
+#' @export
+
+as their only two roxygen comments.
+
+I suspect that once we have everything working, we won't need or want 
+the @export tags on all the method functions.
+
+
+
+On 08/20/2013 12:17 AM, Ross Bennett wrote:
+> Brian,
+>
+> I have just a couple quick questions regarding chart.Weights and
+> chart.RiskReward as generic functions and cleaning up the documentation
+> as you did with the versioned functions.
+>
+> My plan is to use an alias for the chart.Weights.* functions for the
+> different classes and then have a generic chart.Weights function with a
+> call to UseMethod("chart.Weights"). The first argument is RP for
+> chart.Weights.RP, DE for chart.Weights.DE <http://chart.Weights.DE>, and
+> so on. Should the arguments of the chart.Weights.* functions be the same?
+>
+> Should we have the @param and other tags only for one function? Would
+> that go on the generic chart.Weights function?
+>
+> My approach would be the same for the chart.Scatter.* functions.
+>
+> Thanks,
+> Ross
+>
+>
+> On Sun, Aug 18, 2013 at 1:21 PM, Brian G. Peterson <brian at braverock.com
+> <mailto:brian at braverock.com>> wrote:
+>
+>     Sounds good.  - Brian
+>
+>
+>     On 08/18/2013 03:06 PM, Ross Bennett wrote:
+>
+>         Brian,
+>
+>         Thanks for clarifying, I was worried that might be the case. I
+>         could add
+>         a new function named chart.RiskReward and make that our generic
+>         function
+>         and use an alias for the existing chart.Scatter.* functions. It
+>         could
+>         look something like this:
+>
+>         chart.RiskReward.optimize.__portfolio.ROI <- chart.Scatter.ROI
+>         chart.RiskReward.optimize.__portfolio.random <- chart.Scatter.RP
+>
+>         Would that be ok and worthwhile to do?
+>
+>         Ross
+>
+>
+>
+>         On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson
+>         <brian at braverock.com <mailto:brian at braverock.com>
+>         <mailto:brian at braverock.com <mailto:brian at braverock.com>>> wrote:
+>
+>              On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>
+>
+>                  The PerformanceAnalytics packages already has a
+>         chart.Scatter
+>                  function.
+>                  Will we have any naming or masking issues if I make
+>         chart.Scatter a
+>                  function for the different optimize.portfolio.objects?
+>
+>
+>              It's easy to make chart.Weights a generic, but it will be much
+>              harder with chart.Scatter.*
+>
+>              Because PerformanceAnalytics is on CRAN and much more
+>         widely used,
+>
+>              we'd need to match the argument list, and create a
+>              chart.Scatter.default in PerfA.  I don't see any way to
+>         match the
+>              argument list though.
+>
+>              --
+>              Brian
+>
+>     _________________________________________________
+>     GSoC-PortA mailing list
+>     GSoC-PortA at lists.r-forge.r-__project.org
+>     <mailto:GSoC-PortA at lists.r-forge.r-project.org>
+>     http://lists.r-forge.r-__project.org/cgi-bin/mailman/__listinfo/gsoc-porta
+>     <http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta>
+>
+>
+>
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+
+From martinrd at comcast.net  Sat Aug 24 19:10:43 2013
+From: martinrd at comcast.net (Doug Martin)
+Date: Sat, 24 Aug 2013 10:10:43 -0700
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+ <52112CD3.8080406@braverock.com>
+ <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+Message-ID: <000001cea0ec$e7791040$b66b30c0$@comcast.net>
+
+Ross,
+
+ 
+
+Is there a vignette yet for using these chart functions?  If not, a couple
+of code examples?
+
+ 
+
+Doug
+
+ 
+
+ 
+
+From: gsoc-porta-bounces at lists.r-forge.r-project.org
+[mailto:gsoc-porta-bounces at lists.r-forge.r-project.org] On Behalf Of Ross
+Bennett
+Sent: Monday, August 19, 2013 10:17 PM
+To: PortfolioAnalytics
+Subject: Re: [GSoC-PortA] chart.* as generics
+
+ 
+
+Brian,
+
+ 
+
+I have just a couple quick questions regarding chart.Weights and
+chart.RiskReward as generic functions and cleaning up the documentation as
+you did with the versioned functions.
+
+ 
+
+My plan is to use an alias for the chart.Weights.* functions for the
+different classes and then have a generic chart.Weights function with a call
+to UseMethod("chart.Weights"). The first argument is RP for
+chart.Weights.RP, DE for chart.Weights.DE, and so on. Should the arguments
+of the chart.Weights.* functions be the same?
+
+ 
+
+Should we have the @param and other tags only for one function? Would that
+go on the generic chart.Weights function?
+
+ 
+
+My approach would be the same for the chart.Scatter.* functions.
+
+ 
+
+Thanks,
+
+Ross
+
+ 
+
+On Sun, Aug 18, 2013 at 1:21 PM, Brian G. Peterson <brian at braverock.com>
+wrote:
+
+Sounds good.  - Brian
+
+
+
+On 08/18/2013 03:06 PM, Ross Bennett wrote:
+
+Brian,
+
+Thanks for clarifying, I was worried that might be the case. I could add
+a new function named chart.RiskReward and make that our generic function
+and use an alias for the existing chart.Scatter.* functions. It could
+look something like this:
+
+chart.RiskReward.optimize.portfolio.ROI <- chart.Scatter.ROI
+chart.RiskReward.optimize.portfolio.random <- chart.Scatter.RP
+
+Would that be ok and worthwhile to do?
+
+Ross
+
+
+
+On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson <brian at braverock.com
+
+<mailto:brian at braverock.com>> wrote:
+
+    On 08/18/2013 01:35 PM, Ross Bennett wrote:
+
+
+        The PerformanceAnalytics packages already has a chart.Scatter
+        function.
+        Will we have any naming or masking issues if I make chart.Scatter a
+        function for the different optimize.portfolio.objects?
+
+
+    It's easy to make chart.Weights a generic, but it will be much
+    harder with chart.Scatter.*
+
+    Because PerformanceAnalytics is on CRAN and much more widely used,
+
+
+    we'd need to match the argument list, and create a
+    chart.Scatter.default in PerfA.  I don't see any way to match the
+    argument list though.
+
+    --
+    Brian
+
+_______________________________________________
+GSoC-PortA mailing list
+GSoC-PortA at lists.r-forge.r-project.org
+http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+
+ 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130824/6c7c2cf8/attachment.html>
+
+From rossbennett34 at gmail.com  Sat Aug 24 19:52:42 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Sat, 24 Aug 2013 10:52:42 -0700
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <000001cea0ec$e7791040$b66b30c0$@comcast.net>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+ <52112CD3.8080406@braverock.com>
+ <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+ <000001cea0ec$e7791040$b66b30c0$@comcast.net>
+Message-ID: <CAEESW=VVPJ7zobo8Ua65xjDjRSOhssxj+vYKKoTDt8KBD00CDA@mail.gmail.com>
+
+No vignette yet. I'll add some examples to the sandbox folder.
+
+Ross
+
+
+On Sat, Aug 24, 2013 at 10:10 AM, Doug Martin <martinrd at comcast.net> wrote:
+
+> Ross,****
+>
+> ** **
+>
+> Is there a vignette yet for using these chart functions?  If not, a couple
+> of code examples?****
+>
+> ** **
+>
+> Doug****
+>
+> ** **
+>
+> ** **
+>
+> *From:* gsoc-porta-bounces at lists.r-forge.r-project.org [mailto:
+> gsoc-porta-bounces at lists.r-forge.r-project.org] *On Behalf Of *Ross
+> Bennett
+> *Sent:* Monday, August 19, 2013 10:17 PM
+> *To:* PortfolioAnalytics
+> *Subject:* Re: [GSoC-PortA] chart.* as generics****
+>
+> ** **
+>
+> Brian,****
+>
+> ** **
+>
+> I have just a couple quick questions regarding chart.Weights and
+> chart.RiskReward as generic functions and cleaning up the documentation as
+> you did with the versioned functions.****
+>
+> ** **
+>
+> My plan is to use an alias for the chart.Weights.* functions for the
+> different classes and then have a generic chart.Weights function with a
+> call to UseMethod("chart.Weights"). The first argument is RP for
+> chart.Weights.RP, DE for chart.Weights.DE, and so on. Should the
+> arguments of the chart.Weights.* functions be the same?****
+>
+> ** **
+>
+> Should we have the @param and other tags only for one function? Would that
+> go on the generic chart.Weights function?****
+>
+> ** **
+>
+> My approach would be the same for the chart.Scatter.* functions.****
+>
+> ** **
+>
+> Thanks,****
+>
+> Ross****
+>
+> ** **
+>
+> On Sun, Aug 18, 2013 at 1:21 PM, Brian G. Peterson <brian at braverock.com>
+> wrote:****
+>
+> Sounds good.  - Brian****
+>
+>
+>
+> On 08/18/2013 03:06 PM, Ross Bennett wrote:****
+>
+> Brian,
+>
+> Thanks for clarifying, I was worried that might be the case. I could add
+> a new function named chart.RiskReward and make that our generic function
+> and use an alias for the existing chart.Scatter.* functions. It could
+> look something like this:
+>
+> chart.RiskReward.optimize.portfolio.ROI <- chart.Scatter.ROI
+> chart.RiskReward.optimize.portfolio.random <- chart.Scatter.RP
+>
+> Would that be ok and worthwhile to do?
+>
+> Ross
+>
+>
+>
+> On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson <brian at braverock.com**
+> **
+>
+> <mailto:brian at braverock.com>> wrote:
+>
+>     On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>
+>
+>         The PerformanceAnalytics packages already has a chart.Scatter
+>         function.
+>         Will we have any naming or masking issues if I make chart.Scatter a
+>         function for the different optimize.portfolio.objects?
+>
+>
+>     It's easy to make chart.Weights a generic, but it will be much
+>     harder with chart.Scatter.*****
+>
+>     Because PerformanceAnalytics is on CRAN and much more widely used,****
+>
+>
+>     we'd need to match the argument list, and create a
+>     chart.Scatter.default in PerfA.  I don't see any way to match the
+>     argument list though.
+>
+>     --
+>     Brian****
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta****
+>
+> ** **
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130824/00349472/attachment.html>
+
+From brian at braverock.com  Sat Aug 24 19:53:43 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Sat, 24 Aug 2013 12:53:43 -0500
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <000001cea0ec$e7791040$b66b30c0$@comcast.net>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+ <52112CD3.8080406@braverock.com>
+ <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+ <000001cea0ec$e7791040$b66b30c0$@comcast.net>
+Message-ID: <5218F327.7050807@braverock.com>
+
+Of course, you can call plot() on the output object of any optimization 
+and get the standard scatter and weights chart.
+
+Additionally, you can call
+
+chart.RiskReward (to get just the scatter plot)
+
+chart.Weights (to get just the weights plot)
+
+chart.EfficientFrontier (to get a plot of the efficient frontier)
+
+chart.Weights.EF (to get a stacked bar of weights along the efficient 
+frontier)
+
+As for usage, for plot() and all the chart.* functions above, defaults 
+will be set appropriately if you just pass the optimization output 
+object as the first argument.
+
+Currently, he only use of the charting functions is in the script 
+sandbox/testing_efficient_frontier.R  and briefly in the ROI vignette.
+
+I think it would be good to update the other vignettes with charts where 
+appropriate.
+
+Given Ross's recent work to properly define the generics, it shouldn't 
+be necessary to call any of the sub-functions for the particular type of 
+optimization solver that was used.  Calling plot or any of the functions 
+above sholud be possible with any optimize.portfolio output right now.
+
+Regards,
+
+Brian
+
+
+On 08/24/2013 12:10 PM, Doug Martin wrote:
+> Ross,
+>
+> Is there a vignette yet for using these chart functions?  If not, a
+> couple of code examples?
+>
+> Doug
+>
+> *From:*gsoc-porta-bounces at lists.r-forge.r-project.org
+> [mailto:gsoc-porta-bounces at lists.r-forge.r-project.org] *On Behalf Of
+> *Ross Bennett
+> *Sent:* Monday, August 19, 2013 10:17 PM
+> *To:* PortfolioAnalytics
+> *Subject:* Re: [GSoC-PortA] chart.* as generics
+>
+> Brian,
+>
+> I have just a couple quick questions regarding chart.Weights and
+> chart.RiskReward as generic functions and cleaning up the documentation
+> as you did with the versioned functions.
+>
+> My plan is to use an alias for the chart.Weights.* functions for the
+> different classes and then have a generic chart.Weights function with a
+> call to UseMethod("chart.Weights"). The first argument is RP for
+> chart.Weights.RP, DE for chart.Weights.DE <http://chart.Weights.DE>, and
+> so on. Should the arguments of the chart.Weights.* functions be the same?
+>
+> Should we have the @param and other tags only for one function? Would
+> that go on the generic chart.Weights function?
+>
+> My approach would be the same for the chart.Scatter.* functions.
+>
+> Thanks,
+>
+> Ross
+>
+> On Sun, Aug 18, 2013 at 1:21 PM, Brian G. Peterson <brian at braverock.com
+> <mailto:brian at braverock.com>> wrote:
+>
+> Sounds good.  - Brian
+>
+>
+>
+> On 08/18/2013 03:06 PM, Ross Bennett wrote:
+>
+>     Brian,
+>
+>     Thanks for clarifying, I was worried that might be the case. I could add
+>     a new function named chart.RiskReward and make that our generic function
+>     and use an alias for the existing chart.Scatter.* functions. It could
+>     look something like this:
+>
+>     chart.RiskReward.optimize.portfolio.ROI <- chart.Scatter.ROI
+>     chart.RiskReward.optimize.portfolio.random <- chart.Scatter.RP
+>
+>     Would that be ok and worthwhile to do?
+>
+>     Ross
+>
+>
+>
+>     On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson
+>     <brian at braverock.com <mailto:brian at braverock.com>
+>
+>     <mailto:brian at braverock.com <mailto:brian at braverock.com>>> wrote:
+>
+>          On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>
+>
+>              The PerformanceAnalytics packages already has a chart.Scatter
+>              function.
+>              Will we have any naming or masking issues if I make
+>     chart.Scatter a
+>              function for the different optimize.portfolio.objects?
+>
+>
+>          It's easy to make chart.Weights a generic, but it will be much
+>          harder with chart.Scatter.*
+>
+>          Because PerformanceAnalytics is on CRAN and much more widely used,
+>
+>
+>          we'd need to match the argument list, and create a
+>          chart.Scatter.default in PerfA.  I don't see any way to match the
+>          argument list though.
+>
+>          --
+>          Brian
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> <mailto:GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+>
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+
+From martinrd at comcast.net  Sat Aug 24 20:10:30 2013
+From: martinrd at comcast.net (Doug Martin)
+Date: Sat, 24 Aug 2013 11:10:30 -0700
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <CAEESW=VVPJ7zobo8Ua65xjDjRSOhssxj+vYKKoTDt8KBD00CDA@mail.gmail.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+ <52112CD3.8080406@braverock.com>
+ <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+ <000001cea0ec$e7791040$b66b30c0$@comcast.net>
+ <CAEESW=VVPJ7zobo8Ua65xjDjRSOhssxj+vYKKoTDt8KBD00CDA@mail.gmail.com>
+Message-ID: <000e01cea0f5$3e837f80$bb8a7e80$@comcast.net>
+
+Great, thanks.  Doug
+
+ 
+
+ 
+
+From: gsoc-porta-bounces at lists.r-forge.r-project.org
+[mailto:gsoc-porta-bounces at lists.r-forge.r-project.org] On Behalf Of Ross
+Bennett
+Sent: Saturday, August 24, 2013 10:53 AM
+To: PortfolioAnalytics
+Subject: Re: [GSoC-PortA] chart.* as generics
+
+ 
+
+No vignette yet. I'll add some examples to the sandbox folder.
+
+ 
+
+Ross
+
+ 
+
+On Sat, Aug 24, 2013 at 10:10 AM, Doug Martin <martinrd at comcast.net> wrote:
+
+Ross,
+
+ 
+
+Is there a vignette yet for using these chart functions?  If not, a couple
+of code examples?
+
+ 
+
+Doug
+
+ 
+
+ 
+
+From: gsoc-porta-bounces at lists.r-forge.r-project.org
+[mailto:gsoc-porta-bounces at lists.r-forge.r-project.org] On Behalf Of Ross
+Bennett
+Sent: Monday, August 19, 2013 10:17 PM
+To: PortfolioAnalytics
+Subject: Re: [GSoC-PortA] chart.* as generics
+
+ 
+
+Brian,
+
+ 
+
+I have just a couple quick questions regarding chart.Weights and
+chart.RiskReward as generic functions and cleaning up the documentation as
+you did with the versioned functions.
+
+ 
+
+My plan is to use an alias for the chart.Weights.* functions for the
+different classes and then have a generic chart.Weights function with a call
+to UseMethod("chart.Weights"). The first argument is RP for
+chart.Weights.RP, DE for chart.Weights.DE, and so on. Should the arguments
+of the chart.Weights.* functions be the same?
+
+ 
+
+Should we have the @param and other tags only for one function? Would that
+go on the generic chart.Weights function?
+
+ 
+
+My approach would be the same for the chart.Scatter.* functions.
+
+ 
+
+Thanks,
+
+Ross
+
+ 
+
+On Sun, Aug 18, 2013 at 1:21 PM, Brian G. Peterson <brian at braverock.com>
+wrote:
+
+Sounds good.  - Brian
+
+
+
+On 08/18/2013 03:06 PM, Ross Bennett wrote:
+
+Brian,
+
+Thanks for clarifying, I was worried that might be the case. I could add
+a new function named chart.RiskReward and make that our generic function
+and use an alias for the existing chart.Scatter.* functions. It could
+look something like this:
+
+chart.RiskReward.optimize.portfolio.ROI <- chart.Scatter.ROI
+chart.RiskReward.optimize.portfolio.random <- chart.Scatter.RP
+
+Would that be ok and worthwhile to do?
+
+Ross
+
+
+
+On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson <brian at braverock.com
+
+<mailto:brian at braverock.com>> wrote:
+
+    On 08/18/2013 01:35 PM, Ross Bennett wrote:
+
+
+        The PerformanceAnalytics packages already has a chart.Scatter
+        function.
+        Will we have any naming or masking issues if I make chart.Scatter a
+        function for the different optimize.portfolio.objects?
+
+
+    It's easy to make chart.Weights a generic, but it will be much
+    harder with chart.Scatter.*
+
+    Because PerformanceAnalytics is on CRAN and much more widely used,
+
+
+    we'd need to match the argument list, and create a
+    chart.Scatter.default in PerfA.  I don't see any way to match the
+    argument list though.
+
+    --
+    Brian
+
+_______________________________________________
+GSoC-PortA mailing list
+GSoC-PortA at lists.r-forge.r-project.org
+http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+
+ 
+
+
+_______________________________________________
+GSoC-PortA mailing list
+GSoC-PortA at lists.r-forge.r-project.org
+http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+
+ 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130824/8b8a560b/attachment.html>
+
+From martinrd at comcast.net  Sat Aug 24 20:11:27 2013
+From: martinrd at comcast.net (Doug Martin)
+Date: Sat, 24 Aug 2013 11:11:27 -0700
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <5218F327.7050807@braverock.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+ <52112CD3.8080406@braverock.com>
+ <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+ <000001cea0ec$e7791040$b66b30c0$@comcast.net>
+ <5218F327.7050807@braverock.com>
+Message-ID: <001301cea0f5$67e81de0$37b859a0$@comcast.net>
+
+Thanks very much, will have a look.
+
+Doug
+
+
+-----Original Message-----
+From: gsoc-porta-bounces at lists.r-forge.r-project.org
+[mailto:gsoc-porta-bounces at lists.r-forge.r-project.org] On Behalf Of Brian
+G. Peterson
+Sent: Saturday, August 24, 2013 10:54 AM
+To: gsoc-porta at r-forge.wu-wien.ac.at
+Subject: Re: [GSoC-PortA] chart.* as generics
+
+Of course, you can call plot() on the output object of any optimization and
+get the standard scatter and weights chart.
+
+Additionally, you can call
+
+chart.RiskReward (to get just the scatter plot)
+
+chart.Weights (to get just the weights plot)
+
+chart.EfficientFrontier (to get a plot of the efficient frontier)
+
+chart.Weights.EF (to get a stacked bar of weights along the efficient
+frontier)
+
+As for usage, for plot() and all the chart.* functions above, defaults will
+be set appropriately if you just pass the optimization output object as the
+first argument.
+
+Currently, he only use of the charting functions is in the script
+sandbox/testing_efficient_frontier.R  and briefly in the ROI vignette.
+
+I think it would be good to update the other vignettes with charts where
+appropriate.
+
+Given Ross's recent work to properly define the generics, it shouldn't be
+necessary to call any of the sub-functions for the particular type of
+optimization solver that was used.  Calling plot or any of the functions
+above sholud be possible with any optimize.portfolio output right now.
+
+Regards,
+
+Brian
+
+
+On 08/24/2013 12:10 PM, Doug Martin wrote:
+> Ross,
+>
+> Is there a vignette yet for using these chart functions?  If not, a 
+> couple of code examples?
+>
+> Doug
+>
+> *From:*gsoc-porta-bounces at lists.r-forge.r-project.org
+> [mailto:gsoc-porta-bounces at lists.r-forge.r-project.org] *On Behalf Of 
+> *Ross Bennett
+> *Sent:* Monday, August 19, 2013 10:17 PM
+> *To:* PortfolioAnalytics
+> *Subject:* Re: [GSoC-PortA] chart.* as generics
+>
+> Brian,
+>
+> I have just a couple quick questions regarding chart.Weights and 
+> chart.RiskReward as generic functions and cleaning up the 
+> documentation as you did with the versioned functions.
+>
+> My plan is to use an alias for the chart.Weights.* functions for the 
+> different classes and then have a generic chart.Weights function with 
+> a call to UseMethod("chart.Weights"). The first argument is RP for 
+> chart.Weights.RP, DE for chart.Weights.DE <http://chart.Weights.DE>, 
+> and so on. Should the arguments of the chart.Weights.* functions be the
+same?
+>
+> Should we have the @param and other tags only for one function? Would 
+> that go on the generic chart.Weights function?
+>
+> My approach would be the same for the chart.Scatter.* functions.
+>
+> Thanks,
+>
+> Ross
+>
+> On Sun, Aug 18, 2013 at 1:21 PM, Brian G. Peterson 
+> <brian at braverock.com <mailto:brian at braverock.com>> wrote:
+>
+> Sounds good.  - Brian
+>
+>
+>
+> On 08/18/2013 03:06 PM, Ross Bennett wrote:
+>
+>     Brian,
+>
+>     Thanks for clarifying, I was worried that might be the case. I could
+add
+>     a new function named chart.RiskReward and make that our generic
+function
+>     and use an alias for the existing chart.Scatter.* functions. It could
+>     look something like this:
+>
+>     chart.RiskReward.optimize.portfolio.ROI <- chart.Scatter.ROI
+>     chart.RiskReward.optimize.portfolio.random <- chart.Scatter.RP
+>
+>     Would that be ok and worthwhile to do?
+>
+>     Ross
+>
+>
+>
+>     On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson
+>     <brian at braverock.com <mailto:brian at braverock.com>
+>
+>     <mailto:brian at braverock.com <mailto:brian at braverock.com>>> wrote:
+>
+>          On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>
+>
+>              The PerformanceAnalytics packages already has a chart.Scatter
+>              function.
+>              Will we have any naming or masking issues if I make
+>     chart.Scatter a
+>              function for the different optimize.portfolio.objects?
+>
+>
+>          It's easy to make chart.Weights a generic, but it will be much
+>          harder with chart.Scatter.*
+>
+>          Because PerformanceAnalytics is on CRAN and much more widely 
+> used,
+>
+>
+>          we'd need to match the argument list, and create a
+>          chart.Scatter.default in PerfA.  I don't see any way to match the
+>          argument list though.
+>
+>          --
+>          Brian
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> <mailto:GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+>
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+
+
+--
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+_______________________________________________
+GSoC-PortA mailing list
+GSoC-PortA at lists.r-forge.r-project.org
+http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+
+
+From martinrd at comcast.net  Sat Aug 24 20:11:27 2013
+From: martinrd at comcast.net (Doug Martin)
+Date: Sat, 24 Aug 2013 11:11:27 -0700
+Subject: [GSoC-PortA] chart.* as generics
+In-Reply-To: <5218F327.7050807@braverock.com>
+References: <520E2F20.2060104@braverock.com>
+ <CAEESW=VnJiG=YW5GOKwAkmCw7k5Pc2kYg6KmrCtoDX2Lv2DhZA@mail.gmail.com>
+ <520E5527.2070508@braverock.com>
+ <CAEESW=Xuv2zWYVcnX+LBo7-Qe4F-TPQGDNDYaLERNA7CgA8ygw@mail.gmail.com>
+ <5210BCFE.7090605@braverock.com>
+ <CAEESW=WtPggctt7DxdZ5CgU6PdG5J+nWq2qwqc0-kNw5e4h1+g@mail.gmail.com>
+ <52111B04.1040109@braverock.com>
+ <CAEESW=WONRAcD2f4uwe8eYFhKZ3Y1uCwRU3KNjec2NVsgV4meQ@mail.gmail.com>
+ <52112CD3.8080406@braverock.com>
+ <CAEESW=Uxym6N2TXiOz3bTfH4TXxAQeGUVuKYSkc=JRdQB5=cBw@mail.gmail.com>
+ <000001cea0ec$e7791040$b66b30c0$@comcast.net>
+ <5218F327.7050807@braverock.com>
+Message-ID: <001301cea0f5$67e81de0$37b859a0$@comcast.net>
+
+Thanks very much, will have a look.
+
+Doug
+
+
+-----Original Message-----
+From: gsoc-porta-bounces at lists.r-forge.r-project.org
+[mailto:gsoc-porta-bounces at lists.r-forge.r-project.org] On Behalf Of Brian
+G. Peterson
+Sent: Saturday, August 24, 2013 10:54 AM
+To: gsoc-porta at r-forge.wu-wien.ac.at
+Subject: Re: [GSoC-PortA] chart.* as generics
+
+Of course, you can call plot() on the output object of any optimization and
+get the standard scatter and weights chart.
+
+Additionally, you can call
+
+chart.RiskReward (to get just the scatter plot)
+
+chart.Weights (to get just the weights plot)
+
+chart.EfficientFrontier (to get a plot of the efficient frontier)
+
+chart.Weights.EF (to get a stacked bar of weights along the efficient
+frontier)
+
+As for usage, for plot() and all the chart.* functions above, defaults will
+be set appropriately if you just pass the optimization output object as the
+first argument.
+
+Currently, he only use of the charting functions is in the script
+sandbox/testing_efficient_frontier.R  and briefly in the ROI vignette.
+
+I think it would be good to update the other vignettes with charts where
+appropriate.
+
+Given Ross's recent work to properly define the generics, it shouldn't be
+necessary to call any of the sub-functions for the particular type of
+optimization solver that was used.  Calling plot or any of the functions
+above sholud be possible with any optimize.portfolio output right now.
+
+Regards,
+
+Brian
+
+
+On 08/24/2013 12:10 PM, Doug Martin wrote:
+> Ross,
+>
+> Is there a vignette yet for using these chart functions?  If not, a 
+> couple of code examples?
+>
+> Doug
+>
+> *From:*gsoc-porta-bounces at lists.r-forge.r-project.org
+> [mailto:gsoc-porta-bounces at lists.r-forge.r-project.org] *On Behalf Of 
+> *Ross Bennett
+> *Sent:* Monday, August 19, 2013 10:17 PM
+> *To:* PortfolioAnalytics
+> *Subject:* Re: [GSoC-PortA] chart.* as generics
+>
+> Brian,
+>
+> I have just a couple quick questions regarding chart.Weights and 
+> chart.RiskReward as generic functions and cleaning up the 
+> documentation as you did with the versioned functions.
+>
+> My plan is to use an alias for the chart.Weights.* functions for the 
+> different classes and then have a generic chart.Weights function with 
+> a call to UseMethod("chart.Weights"). The first argument is RP for 
+> chart.Weights.RP, DE for chart.Weights.DE <http://chart.Weights.DE>, 
+> and so on. Should the arguments of the chart.Weights.* functions be the
+same?
+>
+> Should we have the @param and other tags only for one function? Would 
+> that go on the generic chart.Weights function?
+>
+> My approach would be the same for the chart.Scatter.* functions.
+>
+> Thanks,
+>
+> Ross
+>
+> On Sun, Aug 18, 2013 at 1:21 PM, Brian G. Peterson 
+> <brian at braverock.com <mailto:brian at braverock.com>> wrote:
+>
+> Sounds good.  - Brian
+>
+>
+>
+> On 08/18/2013 03:06 PM, Ross Bennett wrote:
+>
+>     Brian,
+>
+>     Thanks for clarifying, I was worried that might be the case. I could
+add
+>     a new function named chart.RiskReward and make that our generic
+function
+>     and use an alias for the existing chart.Scatter.* functions. It could
+>     look something like this:
+>
+>     chart.RiskReward.optimize.portfolio.ROI <- chart.Scatter.ROI
+>     chart.RiskReward.optimize.portfolio.random <- chart.Scatter.RP
+>
+>     Would that be ok and worthwhile to do?
+>
+>     Ross
+>
+>
+>
+>     On Sun, Aug 18, 2013 at 12:05 PM, Brian G. Peterson
+>     <brian at braverock.com <mailto:brian at braverock.com>
+>
+>     <mailto:brian at braverock.com <mailto:brian at braverock.com>>> wrote:
+>
+>          On 08/18/2013 01:35 PM, Ross Bennett wrote:
+>
+>
+>              The PerformanceAnalytics packages already has a chart.Scatter
+>              function.
+>              Will we have any naming or masking issues if I make
+>     chart.Scatter a
+>              function for the different optimize.portfolio.objects?
+>
+>
+>          It's easy to make chart.Weights a generic, but it will be much
+>          harder with chart.Scatter.*
+>
+>          Because PerformanceAnalytics is on CRAN and much more widely 
+> used,
+>
+>
+>          we'd need to match the argument list, and create a
+>          chart.Scatter.default in PerfA.  I don't see any way to match the
+>          argument list though.
+>
+>          --
+>          Brian
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> <mailto:GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+>
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+
+
+--
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+_______________________________________________
+GSoC-PortA mailing list
+GSoC-PortA at lists.r-forge.r-project.org
+http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+
+
+From rossbennett34 at gmail.com  Thu Aug 29 19:00:34 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Thu, 29 Aug 2013 10:00:34 -0700
+Subject: [GSoC-PortA] Error with clean.boudt when passing arguments for ...
+	in optimize.portfolio
+Message-ID: <CAEESW=WSfFKPn6+odcwtX6H=jDm5ZsybzCGDN5o8AFd3e=ymvQ@mail.gmail.com>
+
+All,
+
+While I was working through examples for risk_budget_objectives, I came
+across a situation that causes an error and I am not sure how to fix it. If
+clean="boudt" is in the arguments list in the objective and an argument for
+... is passed in optimize.portfolio I am getting an error in clean.boudt.
+
+Error in clean.boudt(na.omit(R[, column, drop = FALSE]), alpha = alpha,  :
+                             unused argument(s) (itermax = 50)
+
+Upon insepecting traceback(), it looks like the error is due
+to Return.clean(R, method = objective$arguments.clean, ...) where the
+dots are picking up the dots arguments from optimize.portfolio.
+
+I added sandbox/testing_risk_budget.R in r2931 that has an example to
+reproduce the error. Is there a way to correct this? I suppose a workaround
+is to clean the returns first and not specify clean in the arguments list
+in the objective so the dots argument in optimize.portfolio can then be
+used to control the parameters for the solvers.
+
+Any thoughts/suggestions on resolving this?
+
+Thanks,
+Ross
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130829/43698aa3/attachment.html>
+
+From brian at braverock.com  Fri Aug 30 20:11:53 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Fri, 30 Aug 2013 13:11:53 -0500
+Subject: [GSoC-PortA] Error with clean.boudt when passing arguments for
+ ... in optimize.portfolio
+In-Reply-To: <CAEESW=WSfFKPn6+odcwtX6H=jDm5ZsybzCGDN5o8AFd3e=ymvQ@mail.gmail.com>
+References: <CAEESW=WSfFKPn6+odcwtX6H=jDm5ZsybzCGDN5o8AFd3e=ymvQ@mail.gmail.com>
+Message-ID: <5220E069.4090205@braverock.com>
+
+On 08/29/2013 12:00 PM, Ross Bennett wrote:
+> All,
+>
+> While I was working through examples for risk_budget_objectives, I came
+> across a situation that causes an error and I am not sure how to fix it.
+> If clean="boudt" is in the arguments list in the objective and an
+> argument for ... is passed in optimize.portfolio I am getting an error
+> in clean.boudt.
+>
+> Error in clean.boudt(na.omit(R[, column, drop = FALSE]), alpha = alpha,  :
+>                               unused argument(s) (itermax = 50)
+
+
+It's a little unclear why dots would be passed that deeply anyway.
+
+Typically, in PortfolioAnalytics, we're matching arguments and stripping 
+dots before calling the underlying objective functions.
+
+This particular edge case is easily fixed by adding dots to the boudt 
+method of Retur.clean, but I'm sure there's a more general solution.
+
+I think we should pick it up in the argument matching, and not expect 
+the called functions to be ready to catch any arbitrary arguments.
+
+> Upon insepecting traceback(), it looks like the error is due
+> to Return.clean(R, method = objective$arguments.clean, ...) where the
+> dots are picking up the dots arguments from optimize.portfolio.
+>
+> I added sandbox/testing_risk_budget.R in r2931 that has an example to
+> reproduce the error. Is there a way to correct this? I suppose a
+> workaround is to clean the returns first and not specify clean in the
+> arguments list in the objective so the dots argument
+> in optimize.portfolio can then be used to control the parameters for the
+> solvers.
+>
+> Any thoughts/suggestions on resolving this?
+>
+> Thanks,
+> Ross
+>
+>
+>
+> _______________________________________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta
+>
+
+
+-- 
+Brian G. Peterson
+http://braverock.com/brian/
+Ph: 773-459-4973
+IM: bgpbraverock
+
+From rossbennett34 at gmail.com  Fri Aug 30 20:35:39 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Fri, 30 Aug 2013 11:35:39 -0700
+Subject: [GSoC-PortA] Error with clean.boudt when passing arguments for
+ ... in optimize.portfolio
+In-Reply-To: <5220E069.4090205@braverock.com>
+References: <CAEESW=WSfFKPn6+odcwtX6H=jDm5ZsybzCGDN5o8AFd3e=ymvQ@mail.gmail.com>
+ <5220E069.4090205@braverock.com>
+Message-ID: <CAEESW=X8f9_SeazqKhn55dO4TH-K7h37bcLkX+JSgAnja=6g2w@mail.gmail.com>
+
+On Fri, Aug 30, 2013 at 11:11 AM, Brian G. Peterson <brian at braverock.com>wrote:
+
+> On 08/29/2013 12:00 PM, Ross Bennett wrote:
+>
+>>
+>> It's a little unclear why dots would be passed that deeply anyway.
+>
+> Typically, in PortfolioAnalytics, we're matching arguments and stripping
+> dots before calling the underlying objective functions.
+>
+> This particular edge case is easily fixed by adding dots to the boudt
+> method of Retur.clean, but I'm sure there's a more general solution.
+>
+> I think we should pick it up in the argument matching, and not expect the
+> called functions to be ready to catch any arbitrary arguments.
+>
+>
+I printed out the .formals list right before the do.call(fun, .formals) and
+$itermax is not an element in .formals, the arguments are being matched and
+stripped correctly in constrained_objective before calling the objective
+function.
+
+
+>
+> --
+> Brian G. Peterson
+> http://braverock.com/brian/
+> Ph: 773-459-4973
+> IM: bgpbraverock
+> ______________________________**_________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-**project.org<GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-**project.org/cgi-bin/mailman/**listinfo/gsoc-porta<http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130830/3e433c17/attachment.html>
+
+From brian at braverock.com  Fri Aug 30 23:38:23 2013
+From: brian at braverock.com (Brian G. Peterson)
+Date: Fri, 30 Aug 2013 16:38:23 -0500
+Subject: [GSoC-PortA] Error with clean.boudt when passing arguments for
+ ... in optimize.portfolio
+In-Reply-To: <CAEESW=X8f9_SeazqKhn55dO4TH-K7h37bcLkX+JSgAnja=6g2w@mail.gmail.com>
+References: <CAEESW=WSfFKPn6+odcwtX6H=jDm5ZsybzCGDN5o8AFd3e=ymvQ@mail.gmail.com>
+ <5220E069.4090205@braverock.com>
+ <CAEESW=X8f9_SeazqKhn55dO4TH-K7h37bcLkX+JSgAnja=6g2w@mail.gmail.com>
+Message-ID: <522110CF.9060207@braverock.com>
+
+On 08/30/2013 01:35 PM, Ross Bennett wrote:
+>
+>
+>
+> On Fri, Aug 30, 2013 at 11:11 AM, Brian G. Peterson <brian at braverock.com
+> <mailto:brian at braverock.com>> wrote:
+>
+>     On 08/29/2013 12:00 PM, Ross Bennett wrote:
+>
+>
+>     It's a little unclear why dots would be passed that deeply anyway.
+>
+>     Typically, in PortfolioAnalytics, we're matching arguments and
+>     stripping dots before calling the underlying objective functions.
+>
+>     This particular edge case is easily fixed by adding dots to the
+>     boudt method of Retur.clean, but I'm sure there's a more general
+>     solution.
+>
+>     I think we should pick it up in the argument matching, and not
+>     expect the called functions to be ready to catch any arbitrary
+>     arguments.
+>
+>
+> I printed out the .formals list right before the do.call(fun, .formals)
+> and $itermax is not an element in .formals, the arguments are being
+> matched and stripped correctly in constrained_objective before calling
+> the objective function.
+
+What about when we calculate portfolio moments?  Isn't that a lot 
+earlier in the process than constrained_objective?
+
+
+From rossbennett34 at gmail.com  Sat Aug 31 02:41:14 2013
+From: rossbennett34 at gmail.com (Ross Bennett)
+Date: Fri, 30 Aug 2013 17:41:14 -0700
+Subject: [GSoC-PortA] Error with clean.boudt when passing arguments for
+ ... in optimize.portfolio
+In-Reply-To: <522110CF.9060207@braverock.com>
+References: <CAEESW=WSfFKPn6+odcwtX6H=jDm5ZsybzCGDN5o8AFd3e=ymvQ@mail.gmail.com>
+ <5220E069.4090205@braverock.com>
+ <CAEESW=X8f9_SeazqKhn55dO4TH-K7h37bcLkX+JSgAnja=6g2w@mail.gmail.com>
+ <522110CF.9060207@braverock.com>
+Message-ID: <CAEESW=X7wkeYSNqo_30XNPQH98zYL9TXD1Z3-gm1zAJht8bNNA@mail.gmail.com>
+
+Brian,
+
+Thanks for pointing this out. It is when the portfolio moments are first
+calculated in optimize.portfolio. I added checks that the arguments passed
+in as dots match the formal arguments of momentFUN. This should be fixed in
+r2947.
+
+Thanks again, have a great weekend!
+
+Ross
+
+
+On Fri, Aug 30, 2013 at 2:38 PM, Brian G. Peterson <brian at braverock.com>wrote:
+
+> On 08/30/2013 01:35 PM, Ross Bennett wrote:
+>
+>>
+>>
+>>
+>> On Fri, Aug 30, 2013 at 11:11 AM, Brian G. Peterson <brian at braverock.com
+>> <mailto:brian at braverock.com>> wrote:
+>>
+>>     On 08/29/2013 12:00 PM, Ross Bennett wrote:
+>>
+>>
+>>     It's a little unclear why dots would be passed that deeply anyway.
+>>
+>>     Typically, in PortfolioAnalytics, we're matching arguments and
+>>     stripping dots before calling the underlying objective functions.
+>>
+>>     This particular edge case is easily fixed by adding dots to the
+>>     boudt method of Retur.clean, but I'm sure there's a more general
+>>     solution.
+>>
+>>     I think we should pick it up in the argument matching, and not
+>>     expect the called functions to be ready to catch any arbitrary
+>>     arguments.
+>>
+>>
+>> I printed out the .formals list right before the do.call(fun, .formals)
+>> and $itermax is not an element in .formals, the arguments are being
+>> matched and stripped correctly in constrained_objective before calling
+>> the objective function.
+>>
+>
+> What about when we calculate portfolio moments?  Isn't that a lot earlier
+> in the process than constrained_objective?
+>
+>
+> ______________________________**_________________
+> GSoC-PortA mailing list
+> GSoC-PortA at lists.r-forge.r-**project.org<GSoC-PortA at lists.r-forge.r-project.org>
+> http://lists.r-forge.r-**project.org/cgi-bin/mailman/**listinfo/gsoc-porta<http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/gsoc-porta>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/gsoc-porta/attachments/20130830/25eb45c1/attachment.html>
+

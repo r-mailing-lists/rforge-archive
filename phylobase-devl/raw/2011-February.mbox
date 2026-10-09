@@ -1,0 +1,184 @@
+From t.jombart at imperial.ac.uk  Wed Feb 23 13:09:28 2011
+From: t.jombart at imperial.ac.uk (Jombart, Thibaut)
+Date: Wed, 23 Feb 2011 12:09:28 +0000
+Subject: [Phylobase-devl] FW: adephylo phylo4d
+In-Reply-To: <BAY145-w33780936AC09B8170DFC74EDD80@phx.gbl>
+References: <BAY145-w33780936AC09B8170DFC74EDD80@phx.gbl>
+Message-ID: <60AAE8805AAC4B44A8DF1888C0CBFDC42A787C1D@ICEXM3.ic.ac.uk>
+
+Dear all, 
+
+A user of adephylo just reported an issue which I think is a bug in the phylo4d constructor. I tried giving it a go - the issue is somewhere in the formatData procedure - but I am not sure how this function is meant to behave anyway.
+
+The issue is fairly simple: we have a "phylo" tree and a data.frame corresponding to tip data with row names identical to tip labels; yet a phylo4d can't seem to be obtained unless we disable tip/data matching:
+
+####
+library(phylobase)
+
+## read tree
+tre <- read.tree("tre.txt")
+
+## read tip data
+dat <- read.table("/home/thibaut/Desktop/temp/tipdata.txt", header=TRUE, row.names=1)
+
+## reorder tip data according to tips
+sum(tre$tip.label == rownames(dat))
+all(tre$tip.label %in% rownames(dat))
+dat <- dat[tre$tip.label,]
+identical(rownames(dat), tre$tip.label) # is TRUE
+
+x <- phylo4d(tre, dat, match.data=TRUE) # THIS IS THE ERROR
+Error in formatData(phy = x, dt = tip.data, type = "tip", ...) : 
+  Your tip data are being matched to internal nodes. Make sure that your data identifiers are correct.
+
+x <- phylo4d(tre, dat, match.data=FALSE) # this works
+####
+
+This happens both with latest CRAN version and the current devel version (compiled from the svn sources on the 22 feb 2011).
+
+Paul Dennis pointed out this issue and kindly allowed me to forward you the datasets to be able to reproduce the issue. Please do not send these data to anyone else.
+
+Many thanks
+
+Thibaut.
+
+ps: here is my R version:
+> R.version
+               _                            
+platform       x86_64-unknown-linux-gnu     
+arch           x86_64                       
+os             linux-gnu                    
+system         x86_64, linux-gnu            
+status                                      
+major          2                            
+minor          12.1                         
+year           2010                         
+month          12                           
+day            16                           
+svn rev        53855                        
+language       R                            
+version.string R version 2.12.1 (2010-12-16)
+
+
+-- 
+######################################
+Dr Thibaut JOMBART
+MRC Centre for Outbreak Analysis and Modelling
+Department of Infectious Disease Epidemiology
+Imperial College - Faculty of Medicine
+St Mary?s Campus
+Norfolk Place
+London W2 1PG
+United Kingdom
+Tel. : 0044 (0)20 7594 3658
+t.jombart at imperial.ac.uk
+http://sites.google.com/site/thibautjombart/
+http://adegenet.r-forge.r-project.org/
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: tre.txt
+URL: <http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20110223/3cd1fae4/attachment-0002.txt>
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: tipdata.txt
+URL: <http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20110223/3cd1fae4/attachment-0003.txt>
+
+From francois.michonneau at gmail.com  Thu Feb 24 17:08:10 2011
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Thu, 24 Feb 2011 11:08:10 -0500
+Subject: [Phylobase-devl] FW: adephylo phylo4d
+In-Reply-To: <60AAE8805AAC4B44A8DF1888C0CBFDC42A787C1D@ICEXM3.ic.ac.uk>
+References: <BAY145-w33780936AC09B8170DFC74EDD80@phx.gbl>
+	<60AAE8805AAC4B44A8DF1888C0CBFDC42A787C1D@ICEXM3.ic.ac.uk>
+Message-ID: <1298563690.23333.11.camel@francois-laptop>
+
+
+Hello,
+
+  I just committed 0.6.3 to R-forge which should fix a bug related to
+the error message described by Thibaut.
+
+  By default, phylobase treats data labels that only contain numbers to
+represent the internal node numbers (i.e., the numbers found in the edge
+matrix). Thus, in the case described you need to invoke the option
+rownamesAsLabels=TRUE:
+
+tre <- read.tree("tre.txt")
+dat <- read.table("tipdata.txt", header=TRUE, row.names=1)
+x <- phylo4d(tre, dat, rownamesAsLabels=TRUE, match.data=TRUE)
+
+  However, this dataset revealed a bug as tips labeled "0" were
+considered the root. This is now fixed.
+
+  Let me know if you encounter any other difficulties.
+
+  Cheers,
+  -- Fran?ois
+
+On Wed, 2011-02-23 at 12:09 +0000, Jombart, Thibaut wrote:
+> Dear all, 
+> 
+> A user of adephylo just reported an issue which I think is a bug in the phylo4d constructor. I tried giving it a go - the issue is somewhere in the formatData procedure - but I am not sure how this function is meant to behave anyway.
+> 
+> The issue is fairly simple: we have a "phylo" tree and a data.frame corresponding to tip data with row names identical to tip labels; yet a phylo4d can't seem to be obtained unless we disable tip/data matching:
+> 
+> ####
+> library(phylobase)
+> 
+> ## read tree
+> tre <- read.tree("tre.txt")
+> 
+> ## read tip data
+> dat <- read.table("/home/thibaut/Desktop/temp/tipdata.txt", header=TRUE, row.names=1)
+> 
+> ## reorder tip data according to tips
+> sum(tre$tip.label == rownames(dat))
+> all(tre$tip.label %in% rownames(dat))
+> dat <- dat[tre$tip.label,]
+> identical(rownames(dat), tre$tip.label) # is TRUE
+> 
+> x <- phylo4d(tre, dat, match.data=TRUE) # THIS IS THE ERROR
+> Error in formatData(phy = x, dt = tip.data, type = "tip", ...) : 
+>   Your tip data are being matched to internal nodes. Make sure that your data identifiers are correct.
+> 
+> x <- phylo4d(tre, dat, match.data=FALSE) # this works
+> ####
+> 
+> This happens both with latest CRAN version and the current devel version (compiled from the svn sources on the 22 feb 2011).
+> 
+> Paul Dennis pointed out this issue and kindly allowed me to forward you the datasets to be able to reproduce the issue. Please do not send these data to anyone else.
+> 
+> Many thanks
+> 
+> Thibaut.
+> 
+> ps: here is my R version:
+> > R.version
+>                _                            
+> platform       x86_64-unknown-linux-gnu     
+> arch           x86_64                       
+> os             linux-gnu                    
+> system         x86_64, linux-gnu            
+> status                                      
+> major          2                            
+> minor          12.1                         
+> year           2010                         
+> month          12                           
+> day            16                           
+> svn rev        53855                        
+> language       R                            
+> version.string R version 2.12.1 (2010-12-16)
+> 
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20110224/c4e771c5/attachment.pgp>
+

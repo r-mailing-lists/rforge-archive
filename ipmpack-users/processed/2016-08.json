@@ -1,0 +1,55 @@
+{
+  "list": "ipmpack-users",
+  "description": "",
+  "month": "2016-08",
+  "messages": [
+    {
+      "id": "msg-fa067393a047",
+      "message_id": "<0AA4B4D5-E039-429B-8D9B-FAC937F21221@bren.ucsb.edu>",
+      "from_name": "Bruce Kendall",
+      "from_email_hash": "35f261d6a729936188c81134b68e85e4335fb23665d884566fca9459d4bed4c5",
+      "date": "2016-08-22T17:01:50Z",
+      "subject": "[Ipmpack-users] Bug in makeSurvObj()",
+      "subject_clean": "[Ipmpack-users] Bug in makeSurvObj()",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "I think I've found a bug in makeSurvObj(). When building a function without data (i.e., by specifying values for coeff), the specified coefficients are not actually applied to the model.\n\nTo reproduce this, run the following code multiple times and notice the inconsistent coefficients:\n\nmakeSurvObj(Formula = surv ~ -1 + size, coeff = c(1,1))\n\nThe problem seems to be in .createSurvObj(), which, unlike .createGrowthObj() and .createFecObj(), does not update the coefficients in the fit slot after fitting the model to dummy data.\n\nI should also point out that this function often throws a warning, because when the dummy survivals are all zero or all one then \"glm.fit: fitted probabilities numerically 0 or 1 occurred \" results. This could be avoided by assigning, say, c(0,1,1) for the survival dummies.\n\nBest,\nBruce\n\n--\nBruce Kendall\nkendall at bren.ucsb.edu <mailto:kendall at bren.ucsb.edu>\nhttp://kendall.bren.ucsb.edu <http://kendall.bren.ucsb.edu/> \nSkype: brucekendall64\n\n             #########################################\n             ####   I am on sabbatical through Sept 2016   ####\n             #########################################\n\n=============================\nAddress through Aug. 2016:\n?????????????????\nDepartment of Zoology\nUniversity of Oxford\nThe Tinbergen Building\nSouth Parks Road\nOxford\nOX1 3PS\nUnited Kingdom\nTel:   \t+44 (0)1865 271139\nMob: \t+44 (0)7534 514781\nHome:\t+44 (0)1865 515349\n\n\n===========================================\nPermanent address:\n?????????????????????????\nBren School of Environmental Science & Management\nUniversity of California, Santa Barbara\nSanta Barbara, CA 93106-5131\nUSA\nTel: +1 (805) 893-7539\n===========================================\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20160822/3392d508/attachment.html>",
+      "body_snippet": "I think I've found a bug in makeSurvObj(). When building a function without data (i.e., by specifying values for coeff), the specified coefficients are not actually applied to the model.\n\nTo reproduce",
+      "thread_id": "thread-fa067393a047",
+      "thread_depth": 0,
+      "month": "2016-08"
+    },
+    {
+      "id": "msg-14abe83fd19a",
+      "message_id": "<21504a5e-a3f2-4f22-bc54-6e8d646fa250@science.ru.nl>",
+      "from_name": "Eelke Jongejans",
+      "from_email_hash": "01cdd1b542fcc2b05aca35e335f1b7fa4f846ca2d82d33f73cd4cf32ff9f7cd0",
+      "date": "2016-08-23T10:19:19Z",
+      "subject": "[Ipmpack-users] Bug in makeSurvObj()",
+      "subject_clean": "[Ipmpack-users] Bug in makeSurvObj()",
+      "in_reply_to": "<0AA4B4D5-E039-429B-8D9B-FAC937F21221@bren.ucsb.edu>",
+      "references": [
+        "<0AA4B4D5-E039-429B-8D9B-FAC937F21221@bren.ucsb.edu>"
+      ],
+      "body_plain": "Dear Bruce,\n\nthanks for catching this bug!\n\nThe functions below should solve this problem. They will be incorporated \nin the next version of IPMpack. The following two lines should work with \nthese new functions:\n\nmakeSurvObj(Formula = surv ~ size, coeff = c(1,1))\n\nmakeSurvObj(Formula = surv ~ -1 + size, coeff = c(1))\n\n\ncheers,\nEelke\n\n\n.createSurvObj <- function (Formula = surv ~ size, coeff = c(1, 1))\n{\n   var.names <- attr(terms(Formula),\"term.labels\")\n   if (attr(terms(Formula),\"intercept\")==1) var.names \n<-c(\"(Intercept)\",var.names)\n   if (length(coeff) != (length(var.names))) stop(\"not enough \ncoefficients supplied for the chosen Formula\")\n   dataf <- as.data.frame(matrix(rnorm(21 * length(var.names)), 21, \nlength(var.names)))\n   colnames(dataf) <- var.names\n   dataf$surv <- sample(c(0, 1), nrow(dataf), replace = TRUE)\n   fit <- glm(Formula, data = dataf, family = binomial)\n   sv1 <- new(\"survObj\")\n   sv1 at fit <- fit\n   for (i in 1:length(coeff)) sv1 at fit$coefficients[[i]] <- coeff[i]\n   return(sv1)\n}\n\n.createGrowthObj <- function (Formula = sizeNext ~ size, coeff = c(1, \n1), sd = 1)\n{\n   var.names <- attr(terms(Formula),\"term.labels\")\n   if (attr(terms(Formula),\"intercept\")==1) var.names \n<-c(\"(Intercept)\",var.names)\n   if (length(coeff) != (length(var.names))) stop(\"not enough \ncoefficients supplied for the chosen Formula\")\n   dataf <- as.data.frame(matrix(rnorm(21 * \n(length(all.vars(Formula)))), 21, length(all.vars(Formula))))\n   colnames(dataf) <- all.vars(Formula)\n   fit <- lm(Formula, data = dataf)\n   if (length(grep(\"sizeNext\", as.character(Formula))) > 0) {\n     gr1 <- new(\"growthObj\")\n     gr1 at fit <- fit\n     for (i in 1:length(coeff)) gr1 at fit$coefficients[i] <- coeff[i]\n     gr1 at sd <- sd\n   }\n   if (length(grep(\"incr\", as.character(Formula))) > 0) {\n     gr1 <- new(\"growthObjIncr\")\n     gr1 at fit <- fit\n     for (i in 1:length(coeff)) gr1 at fit$coefficients[i] <- coeff[i]\n     gr1 at sd <- sd\n   }\n   return(gr1)\n}\n\nmakeSurvObj <- function (dataf = NULL, Formula = surv ~ size + size2, \ncoeff = NULL)\n{\n   if (!is.null(dataf)) {\n     dataf <- subset(dataf, is.na(dataf$surv) == FALSE)\n     if (length(dataf$offspringNext) > 0) dataf <- subset(dataf, \n!dataf$offspringNext %in% c(\"sexual\", \"clonal\"))\n     dataf$size2 <- dataf$size^2\n     dataf$size3 <- dataf$size^3\n     if (length(grep(\"expsize\", as.character(Formula))) > 0)\n       dataf$expsize <- exp(dataf$size)\n     if (length(grep(\"logsize\", as.character(Formula))) > 0)\n       dataf$logsize <- log(dataf$size)\n     if (\"covariate\" %in% unlist(strsplit(as.character(Formula), \"[+-\\\\* \n]\")) & length(dataf$covariate) > 0) {\n       dataf$covariate <- as.factor(dataf$covariate)\n       levels(dataf$covariate) <- 1:length(unique(dataf$covariate))\n     }\n     if (\"covariateNext\" %in% unlist(strsplit(as.character(Formula), \n\"[+-\\\\* ]\")) & length(dataf$covariateNext) > 0) {\n       dataf$covariateNext <- as.factor(dataf$covariateNext)\n       levels(dataf$covariateNext) <- 1:length(unique(dataf$covariateNext))\n     }\n     if (length(intersect(all.vars(Formula), colnames(dataf))) < \nlength(all.vars(Formula)))\n       print(\"warning: not all variables in the formula are present in \ndataf; model cannot be fit\")\n     fit <- glm(Formula, family = binomial, data = dataf)\n     sv1 <- new(\"survObj\")\n     sv1 at fit <- fit\n   }\n   else {\n     if (is.null(coeff)) stop(\"require coefficients if data is not \nsupplied\")\n     sv1 <- .createSurvObj(Formula = Formula, coeff = coeff)\n   }\n   return(sv1)\n}\n\n\nOn 22-Aug-16 7:01 PM, Bruce Kendall wrote:\n> I think I've found a bug in makeSurvObj(). When building a function \n> without data (i.e., by specifying values for coeff), the specified \n> coefficients are not actually applied to the model.\n>\n> To reproduce this, run the following code multiple times and notice \n> the inconsistent coefficients:\n>\n> makeSurvObj(Formula = surv ~ -1 + size, coeff = c(1,1))\n>\n> The problem seems to be in .createSurvObj(), which, unlike \n> .createGrowthObj() and .createFecObj(), does not update the \n> coefficients in the fit slot after fitting the model to dummy data.\n>\n> I should also point out that this function often throws a warning, \n> because when the dummy survivals are all zero or all one then \n> \"glm.fit: fitted probabilities numerically 0 or 1 occurred \" results. \n> This could be avoided by assigning, say, c(0,1,1) for the survival \n> dummies.\n>\n> Best,\n> Bruce\n>\n> --\n> Bruce Kendall\n> kendall at bren.ucsb.edu <mailto:kendall at bren.ucsb.edu>\n> http://kendall.bren.ucsb.edu\n> Skype: brucekendall64\n>\n>  #########################################\n>  ####   I am on sabbatical through Sept 2016   ####\n>  #########################################\n>\n> =============================\n> Address through Aug. 2016:\n> ?????????????????\n> Department of Zoology\n> University of Oxford\n> The Tinbergen Building\n> South Parks Road\n> Oxford\n> OX1 3PS\n> United Kingdom\n> Tel: +44 (0)1865 271139\n> Mob:+44 (0)7534 514781\n> Home:+44 (0)1865 515349\n>\n>\n> ===========================================\n> Permanent address:\n> ?????????????????????????\n> Bren School of Environmental Science & Management\n> University of California, Santa Barbara\n> Santa Barbara, CA 93106-5131\n> USA\n> Tel: +1 (805) 893-7539\n> ===========================================\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n> _______________________________________________\n> IPMpack-users mailing list\n> IPMpack-users at lists.r-forge.r-project.org\n> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/ipmpack-users\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20160823/c4014c5b/attachment-0001.html>",
+      "body_snippet": "Dear Bruce,\n\nthanks for catching this bug!\n\nThe functions below should solve this problem. They will be incorporated \nin the next version of IPMpack. The following two lines should work with \nthese ne",
+      "thread_id": "thread-fa067393a047",
+      "thread_depth": 1,
+      "month": "2016-08"
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-fa067393a047",
+      "subject": "[Ipmpack-users] Bug in makeSurvObj()",
+      "message_count": 2,
+      "participants": [
+        "Bruce Kendall",
+        "Eelke Jongejans"
+      ],
+      "started": "2016-08-22T17:01:50Z",
+      "last_reply": "2016-08-23T10:19:19Z",
+      "root_message_id": "msg-fa067393a047"
+    }
+  ]
+}

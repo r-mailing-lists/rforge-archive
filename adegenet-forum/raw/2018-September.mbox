@@ -1,0 +1,571 @@
+From nvincigue at gmail.com  Sat Sep  1 15:28:22 2018
+From: nvincigue at gmail.com (nvincigue at gmail.com)
+Date: Sat, 1 Sep 2018 06:28:22 -0700
+Subject: [adegenet-forum] Randomly subsetting genind object
+Message-ID: <9DAB5C98-0C7C-4222-A481-35D76F0885E0@gmail.com>
+
+Is there a way to randomly sample a subset of my SNP data, say 13 SNPs out of ~3k, in adegenet when I read in a STRUCTURE file?
+
+boot_1 <-
+  read.structure(
+    ?snps.str",
+    onerowperind = TRUE,
+    n.ind = 16,
+    n.loc = 2468,
+    ask = FALSE,
+    quiet = TRUE
+  )
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20180901/6d387bb2/attachment.html>
+
+From zkamvar at gmail.com  Sat Sep  8 12:08:42 2018
+From: zkamvar at gmail.com (Zhian Kamvar)
+Date: Sat, 8 Sep 2018 11:08:42 +0100
+Subject: [adegenet-forum] Randomly subsetting genind object
+Message-ID: <881A7FF6-65F3-4BB7-9F4C-04C6F6EFB0FD@gmail.com>
+
+If you are looking to take a random sample of loci, you can just sample them after you read in the data by using the ?loc? argument:
+
+myData[loc=sample(nLoc(myData), 13)]
+
+
+Sent from my iPhone
+
+> Is there a way to randomly sample a subset of my SNP data, say 13 SNPs out of ~3k, in adegenet when I read in a STRUCTURE file?
+> 
+> boot_1 <-
+>  read.structure(
+>    ?snps.str",
+>    onerowperind = TRUE,
+>    n.ind = 16,
+>    n.loc = 2468,
+>    ask = FALSE,
+>    quiet = TRUE
+>  )
+> 
+> -------------- next part --------------
+> An HTML attachment was scrubbed...
+> URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20180901/6d387bb2/attachment-0001.html>
+> 
+> ------------------------------
+> 
+> Subject: Digest Footer
+> 
+> _______________________________________________
+> adegenet-forum mailing list
+> adegenet-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/adegenet-forum
+> 
+> ------------------------------
+> 
+> End of adegenet-forum Digest, Vol 121, Issue 1
+> **********************************************
+
+From jphill01 at uoguelph.ca  Wed Sep 26 17:46:07 2018
+From: jphill01 at uoguelph.ca (Jarrett Phillips)
+Date: Wed, 26 Sep 2018 15:46:07 +0000
+Subject: [adegenet-forum] Nucleotide substitution model used by
+	haploGen()/SeqTrack()
+Message-ID: <YQXPR01MB069458BFD63BE601F9505BCAD5150@YQXPR01MB0694.CANPRD01.PROD.OUTLOOK.COM>
+
+Dear Thibaut,
+
+
+This question stems from  ones I asked in August.
+
+
+I've been experimenting with the R code from haploGen() and include it below (with my own slight modifications for my specific problem). Hopefully you can lend some advice as to the issue I am facing (see below).
+
+
+Note here I refer to a haplotype as a unique DNA sequence.
+
+
+
+library(pegas)
+
+
+set.seed(17)
+
+
+sim.seqs <- TRUE
+
+length.seqs <- 500
+
+num.seqs <- 100 # number of DNA sequences
+
+
+
+if (sim.seqs == TRUE) {
+
+
+
+      nucl <- as.DNAbin(c('a','c','g','t'))
+
+
+     res <- sample(nucl, size = length.seqs, replace = TRUE, prob = rep(0.25, 4))
+
+
+     if (subst.model == "K80") {
+
+
+
+        transi.set <- list('a' = as.DNAbin('g'),
+
+                           'c' = as.DNAbin('t'),
+
+                           'g' = as.DNAbin('a'),
+
+                           't' = as.DNAbin('c'))
+
+        transv.set <- list('a' = as.DNAbin(c('c', 't')),
+
+                           'c' = as.DNAbin(c('a', 'g')),
+
+                           'g' = as.DNAbin(c('c', 't')),
+
+                           't' = as.DNAbin(c('a', 'g')))
+
+
+
+        transi <- function(res) {
+
+          unlist(transi.set[as.character(res)])
+
+        }
+
+
+
+        transv <- function(res) {
+
+          sapply(transv.set[as.character(res)], sample, 1)
+
+        }
+
+
+
+        duplicate.seq <- function(res) {
+
+          num.transi <- rbinom(n = 1, size = length.seqs, prob = transi.rate) # total number of transitions
+
+          if (num.transi > 0) {
+
+            idx <- sample(length.seqs, size = num.transi, replace = FALSE)
+
+            res[idx] <- transi(res[idx])
+
+          }
+
+
+
+          num.transv <- rbinom(n = 1, size = length.seqs, prob = transv.rate) # total number of transversions
+
+          if (num.transv > 0) {
+
+            idx <- sample(length.seqs, size = num.transv, replace = FALSE)
+
+            res[idx] <- transv(res[idx])
+
+          }
+
+          res
+
+          }
+
+        }
+
+
+
+      res <- matrix(replicate(num.seqs, duplicate.seq(res)), byrow = TRUE, nrow = num.seqs)
+
+
+
+      class(res) <- "DNAbin"
+
+
+
+      # write.dna(res, file = "seqs.fas", format = "fasta")
+
+
+
+      h <- sort(haplotype(res), decreasing = TRUE, what = "frequencies")
+
+      rownames(h) <- 1:nrow(h)
+
+
+
+    }
+
+
+## Output
+
+
+h
+
+
+Haplotypes extracted from: res
+
+
+    Number of haplotypes: 5
+
+         Sequence length: 500
+
+
+Haplotype labels and frequencies:
+
+
+  1  2  3  4  5
+
+96  1  1  1  1
+
+
+
+If the code is run multiple times (without the seed), the same pattern emerges: h is always skewed toward the most dominant haplotype.
+
+
+Is there a way that you've implemented in haploGen() (and that I have potentially glossed over) that gives different trends each time the code is run?
+
+
+For example, I want to be able to run the code (without seed) and get something like
+
+
+h
+
+
+Haplotypes extracted from: res
+
+
+    Number of haplotypes: 5
+
+         Sequence length: 500
+
+
+Haplotype labels and frequencies:
+
+
+  1    2    3    4   5
+
+35  15  25  20  5
+
+
+
+haploGen() does exactly this. Each time haploGen() is run, a different distribution for h  is outputted. I just want to emulate what you have done, but am stuck at this roadblock and I m uncertain of what is causing this issue.
+
+
+Note: I am just wanting to generalize your approach to generate DNA sequences (not necessarily for outbreak modelling).
+
+
+Can you please shed some light?
+
+
+
+Thank you in advance.
+
+
+
+Sincerely,
+
+
+Jarrett Phillips
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20180926/408416d5/attachment.html>
+
+From kamvarz at science.oregonstate.edu  Thu Sep 27 12:14:04 2018
+From: kamvarz at science.oregonstate.edu (Zhian Kamvar)
+Date: Thu, 27 Sep 2018 11:14:04 +0100
+Subject: [adegenet-forum] Nucleotide substitution model used by
+	haploGen()/SeqTrack()
+In-Reply-To: <mailman.9.1538042411.16826.adegenet-forum@lists.r-forge.r-project.org>
+References: <mailman.9.1538042411.16826.adegenet-forum@lists.r-forge.r-project.org>
+Message-ID: <CAPsXksJ8oiHu_53Rqo58DNX1GD+5bji=0g_sCGxAkUExB+FORg@mail.gmail.com>
+
+Hi Jarrett,
+
+The code below doesn't work as subst.model, transi.rate, and transiv.rate
+have not been defined. Could these be the problems you are running into?
+Also, you may wish to include a link to the previous discussion so people
+can understand what's going on.
+
+Best,
+Zhian
+
+On Thu, Sep 27, 2018 at 11:00 AM <
+adegenet-forum-request at lists.r-forge.r-project.org> wrote:
+
+> Send adegenet-forum mailing list submissions to
+>         adegenet-forum at lists.r-forge.r-project.org
+>
+> To subscribe or unsubscribe via the World Wide Web, visit
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/adegenet-forum
+>
+> or, via email, send a message with subject or body 'help' to
+>         adegenet-forum-request at lists.r-forge.r-project.org
+>
+> You can reach the person managing the list at
+>         adegenet-forum-owner at lists.r-forge.r-project.org
+>
+> When replying, please edit your Subject line so it is more specific
+> than "Re: Contents of adegenet-forum digest..."
+>
+>
+> Today's Topics:
+>
+>    1. Nucleotide substitution model used by     haploGen()/SeqTrack()
+>       (Jarrett Phillips)
+>
+>
+> ----------------------------------------------------------------------
+>
+> Message: 1
+> Date: Wed, 26 Sep 2018 15:46:07 +0000
+> From: Jarrett Phillips <jphill01 at uoguelph.ca>
+> To: "adegenet-forum at lists.r-forge.r-project.org"
+>         <adegenet-forum at lists.r-forge.r-project.org>
+> Subject: [adegenet-forum] Nucleotide substitution model used by
+>         haploGen()/SeqTrack()
+> Message-ID:
+>         <
+> YQXPR01MB069458BFD63BE601F9505BCAD5150 at YQXPR01MB0694.CANPRD01.PROD.OUTLOOK.COM
+> >
+>
+> Content-Type: text/plain; charset="iso-8859-1"
+>
+> Dear Thibaut,
+>
+>
+> This question stems from  ones I asked in August.
+>
+>
+> I've been experimenting with the R code from haploGen() and include it
+> below (with my own slight modifications for my specific problem). Hopefully
+> you can lend some advice as to the issue I am facing (see below).
+>
+>
+> Note here I refer to a haplotype as a unique DNA sequence.
+>
+>
+>
+> library(pegas)
+>
+>
+> set.seed(17)
+>
+>
+> sim.seqs <- TRUE
+>
+> length.seqs <- 500
+>
+> num.seqs <- 100 # number of DNA sequences
+>
+>
+>
+> if (sim.seqs == TRUE) {
+>
+>
+>
+>       nucl <- as.DNAbin(c('a','c','g','t'))
+>
+>
+>      res <- sample(nucl, size = length.seqs, replace = TRUE, prob =
+> rep(0.25, 4))
+>
+>
+>      if (subst.model == "K80") {
+>
+>
+>
+>         transi.set <- list('a' = as.DNAbin('g'),
+>
+>                            'c' = as.DNAbin('t'),
+>
+>                            'g' = as.DNAbin('a'),
+>
+>                            't' = as.DNAbin('c'))
+>
+>         transv.set <- list('a' = as.DNAbin(c('c', 't')),
+>
+>                            'c' = as.DNAbin(c('a', 'g')),
+>
+>                            'g' = as.DNAbin(c('c', 't')),
+>
+>                            't' = as.DNAbin(c('a', 'g')))
+>
+>
+>
+>         transi <- function(res) {
+>
+>           unlist(transi.set[as.character(res)])
+>
+>         }
+>
+>
+>
+>         transv <- function(res) {
+>
+>           sapply(transv.set[as.character(res)], sample, 1)
+>
+>         }
+>
+>
+>
+>         duplicate.seq <- function(res) {
+>
+>           num.transi <- rbinom(n = 1, size = length.seqs, prob =
+> transi.rate) # total number of transitions
+>
+>           if (num.transi > 0) {
+>
+>             idx <- sample(length.seqs, size = num.transi, replace = FALSE)
+>
+>             res[idx] <- transi(res[idx])
+>
+>           }
+>
+>
+>
+>           num.transv <- rbinom(n = 1, size = length.seqs, prob =
+> transv.rate) # total number of transversions
+>
+>           if (num.transv > 0) {
+>
+>             idx <- sample(length.seqs, size = num.transv, replace = FALSE)
+>
+>             res[idx] <- transv(res[idx])
+>
+>           }
+>
+>           res
+>
+>           }
+>
+>         }
+>
+>
+>
+>       res <- matrix(replicate(num.seqs, duplicate.seq(res)), byrow = TRUE,
+> nrow = num.seqs)
+>
+>
+>
+>       class(res) <- "DNAbin"
+>
+>
+>
+>       # write.dna(res, file = "seqs.fas", format = "fasta")
+>
+>
+>
+>       h <- sort(haplotype(res), decreasing = TRUE, what = "frequencies")
+>
+>       rownames(h) <- 1:nrow(h)
+>
+>
+>
+>     }
+>
+>
+> ## Output
+>
+>
+> h
+>
+>
+> Haplotypes extracted from: res
+>
+>
+>     Number of haplotypes: 5
+>
+>          Sequence length: 500
+>
+>
+> Haplotype labels and frequencies:
+>
+>
+>   1  2  3  4  5
+>
+> 96  1  1  1  1
+>
+>
+>
+> If the code is run multiple times (without the seed), the same pattern
+> emerges: h is always skewed toward the most dominant haplotype.
+>
+>
+> Is there a way that you've implemented in haploGen() (and that I have
+> potentially glossed over) that gives different trends each time the code is
+> run?
+>
+>
+> For example, I want to be able to run the code (without seed) and get
+> something like
+>
+>
+> h
+>
+>
+> Haplotypes extracted from: res
+>
+>
+>     Number of haplotypes: 5
+>
+>          Sequence length: 500
+>
+>
+> Haplotype labels and frequencies:
+>
+>
+>   1    2    3    4   5
+>
+> 35  15  25  20  5
+>
+>
+>
+> haploGen() does exactly this. Each time haploGen() is run, a different
+> distribution for h  is outputted. I just want to emulate what you have
+> done, but am stuck at this roadblock and I m uncertain of what is causing
+> this issue.
+>
+>
+> Note: I am just wanting to generalize your approach to generate DNA
+> sequences (not necessarily for outbreak modelling).
+>
+>
+> Can you please shed some light?
+>
+>
+>
+> Thank you in advance.
+>
+>
+>
+> Sincerely,
+>
+>
+> Jarrett Phillips
+> -------------- next part --------------
+> An HTML attachment was scrubbed...
+> URL: <
+> http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20180926/408416d5/attachment-0001.html
+> >
+>
+> ------------------------------
+>
+> Subject: Digest Footer
+>
+> _______________________________________________
+> adegenet-forum mailing list
+> adegenet-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/adegenet-forum
+>
+> ------------------------------
+>
+> End of adegenet-forum Digest, Vol 121, Issue 3
+> **********************************************
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20180927/b479f31d/attachment.html>
+

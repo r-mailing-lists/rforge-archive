@@ -1,0 +1,3618 @@
+From lawrence.michael at gene.com  Mon Nov  8 04:11:31 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sun, 7 Nov 2010 19:11:31 -0800
+Subject: [RQt-devel] Qt 4.7 and QtDeclarative
+Message-ID: <AANLkTikkkB0z3VkgJe9EMtZDc5xL4uoguxyzMPv4bpnt@mail.gmail.com>
+
+Hi guys,
+
+Just tried qtbase with Qt 4.7, and things seem to work. I just added support
+for a new module in 4.7: QtDeclarative. It embeds a new declarative
+Javascript/JSON inspired language called QML. You can read about it here:
+http://en.wikipedia.org/wiki/QML. Basically, it makes it easy to write
+dynamic UI's by binding properties together, connecting signals to slots,
+etc. Actual javascript can be embedded for more complex logic. New types can
+be defined with signals, properties and slots, and R can interact with these
+as with any other QObject. The reverse is also possible: R can assign
+objects (even of a class defined within R) into the QML evaluation context.
+This is part of a growing trend towards Javascript-driven UI's on the
+desktop, like Google's Chrome OS and Gnome 3.0 (
+http://live.gnome.org/GnomeShell).
+
+This could be useful, for example, for layering a UI over the pipeline being
+developed in the cranvas package. The dynamic binding of properties is a key
+feature, and that's essentially what we were aiming at with mutaframe in the
+plumbr package. That is, the variables in the mutaframe could be dynamic.
+The missing piece is implicitly updating a pipeline stage when there is a
+change to the dependencies of the expression generating the dynamic column.
+Figuring out the dependencies probably requires static code analysis, like
+that done by Duncan's CodeDepends package.
+
+Michael
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101107/957031d4/attachment.html>
+
+From xieyihui at gmail.com  Thu Nov 11 23:48:46 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Thu, 11 Nov 2010 16:48:46 -0600
+Subject: [RQt-devel] qdrawText() crashes R
+Message-ID: <AANLkTikpX+aXU44iOWMvorpsMaa9Ero8BF2A-QL2QmnW@mail.gmail.com>
+
+Hi,
+
+I was trying to draw y-axis tick labels with qdrawText() and found
+qdrawText() can crash R when '\n' is present in the texts. A
+reproducible example is below:
+
+library(qtpaint)
+s <- qscene()
+test_layer <- qlayer(s, function(layer, painter) {
+    for(x in c(0,3,5,8,10)) {
+        qdrawText(painter, paste('x =',x), x, 5)
+    }
+    ## qdrawText(painter, 'asdf', 1,1)
+    qdrawText(painter, c('aaa\nbbb\ncdg\nqwer','qwer'), 4, c(1,5),
+halign='right', valign='center')
+}, limits=qrect(0,0,10,10))
+qplotView(s)
+
+
+Whenever I ran this code, R will crash. When I was lucky that R did
+not crash immediately, I could minimize the window to crash R again.
+Any ideas?
+
+Thanks!
+
+> *** glibc detected *** /usr/local/lib64/R/bin/exec/R: double free or corruption (!prev): 0x00000000043d31e0 ***
+======= Backtrace: =========
+/lib/libc.so.6(+0x774b6)[0x7f46415634b6]
+/lib/libc.so.6(cfree+0x73)[0x7f4641569c83]
+/usr/lib/nvidia-current/libGL.so.1(+0x992ff)[0x7f46388472ff]
+======= Memory map: ========
+00400000-00401000 r-xp 00000000 08:01 131789
+  /usr/local/lib64/R/bin/exec/R
+00600000-00601000 r--p 00000000 08:01 131789
+  /usr/local/lib64/R/bin/exec/R
+00601000-00602000 rw-p 00001000 08:01 131789
+  /usr/local/lib64/R/bin/exec/R
+022aa000-04576000 rw-p 00000000 00:00 0                                  [heap]
+40ec6000-40ec8000 r-xs 00000000 08:01 1502
+  /tmp/gl2W9m0B (deleted)
+414cd000-414cf000 r-xs 00000000 08:01 1442
+  /tmp/glyRl1a3 (deleted)
+416ea000-41750000 rw-p 00000000 00:05 4639
+  /dev/zero
+41a8b000-41a8d000 r-xs 00000000 08:01 62
+  /tmp/glKpwGlu (deleted)
+41ae4000-41ae6000 r-xs 00000000 08:01 2682
+  /tmp/glM3OJPa (deleted)
+7f4623c00000-7f4624000000 rw-s 3b757000 00:05 7852
+  /dev/nvidia0
+7f4624000000-7f4624021000 rw-p 00000000 00:00 0
+7f4624021000-7f4628000000 ---p 00000000 00:00 0
+7f4628110000-7f462811c000 rw-p 00000000 00:00 0
+7f462811c000-7f462816a000 r--p 00000000 08:01 5512012
+  /usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf
+7f4628172000-7f4628272000 rw-s 12a46000 00:05 7852
+  /dev/nvidia0
+7f4628272000-7f46282b2000 rw-s 18c3a000 00:05 7852
+  /dev/nvidia0
+7f46282b2000-7f46282d2000 rw-s 2f79e000 00:05 7852
+  /dev/nvidia0
+7f46282d2000-7f4628346000 r-xp 00000000 08:01 1706123
+  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+7f4628346000-7f4628545000 ---p 00074000 08:01 1706123
+  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+7f4628545000-7f4628548000 r--p 00073000 08:01 1706123
+  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+7f4628548000-7f462854e000 rw-p 00076000 08:01 1706123
+  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+7f462854e000-7f462854f000 ---p 00000000 00:00 0
+7f462854f000-7f4628d9f000 rw-p 00000000 00:00 0
+7f4628d9f000-7f4628db1000 r-xp 00000000 08:01 665470
+  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+7f4628db1000-7f4628fb1000 ---p 00012000 08:01 665470
+  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+7f4628fb1000-7f4628fb2000 r--p 00012000 08:01 665470
+  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+7f4628fb2000-7f4628fb3000 rw-p 00013000 08:01 665470
+  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+7f4628fb3000-7f4629002000 r--p 00000000 08:01 918237
+  /usr/share/fonts/truetype/ttf-dejavu/DejaVuSansMono.ttf
+7f4629002000-7f4629004000 r-xp 00000000 08:01 677948
+  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+7f4629004000-7f4629203000 ---p 00002000 08:01 677948
+  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+7f4629203000-7f4629204000 r--p 00001000 08:01 677948
+  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+7f4629204000-7f4629205000 rw-p 00002000 08:01 677948
+  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+7f4629205000-7f4629230000 r-xp 00000000 08:01 673769
+  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+7f4629230000-7f4629430000 ---p 0002b000 08:01 673769
+  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+7f4629430000-7f4629431000 r--p 0002b000 08:01 673769
+  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+7f4629431000-7f4629432000 rw-p 0002c000 08:01 673769
+  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+7f4629432000-7f4629436000 r-xp 00000000 08:01 1776
+  /usr/lib/libcanberra-gtk.so.0.1.6
+7f4629436000-7f4629635000 ---p 00004000 08:01 1776
+  /usr/lib/libcanberra-gtk.so.0.1.6
+7f4629635000-7f4629636000 r--p 00003000 08:01 1776
+  /usr/lib/libcanberra-gtk.so.0.1.6
+7f4629636000-7f4629637000 rw-p 00004000 08:01 1776
+  /usr/lib/libcanberra-gtk.so.0.1.6
+7f4629637000-7f462963c000 r-xp 00000000 08:01 673294
+  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+7f462963c000-7f462983c000 ---p 00005000 08:01 673294
+  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+7f462983c000-7f462983d000 r--p 00005000 08:01 673294
+  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+7f462983d000-7f462983e000 rw-p 00006000 08:01 673294
+  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+7f462983e000-7f4629841000 r-xp 00000000 08:01 3177
+  /lib/libgpg-error.so.0.4.0
+7f4629841000-7f4629a40000 ---p 00003000 08:01 3177
+  /lib/libgpg-error.so.0.4.0
+7f4629a40000-7f4629a41000 r--p 00002000 08:01 3177
+  /lib/libgpg-error.so.0.4.0
+7f4629a41000-7f4629a42000 rw-p 00003000 08:01 3177
+  /lib/libgpg-error.so.0.4.0
+7f4629a42000-7f4629a52000 r-xp 00000000 08:01 1832
+  /usr/lib/libtasn1.so.3.1.9
+7f4629a52000-7f4629c51000 ---p 00010000 08:01 1832
+  /usr/lib/libtasn1.so.3.1.9
+7f4629c51000-7f4629c52000 r--p 0000f000 08:01 1832
+  /usr/lib/libtasn1.so.3.1.9
+7f4629c52000-7f4629c53000 rw-p 00010000 08:01 1832
+  /usr/lib/libtasn1.so.3.1.9
+7f4629c53000-7f4629c5b000 r-xp 00000000 08:01 2764
+  /usr/lib/libltdl.so.7.2.1
+7f4629c5b000-7f4629e5b000 ---p 00008000 08:01 2764
+  /usr/lib/libltdl.so.7.2.1
+7f4629e5b000-7f4629e5c000 r--p 00008000 08:01 2764
+  /usr/lib/libltdl.so.7.2.1
+7f4629e5c000-7f4629e5d000 rw-p 00009000 08:01 2764
+  /usr/lib/libltdl.so.7.2.1
+7f4629e5d000-7f4629e6b000 r-xp 00000000 08:01 4124
+  /usr/lib/libtdb.so.1.2.1
+7f4629e6b000-7f462a06a000 ---p 0000e000 08:01 4124
+  /usr/lib/libtdb.so.1.2.1
+7f462a06a000-7f462a06b000 r--p 0000d000 08:01 4124
+  /usr/lib/libtdb.so.1.2.1
+7f462a06b000-7f462a06c000 rw-p 0000e000 08:01 4124
+  /usr/lib/libtdb.so.1.2.1
+7f462a06c000-7f462a073000 r-xp 00000000 08:01 4865
+  /usr/lib/libvorbisfile.so.3.3.2
+7f462a073000-7f462a272000 ---p 00007000 08:01 4865
+  /usr/lib/libvorbisfile.so.3.3.2
+7f462a272000-7f462a273000 r--p 00006000 08:01 4865
+  /usr/lib/libvorbisfile.so.3.3.2
+7f462a273000-7f462a274000 rw-p 00007000 08:01 4865
+  /usr/lib/libvorbisfile.so.3.3.2
+7f462a274000-7f462a2e8000 r-xp 00000000 08:01 3636
+  /lib/libgcrypt.so.11.5.3
+7f462a2e8000-7f462a4e8000 ---p 00074000 08:01 3636
+  /lib/libgcrypt.so.11.5.3
+7f462a4e8000-7f462a4e9000 r--p 00074000 08:01 3636
+  /lib/libgcrypt.so.11.5.3
+7f462a4e9000-7f462a4ec000 rw-p 00075000 08:01 3636
+  /lib/libgcrypt.so.11.5.3
+7f462a4ec000-7f462a4ee000 r-xp 00000000 08:01 2830
+  /lib/libutil-2.12.1.so
+7f462a4ee000-7f462a6ed000 ---p 00002000 08:01 2830
+  /lib/libutil-2.12.1.so
+7f462a6ed000-7f462a6ee000 r--p 00001000 08:01 2830
+  /lib/libutil-2.12.1.so
+7f462a6ee000-7f462a6ef000 rw-p 00002000
+Process R aborted at Thu Nov 11 16:43:38 2010
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+From yintengfei at gmail.com  Fri Nov 12 00:24:39 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Thu, 11 Nov 2010 17:24:39 -0600
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+Message-ID: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+
+Hi
+
+Here comes another question with text, please see the attached  code below,
+only rect could be resized,  when I call v$scale()
+
+text, circle doesn't change. it happens to visnab, the circular view, when I
+scale the view, every thing resize but the text, it's still in the same
+size.
+
+library(qtpaint)
+s <- qscene()
+test_layer <- qlayer(s,function(layer,painter){
+  qdrawRect(painter,30,30,70,70,stroke="blue")
+  qdrawCircle(painter,50,50,20,stroke="red")
+  qdrawText(painter,"TEST",50,50)
+},limits=qrect(0,0,100,100))
+v <- qplotView(s)
+v$show()
+
+v$scale(1.5,1.5)
+
+Thanks
+
+Tengfei
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101111/b4638edc/attachment.htm>
+
+From yintengfei at gmail.com  Fri Nov 12 00:26:17 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Thu, 11 Nov 2010 17:26:17 -0600
+Subject: [RQt-devel] qdrawText() crashes R
+In-Reply-To: <AANLkTikpX+aXU44iOWMvorpsMaa9Ero8BF2A-QL2QmnW@mail.gmail.com>
+References: <AANLkTikpX+aXU44iOWMvorpsMaa9Ero8BF2A-QL2QmnW@mail.gmail.com>
+Message-ID: <AANLkTi=BL8mf4uJCw01O_fNGG+AYhTHpmAJPOJp_i6qz@mail.gmail.com>
+
+Same thing happens on my laptop, when I resize it.
+
+*** caught segfault ***
+address 0xffffffff00000008, cause 'memory not mapped'
+
+Traceback:
+ 1: .Call("qt_qdrawText_Painter", p, as.character(text), as.numeric(x),
+as.numeric(y), as.integer(hflag + vflag), as.numeric(rot),
+.normArgStroke(p, color, m))
+ 2: drawText(text)
+ 3: qdrawText(painter, c("aaa\nbbb\ncdg\nqwer", "qwer"), 4, c(1,     5),
+halign = "right", valign = "center")
+ 4: function (layer, painter) {    for (x in c(0, 3, 5, 8, 10)) {
+ qdrawText(painter, paste("x =", x), x, 5)    }    qdrawText(painter,
+c("aaa\nbbb\ncdg\nqwer", "qwer"), 4, c(1,         5), halign = "right",
+valign = "center")}(<environment>, <pointer: 0x47b0490>)
+
+Possible actions:
+1: abort (with core dump, if enabled)
+2: normal R exit
+3: exit R without saving workspace
+4: exit R saving workspace
+Selection:
+
+
+On Thu, Nov 11, 2010 at 4:48 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+
+> Hi,
+>
+> I was trying to draw y-axis tick labels with qdrawText() and found
+> qdrawText() can crash R when '\n' is present in the texts. A
+> reproducible example is below:
+>
+> library(qtpaint)
+> s <- qscene()
+> test_layer <- qlayer(s, function(layer, painter) {
+>    for(x in c(0,3,5,8,10)) {
+>        qdrawText(painter, paste('x =',x), x, 5)
+>    }
+>    ## qdrawText(painter, 'asdf', 1,1)
+>    qdrawText(painter, c('aaa\nbbb\ncdg\nqwer','qwer'), 4, c(1,5),
+> halign='right', valign='center')
+> }, limits=qrect(0,0,10,10))
+> qplotView(s)
+>
+>
+> Whenever I ran this code, R will crash. When I was lucky that R did
+> not crash immediately, I could minimize the window to crash R again.
+> Any ideas?
+>
+> Thanks!
+>
+> > *** glibc detected *** /usr/local/lib64/R/bin/exec/R: double free or
+> corruption (!prev): 0x00000000043d31e0 ***
+> ======= Backtrace: =========
+> /lib/libc.so.6(+0x774b6)[0x7f46415634b6]
+> /lib/libc.so.6(cfree+0x73)[0x7f4641569c83]
+> /usr/lib/nvidia-current/libGL.so.1(+0x992ff)[0x7f46388472ff]
+> ======= Memory map: ========
+> 00400000-00401000 r-xp 00000000 08:01 131789
+>  /usr/local/lib64/R/bin/exec/R
+> 00600000-00601000 r--p 00000000 08:01 131789
+>  /usr/local/lib64/R/bin/exec/R
+> 00601000-00602000 rw-p 00001000 08:01 131789
+>  /usr/local/lib64/R/bin/exec/R
+> 022aa000-04576000 rw-p 00000000 00:00 0
+>  [heap]
+> 40ec6000-40ec8000 r-xs 00000000 08:01 1502
+>  /tmp/gl2W9m0B (deleted)
+> 414cd000-414cf000 r-xs 00000000 08:01 1442
+>  /tmp/glyRl1a3 (deleted)
+> 416ea000-41750000 rw-p 00000000 00:05 4639
+>  /dev/zero
+> 41a8b000-41a8d000 r-xs 00000000 08:01 62
+>  /tmp/glKpwGlu (deleted)
+> 41ae4000-41ae6000 r-xs 00000000 08:01 2682
+>  /tmp/glM3OJPa (deleted)
+> 7f4623c00000-7f4624000000 rw-s 3b757000 00:05 7852
+>  /dev/nvidia0
+> 7f4624000000-7f4624021000 rw-p 00000000 00:00 0
+> 7f4624021000-7f4628000000 ---p 00000000 00:00 0
+> 7f4628110000-7f462811c000 rw-p 00000000 00:00 0
+> 7f462811c000-7f462816a000 r--p 00000000 08:01 5512012
+>  /usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf
+> 7f4628172000-7f4628272000 rw-s 12a46000 00:05 7852
+>  /dev/nvidia0
+> 7f4628272000-7f46282b2000 rw-s 18c3a000 00:05 7852
+>  /dev/nvidia0
+> 7f46282b2000-7f46282d2000 rw-s 2f79e000 00:05 7852
+>  /dev/nvidia0
+> 7f46282d2000-7f4628346000 r-xp 00000000 08:01 1706123
+>
+>  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+> 7f4628346000-7f4628545000 ---p 00074000 08:01 1706123
+>
+>  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+> 7f4628545000-7f4628548000 r--p 00073000 08:01 1706123
+>
+>  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+> 7f4628548000-7f462854e000 rw-p 00076000 08:01 1706123
+>
+>  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+> 7f462854e000-7f462854f000 ---p 00000000 00:00 0
+> 7f462854f000-7f4628d9f000 rw-p 00000000 00:00 0
+> 7f4628d9f000-7f4628db1000 r-xp 00000000 08:01 665470
+>  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+> 7f4628db1000-7f4628fb1000 ---p 00012000 08:01 665470
+>  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+> 7f4628fb1000-7f4628fb2000 r--p 00012000 08:01 665470
+>  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+> 7f4628fb2000-7f4628fb3000 rw-p 00013000 08:01 665470
+>  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+> 7f4628fb3000-7f4629002000 r--p 00000000 08:01 918237
+>  /usr/share/fonts/truetype/ttf-dejavu/DejaVuSansMono.ttf
+> 7f4629002000-7f4629004000 r-xp 00000000 08:01 677948
+>  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+> 7f4629004000-7f4629203000 ---p 00002000 08:01 677948
+>  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+> 7f4629203000-7f4629204000 r--p 00001000 08:01 677948
+>  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+> 7f4629204000-7f4629205000 rw-p 00002000 08:01 677948
+>  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+> 7f4629205000-7f4629230000 r-xp 00000000 08:01 673769
+>  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+> 7f4629230000-7f4629430000 ---p 0002b000 08:01 673769
+>  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+> 7f4629430000-7f4629431000 r--p 0002b000 08:01 673769
+>  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+> 7f4629431000-7f4629432000 rw-p 0002c000 08:01 673769
+>  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+> 7f4629432000-7f4629436000 r-xp 00000000 08:01 1776
+>  /usr/lib/libcanberra-gtk.so.0.1.6
+> 7f4629436000-7f4629635000 ---p 00004000 08:01 1776
+>  /usr/lib/libcanberra-gtk.so.0.1.6
+> 7f4629635000-7f4629636000 r--p 00003000 08:01 1776
+>  /usr/lib/libcanberra-gtk.so.0.1.6
+> 7f4629636000-7f4629637000 rw-p 00004000 08:01 1776
+>  /usr/lib/libcanberra-gtk.so.0.1.6
+> 7f4629637000-7f462963c000 r-xp 00000000 08:01 673294
+>  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+> 7f462963c000-7f462983c000 ---p 00005000 08:01 673294
+>  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+> 7f462983c000-7f462983d000 r--p 00005000 08:01 673294
+>  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+> 7f462983d000-7f462983e000 rw-p 00006000 08:01 673294
+>  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+> 7f462983e000-7f4629841000 r-xp 00000000 08:01 3177
+>  /lib/libgpg-error.so.0.4.0
+> 7f4629841000-7f4629a40000 ---p 00003000 08:01 3177
+>  /lib/libgpg-error.so.0.4.0
+> 7f4629a40000-7f4629a41000 r--p 00002000 08:01 3177
+>  /lib/libgpg-error.so.0.4.0
+> 7f4629a41000-7f4629a42000 rw-p 00003000 08:01 3177
+>  /lib/libgpg-error.so.0.4.0
+> 7f4629a42000-7f4629a52000 r-xp 00000000 08:01 1832
+>  /usr/lib/libtasn1.so.3.1.9
+> 7f4629a52000-7f4629c51000 ---p 00010000 08:01 1832
+>  /usr/lib/libtasn1.so.3.1.9
+> 7f4629c51000-7f4629c52000 r--p 0000f000 08:01 1832
+>  /usr/lib/libtasn1.so.3.1.9
+> 7f4629c52000-7f4629c53000 rw-p 00010000 08:01 1832
+>  /usr/lib/libtasn1.so.3.1.9
+> 7f4629c53000-7f4629c5b000 r-xp 00000000 08:01 2764
+>  /usr/lib/libltdl.so.7.2.1
+> 7f4629c5b000-7f4629e5b000 ---p 00008000 08:01 2764
+>  /usr/lib/libltdl.so.7.2.1
+> 7f4629e5b000-7f4629e5c000 r--p 00008000 08:01 2764
+>  /usr/lib/libltdl.so.7.2.1
+> 7f4629e5c000-7f4629e5d000 rw-p 00009000 08:01 2764
+>  /usr/lib/libltdl.so.7.2.1
+> 7f4629e5d000-7f4629e6b000 r-xp 00000000 08:01 4124
+>  /usr/lib/libtdb.so.1.2.1
+> 7f4629e6b000-7f462a06a000 ---p 0000e000 08:01 4124
+>  /usr/lib/libtdb.so.1.2.1
+> 7f462a06a000-7f462a06b000 r--p 0000d000 08:01 4124
+>  /usr/lib/libtdb.so.1.2.1
+> 7f462a06b000-7f462a06c000 rw-p 0000e000 08:01 4124
+>  /usr/lib/libtdb.so.1.2.1
+> 7f462a06c000-7f462a073000 r-xp 00000000 08:01 4865
+>  /usr/lib/libvorbisfile.so.3.3.2
+> 7f462a073000-7f462a272000 ---p 00007000 08:01 4865
+>  /usr/lib/libvorbisfile.so.3.3.2
+> 7f462a272000-7f462a273000 r--p 00006000 08:01 4865
+>  /usr/lib/libvorbisfile.so.3.3.2
+> 7f462a273000-7f462a274000 rw-p 00007000 08:01 4865
+>  /usr/lib/libvorbisfile.so.3.3.2
+> 7f462a274000-7f462a2e8000 r-xp 00000000 08:01 3636
+>  /lib/libgcrypt.so.11.5.3
+> 7f462a2e8000-7f462a4e8000 ---p 00074000 08:01 3636
+>  /lib/libgcrypt.so.11.5.3
+> 7f462a4e8000-7f462a4e9000 r--p 00074000 08:01 3636
+>  /lib/libgcrypt.so.11.5.3
+> 7f462a4e9000-7f462a4ec000 rw-p 00075000 08:01 3636
+>  /lib/libgcrypt.so.11.5.3
+> 7f462a4ec000-7f462a4ee000 r-xp 00000000 08:01 2830
+>  /lib/libutil-2.12.1.so
+> 7f462a4ee000-7f462a6ed000 ---p 00002000 08:01 2830
+>  /lib/libutil-2.12.1.so
+> 7f462a6ed000-7f462a6ee000 r--p 00001000 08:01 2830
+>  /lib/libutil-2.12.1.so
+> 7f462a6ee000-7f462a6ef000 rw-p 00002000
+> Process R aborted at Thu Nov 11 16:43:38 2010
+>
+> Regards,
+> Yihui
+> --
+> Yihui Xie <xieyihui at gmail.com>
+> Phone: 515-294-2465 Web: http://yihui.name
+> Department of Statistics, Iowa State University
+> 2215 Snedecor Hall, Ames, IA
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101111/b18c1862/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Fri Nov 12 00:39:34 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 11 Nov 2010 15:39:34 -0800
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+Message-ID: <AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+
+This is by design. If this didn't work that way, then when the user zoomed
+into a chromosome, for example, the text labels would get really stretched
+out. Glyphs are the same way (they're essentially fancy characters). Zooming
+into a scatterplot should not make the glyphs larger. Circles (after much
+debate inside my head) behave the same as glyphs. This is because their
+radius, like in a bubble plot, is derived from something other than the X
+and Y axes.
+
+Shapes however, like rectangles, polygons and paths, are zoomed. You expect
+a mosaic plot rectangle or a map polygon to scale with the plot.
+
+Are you sure you really need the text to scale with the zoom? Deepayan and I
+decided a long time ago that zooming does not behave like a "magnifying
+glass." It rescales the plot.
+
+There are some ways to get around this if you really want to:
+- Draw the text as a path.
+- Use the "render" method on the scene to render to a QPicture, rescale that
+and display it. This is how I imagined someone making a magnifying glass.
+QPicture is a vectorized representation, so no nasty scaling artifacts are
+introduced.
+
+Michael
+
+On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+> Hi
+>
+> Here comes another question with text, please see the attached  code below,
+> only rect could be resized,  when I call v$scale()
+>
+> text, circle doesn't change. it happens to visnab, the circular view, when
+> I scale the view, every thing resize but the text, it's still in the same
+> size.
+>
+> library(qtpaint)
+> s <- qscene()
+> test_layer <- qlayer(s,function(layer,painter){
+>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>   qdrawCircle(painter,50,50,20,stroke="red")
+>   qdrawText(painter,"TEST",50,50)
+> },limits=qrect(0,0,100,100))
+> v <- qplotView(s)
+> v$show()
+>
+> v$scale(1.5,1.5)
+>
+> Thanks
+>
+> Tengfei
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101111/6e8664ee/attachment.htm>
+
+From yintengfei at gmail.com  Fri Nov 12 01:14:13 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Thu, 11 Nov 2010 18:14:13 -0600
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+Message-ID: <AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+
+On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <lawrence.michael at gene.com
+> wrote:
+
+> This is by design. If this didn't work that way, then when the user zoomed
+> into a chromosome, for example, the text labels would get really stretched
+> out. Glyphs are the same way (they're essentially fancy characters). Zooming
+> into a scatterplot should not make the glyphs larger. Circles (after much
+> debate inside my head) behave the same as glyphs. This is because their
+> radius, like in a bubble plot, is derived from something other than the X
+> and Y axes.
+>
+> Shapes however, like rectangles, polygons and paths, are zoomed. You expect
+> a mosaic plot rectangle or a map polygon to scale with the plot.
+>
+>
+This make sense to me, in most cases, i guess people won't expect the circle
+or text to be  zoomed in.
+
+Are you sure you really need the text to scale with the zoom? Deepayan and I
+> decided a long time ago that zooming does not behave like a "magnifying
+> glass." It rescales the plot.
+>
+>
+No, you don't have to change that, it's convenient so far, I am just curious
+why this doesn't work for text and circle, because in other rare case, I
+will draw very small text as labels of axis for one circular track, or if I
+draw points around the circular track, I am still expecting the points will
+be zoomed in when I rescale the view. I guess I am confused the "rescale of
+the view" with the one you defined with Deepayan, but it make sense to me.
+
+There are some ways to get around this if you really want to:
+> - Draw the text as a path.
+> - Use the "render" method on the scene to render to a QPicture, rescale
+> that and display it. This is how I imagined someone making a magnifying
+> glass. QPicture is a vectorized representation, so no nasty scaling
+> artifacts are introduced.
+>
+
+Thanks, I think I need to do it in this way, if I really need them to be
+rescaled.  I never try QPicture before, I will take a look at it.
+
+
+> Michael
+>
+> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>
+>> Hi
+>>
+>> Here comes another question with text, please see the attached  code
+>> below, only rect could be resized,  when I call v$scale()
+>>
+>> text, circle doesn't change. it happens to visnab, the circular view, when
+>> I scale the view, every thing resize but the text, it's still in the same
+>> size.
+>>
+>> library(qtpaint)
+>> s <- qscene()
+>> test_layer <- qlayer(s,function(layer,painter){
+>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>   qdrawText(painter,"TEST",50,50)
+>> },limits=qrect(0,0,100,100))
+>> v <- qplotView(s)
+>> v$show()
+>>
+>> v$scale(1.5,1.5)
+>>
+>> Thanks
+>>
+>> Tengfei
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>>
+>
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101111/bad13479/attachment.htm>
+
+From yintengfei at gmail.com  Fri Nov 12 04:32:25 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Thu, 11 Nov 2010 21:32:25 -0600
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+Message-ID: <AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+
+So even when you use view$rotate(), the text direction won't change..is this
+also what we expected to see?
+
+and by the way, do you know any way to change to text size, the use case
+here is sth like "tag cloud", but I guess I can draw text as path to solve
+this problem.
+
+On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+>
+>
+> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+> lawrence.michael at gene.com> wrote:
+>
+>> This is by design. If this didn't work that way, then when the user zoomed
+>> into a chromosome, for example, the text labels would get really stretched
+>> out. Glyphs are the same way (they're essentially fancy characters). Zooming
+>> into a scatterplot should not make the glyphs larger. Circles (after much
+>> debate inside my head) behave the same as glyphs. This is because their
+>> radius, like in a bubble plot, is derived from something other than the X
+>> and Y axes.
+>>
+>> Shapes however, like rectangles, polygons and paths, are zoomed. You
+>> expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>
+>>
+> This make sense to me, in most cases, i guess people won't expect the
+> circle or text to be  zoomed in.
+>
+> Are you sure you really need the text to scale with the zoom? Deepayan and
+>> I decided a long time ago that zooming does not behave like a "magnifying
+>> glass." It rescales the plot.
+>>
+>>
+> No, you don't have to change that, it's convenient so far, I am just
+> curious why this doesn't work for text and circle, because in other rare
+> case, I will draw very small text as labels of axis for one circular track,
+> or if I draw points around the circular track, I am still expecting the
+> points will be zoomed in when I rescale the view. I guess I am confused the
+> "rescale of the view" with the one you defined with Deepayan, but it make
+> sense to me.
+>
+> There are some ways to get around this if you really want to:
+>> - Draw the text as a path.
+>> - Use the "render" method on the scene to render to a QPicture, rescale
+>> that and display it. This is how I imagined someone making a magnifying
+>> glass. QPicture is a vectorized representation, so no nasty scaling
+>> artifacts are introduced.
+>>
+>
+> Thanks, I think I need to do it in this way, if I really need them to be
+> rescaled.  I never try QPicture before, I will take a look at it.
+>
+>
+>> Michael
+>>
+>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>
+>>> Hi
+>>>
+>>> Here comes another question with text, please see the attached  code
+>>> below, only rect could be resized,  when I call v$scale()
+>>>
+>>> text, circle doesn't change. it happens to visnab, the circular view,
+>>> when I scale the view, every thing resize but the text, it's still in the
+>>> same size.
+>>>
+>>> library(qtpaint)
+>>> s <- qscene()
+>>> test_layer <- qlayer(s,function(layer,painter){
+>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>   qdrawText(painter,"TEST",50,50)
+>>> },limits=qrect(0,0,100,100))
+>>> v <- qplotView(s)
+>>> v$show()
+>>>
+>>> v$scale(1.5,1.5)
+>>>
+>>> Thanks
+>>>
+>>> Tengfei
+>>> --
+>>> Tengfei Yin
+>>> MCDB PhD student
+>>> 1620 Howe Hall, 2274,
+>>> Iowa State University
+>>> Ames, IA,50011-2274
+>>> Homepage: www.tengfei.name
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> Qtinterfaces-devel mailing list
+>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>
+>>>
+>>
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101111/67891c74/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Fri Nov 12 05:27:21 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 11 Nov 2010 20:27:21 -0800
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+Message-ID: <AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+
+On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+> So even when you use view$rotate(), the text direction won't change..is
+> this also what we expected to see?
+>
+>
+Yes. I can see how that may not always be desirable, but it would be tough
+to work around it. That is, I cannot tease out the rotation from the rest of
+the transformation. In the case of a word cloud, I think it would be
+desirable, i.e., one is thinking of the text as glyphs that are independent
+of the scales.
+
+
+> and by the way, do you know any way to change to text size, the use case
+> here is sth like "tag cloud", but I guess I can draw text as path to solve
+> this problem.
+>
+>
+Just change the font.. do you want some sort of vectorized "cex" argument to
+qdrawText? Might not be that hard to add.
+
+Michael
+
+
+>
+> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>
+>>
+>>
+>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>> lawrence.michael at gene.com> wrote:
+>>
+>>> This is by design. If this didn't work that way, then when the user
+>>> zoomed into a chromosome, for example, the text labels would get really
+>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>> is because their radius, like in a bubble plot, is derived from something
+>>> other than the X and Y axes.
+>>>
+>>> Shapes however, like rectangles, polygons and paths, are zoomed. You
+>>> expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>
+>>>
+>> This make sense to me, in most cases, i guess people won't expect the
+>> circle or text to be  zoomed in.
+>>
+>> Are you sure you really need the text to scale with the zoom? Deepayan and
+>>> I decided a long time ago that zooming does not behave like a "magnifying
+>>> glass." It rescales the plot.
+>>>
+>>>
+>> No, you don't have to change that, it's convenient so far, I am just
+>> curious why this doesn't work for text and circle, because in other rare
+>> case, I will draw very small text as labels of axis for one circular track,
+>> or if I draw points around the circular track, I am still expecting the
+>> points will be zoomed in when I rescale the view. I guess I am confused the
+>> "rescale of the view" with the one you defined with Deepayan, but it make
+>> sense to me.
+>>
+>> There are some ways to get around this if you really want to:
+>>> - Draw the text as a path.
+>>> - Use the "render" method on the scene to render to a QPicture, rescale
+>>> that and display it. This is how I imagined someone making a magnifying
+>>> glass. QPicture is a vectorized representation, so no nasty scaling
+>>> artifacts are introduced.
+>>>
+>>
+>> Thanks, I think I need to do it in this way, if I really need them to be
+>> rescaled.  I never try QPicture before, I will take a look at it.
+>>
+>>
+>>> Michael
+>>>
+>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>
+>>>> Hi
+>>>>
+>>>> Here comes another question with text, please see the attached  code
+>>>> below, only rect could be resized,  when I call v$scale()
+>>>>
+>>>> text, circle doesn't change. it happens to visnab, the circular view,
+>>>> when I scale the view, every thing resize but the text, it's still in the
+>>>> same size.
+>>>>
+>>>> library(qtpaint)
+>>>> s <- qscene()
+>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>   qdrawText(painter,"TEST",50,50)
+>>>> },limits=qrect(0,0,100,100))
+>>>> v <- qplotView(s)
+>>>> v$show()
+>>>>
+>>>> v$scale(1.5,1.5)
+>>>>
+>>>> Thanks
+>>>>
+>>>> Tengfei
+>>>> --
+>>>> Tengfei Yin
+>>>> MCDB PhD student
+>>>> 1620 Howe Hall, 2274,
+>>>> Iowa State University
+>>>> Ames, IA,50011-2274
+>>>> Homepage: www.tengfei.name
+>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> Qtinterfaces-devel mailing list
+>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>
+>>>>
+>>>
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101111/6f48106a/attachment.htm>
+
+From lawrence.michael at gene.com  Fri Nov 12 05:28:58 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 11 Nov 2010 20:28:58 -0800
+Subject: [RQt-devel] qdrawText() crashes R
+In-Reply-To: <AANLkTi=BL8mf4uJCw01O_fNGG+AYhTHpmAJPOJp_i6qz@mail.gmail.com>
+References: <AANLkTikpX+aXU44iOWMvorpsMaa9Ero8BF2A-QL2QmnW@mail.gmail.com>
+	<AANLkTi=BL8mf4uJCw01O_fNGG+AYhTHpmAJPOJp_i6qz@mail.gmail.com>
+Message-ID: <AANLkTinYXmGN7UdSZgkjfq2VM5-DxZeJFYiKLWTuPtfR@mail.gmail.com>
+
+This should be fixed...
+
+On Thu, Nov 11, 2010 at 3:26 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+> Same thing happens on my laptop, when I resize it.
+>
+> *** caught segfault ***
+> address 0xffffffff00000008, cause 'memory not mapped'
+>
+> Traceback:
+>  1: .Call("qt_qdrawText_Painter", p, as.character(text), as.numeric(x),
+> as.numeric(y), as.integer(hflag + vflag), as.numeric(rot),
+> .normArgStroke(p, color, m))
+>  2: drawText(text)
+>  3: qdrawText(painter, c("aaa\nbbb\ncdg\nqwer", "qwer"), 4, c(1,     5),
+> halign = "right", valign = "center")
+>  4: function (layer, painter) {    for (x in c(0, 3, 5, 8, 10)) {
+>  qdrawText(painter, paste("x =", x), x, 5)    }    qdrawText(painter,
+> c("aaa\nbbb\ncdg\nqwer", "qwer"), 4, c(1,         5), halign = "right",
+> valign = "center")}(<environment>, <pointer: 0x47b0490>)
+>
+> Possible actions:
+> 1: abort (with core dump, if enabled)
+> 2: normal R exit
+> 3: exit R without saving workspace
+> 4: exit R saving workspace
+> Selection:
+>
+>
+> On Thu, Nov 11, 2010 at 4:48 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>
+>> Hi,
+>>
+>> I was trying to draw y-axis tick labels with qdrawText() and found
+>> qdrawText() can crash R when '\n' is present in the texts. A
+>> reproducible example is below:
+>>
+>> library(qtpaint)
+>> s <- qscene()
+>> test_layer <- qlayer(s, function(layer, painter) {
+>>    for(x in c(0,3,5,8,10)) {
+>>        qdrawText(painter, paste('x =',x), x, 5)
+>>    }
+>>    ## qdrawText(painter, 'asdf', 1,1)
+>>    qdrawText(painter, c('aaa\nbbb\ncdg\nqwer','qwer'), 4, c(1,5),
+>> halign='right', valign='center')
+>> }, limits=qrect(0,0,10,10))
+>> qplotView(s)
+>>
+>>
+>> Whenever I ran this code, R will crash. When I was lucky that R did
+>> not crash immediately, I could minimize the window to crash R again.
+>> Any ideas?
+>>
+>> Thanks!
+>>
+>> > *** glibc detected *** /usr/local/lib64/R/bin/exec/R: double free or
+>> corruption (!prev): 0x00000000043d31e0 ***
+>> ======= Backtrace: =========
+>> /lib/libc.so.6(+0x774b6)[0x7f46415634b6]
+>> /lib/libc.so.6(cfree+0x73)[0x7f4641569c83]
+>> /usr/lib/nvidia-current/libGL.so.1(+0x992ff)[0x7f46388472ff]
+>> ======= Memory map: ========
+>> 00400000-00401000 r-xp 00000000 08:01 131789
+>>  /usr/local/lib64/R/bin/exec/R
+>> 00600000-00601000 r--p 00000000 08:01 131789
+>>  /usr/local/lib64/R/bin/exec/R
+>> 00601000-00602000 rw-p 00001000 08:01 131789
+>>  /usr/local/lib64/R/bin/exec/R
+>> 022aa000-04576000 rw-p 00000000 00:00 0
+>>  [heap]
+>> 40ec6000-40ec8000 r-xs 00000000 08:01 1502
+>>  /tmp/gl2W9m0B (deleted)
+>> 414cd000-414cf000 r-xs 00000000 08:01 1442
+>>  /tmp/glyRl1a3 (deleted)
+>> 416ea000-41750000 rw-p 00000000 00:05 4639
+>>  /dev/zero
+>> 41a8b000-41a8d000 r-xs 00000000 08:01 62
+>>  /tmp/glKpwGlu (deleted)
+>> 41ae4000-41ae6000 r-xs 00000000 08:01 2682
+>>  /tmp/glM3OJPa (deleted)
+>> 7f4623c00000-7f4624000000 rw-s 3b757000 00:05 7852
+>>  /dev/nvidia0
+>> 7f4624000000-7f4624021000 rw-p 00000000 00:00 0
+>> 7f4624021000-7f4628000000 ---p 00000000 00:00 0
+>> 7f4628110000-7f462811c000 rw-p 00000000 00:00 0
+>> 7f462811c000-7f462816a000 r--p 00000000 08:01 5512012
+>>  /usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf
+>> 7f4628172000-7f4628272000 rw-s 12a46000 00:05 7852
+>>  /dev/nvidia0
+>> 7f4628272000-7f46282b2000 rw-s 18c3a000 00:05 7852
+>>  /dev/nvidia0
+>> 7f46282b2000-7f46282d2000 rw-s 2f79e000 00:05 7852
+>>  /dev/nvidia0
+>> 7f46282d2000-7f4628346000 r-xp 00000000 08:01 1706123
+>>
+>>  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+>> 7f4628346000-7f4628545000 ---p 00074000 08:01 1706123
+>>
+>>  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+>> 7f4628545000-7f4628548000 r--p 00073000 08:01 1706123
+>>
+>>  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+>> 7f4628548000-7f462854e000 rw-p 00076000 08:01 1706123
+>>
+>>  /home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+>> 7f462854e000-7f462854f000 ---p 00000000 00:00 0
+>> 7f462854f000-7f4628d9f000 rw-p 00000000 00:00 0
+>> 7f4628d9f000-7f4628db1000 r-xp 00000000 08:01 665470
+>>  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+>> 7f4628db1000-7f4628fb1000 ---p 00012000 08:01 665470
+>>  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+>> 7f4628fb1000-7f4628fb2000 r--p 00012000 08:01 665470
+>>  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+>> 7f4628fb2000-7f4628fb3000 rw-p 00013000 08:01 665470
+>>  /usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+>> 7f4628fb3000-7f4629002000 r--p 00000000 08:01 918237
+>>  /usr/share/fonts/truetype/ttf-dejavu/DejaVuSansMono.ttf
+>> 7f4629002000-7f4629004000 r-xp 00000000 08:01 677948
+>>  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+>> 7f4629004000-7f4629203000 ---p 00002000 08:01 677948
+>>  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+>> 7f4629203000-7f4629204000 r--p 00001000 08:01 677948
+>>  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+>> 7f4629204000-7f4629205000 rw-p 00002000 08:01 677948
+>>  /usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+>> 7f4629205000-7f4629230000 r-xp 00000000 08:01 673769
+>>  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+>> 7f4629230000-7f4629430000 ---p 0002b000 08:01 673769
+>>  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+>> 7f4629430000-7f4629431000 r--p 0002b000 08:01 673769
+>>  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+>> 7f4629431000-7f4629432000 rw-p 0002c000 08:01 673769
+>>  /usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+>> 7f4629432000-7f4629436000 r-xp 00000000 08:01 1776
+>>  /usr/lib/libcanberra-gtk.so.0.1.6
+>> 7f4629436000-7f4629635000 ---p 00004000 08:01 1776
+>>  /usr/lib/libcanberra-gtk.so.0.1.6
+>> 7f4629635000-7f4629636000 r--p 00003000 08:01 1776
+>>  /usr/lib/libcanberra-gtk.so.0.1.6
+>> 7f4629636000-7f4629637000 rw-p 00004000 08:01 1776
+>>  /usr/lib/libcanberra-gtk.so.0.1.6
+>> 7f4629637000-7f462963c000 r-xp 00000000 08:01 673294
+>>  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+>> 7f462963c000-7f462983c000 ---p 00005000 08:01 673294
+>>  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+>> 7f462983c000-7f462983d000 r--p 00005000 08:01 673294
+>>  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+>> 7f462983d000-7f462983e000 rw-p 00006000 08:01 673294
+>>  /usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+>> 7f462983e000-7f4629841000 r-xp 00000000 08:01 3177
+>>  /lib/libgpg-error.so.0.4.0
+>> 7f4629841000-7f4629a40000 ---p 00003000 08:01 3177
+>>  /lib/libgpg-error.so.0.4.0
+>> 7f4629a40000-7f4629a41000 r--p 00002000 08:01 3177
+>>  /lib/libgpg-error.so.0.4.0
+>> 7f4629a41000-7f4629a42000 rw-p 00003000 08:01 3177
+>>  /lib/libgpg-error.so.0.4.0
+>> 7f4629a42000-7f4629a52000 r-xp 00000000 08:01 1832
+>>  /usr/lib/libtasn1.so.3.1.9
+>> 7f4629a52000-7f4629c51000 ---p 00010000 08:01 1832
+>>  /usr/lib/libtasn1.so.3.1.9
+>> 7f4629c51000-7f4629c52000 r--p 0000f000 08:01 1832
+>>  /usr/lib/libtasn1.so.3.1.9
+>> 7f4629c52000-7f4629c53000 rw-p 00010000 08:01 1832
+>>  /usr/lib/libtasn1.so.3.1.9
+>> 7f4629c53000-7f4629c5b000 r-xp 00000000 08:01 2764
+>>  /usr/lib/libltdl.so.7.2.1
+>> 7f4629c5b000-7f4629e5b000 ---p 00008000 08:01 2764
+>>  /usr/lib/libltdl.so.7.2.1
+>> 7f4629e5b000-7f4629e5c000 r--p 00008000 08:01 2764
+>>  /usr/lib/libltdl.so.7.2.1
+>> 7f4629e5c000-7f4629e5d000 rw-p 00009000 08:01 2764
+>>  /usr/lib/libltdl.so.7.2.1
+>> 7f4629e5d000-7f4629e6b000 r-xp 00000000 08:01 4124
+>>  /usr/lib/libtdb.so.1.2.1
+>> 7f4629e6b000-7f462a06a000 ---p 0000e000 08:01 4124
+>>  /usr/lib/libtdb.so.1.2.1
+>> 7f462a06a000-7f462a06b000 r--p 0000d000 08:01 4124
+>>  /usr/lib/libtdb.so.1.2.1
+>> 7f462a06b000-7f462a06c000 rw-p 0000e000 08:01 4124
+>>  /usr/lib/libtdb.so.1.2.1
+>> 7f462a06c000-7f462a073000 r-xp 00000000 08:01 4865
+>>  /usr/lib/libvorbisfile.so.3.3.2
+>> 7f462a073000-7f462a272000 ---p 00007000 08:01 4865
+>>  /usr/lib/libvorbisfile.so.3.3.2
+>> 7f462a272000-7f462a273000 r--p 00006000 08:01 4865
+>>  /usr/lib/libvorbisfile.so.3.3.2
+>> 7f462a273000-7f462a274000 rw-p 00007000 08:01 4865
+>>  /usr/lib/libvorbisfile.so.3.3.2
+>> 7f462a274000-7f462a2e8000 r-xp 00000000 08:01 3636
+>>  /lib/libgcrypt.so.11.5.3
+>> 7f462a2e8000-7f462a4e8000 ---p 00074000 08:01 3636
+>>  /lib/libgcrypt.so.11.5.3
+>> 7f462a4e8000-7f462a4e9000 r--p 00074000 08:01 3636
+>>  /lib/libgcrypt.so.11.5.3
+>> 7f462a4e9000-7f462a4ec000 rw-p 00075000 08:01 3636
+>>  /lib/libgcrypt.so.11.5.3
+>> 7f462a4ec000-7f462a4ee000 r-xp 00000000 08:01 2830
+>>  /lib/libutil-2.12.1.so
+>> 7f462a4ee000-7f462a6ed000 ---p 00002000 08:01 2830
+>>  /lib/libutil-2.12.1.so
+>> 7f462a6ed000-7f462a6ee000 r--p 00001000 08:01 2830
+>>  /lib/libutil-2.12.1.so
+>> 7f462a6ee000-7f462a6ef000 rw-p 00002000
+>> Process R aborted at Thu Nov 11 16:43:38 2010
+>>
+>> Regards,
+>> Yihui
+>> --
+>> Yihui Xie <xieyihui at gmail.com>
+>> Phone: 515-294-2465 Web: http://yihui.name
+>> Department of Statistics, Iowa State University
+>> 2215 Snedecor Hall, Ames, IA
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101111/6e3b73fb/attachment-0001.htm>
+
+From yintengfei at gmail.com  Fri Nov 12 06:35:00 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Thu, 11 Nov 2010 23:35:00 -0600
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+	<AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+Message-ID: <AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+
+On Thu, Nov 11, 2010 at 10:27 PM, Michael Lawrence <
+lawrence.michael at gene.com> wrote:
+
+>
+>
+> On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>
+>> So even when you use view$rotate(), the text direction won't change..is
+>> this also what we expected to see?
+>>
+>>
+> Yes. I can see how that may not always be desirable, but it would be tough
+> to work around it. That is, I cannot tease out the rotation from the rest of
+> the transformation. In the case of a word cloud, I think it would be
+> desirable, i.e., one is thinking of the text as glyphs that are independent
+> of the scales.
+>
+>
+>> and by the way, do you know any way to change to text size, the use case
+>> here is sth like "tag cloud", but I guess I can draw text as path to solve
+>> this problem.
+>>
+>>
+> Just change the font.. do you want some sort of vectorized "cex" argument
+> to qdrawText? Might not be that hard to add.
+>
+
+Yes, if you don't mind spend some time on it, it will be really nice to have
+a control over the text size, e.g. when I plot a sequence data, like
+ACTGGGC....I can resize one single character  to address the mis-alignment.
+
+>
+> Michael
+>
+>
+>>
+>> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>
+>>>
+>>>
+>>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>>> lawrence.michael at gene.com> wrote:
+>>>
+>>>> This is by design. If this didn't work that way, then when the user
+>>>> zoomed into a chromosome, for example, the text labels would get really
+>>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>>> is because their radius, like in a bubble plot, is derived from something
+>>>> other than the X and Y axes.
+>>>>
+>>>> Shapes however, like rectangles, polygons and paths, are zoomed. You
+>>>> expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>>
+>>>>
+>>> This make sense to me, in most cases, i guess people won't expect the
+>>> circle or text to be  zoomed in.
+>>>
+>>> Are you sure you really need the text to scale with the zoom? Deepayan
+>>>> and I decided a long time ago that zooming does not behave like a
+>>>> "magnifying glass." It rescales the plot.
+>>>>
+>>>>
+>>> No, you don't have to change that, it's convenient so far, I am just
+>>> curious why this doesn't work for text and circle, because in other rare
+>>> case, I will draw very small text as labels of axis for one circular track,
+>>> or if I draw points around the circular track, I am still expecting the
+>>> points will be zoomed in when I rescale the view. I guess I am confused the
+>>> "rescale of the view" with the one you defined with Deepayan, but it make
+>>> sense to me.
+>>>
+>>> There are some ways to get around this if you really want to:
+>>>> - Draw the text as a path.
+>>>> - Use the "render" method on the scene to render to a QPicture, rescale
+>>>> that and display it. This is how I imagined someone making a magnifying
+>>>> glass. QPicture is a vectorized representation, so no nasty scaling
+>>>> artifacts are introduced.
+>>>>
+>>>
+>>> Thanks, I think I need to do it in this way, if I really need them to be
+>>> rescaled.  I never try QPicture before, I will take a look at it.
+>>>
+>>>
+>>>> Michael
+>>>>
+>>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>
+>>>>> Hi
+>>>>>
+>>>>> Here comes another question with text, please see the attached  code
+>>>>> below, only rect could be resized,  when I call v$scale()
+>>>>>
+>>>>> text, circle doesn't change. it happens to visnab, the circular view,
+>>>>> when I scale the view, every thing resize but the text, it's still in the
+>>>>> same size.
+>>>>>
+>>>>> library(qtpaint)
+>>>>> s <- qscene()
+>>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>>   qdrawText(painter,"TEST",50,50)
+>>>>> },limits=qrect(0,0,100,100))
+>>>>> v <- qplotView(s)
+>>>>> v$show()
+>>>>>
+>>>>> v$scale(1.5,1.5)
+>>>>>
+>>>>> Thanks
+>>>>>
+>>>>> Tengfei
+>>>>> --
+>>>>> Tengfei Yin
+>>>>> MCDB PhD student
+>>>>> 1620 Howe Hall, 2274,
+>>>>> Iowa State University
+>>>>> Ames, IA,50011-2274
+>>>>> Homepage: www.tengfei.name
+>>>>>
+>>>>>
+>>>>>
+>>>>> _______________________________________________
+>>>>> Qtinterfaces-devel mailing list
+>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>
+>>>>>
+>>>>
+>>>
+>>>
+>>> --
+>>> Tengfei Yin
+>>> MCDB PhD student
+>>> 1620 Howe Hall, 2274,
+>>> Iowa State University
+>>> Ames, IA,50011-2274
+>>> Homepage: www.tengfei.name
+>>>
+>>>
+>>>
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>>
+>
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101111/6506c600/attachment.htm>
+
+From lawrence.michael at gene.com  Fri Nov 12 14:09:35 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 12 Nov 2010 05:09:35 -0800
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+	<AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+	<AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+Message-ID: <AANLkTineex47w_Ph_C-3_F3EvA22yAfhri=dA8gtzO+P@mail.gmail.com>
+
+On Thu, Nov 11, 2010 at 9:35 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+>
+>
+> On Thu, Nov 11, 2010 at 10:27 PM, Michael Lawrence <
+> lawrence.michael at gene.com> wrote:
+>
+>>
+>>
+>> On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>
+>>> So even when you use view$rotate(), the text direction won't change..is
+>>> this also what we expected to see?
+>>>
+>>>
+>> Yes. I can see how that may not always be desirable, but it would be tough
+>> to work around it. That is, I cannot tease out the rotation from the rest of
+>> the transformation. In the case of a word cloud, I think it would be
+>> desirable, i.e., one is thinking of the text as glyphs that are independent
+>> of the scales.
+>>
+>>
+>>> and by the way, do you know any way to change to text size, the use case
+>>> here is sth like "tag cloud", but I guess I can draw text as path to solve
+>>> this problem.
+>>>
+>>>
+>> Just change the font.. do you want some sort of vectorized "cex" argument
+>> to qdrawText? Might not be that hard to add.
+>>
+>
+> Yes, if you don't mind spend some time on it, it will be really nice to
+> have a control over the text size, e.g. when I plot a sequence data, like
+> ACTGGGC....I can resize one single character  to address the mis-alignment.
+>
+
+You mean like a sequence logo plot, based on the counts of each base? Sweet
+idea. The feature is committed, have fun.
+
+
+>
+>> Michael
+>>
+>>
+>>>
+>>> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>
+>>>>
+>>>>
+>>>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>>>> lawrence.michael at gene.com> wrote:
+>>>>
+>>>>> This is by design. If this didn't work that way, then when the user
+>>>>> zoomed into a chromosome, for example, the text labels would get really
+>>>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>>>> is because their radius, like in a bubble plot, is derived from something
+>>>>> other than the X and Y axes.
+>>>>>
+>>>>> Shapes however, like rectangles, polygons and paths, are zoomed. You
+>>>>> expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>>>
+>>>>>
+>>>> This make sense to me, in most cases, i guess people won't expect the
+>>>> circle or text to be  zoomed in.
+>>>>
+>>>> Are you sure you really need the text to scale with the zoom? Deepayan
+>>>>> and I decided a long time ago that zooming does not behave like a
+>>>>> "magnifying glass." It rescales the plot.
+>>>>>
+>>>>>
+>>>> No, you don't have to change that, it's convenient so far, I am just
+>>>> curious why this doesn't work for text and circle, because in other rare
+>>>> case, I will draw very small text as labels of axis for one circular track,
+>>>> or if I draw points around the circular track, I am still expecting the
+>>>> points will be zoomed in when I rescale the view. I guess I am confused the
+>>>> "rescale of the view" with the one you defined with Deepayan, but it make
+>>>> sense to me.
+>>>>
+>>>> There are some ways to get around this if you really want to:
+>>>>> - Draw the text as a path.
+>>>>> - Use the "render" method on the scene to render to a QPicture, rescale
+>>>>> that and display it. This is how I imagined someone making a magnifying
+>>>>> glass. QPicture is a vectorized representation, so no nasty scaling
+>>>>> artifacts are introduced.
+>>>>>
+>>>>
+>>>> Thanks, I think I need to do it in this way, if I really need them to be
+>>>> rescaled.  I never try QPicture before, I will take a look at it.
+>>>>
+>>>>
+>>>>> Michael
+>>>>>
+>>>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>
+>>>>>> Hi
+>>>>>>
+>>>>>> Here comes another question with text, please see the attached  code
+>>>>>> below, only rect could be resized,  when I call v$scale()
+>>>>>>
+>>>>>> text, circle doesn't change. it happens to visnab, the circular view,
+>>>>>> when I scale the view, every thing resize but the text, it's still in the
+>>>>>> same size.
+>>>>>>
+>>>>>> library(qtpaint)
+>>>>>> s <- qscene()
+>>>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>>>   qdrawText(painter,"TEST",50,50)
+>>>>>> },limits=qrect(0,0,100,100))
+>>>>>> v <- qplotView(s)
+>>>>>> v$show()
+>>>>>>
+>>>>>> v$scale(1.5,1.5)
+>>>>>>
+>>>>>> Thanks
+>>>>>>
+>>>>>> Tengfei
+>>>>>> --
+>>>>>> Tengfei Yin
+>>>>>> MCDB PhD student
+>>>>>> 1620 Howe Hall, 2274,
+>>>>>> Iowa State University
+>>>>>> Ames, IA,50011-2274
+>>>>>> Homepage: www.tengfei.name
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> _______________________________________________
+>>>>>> Qtinterfaces-devel mailing list
+>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>
+>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>
+>>>>>>
+>>>>>
+>>>>
+>>>>
+>>>> --
+>>>> Tengfei Yin
+>>>> MCDB PhD student
+>>>> 1620 Howe Hall, 2274,
+>>>> Iowa State University
+>>>> Ames, IA,50011-2274
+>>>> Homepage: www.tengfei.name
+>>>>
+>>>>
+>>>>
+>>>
+>>>
+>>> --
+>>> Tengfei Yin
+>>> MCDB PhD student
+>>> 1620 Howe Hall, 2274,
+>>> Iowa State University
+>>> Ames, IA,50011-2274
+>>> Homepage: www.tengfei.name
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> Qtinterfaces-devel mailing list
+>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>
+>>>
+>>
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101112/fae1dc5e/attachment.htm>
+
+From yintengfei at gmail.com  Fri Nov 12 17:59:52 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Fri, 12 Nov 2010 10:59:52 -0600
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTineex47w_Ph_C-3_F3EvA22yAfhri=dA8gtzO+P@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+	<AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+	<AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+	<AANLkTineex47w_Ph_C-3_F3EvA22yAfhri=dA8gtzO+P@mail.gmail.com>
+Message-ID: <AANLkTinfxFG=wKyzygbX9DhqJneCfaFxdd24vtAaLJ5+@mail.gmail.com>
+
+On Fri, Nov 12, 2010 at 7:09 AM, Michael Lawrence <lawrence.michael at gene.com
+> wrote:
+
+>
+>
+> On Thu, Nov 11, 2010 at 9:35 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>
+>>
+>>
+>> On Thu, Nov 11, 2010 at 10:27 PM, Michael Lawrence <
+>> lawrence.michael at gene.com> wrote:
+>>
+>>>
+>>>
+>>> On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>
+>>>> So even when you use view$rotate(), the text direction won't change..is
+>>>> this also what we expected to see?
+>>>>
+>>>>
+>>> Yes. I can see how that may not always be desirable, but it would be
+>>> tough to work around it. That is, I cannot tease out the rotation from the
+>>> rest of the transformation. In the case of a word cloud, I think it would be
+>>> desirable, i.e., one is thinking of the text as glyphs that are independent
+>>> of the scales.
+>>>
+>>>
+>>>> and by the way, do you know any way to change to text size, the use case
+>>>> here is sth like "tag cloud", but I guess I can draw text as path to solve
+>>>> this problem.
+>>>>
+>>>>
+>>> Just change the font.. do you want some sort of vectorized "cex" argument
+>>> to qdrawText? Might not be that hard to add.
+>>>
+>>
+>> Yes, if you don't mind spend some time on it, it will be really nice to
+>> have a control over the text size, e.g. when I plot a sequence data, like
+>> ACTGGGC....I can resize one single character  to address the mis-alignment.
+>>
+>
+> You mean like a sequence logo plot, based on the counts of each base? Sweet
+> idea. The feature is committed, have fun.
+>
+
+Yes, I plan to do sth like this~the problem of this kind of graphic is that,
+no problem showing as a single plot, but when showing along a shot-read
+alighment, due to resale of all the text, even a single size change of one
+base will make it hard to align a single sequence with other "normal" text.
+I will work around this to see if I have some problem.
+
+Btw: any idea where is globalPos(), I try to use tooltip associated with
+locate() function to do this?when mouse over on exon, show the id, but I can
+only find pos, based on the documentation, it looks like I need to get
+globalPos..of course I have alternative workaround instead of using
+QToolTip.
+
+Thanks
+
+>
+>
+>>
+>>> Michael
+>>>
+>>>
+>>>>
+>>>> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>
+>>>>>
+>>>>>
+>>>>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>>>>> lawrence.michael at gene.com> wrote:
+>>>>>
+>>>>>> This is by design. If this didn't work that way, then when the user
+>>>>>> zoomed into a chromosome, for example, the text labels would get really
+>>>>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>>>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>>>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>>>>> is because their radius, like in a bubble plot, is derived from something
+>>>>>> other than the X and Y axes.
+>>>>>>
+>>>>>> Shapes however, like rectangles, polygons and paths, are zoomed. You
+>>>>>> expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>>>>
+>>>>>>
+>>>>> This make sense to me, in most cases, i guess people won't expect the
+>>>>> circle or text to be  zoomed in.
+>>>>>
+>>>>> Are you sure you really need the text to scale with the zoom? Deepayan
+>>>>>> and I decided a long time ago that zooming does not behave like a
+>>>>>> "magnifying glass." It rescales the plot.
+>>>>>>
+>>>>>>
+>>>>> No, you don't have to change that, it's convenient so far, I am just
+>>>>> curious why this doesn't work for text and circle, because in other rare
+>>>>> case, I will draw very small text as labels of axis for one circular track,
+>>>>> or if I draw points around the circular track, I am still expecting the
+>>>>> points will be zoomed in when I rescale the view. I guess I am confused the
+>>>>> "rescale of the view" with the one you defined with Deepayan, but it make
+>>>>> sense to me.
+>>>>>
+>>>>> There are some ways to get around this if you really want to:
+>>>>>> - Draw the text as a path.
+>>>>>> - Use the "render" method on the scene to render to a QPicture,
+>>>>>> rescale that and display it. This is how I imagined someone making a
+>>>>>> magnifying glass. QPicture is a vectorized representation, so no nasty
+>>>>>> scaling artifacts are introduced.
+>>>>>>
+>>>>>
+>>>>> Thanks, I think I need to do it in this way, if I really need them to
+>>>>> be rescaled.  I never try QPicture before, I will take a look at it.
+>>>>>
+>>>>>
+>>>>>> Michael
+>>>>>>
+>>>>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>
+>>>>>>> Hi
+>>>>>>>
+>>>>>>> Here comes another question with text, please see the attached  code
+>>>>>>> below, only rect could be resized,  when I call v$scale()
+>>>>>>>
+>>>>>>> text, circle doesn't change. it happens to visnab, the circular view,
+>>>>>>> when I scale the view, every thing resize but the text, it's still in the
+>>>>>>> same size.
+>>>>>>>
+>>>>>>> library(qtpaint)
+>>>>>>> s <- qscene()
+>>>>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>>>>   qdrawText(painter,"TEST",50,50)
+>>>>>>> },limits=qrect(0,0,100,100))
+>>>>>>> v <- qplotView(s)
+>>>>>>> v$show()
+>>>>>>>
+>>>>>>> v$scale(1.5,1.5)
+>>>>>>>
+>>>>>>> Thanks
+>>>>>>>
+>>>>>>> Tengfei
+>>>>>>> --
+>>>>>>> Tengfei Yin
+>>>>>>> MCDB PhD student
+>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>> Iowa State University
+>>>>>>> Ames, IA,50011-2274
+>>>>>>> Homepage: www.tengfei.name
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> _______________________________________________
+>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>
+>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>
+>>>>>>>
+>>>>>>
+>>>>>
+>>>>>
+>>>>> --
+>>>>> Tengfei Yin
+>>>>> MCDB PhD student
+>>>>> 1620 Howe Hall, 2274,
+>>>>> Iowa State University
+>>>>> Ames, IA,50011-2274
+>>>>> Homepage: www.tengfei.name
+>>>>>
+>>>>>
+>>>>>
+>>>>
+>>>>
+>>>> --
+>>>> Tengfei Yin
+>>>> MCDB PhD student
+>>>> 1620 Howe Hall, 2274,
+>>>> Iowa State University
+>>>> Ames, IA,50011-2274
+>>>> Homepage: www.tengfei.name
+>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> Qtinterfaces-devel mailing list
+>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>
+>>>>
+>>>
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101112/df1c48a5/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Fri Nov 12 22:27:47 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 12 Nov 2010 13:27:47 -0800
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTinfxFG=wKyzygbX9DhqJneCfaFxdd24vtAaLJ5+@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+	<AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+	<AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+	<AANLkTineex47w_Ph_C-3_F3EvA22yAfhri=dA8gtzO+P@mail.gmail.com>
+	<AANLkTinfxFG=wKyzygbX9DhqJneCfaFxdd24vtAaLJ5+@mail.gmail.com>
+Message-ID: <AANLkTi=GMfSxiCv+ihRuxpOrJcjZGFht7kWyw5Hayy4Y@mail.gmail.com>
+
+On Fri, Nov 12, 2010 at 8:59 AM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+>
+>
+> On Fri, Nov 12, 2010 at 7:09 AM, Michael Lawrence <
+> lawrence.michael at gene.com> wrote:
+>
+>>
+>>
+>> On Thu, Nov 11, 2010 at 9:35 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>
+>>>
+>>>
+>>> On Thu, Nov 11, 2010 at 10:27 PM, Michael Lawrence <
+>>> lawrence.michael at gene.com> wrote:
+>>>
+>>>>
+>>>>
+>>>> On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>
+>>>>> So even when you use view$rotate(), the text direction won't change..is
+>>>>> this also what we expected to see?
+>>>>>
+>>>>>
+>>>> Yes. I can see how that may not always be desirable, but it would be
+>>>> tough to work around it. That is, I cannot tease out the rotation from the
+>>>> rest of the transformation. In the case of a word cloud, I think it would be
+>>>> desirable, i.e., one is thinking of the text as glyphs that are independent
+>>>> of the scales.
+>>>>
+>>>>
+>>>>> and by the way, do you know any way to change to text size, the use
+>>>>> case here is sth like "tag cloud", but I guess I can draw text as path to
+>>>>> solve this problem.
+>>>>>
+>>>>>
+>>>> Just change the font.. do you want some sort of vectorized "cex"
+>>>> argument to qdrawText? Might not be that hard to add.
+>>>>
+>>>
+>>> Yes, if you don't mind spend some time on it, it will be really nice to
+>>> have a control over the text size, e.g. when I plot a sequence data, like
+>>> ACTGGGC....I can resize one single character  to address the mis-alignment.
+>>>
+>>
+>> You mean like a sequence logo plot, based on the counts of each base?
+>> Sweet idea. The feature is committed, have fun.
+>>
+>
+> Yes, I plan to do sth like this~the problem of this kind of graphic is
+> that, no problem showing as a single plot, but when showing along a
+> shot-read alighment, due to resale of all the text, even a single size
+> change of one base will make it hard to align a single sequence with other
+> "normal" text. I will work around this to see if I have some problem.
+>
+>
+Text glyphs could be scaled differently in the horizontal and vertical.
+Would this help with this issue? That is, you could stretch the letters
+vertically.
+
+Btw: any idea where is globalPos(), I try to use tooltip associated with
+> locate() function to do this?when mouse over on exon, show the id, but I can
+> only find pos, based on the documentation, it looks like I need to get
+> globalPos..of course I have alternative workaround instead of using
+> QToolTip.
+>
+>
+I'm not sure I follow. Are you talking about globalPos() on the event
+object? That is global screen position, not even relative to the window, so
+you would need to be careful to adjust it.
+
+Thanks
+>
+>>
+>>
+>>>
+>>>> Michael
+>>>>
+>>>>
+>>>>>
+>>>>> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>>>>>> lawrence.michael at gene.com> wrote:
+>>>>>>
+>>>>>>> This is by design. If this didn't work that way, then when the user
+>>>>>>> zoomed into a chromosome, for example, the text labels would get really
+>>>>>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>>>>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>>>>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>>>>>> is because their radius, like in a bubble plot, is derived from something
+>>>>>>> other than the X and Y axes.
+>>>>>>>
+>>>>>>> Shapes however, like rectangles, polygons and paths, are zoomed. You
+>>>>>>> expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>>>>>
+>>>>>>>
+>>>>>> This make sense to me, in most cases, i guess people won't expect the
+>>>>>> circle or text to be  zoomed in.
+>>>>>>
+>>>>>> Are you sure you really need the text to scale with the zoom? Deepayan
+>>>>>>> and I decided a long time ago that zooming does not behave like a
+>>>>>>> "magnifying glass." It rescales the plot.
+>>>>>>>
+>>>>>>>
+>>>>>> No, you don't have to change that, it's convenient so far, I am just
+>>>>>> curious why this doesn't work for text and circle, because in other rare
+>>>>>> case, I will draw very small text as labels of axis for one circular track,
+>>>>>> or if I draw points around the circular track, I am still expecting the
+>>>>>> points will be zoomed in when I rescale the view. I guess I am confused the
+>>>>>> "rescale of the view" with the one you defined with Deepayan, but it make
+>>>>>> sense to me.
+>>>>>>
+>>>>>> There are some ways to get around this if you really want to:
+>>>>>>> - Draw the text as a path.
+>>>>>>> - Use the "render" method on the scene to render to a QPicture,
+>>>>>>> rescale that and display it. This is how I imagined someone making a
+>>>>>>> magnifying glass. QPicture is a vectorized representation, so no nasty
+>>>>>>> scaling artifacts are introduced.
+>>>>>>>
+>>>>>>
+>>>>>> Thanks, I think I need to do it in this way, if I really need them to
+>>>>>> be rescaled.  I never try QPicture before, I will take a look at it.
+>>>>>>
+>>>>>>
+>>>>>>> Michael
+>>>>>>>
+>>>>>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>>
+>>>>>>>> Hi
+>>>>>>>>
+>>>>>>>> Here comes another question with text, please see the attached  code
+>>>>>>>> below, only rect could be resized,  when I call v$scale()
+>>>>>>>>
+>>>>>>>> text, circle doesn't change. it happens to visnab, the circular
+>>>>>>>> view, when I scale the view, every thing resize but the text, it's still in
+>>>>>>>> the same size.
+>>>>>>>>
+>>>>>>>> library(qtpaint)
+>>>>>>>> s <- qscene()
+>>>>>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>>>>>   qdrawText(painter,"TEST",50,50)
+>>>>>>>> },limits=qrect(0,0,100,100))
+>>>>>>>> v <- qplotView(s)
+>>>>>>>> v$show()
+>>>>>>>>
+>>>>>>>> v$scale(1.5,1.5)
+>>>>>>>>
+>>>>>>>> Thanks
+>>>>>>>>
+>>>>>>>> Tengfei
+>>>>>>>> --
+>>>>>>>> Tengfei Yin
+>>>>>>>> MCDB PhD student
+>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>> Iowa State University
+>>>>>>>> Ames, IA,50011-2274
+>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> _______________________________________________
+>>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>>
+>>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>>
+>>>>>>>>
+>>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> --
+>>>>>> Tengfei Yin
+>>>>>> MCDB PhD student
+>>>>>> 1620 Howe Hall, 2274,
+>>>>>> Iowa State University
+>>>>>> Ames, IA,50011-2274
+>>>>>> Homepage: www.tengfei.name
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>
+>>>>>
+>>>>> --
+>>>>> Tengfei Yin
+>>>>> MCDB PhD student
+>>>>> 1620 Howe Hall, 2274,
+>>>>> Iowa State University
+>>>>> Ames, IA,50011-2274
+>>>>> Homepage: www.tengfei.name
+>>>>>
+>>>>>
+>>>>>
+>>>>> _______________________________________________
+>>>>> Qtinterfaces-devel mailing list
+>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>
+>>>>>
+>>>>
+>>>
+>>>
+>>> --
+>>> Tengfei Yin
+>>> MCDB PhD student
+>>> 1620 Howe Hall, 2274,
+>>> Iowa State University
+>>> Ames, IA,50011-2274
+>>> Homepage: www.tengfei.name
+>>>
+>>>
+>>>
+>>
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101112/dab9dd53/attachment.htm>
+
+From yintengfei at gmail.com  Fri Nov 12 23:13:31 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Fri, 12 Nov 2010 16:13:31 -0600
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTi=GMfSxiCv+ihRuxpOrJcjZGFht7kWyw5Hayy4Y@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+	<AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+	<AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+	<AANLkTineex47w_Ph_C-3_F3EvA22yAfhri=dA8gtzO+P@mail.gmail.com>
+	<AANLkTinfxFG=wKyzygbX9DhqJneCfaFxdd24vtAaLJ5+@mail.gmail.com>
+	<AANLkTi=GMfSxiCv+ihRuxpOrJcjZGFht7kWyw5Hayy4Y@mail.gmail.com>
+Message-ID: <AANLkTi=UyH=sAGB6JrVS=vZ+UJLE9CauVWnKGKLerJUY@mail.gmail.com>
+
+On Fri, Nov 12, 2010 at 3:27 PM, Michael Lawrence <lawrence.michael at gene.com
+> wrote:
+
+>
+>
+> On Fri, Nov 12, 2010 at 8:59 AM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>
+>>
+>>
+>> On Fri, Nov 12, 2010 at 7:09 AM, Michael Lawrence <
+>> lawrence.michael at gene.com> wrote:
+>>
+>>>
+>>>
+>>> On Thu, Nov 11, 2010 at 9:35 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>
+>>>>
+>>>>
+>>>> On Thu, Nov 11, 2010 at 10:27 PM, Michael Lawrence <
+>>>> lawrence.michael at gene.com> wrote:
+>>>>
+>>>>>
+>>>>>
+>>>>> On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>
+>>>>>> So even when you use view$rotate(), the text direction won't
+>>>>>> change..is this also what we expected to see?
+>>>>>>
+>>>>>>
+>>>>> Yes. I can see how that may not always be desirable, but it would be
+>>>>> tough to work around it. That is, I cannot tease out the rotation from the
+>>>>> rest of the transformation. In the case of a word cloud, I think it would be
+>>>>> desirable, i.e., one is thinking of the text as glyphs that are independent
+>>>>> of the scales.
+>>>>>
+>>>>>
+>>>>>> and by the way, do you know any way to change to text size, the use
+>>>>>> case here is sth like "tag cloud", but I guess I can draw text as path to
+>>>>>> solve this problem.
+>>>>>>
+>>>>>>
+>>>>> Just change the font.. do you want some sort of vectorized "cex"
+>>>>> argument to qdrawText? Might not be that hard to add.
+>>>>>
+>>>>
+>>>> Yes, if you don't mind spend some time on it, it will be really nice to
+>>>> have a control over the text size, e.g. when I plot a sequence data, like
+>>>> ACTGGGC....I can resize one single character  to address the mis-alignment.
+>>>>
+>>>
+>>> You mean like a sequence logo plot, based on the counts of each base?
+>>> Sweet idea. The feature is committed, have fun.
+>>>
+>>
+>> Yes, I plan to do sth like this~the problem of this kind of graphic is
+>> that, no problem showing as a single plot, but when showing along a
+>> shot-read alighment, due to resale of all the text, even a single size
+>> change of one base will make it hard to align a single sequence with other
+>> "normal" text. I will work around this to see if I have some problem.
+>>
+>>
+> Text glyphs could be scaled differently in the horizontal and vertical.
+> Would this help with this issue? That is, you could stretch the letters
+> vertically.
+>
+
+Do you mean sth that is already in  qtpaint? it's not in qdrawText(), and
+the qglyphText has no such a parameter, do you suggest me to create text as
+path and use qdrawPath to plot those stuff?? and by the way, in the qt
+document,
+void QFont::setStretch ( int factor )
+only set width of character. How can I specify whether to stretch it
+vertically or horizontally? Or do you mean doing sth like transformation?
+
+
+>  Btw: any idea where is globalPos(), I try to use tooltip associated with
+>> locate() function to do this?when mouse over on exon, show the id, but I can
+>> only find pos, based on the documentation, it looks like I need to get
+>> globalPos..of course I have alternative workaround instead of using
+>> QToolTip.
+>>
+>>
+> I'm not sure I follow. Are you talking about globalPos() on the event
+> object? That is global screen position, not even relative to the window, so
+> you would need to be careful to adjust it.
+>
+
+Yes, I can not find globalPos() on event object? and I think you are right,
+I guess I cannot use it.  I am thinking that maybe qdrawText will be faster
+than QToolTip, maybe tooltip is not used in this purpose to show the exon
+names, maybe it's designed to show widget name and function description.
+
+Thanks
+
+>
+> Thanks
+>>
+>>>
+>>>
+>>>>
+>>>>> Michael
+>>>>>
+>>>>>
+>>>>>>
+>>>>>> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>>>>>>> lawrence.michael at gene.com> wrote:
+>>>>>>>
+>>>>>>>> This is by design. If this didn't work that way, then when the user
+>>>>>>>> zoomed into a chromosome, for example, the text labels would get really
+>>>>>>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>>>>>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>>>>>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>>>>>>> is because their radius, like in a bubble plot, is derived from something
+>>>>>>>> other than the X and Y axes.
+>>>>>>>>
+>>>>>>>> Shapes however, like rectangles, polygons and paths, are zoomed. You
+>>>>>>>> expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>>>>>>
+>>>>>>>>
+>>>>>>> This make sense to me, in most cases, i guess people won't expect the
+>>>>>>> circle or text to be  zoomed in.
+>>>>>>>
+>>>>>>> Are you sure you really need the text to scale with the zoom?
+>>>>>>>> Deepayan and I decided a long time ago that zooming does not behave like a
+>>>>>>>> "magnifying glass." It rescales the plot.
+>>>>>>>>
+>>>>>>>>
+>>>>>>> No, you don't have to change that, it's convenient so far, I am just
+>>>>>>> curious why this doesn't work for text and circle, because in other rare
+>>>>>>> case, I will draw very small text as labels of axis for one circular track,
+>>>>>>> or if I draw points around the circular track, I am still expecting the
+>>>>>>> points will be zoomed in when I rescale the view. I guess I am confused the
+>>>>>>> "rescale of the view" with the one you defined with Deepayan, but it make
+>>>>>>> sense to me.
+>>>>>>>
+>>>>>>> There are some ways to get around this if you really want to:
+>>>>>>>> - Draw the text as a path.
+>>>>>>>> - Use the "render" method on the scene to render to a QPicture,
+>>>>>>>> rescale that and display it. This is how I imagined someone making a
+>>>>>>>> magnifying glass. QPicture is a vectorized representation, so no nasty
+>>>>>>>> scaling artifacts are introduced.
+>>>>>>>>
+>>>>>>>
+>>>>>>> Thanks, I think I need to do it in this way, if I really need them to
+>>>>>>> be rescaled.  I never try QPicture before, I will take a look at it.
+>>>>>>>
+>>>>>>>
+>>>>>>>> Michael
+>>>>>>>>
+>>>>>>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>>>
+>>>>>>>>> Hi
+>>>>>>>>>
+>>>>>>>>> Here comes another question with text, please see the attached
+>>>>>>>>>  code below, only rect could be resized,  when I call v$scale()
+>>>>>>>>>
+>>>>>>>>> text, circle doesn't change. it happens to visnab, the circular
+>>>>>>>>> view, when I scale the view, every thing resize but the text, it's still in
+>>>>>>>>> the same size.
+>>>>>>>>>
+>>>>>>>>> library(qtpaint)
+>>>>>>>>> s <- qscene()
+>>>>>>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>>>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>>>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>>>>>>   qdrawText(painter,"TEST",50,50)
+>>>>>>>>> },limits=qrect(0,0,100,100))
+>>>>>>>>> v <- qplotView(s)
+>>>>>>>>> v$show()
+>>>>>>>>>
+>>>>>>>>> v$scale(1.5,1.5)
+>>>>>>>>>
+>>>>>>>>> Thanks
+>>>>>>>>>
+>>>>>>>>> Tengfei
+>>>>>>>>> --
+>>>>>>>>> Tengfei Yin
+>>>>>>>>> MCDB PhD student
+>>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>>> Iowa State University
+>>>>>>>>> Ames, IA,50011-2274
+>>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> _______________________________________________
+>>>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>>>
+>>>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> --
+>>>>>>> Tengfei Yin
+>>>>>>> MCDB PhD student
+>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>> Iowa State University
+>>>>>>> Ames, IA,50011-2274
+>>>>>>> Homepage: www.tengfei.name
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> --
+>>>>>> Tengfei Yin
+>>>>>> MCDB PhD student
+>>>>>> 1620 Howe Hall, 2274,
+>>>>>> Iowa State University
+>>>>>> Ames, IA,50011-2274
+>>>>>> Homepage: www.tengfei.name
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> _______________________________________________
+>>>>>> Qtinterfaces-devel mailing list
+>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>
+>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>
+>>>>>>
+>>>>>
+>>>>
+>>>>
+>>>> --
+>>>> Tengfei Yin
+>>>> MCDB PhD student
+>>>> 1620 Howe Hall, 2274,
+>>>> Iowa State University
+>>>> Ames, IA,50011-2274
+>>>> Homepage: www.tengfei.name
+>>>>
+>>>>
+>>>>
+>>>
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101112/3e4f4c18/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Fri Nov 12 23:42:08 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 12 Nov 2010 14:42:08 -0800
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTi=UyH=sAGB6JrVS=vZ+UJLE9CauVWnKGKLerJUY@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+	<AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+	<AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+	<AANLkTineex47w_Ph_C-3_F3EvA22yAfhri=dA8gtzO+P@mail.gmail.com>
+	<AANLkTinfxFG=wKyzygbX9DhqJneCfaFxdd24vtAaLJ5+@mail.gmail.com>
+	<AANLkTi=GMfSxiCv+ihRuxpOrJcjZGFht7kWyw5Hayy4Y@mail.gmail.com>
+	<AANLkTi=UyH=sAGB6JrVS=vZ+UJLE9CauVWnKGKLerJUY@mail.gmail.com>
+Message-ID: <AANLkTimnFePqFJmh9Wi0LJFHff+ir9XppRYOJ3Y15VZM@mail.gmail.com>
+
+On Fri, Nov 12, 2010 at 2:13 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+
+>
+>
+> On Fri, Nov 12, 2010 at 3:27 PM, Michael Lawrence <
+> lawrence.michael at gene.com> wrote:
+>
+>>
+>>
+>> On Fri, Nov 12, 2010 at 8:59 AM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>
+>>>
+>>>
+>>> On Fri, Nov 12, 2010 at 7:09 AM, Michael Lawrence <
+>>> lawrence.michael at gene.com> wrote:
+>>>
+>>>>
+>>>>
+>>>> On Thu, Nov 11, 2010 at 9:35 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>
+>>>>>
+>>>>>
+>>>>> On Thu, Nov 11, 2010 at 10:27 PM, Michael Lawrence <
+>>>>> lawrence.michael at gene.com> wrote:
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>> On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>
+>>>>>>> So even when you use view$rotate(), the text direction won't
+>>>>>>> change..is this also what we expected to see?
+>>>>>>>
+>>>>>>>
+>>>>>> Yes. I can see how that may not always be desirable, but it would be
+>>>>>> tough to work around it. That is, I cannot tease out the rotation from the
+>>>>>> rest of the transformation. In the case of a word cloud, I think it would be
+>>>>>> desirable, i.e., one is thinking of the text as glyphs that are independent
+>>>>>> of the scales.
+>>>>>>
+>>>>>>
+>>>>>>> and by the way, do you know any way to change to text size, the use
+>>>>>>> case here is sth like "tag cloud", but I guess I can draw text as path to
+>>>>>>> solve this problem.
+>>>>>>>
+>>>>>>>
+>>>>>> Just change the font.. do you want some sort of vectorized "cex"
+>>>>>> argument to qdrawText? Might not be that hard to add.
+>>>>>>
+>>>>>
+>>>>> Yes, if you don't mind spend some time on it, it will be really nice to
+>>>>> have a control over the text size, e.g. when I plot a sequence data, like
+>>>>> ACTGGGC....I can resize one single character  to address the mis-alignment.
+>>>>>
+>>>>
+>>>> You mean like a sequence logo plot, based on the counts of each base?
+>>>> Sweet idea. The feature is committed, have fun.
+>>>>
+>>>
+>>> Yes, I plan to do sth like this~the problem of this kind of graphic is
+>>> that, no problem showing as a single plot, but when showing along a
+>>> shot-read alighment, due to resale of all the text, even a single size
+>>> change of one base will make it hard to align a single sequence with other
+>>> "normal" text. I will work around this to see if I have some problem.
+>>>
+>>>
+>> Text glyphs could be scaled differently in the horizontal and vertical.
+>> Would this help with this issue? That is, you could stretch the letters
+>> vertically.
+>>
+>
+> Do you mean sth that is already in  qtpaint?
+>
+
+No it's not there yet but it would be easy to support it. Right now 'cex'
+causes a symmetric scale; it does not need to be that way. I will add it.
+
+
+
+> it's not in qdrawText(), and the qglyphText has no such a parameter, do you
+> suggest me to create text as path and use qdrawPath to plot those stuff??
+> and by the way, in the qt document,
+> void QFont::setStretch ( int factor )
+> only set width of character. How can I specify whether to stretch it
+> vertically or horizontally? Or do you mean doing sth like transformation?
+>
+>
+>>  Btw: any idea where is globalPos(), I try to use tooltip associated with
+>>> locate() function to do this?when mouse over on exon, show the id, but I can
+>>> only find pos, based on the documentation, it looks like I need to get
+>>> globalPos..of course I have alternative workaround instead of using
+>>> QToolTip.
+>>>
+>>>
+>> I'm not sure I follow. Are you talking about globalPos() on the event
+>> object? That is global screen position, not even relative to the window, so
+>> you would need to be careful to adjust it.
+>>
+>
+> Yes, I can not find globalPos() on event object?
+>
+
+What about screenPos()?
+
+
+> and I think you are right, I guess I cannot use it.  I am thinking that
+> maybe qdrawText will be faster than QToolTip, maybe tooltip is not used in
+> this purpose to show the exon names, maybe it's designed to show widget name
+> and function description.
+>
+>
+Well the tooltip window has various features, like hypertext. The user could
+click on something and launch a web browser to some external database, for
+example.
+
+
+> Thanks
+>
+>>
+>> Thanks
+>>>
+>>>>
+>>>>
+>>>>>
+>>>>>> Michael
+>>>>>>
+>>>>>>
+>>>>>>>
+>>>>>>> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>>>>>>>> lawrence.michael at gene.com> wrote:
+>>>>>>>>
+>>>>>>>>> This is by design. If this didn't work that way, then when the user
+>>>>>>>>> zoomed into a chromosome, for example, the text labels would get really
+>>>>>>>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>>>>>>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>>>>>>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>>>>>>>> is because their radius, like in a bubble plot, is derived from something
+>>>>>>>>> other than the X and Y axes.
+>>>>>>>>>
+>>>>>>>>> Shapes however, like rectangles, polygons and paths, are zoomed.
+>>>>>>>>> You expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>> This make sense to me, in most cases, i guess people won't expect
+>>>>>>>> the circle or text to be  zoomed in.
+>>>>>>>>
+>>>>>>>> Are you sure you really need the text to scale with the zoom?
+>>>>>>>>> Deepayan and I decided a long time ago that zooming does not behave like a
+>>>>>>>>> "magnifying glass." It rescales the plot.
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>> No, you don't have to change that, it's convenient so far, I am just
+>>>>>>>> curious why this doesn't work for text and circle, because in other rare
+>>>>>>>> case, I will draw very small text as labels of axis for one circular track,
+>>>>>>>> or if I draw points around the circular track, I am still expecting the
+>>>>>>>> points will be zoomed in when I rescale the view. I guess I am confused the
+>>>>>>>> "rescale of the view" with the one you defined with Deepayan, but it make
+>>>>>>>> sense to me.
+>>>>>>>>
+>>>>>>>> There are some ways to get around this if you really want to:
+>>>>>>>>> - Draw the text as a path.
+>>>>>>>>> - Use the "render" method on the scene to render to a QPicture,
+>>>>>>>>> rescale that and display it. This is how I imagined someone making a
+>>>>>>>>> magnifying glass. QPicture is a vectorized representation, so no nasty
+>>>>>>>>> scaling artifacts are introduced.
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> Thanks, I think I need to do it in this way, if I really need them
+>>>>>>>> to be rescaled.  I never try QPicture before, I will take a look at it.
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>> Michael
+>>>>>>>>>
+>>>>>>>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <yintengfei at gmail.com
+>>>>>>>>> > wrote:
+>>>>>>>>>
+>>>>>>>>>> Hi
+>>>>>>>>>>
+>>>>>>>>>> Here comes another question with text, please see the attached
+>>>>>>>>>>  code below, only rect could be resized,  when I call v$scale()
+>>>>>>>>>>
+>>>>>>>>>> text, circle doesn't change. it happens to visnab, the circular
+>>>>>>>>>> view, when I scale the view, every thing resize but the text, it's still in
+>>>>>>>>>> the same size.
+>>>>>>>>>>
+>>>>>>>>>> library(qtpaint)
+>>>>>>>>>> s <- qscene()
+>>>>>>>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>>>>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>>>>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>>>>>>>   qdrawText(painter,"TEST",50,50)
+>>>>>>>>>> },limits=qrect(0,0,100,100))
+>>>>>>>>>> v <- qplotView(s)
+>>>>>>>>>> v$show()
+>>>>>>>>>>
+>>>>>>>>>> v$scale(1.5,1.5)
+>>>>>>>>>>
+>>>>>>>>>> Thanks
+>>>>>>>>>>
+>>>>>>>>>> Tengfei
+>>>>>>>>>> --
+>>>>>>>>>> Tengfei Yin
+>>>>>>>>>> MCDB PhD student
+>>>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>>>> Iowa State University
+>>>>>>>>>> Ames, IA,50011-2274
+>>>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> _______________________________________________
+>>>>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>>>>
+>>>>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> --
+>>>>>>>> Tengfei Yin
+>>>>>>>> MCDB PhD student
+>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>> Iowa State University
+>>>>>>>> Ames, IA,50011-2274
+>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> --
+>>>>>>> Tengfei Yin
+>>>>>>> MCDB PhD student
+>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>> Iowa State University
+>>>>>>> Ames, IA,50011-2274
+>>>>>>> Homepage: www.tengfei.name
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> _______________________________________________
+>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>
+>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>
+>>>>>>>
+>>>>>>
+>>>>>
+>>>>>
+>>>>> --
+>>>>> Tengfei Yin
+>>>>> MCDB PhD student
+>>>>> 1620 Howe Hall, 2274,
+>>>>> Iowa State University
+>>>>> Ames, IA,50011-2274
+>>>>> Homepage: www.tengfei.name
+>>>>>
+>>>>>
+>>>>>
+>>>>
+>>>
+>>>
+>>> --
+>>> Tengfei Yin
+>>> MCDB PhD student
+>>> 1620 Howe Hall, 2274,
+>>> Iowa State University
+>>> Ames, IA,50011-2274
+>>> Homepage: www.tengfei.name
+>>>
+>>>
+>>>
+>>
+>
+>
+> --
+> Tengfei Yin
+> MCDB PhD student
+> 1620 Howe Hall, 2274,
+> Iowa State University
+> Ames, IA,50011-2274
+> Homepage: www.tengfei.name
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101112/1711f1fe/attachment.htm>
+
+From yintengfei at gmail.com  Fri Nov 12 23:50:53 2010
+From: yintengfei at gmail.com (Tengfei Yin)
+Date: Fri, 12 Nov 2010 16:50:53 -0600
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTimnFePqFJmh9Wi0LJFHff+ir9XppRYOJ3Y15VZM@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+	<AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+	<AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+	<AANLkTineex47w_Ph_C-3_F3EvA22yAfhri=dA8gtzO+P@mail.gmail.com>
+	<AANLkTinfxFG=wKyzygbX9DhqJneCfaFxdd24vtAaLJ5+@mail.gmail.com>
+	<AANLkTi=GMfSxiCv+ihRuxpOrJcjZGFht7kWyw5Hayy4Y@mail.gmail.com>
+	<AANLkTi=UyH=sAGB6JrVS=vZ+UJLE9CauVWnKGKLerJUY@mail.gmail.com>
+	<AANLkTimnFePqFJmh9Wi0LJFHff+ir9XppRYOJ3Y15VZM@mail.gmail.com>
+Message-ID: <AANLkTim=2OU-oFB4qxO1zQWo+2mxBXbKA3kz6imx42ua@mail.gmail.com>
+
+On Fri, Nov 12, 2010 at 4:42 PM, Michael Lawrence <lawrence.michael at gene.com
+> wrote:
+
+>
+>
+> On Fri, Nov 12, 2010 at 2:13 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>
+>>
+>>
+>> On Fri, Nov 12, 2010 at 3:27 PM, Michael Lawrence <
+>> lawrence.michael at gene.com> wrote:
+>>
+>>>
+>>>
+>>> On Fri, Nov 12, 2010 at 8:59 AM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>
+>>>>
+>>>>
+>>>> On Fri, Nov 12, 2010 at 7:09 AM, Michael Lawrence <
+>>>> lawrence.michael at gene.com> wrote:
+>>>>
+>>>>>
+>>>>>
+>>>>> On Thu, Nov 11, 2010 at 9:35 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>> On Thu, Nov 11, 2010 at 10:27 PM, Michael Lawrence <
+>>>>>> lawrence.michael at gene.com> wrote:
+>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>>
+>>>>>>>> So even when you use view$rotate(), the text direction won't
+>>>>>>>> change..is this also what we expected to see?
+>>>>>>>>
+>>>>>>>>
+>>>>>>> Yes. I can see how that may not always be desirable, but it would be
+>>>>>>> tough to work around it. That is, I cannot tease out the rotation from the
+>>>>>>> rest of the transformation. In the case of a word cloud, I think it would be
+>>>>>>> desirable, i.e., one is thinking of the text as glyphs that are independent
+>>>>>>> of the scales.
+>>>>>>>
+>>>>>>>
+>>>>>>>> and by the way, do you know any way to change to text size, the use
+>>>>>>>> case here is sth like "tag cloud", but I guess I can draw text as path to
+>>>>>>>> solve this problem.
+>>>>>>>>
+>>>>>>>>
+>>>>>>> Just change the font.. do you want some sort of vectorized "cex"
+>>>>>>> argument to qdrawText? Might not be that hard to add.
+>>>>>>>
+>>>>>>
+>>>>>> Yes, if you don't mind spend some time on it, it will be really nice
+>>>>>> to have a control over the text size, e.g. when I plot a sequence data, like
+>>>>>> ACTGGGC....I can resize one single character  to address the mis-alignment.
+>>>>>>
+>>>>>
+>>>>> You mean like a sequence logo plot, based on the counts of each base?
+>>>>> Sweet idea. The feature is committed, have fun.
+>>>>>
+>>>>
+>>>> Yes, I plan to do sth like this~the problem of this kind of graphic is
+>>>> that, no problem showing as a single plot, but when showing along a
+>>>> shot-read alighment, due to resale of all the text, even a single size
+>>>> change of one base will make it hard to align a single sequence with other
+>>>> "normal" text. I will work around this to see if I have some problem.
+>>>>
+>>>>
+>>> Text glyphs could be scaled differently in the horizontal and vertical.
+>>> Would this help with this issue? That is, you could stretch the letters
+>>> vertically.
+>>>
+>>
+>> Do you mean sth that is already in  qtpaint?
+>>
+>
+> No it's not there yet but it would be easy to support it. Right now 'cex'
+> causes a symmetric scale; it does not need to be that way. I will add it.
+>
+>
+>
+>> it's not in qdrawText(), and the qglyphText has no such a parameter, do
+>> you suggest me to create text as path and use qdrawPath to plot those
+>> stuff?? and by the way, in the qt document,
+>> void QFont::setStretch ( int factor )
+>> only set width of character. How can I specify whether to stretch it
+>> vertically or horizontally? Or do you mean doing sth like transformation?
+>>
+>>
+>>>  Btw: any idea where is globalPos(), I try to use tooltip associated
+>>>> with locate() function to do this?when mouse over on exon, show the id, but
+>>>> I can only find pos, based on the documentation, it looks like I need to get
+>>>> globalPos..of course I have alternative workaround instead of using
+>>>> QToolTip.
+>>>>
+>>>>
+>>> I'm not sure I follow. Are you talking about globalPos() on the event
+>>> object? That is global screen position, not even relative to the window, so
+>>> you would need to be careful to adjust it.
+>>>
+>>
+>> Yes, I can not find globalPos() on event object?
+>>
+>
+> What about screenPos()?
+>
+Yes, screenPos() is there.
+
+>
+>
+>> and I think you are right, I guess I cannot use it.  I am thinking that
+>> maybe qdrawText will be faster than QToolTip, maybe tooltip is not used in
+>> this purpose to show the exon names, maybe it's designed to show widget name
+>> and function description.
+>>
+>>
+> Well the tooltip window has various features, like hypertext. The user
+> could click on something and launch a web browser to some external database,
+> for example.
+>
+>
+Hmm, sounds quite useful, I never think about that before.....
+
+>  Thanks
+>>
+>>>
+>>> Thanks
+>>>>
+>>>>>
+>>>>>
+>>>>>>
+>>>>>>> Michael
+>>>>>>>
+>>>>>>>
+>>>>>>>>
+>>>>>>>> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>>>>>>>>> lawrence.michael at gene.com> wrote:
+>>>>>>>>>
+>>>>>>>>>> This is by design. If this didn't work that way, then when the
+>>>>>>>>>> user zoomed into a chromosome, for example, the text labels would get really
+>>>>>>>>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>>>>>>>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>>>>>>>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>>>>>>>>> is because their radius, like in a bubble plot, is derived from something
+>>>>>>>>>> other than the X and Y axes.
+>>>>>>>>>>
+>>>>>>>>>> Shapes however, like rectangles, polygons and paths, are zoomed.
+>>>>>>>>>> You expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>> This make sense to me, in most cases, i guess people won't expect
+>>>>>>>>> the circle or text to be  zoomed in.
+>>>>>>>>>
+>>>>>>>>> Are you sure you really need the text to scale with the zoom?
+>>>>>>>>>> Deepayan and I decided a long time ago that zooming does not behave like a
+>>>>>>>>>> "magnifying glass." It rescales the plot.
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>> No, you don't have to change that, it's convenient so far, I am
+>>>>>>>>> just curious why this doesn't work for text and circle, because in other
+>>>>>>>>> rare case, I will draw very small text as labels of axis for one circular
+>>>>>>>>> track, or if I draw points around the circular track, I am still expecting
+>>>>>>>>> the points will be zoomed in when I rescale the view. I guess I am confused
+>>>>>>>>> the "rescale of the view" with the one you defined with Deepayan, but it
+>>>>>>>>> make sense to me.
+>>>>>>>>>
+>>>>>>>>> There are some ways to get around this if you really want to:
+>>>>>>>>>> - Draw the text as a path.
+>>>>>>>>>> - Use the "render" method on the scene to render to a QPicture,
+>>>>>>>>>> rescale that and display it. This is how I imagined someone making a
+>>>>>>>>>> magnifying glass. QPicture is a vectorized representation, so no nasty
+>>>>>>>>>> scaling artifacts are introduced.
+>>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Thanks, I think I need to do it in this way, if I really need them
+>>>>>>>>> to be rescaled.  I never try QPicture before, I will take a look at it.
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>> Michael
+>>>>>>>>>>
+>>>>>>>>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <
+>>>>>>>>>> yintengfei at gmail.com> wrote:
+>>>>>>>>>>
+>>>>>>>>>>> Hi
+>>>>>>>>>>>
+>>>>>>>>>>> Here comes another question with text, please see the attached
+>>>>>>>>>>>  code below, only rect could be resized,  when I call v$scale()
+>>>>>>>>>>>
+>>>>>>>>>>> text, circle doesn't change. it happens to visnab, the circular
+>>>>>>>>>>> view, when I scale the view, every thing resize but the text, it's still in
+>>>>>>>>>>> the same size.
+>>>>>>>>>>>
+>>>>>>>>>>> library(qtpaint)
+>>>>>>>>>>> s <- qscene()
+>>>>>>>>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>>>>>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>>>>>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>>>>>>>>   qdrawText(painter,"TEST",50,50)
+>>>>>>>>>>> },limits=qrect(0,0,100,100))
+>>>>>>>>>>> v <- qplotView(s)
+>>>>>>>>>>> v$show()
+>>>>>>>>>>>
+>>>>>>>>>>> v$scale(1.5,1.5)
+>>>>>>>>>>>
+>>>>>>>>>>> Thanks
+>>>>>>>>>>>
+>>>>>>>>>>> Tengfei
+>>>>>>>>>>> --
+>>>>>>>>>>> Tengfei Yin
+>>>>>>>>>>> MCDB PhD student
+>>>>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>>>>> Iowa State University
+>>>>>>>>>>> Ames, IA,50011-2274
+>>>>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> _______________________________________________
+>>>>>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>>>>>
+>>>>>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> --
+>>>>>>>>> Tengfei Yin
+>>>>>>>>> MCDB PhD student
+>>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>>> Iowa State University
+>>>>>>>>> Ames, IA,50011-2274
+>>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> --
+>>>>>>>> Tengfei Yin
+>>>>>>>> MCDB PhD student
+>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>> Iowa State University
+>>>>>>>> Ames, IA,50011-2274
+>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> _______________________________________________
+>>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>>
+>>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>>
+>>>>>>>>
+>>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> --
+>>>>>> Tengfei Yin
+>>>>>> MCDB PhD student
+>>>>>> 1620 Howe Hall, 2274,
+>>>>>> Iowa State University
+>>>>>> Ames, IA,50011-2274
+>>>>>> Homepage: www.tengfei.name
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>
+>>>>
+>>>>
+>>>> --
+>>>> Tengfei Yin
+>>>> MCDB PhD student
+>>>> 1620 Howe Hall, 2274,
+>>>> Iowa State University
+>>>> Ames, IA,50011-2274
+>>>> Homepage: www.tengfei.name
+>>>>
+>>>>
+>>>>
+>>>
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>
+
+
+-- 
+Tengfei Yin
+MCDB PhD student
+1620 Howe Hall, 2274,
+Iowa State University
+Ames, IA,50011-2274
+Homepage: www.tengfei.name
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101112/097b7c18/attachment-0001.htm>
+
+From xieyihui at gmail.com  Sat Nov 13 06:25:57 2010
+From: xieyihui at gmail.com (Yihui Xie)
+Date: Fri, 12 Nov 2010 23:25:57 -0600
+Subject: [RQt-devel] qdrawText() crashes R
+In-Reply-To: <AANLkTinYXmGN7UdSZgkjfq2VM5-DxZeJFYiKLWTuPtfR@mail.gmail.com>
+References: <AANLkTikpX+aXU44iOWMvorpsMaa9Ero8BF2A-QL2QmnW@mail.gmail.com>
+	<AANLkTi=BL8mf4uJCw01O_fNGG+AYhTHpmAJPOJp_i6qz@mail.gmail.com>
+	<AANLkTinYXmGN7UdSZgkjfq2VM5-DxZeJFYiKLWTuPtfR@mail.gmail.com>
+Message-ID: <AANLkTi=W44a-_h1vb=j5QDU9wL8jcxUKqu3w03c7Gdut@mail.gmail.com>
+
+Thanks a lot. It's working now.
+
+Regards,
+Yihui
+--
+Yihui Xie <xieyihui at gmail.com>
+Phone: 515-294-2465 Web: http://yihui.name
+Department of Statistics, Iowa State University
+2215 Snedecor Hall, Ames, IA
+
+
+
+On Thu, Nov 11, 2010 at 10:28 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> This should be fixed...
+>
+> On Thu, Nov 11, 2010 at 3:26 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>>
+>> Same thing happens on my laptop, when I resize it.
+>> *** caught segfault ***
+>> address 0xffffffff00000008, cause 'memory not mapped'
+>> Traceback:
+>> ?1: .Call("qt_qdrawText_Painter", p, as.character(text), as.numeric(x),
+>> ? as.numeric(y), as.integer(hflag + vflag), as.numeric(rot),
+>> .normArgStroke(p, color, m))
+>> ?2: drawText(text)
+>> ?3: qdrawText(painter, c("aaa\nbbb\ncdg\nqwer", "qwer"), 4, c(1, ? ? 5),
+>> halign = "right", valign = "center")
+>> ?4: function (layer, painter) { ? ?for (x in c(0, 3, 5, 8, 10)) {
+>> ?qdrawText(painter, paste("x =", x), x, 5) ? ?} ? ?qdrawText(painter,
+>> c("aaa\nbbb\ncdg\nqwer", "qwer"), 4, c(1, ? ? ? ? 5), halign = "right",
+>> valign = "center")}(<environment>, <pointer: 0x47b0490>)
+>> Possible actions:
+>> 1: abort (with core dump, if enabled)
+>> 2: normal R exit
+>> 3: exit R without saving workspace
+>> 4: exit R saving workspace
+>> Selection:
+>>
+>> On Thu, Nov 11, 2010 at 4:48 PM, Yihui Xie <xieyihui at gmail.com> wrote:
+>>>
+>>> Hi,
+>>>
+>>> I was trying to draw y-axis tick labels with qdrawText() and found
+>>> qdrawText() can crash R when '\n' is present in the texts. A
+>>> reproducible example is below:
+>>>
+>>> library(qtpaint)
+>>> s <- qscene()
+>>> test_layer <- qlayer(s, function(layer, painter) {
+>>> ? ?for(x in c(0,3,5,8,10)) {
+>>> ? ? ? ?qdrawText(painter, paste('x =',x), x, 5)
+>>> ? ?}
+>>> ? ?## qdrawText(painter, 'asdf', 1,1)
+>>> ? ?qdrawText(painter, c('aaa\nbbb\ncdg\nqwer','qwer'), 4, c(1,5),
+>>> halign='right', valign='center')
+>>> }, limits=qrect(0,0,10,10))
+>>> qplotView(s)
+>>>
+>>>
+>>> Whenever I ran this code, R will crash. When I was lucky that R did
+>>> not crash immediately, I could minimize the window to crash R again.
+>>> Any ideas?
+>>>
+>>> Thanks!
+>>>
+>>> > *** glibc detected *** /usr/local/lib64/R/bin/exec/R: double free or
+>>> > corruption (!prev): 0x00000000043d31e0 ***
+>>> ======= Backtrace: =========
+>>> /lib/libc.so.6(+0x774b6)[0x7f46415634b6]
+>>> /lib/libc.so.6(cfree+0x73)[0x7f4641569c83]
+>>> /usr/lib/nvidia-current/libGL.so.1(+0x992ff)[0x7f46388472ff]
+>>> ======= Memory map: ========
+>>> 00400000-00401000 r-xp 00000000 08:01 131789
+>>> ?/usr/local/lib64/R/bin/exec/R
+>>> 00600000-00601000 r--p 00000000 08:01 131789
+>>> ?/usr/local/lib64/R/bin/exec/R
+>>> 00601000-00602000 rw-p 00001000 08:01 131789
+>>> ?/usr/local/lib64/R/bin/exec/R
+>>> 022aa000-04576000 rw-p 00000000 00:00 0
+>>> ?[heap]
+>>> 40ec6000-40ec8000 r-xs 00000000 08:01 1502
+>>> ?/tmp/gl2W9m0B (deleted)
+>>> 414cd000-414cf000 r-xs 00000000 08:01 1442
+>>> ?/tmp/glyRl1a3 (deleted)
+>>> 416ea000-41750000 rw-p 00000000 00:05 4639
+>>> ?/dev/zero
+>>> 41a8b000-41a8d000 r-xs 00000000 08:01 62
+>>> ?/tmp/glKpwGlu (deleted)
+>>> 41ae4000-41ae6000 r-xs 00000000 08:01 2682
+>>> ?/tmp/glM3OJPa (deleted)
+>>> 7f4623c00000-7f4624000000 rw-s 3b757000 00:05 7852
+>>> ?/dev/nvidia0
+>>> 7f4624000000-7f4624021000 rw-p 00000000 00:00 0
+>>> 7f4624021000-7f4628000000 ---p 00000000 00:00 0
+>>> 7f4628110000-7f462811c000 rw-p 00000000 00:00 0
+>>> 7f462811c000-7f462816a000 r--p 00000000 08:01 5512012
+>>> ?/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf
+>>> 7f4628172000-7f4628272000 rw-s 12a46000 00:05 7852
+>>> ?/dev/nvidia0
+>>> 7f4628272000-7f46282b2000 rw-s 18c3a000 00:05 7852
+>>> ?/dev/nvidia0
+>>> 7f46282b2000-7f46282d2000 rw-s 2f79e000 00:05 7852
+>>> ?/dev/nvidia0
+>>> 7f46282d2000-7f4628346000 r-xp 00000000 08:01 1706123
+>>>
+>>> ?/home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+>>> 7f4628346000-7f4628545000 ---p 00074000 08:01 1706123
+>>>
+>>> ?/home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+>>> 7f4628545000-7f4628548000 r--p 00073000 08:01 1706123
+>>>
+>>> ?/home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+>>> 7f4628548000-7f462854e000 rw-p 00076000 08:01 1706123
+>>>
+>>> ?/home/yihui/R/x86_64-unknown-linux-gnu-library/2.12/qtpaint/libs/qtpaint.so
+>>> 7f462854e000-7f462854f000 ---p 00000000 00:00 0
+>>> 7f462854f000-7f4628d9f000 rw-p 00000000 00:00 0
+>>> 7f4628d9f000-7f4628db1000 r-xp 00000000 08:01 665470
+>>> ?/usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+>>> 7f4628db1000-7f4628fb1000 ---p 00012000 08:01 665470
+>>> ?/usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+>>> 7f4628fb1000-7f4628fb2000 r--p 00012000 08:01 665470
+>>> ?/usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+>>> 7f4628fb2000-7f4628fb3000 rw-p 00013000 08:01 665470
+>>> ?/usr/lib/gtk-2.0/2.10.0/immodules/im-scim-bridge.so
+>>> 7f4628fb3000-7f4629002000 r--p 00000000 08:01 918237
+>>> ?/usr/share/fonts/truetype/ttf-dejavu/DejaVuSansMono.ttf
+>>> 7f4629002000-7f4629004000 r-xp 00000000 08:01 677948
+>>> ?/usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+>>> 7f4629004000-7f4629203000 ---p 00002000 08:01 677948
+>>> ?/usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+>>> 7f4629203000-7f4629204000 r--p 00001000 08:01 677948
+>>> ?/usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+>>> 7f4629204000-7f4629205000 rw-p 00002000 08:01 677948
+>>> ?/usr/lib/pango/1.6.0/modules/pango-basic-fc.so
+>>> 7f4629205000-7f4629230000 r-xp 00000000 08:01 673769
+>>> ?/usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+>>> 7f4629230000-7f4629430000 ---p 0002b000 08:01 673769
+>>> ?/usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+>>> 7f4629430000-7f4629431000 r--p 0002b000 08:01 673769
+>>> ?/usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+>>> 7f4629431000-7f4629432000 rw-p 0002c000 08:01 673769
+>>> ?/usr/lib/gtk-2.0/2.10.0/engines/libclearlooks.so
+>>> 7f4629432000-7f4629436000 r-xp 00000000 08:01 1776
+>>> ?/usr/lib/libcanberra-gtk.so.0.1.6
+>>> 7f4629436000-7f4629635000 ---p 00004000 08:01 1776
+>>> ?/usr/lib/libcanberra-gtk.so.0.1.6
+>>> 7f4629635000-7f4629636000 r--p 00003000 08:01 1776
+>>> ?/usr/lib/libcanberra-gtk.so.0.1.6
+>>> 7f4629636000-7f4629637000 rw-p 00004000 08:01 1776
+>>> ?/usr/lib/libcanberra-gtk.so.0.1.6
+>>> 7f4629637000-7f462963c000 r-xp 00000000 08:01 673294
+>>> ?/usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+>>> 7f462963c000-7f462983c000 ---p 00005000 08:01 673294
+>>> ?/usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+>>> 7f462983c000-7f462983d000 r--p 00005000 08:01 673294
+>>> ?/usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+>>> 7f462983d000-7f462983e000 rw-p 00006000 08:01 673294
+>>> ?/usr/lib/gtk-2.0/modules/libcanberra-gtk-module.so
+>>> 7f462983e000-7f4629841000 r-xp 00000000 08:01 3177
+>>> ?/lib/libgpg-error.so.0.4.0
+>>> 7f4629841000-7f4629a40000 ---p 00003000 08:01 3177
+>>> ?/lib/libgpg-error.so.0.4.0
+>>> 7f4629a40000-7f4629a41000 r--p 00002000 08:01 3177
+>>> ?/lib/libgpg-error.so.0.4.0
+>>> 7f4629a41000-7f4629a42000 rw-p 00003000 08:01 3177
+>>> ?/lib/libgpg-error.so.0.4.0
+>>> 7f4629a42000-7f4629a52000 r-xp 00000000 08:01 1832
+>>> ?/usr/lib/libtasn1.so.3.1.9
+>>> 7f4629a52000-7f4629c51000 ---p 00010000 08:01 1832
+>>> ?/usr/lib/libtasn1.so.3.1.9
+>>> 7f4629c51000-7f4629c52000 r--p 0000f000 08:01 1832
+>>> ?/usr/lib/libtasn1.so.3.1.9
+>>> 7f4629c52000-7f4629c53000 rw-p 00010000 08:01 1832
+>>> ?/usr/lib/libtasn1.so.3.1.9
+>>> 7f4629c53000-7f4629c5b000 r-xp 00000000 08:01 2764
+>>> ?/usr/lib/libltdl.so.7.2.1
+>>> 7f4629c5b000-7f4629e5b000 ---p 00008000 08:01 2764
+>>> ?/usr/lib/libltdl.so.7.2.1
+>>> 7f4629e5b000-7f4629e5c000 r--p 00008000 08:01 2764
+>>> ?/usr/lib/libltdl.so.7.2.1
+>>> 7f4629e5c000-7f4629e5d000 rw-p 00009000 08:01 2764
+>>> ?/usr/lib/libltdl.so.7.2.1
+>>> 7f4629e5d000-7f4629e6b000 r-xp 00000000 08:01 4124
+>>> ?/usr/lib/libtdb.so.1.2.1
+>>> 7f4629e6b000-7f462a06a000 ---p 0000e000 08:01 4124
+>>> ?/usr/lib/libtdb.so.1.2.1
+>>> 7f462a06a000-7f462a06b000 r--p 0000d000 08:01 4124
+>>> ?/usr/lib/libtdb.so.1.2.1
+>>> 7f462a06b000-7f462a06c000 rw-p 0000e000 08:01 4124
+>>> ?/usr/lib/libtdb.so.1.2.1
+>>> 7f462a06c000-7f462a073000 r-xp 00000000 08:01 4865
+>>> ?/usr/lib/libvorbisfile.so.3.3.2
+>>> 7f462a073000-7f462a272000 ---p 00007000 08:01 4865
+>>> ?/usr/lib/libvorbisfile.so.3.3.2
+>>> 7f462a272000-7f462a273000 r--p 00006000 08:01 4865
+>>> ?/usr/lib/libvorbisfile.so.3.3.2
+>>> 7f462a273000-7f462a274000 rw-p 00007000 08:01 4865
+>>> ?/usr/lib/libvorbisfile.so.3.3.2
+>>> 7f462a274000-7f462a2e8000 r-xp 00000000 08:01 3636
+>>> ?/lib/libgcrypt.so.11.5.3
+>>> 7f462a2e8000-7f462a4e8000 ---p 00074000 08:01 3636
+>>> ?/lib/libgcrypt.so.11.5.3
+>>> 7f462a4e8000-7f462a4e9000 r--p 00074000 08:01 3636
+>>> ?/lib/libgcrypt.so.11.5.3
+>>> 7f462a4e9000-7f462a4ec000 rw-p 00075000 08:01 3636
+>>> ?/lib/libgcrypt.so.11.5.3
+>>> 7f462a4ec000-7f462a4ee000 r-xp 00000000 08:01 2830
+>>> ?/lib/libutil-2.12.1.so
+>>> 7f462a4ee000-7f462a6ed000 ---p 00002000 08:01 2830
+>>> ?/lib/libutil-2.12.1.so
+>>> 7f462a6ed000-7f462a6ee000 r--p 00001000 08:01 2830
+>>> ?/lib/libutil-2.12.1.so
+>>> 7f462a6ee000-7f462a6ef000 rw-p 00002000
+>>> Process R aborted at Thu Nov 11 16:43:38 2010
+>>>
+>>> Regards,
+>>> Yihui
+>>> --
+>>> Yihui Xie <xieyihui at gmail.com>
+>>> Phone: 515-294-2465 Web: http://yihui.name
+>>> Department of Statistics, Iowa State University
+>>> 2215 Snedecor Hall, Ames, IA
+>>> _______________________________________________
+>>> Qtinterfaces-devel mailing list
+>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>> _______________________________________________
+>> Qtinterfaces-devel mailing list
+>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>
+>
+>
+
+From lawrence.michael at gene.com  Sat Nov 13 14:28:19 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sat, 13 Nov 2010 05:28:19 -0800
+Subject: [RQt-devel] scale of view for some primitive doesn't work
+In-Reply-To: <AANLkTimnFePqFJmh9Wi0LJFHff+ir9XppRYOJ3Y15VZM@mail.gmail.com>
+References: <AANLkTim8E-Wb4SJuzeFYCuEdjmgFWCXTseD4eE-quZkM@mail.gmail.com>
+	<AANLkTimjGTNvV5=mZXC9U1KTaVNoAfk24MR-AtCiUTa7@mail.gmail.com>
+	<AANLkTi=rJoEY8AJFPfL=EBYsbvKw_DGGh-jwRi+++hPr@mail.gmail.com>
+	<AANLkTi=bP85g6WZUKmuqxfcdmFZk1SYjaBbPzgbBbrUy@mail.gmail.com>
+	<AANLkTinVsziKMx5=_3pwa+wayMCsCBn9cigEpfTuZJ2a@mail.gmail.com>
+	<AANLkTimPMHF_gp3D9aa69r+FCSDZ7TC=66GNxym2FzaP@mail.gmail.com>
+	<AANLkTineex47w_Ph_C-3_F3EvA22yAfhri=dA8gtzO+P@mail.gmail.com>
+	<AANLkTinfxFG=wKyzygbX9DhqJneCfaFxdd24vtAaLJ5+@mail.gmail.com>
+	<AANLkTi=GMfSxiCv+ihRuxpOrJcjZGFht7kWyw5Hayy4Y@mail.gmail.com>
+	<AANLkTi=UyH=sAGB6JrVS=vZ+UJLE9CauVWnKGKLerJUY@mail.gmail.com>
+	<AANLkTimnFePqFJmh9Wi0LJFHff+ir9XppRYOJ3Y15VZM@mail.gmail.com>
+Message-ID: <AANLkTinEOfFxG88qxSTg_1+Gz=GBLAWRymkt1xT25JyP@mail.gmail.com>
+
+On Fri, Nov 12, 2010 at 2:42 PM, Michael Lawrence <michafla at gene.com> wrote:
+
+>
+>
+> On Fri, Nov 12, 2010 at 2:13 PM, Tengfei Yin <yintengfei at gmail.com> wrote:
+>
+>>
+>>
+>> On Fri, Nov 12, 2010 at 3:27 PM, Michael Lawrence <
+>> lawrence.michael at gene.com> wrote:
+>>
+>>>
+>>>
+>>> On Fri, Nov 12, 2010 at 8:59 AM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>
+>>>>
+>>>>
+>>>> On Fri, Nov 12, 2010 at 7:09 AM, Michael Lawrence <
+>>>> lawrence.michael at gene.com> wrote:
+>>>>
+>>>>>
+>>>>>
+>>>>> On Thu, Nov 11, 2010 at 9:35 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>> On Thu, Nov 11, 2010 at 10:27 PM, Michael Lawrence <
+>>>>>> lawrence.michael at gene.com> wrote:
+>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> On Thu, Nov 11, 2010 at 7:32 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>>
+>>>>>>>> So even when you use view$rotate(), the text direction won't
+>>>>>>>> change..is this also what we expected to see?
+>>>>>>>>
+>>>>>>>>
+>>>>>>> Yes. I can see how that may not always be desirable, but it would be
+>>>>>>> tough to work around it. That is, I cannot tease out the rotation from the
+>>>>>>> rest of the transformation. In the case of a word cloud, I think it would be
+>>>>>>> desirable, i.e., one is thinking of the text as glyphs that are independent
+>>>>>>> of the scales.
+>>>>>>>
+>>>>>>>
+>>>>>>>> and by the way, do you know any way to change to text size, the use
+>>>>>>>> case here is sth like "tag cloud", but I guess I can draw text as path to
+>>>>>>>> solve this problem.
+>>>>>>>>
+>>>>>>>>
+>>>>>>> Just change the font.. do you want some sort of vectorized "cex"
+>>>>>>> argument to qdrawText? Might not be that hard to add.
+>>>>>>>
+>>>>>>
+>>>>>> Yes, if you don't mind spend some time on it, it will be really nice
+>>>>>> to have a control over the text size, e.g. when I plot a sequence data, like
+>>>>>> ACTGGGC....I can resize one single character  to address the mis-alignment.
+>>>>>>
+>>>>>
+>>>>> You mean like a sequence logo plot, based on the counts of each base?
+>>>>> Sweet idea. The feature is committed, have fun.
+>>>>>
+>>>>
+>>>> Yes, I plan to do sth like this~the problem of this kind of graphic is
+>>>> that, no problem showing as a single plot, but when showing along a
+>>>> shot-read alighment, due to resale of all the text, even a single size
+>>>> change of one base will make it hard to align a single sequence with other
+>>>> "normal" text. I will work around this to see if I have some problem.
+>>>>
+>>>>
+>>> Text glyphs could be scaled differently in the horizontal and vertical.
+>>> Would this help with this issue? That is, you could stretch the letters
+>>> vertically.
+>>>
+>>
+>> Do you mean sth that is already in  qtpaint?
+>>
+>
+> No it's not there yet but it would be easy to support it. Right now 'cex'
+> causes a symmetric scale; it does not need to be that way. I will add it.
+>
+>
+
+I added support for this. Just specify the 'vcex' parameter instead of 'cex'
+to expand only in the vertical direction.
+
+
+
+>
+>> it's not in qdrawText(), and the qglyphText has no such a parameter, do
+>> you suggest me to create text as path and use qdrawPath to plot those
+>> stuff?? and by the way, in the qt document,
+>> void QFont::setStretch ( int factor )
+>> only set width of character. How can I specify whether to stretch it
+>> vertically or horizontally? Or do you mean doing sth like transformation?
+>>
+>>
+>>>  Btw: any idea where is globalPos(), I try to use tooltip associated
+>>>> with locate() function to do this?when mouse over on exon, show the id, but
+>>>> I can only find pos, based on the documentation, it looks like I need to get
+>>>> globalPos..of course I have alternative workaround instead of using
+>>>> QToolTip.
+>>>>
+>>>>
+>>> I'm not sure I follow. Are you talking about globalPos() on the event
+>>> object? That is global screen position, not even relative to the window, so
+>>> you would need to be careful to adjust it.
+>>>
+>>
+>> Yes, I can not find globalPos() on event object?
+>>
+>
+> What about screenPos()?
+>
+>
+>> and I think you are right, I guess I cannot use it.  I am thinking that
+>> maybe qdrawText will be faster than QToolTip, maybe tooltip is not used in
+>> this purpose to show the exon names, maybe it's designed to show widget name
+>> and function description.
+>>
+>>
+> Well the tooltip window has various features, like hypertext. The user
+> could click on something and launch a web browser to some external database,
+> for example.
+>
+>
+>> Thanks
+>>
+>>>
+>>> Thanks
+>>>>
+>>>>>
+>>>>>
+>>>>>>
+>>>>>>> Michael
+>>>>>>>
+>>>>>>>
+>>>>>>>>
+>>>>>>>> On Thu, Nov 11, 2010 at 6:14 PM, Tengfei Yin <yintengfei at gmail.com>wrote:
+>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> On Thu, Nov 11, 2010 at 5:39 PM, Michael Lawrence <
+>>>>>>>>> lawrence.michael at gene.com> wrote:
+>>>>>>>>>
+>>>>>>>>>> This is by design. If this didn't work that way, then when the
+>>>>>>>>>> user zoomed into a chromosome, for example, the text labels would get really
+>>>>>>>>>> stretched out. Glyphs are the same way (they're essentially fancy
+>>>>>>>>>> characters). Zooming into a scatterplot should not make the glyphs larger.
+>>>>>>>>>> Circles (after much debate inside my head) behave the same as glyphs. This
+>>>>>>>>>> is because their radius, like in a bubble plot, is derived from something
+>>>>>>>>>> other than the X and Y axes.
+>>>>>>>>>>
+>>>>>>>>>> Shapes however, like rectangles, polygons and paths, are zoomed.
+>>>>>>>>>> You expect a mosaic plot rectangle or a map polygon to scale with the plot.
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>> This make sense to me, in most cases, i guess people won't expect
+>>>>>>>>> the circle or text to be  zoomed in.
+>>>>>>>>>
+>>>>>>>>> Are you sure you really need the text to scale with the zoom?
+>>>>>>>>>> Deepayan and I decided a long time ago that zooming does not behave like a
+>>>>>>>>>> "magnifying glass." It rescales the plot.
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>> No, you don't have to change that, it's convenient so far, I am
+>>>>>>>>> just curious why this doesn't work for text and circle, because in other
+>>>>>>>>> rare case, I will draw very small text as labels of axis for one circular
+>>>>>>>>> track, or if I draw points around the circular track, I am still expecting
+>>>>>>>>> the points will be zoomed in when I rescale the view. I guess I am confused
+>>>>>>>>> the "rescale of the view" with the one you defined with Deepayan, but it
+>>>>>>>>> make sense to me.
+>>>>>>>>>
+>>>>>>>>> There are some ways to get around this if you really want to:
+>>>>>>>>>> - Draw the text as a path.
+>>>>>>>>>> - Use the "render" method on the scene to render to a QPicture,
+>>>>>>>>>> rescale that and display it. This is how I imagined someone making a
+>>>>>>>>>> magnifying glass. QPicture is a vectorized representation, so no nasty
+>>>>>>>>>> scaling artifacts are introduced.
+>>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Thanks, I think I need to do it in this way, if I really need them
+>>>>>>>>> to be rescaled.  I never try QPicture before, I will take a look at it.
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>> Michael
+>>>>>>>>>>
+>>>>>>>>>> On Thu, Nov 11, 2010 at 3:24 PM, Tengfei Yin <
+>>>>>>>>>> yintengfei at gmail.com> wrote:
+>>>>>>>>>>
+>>>>>>>>>>> Hi
+>>>>>>>>>>>
+>>>>>>>>>>> Here comes another question with text, please see the attached
+>>>>>>>>>>>  code below, only rect could be resized,  when I call v$scale()
+>>>>>>>>>>>
+>>>>>>>>>>> text, circle doesn't change. it happens to visnab, the circular
+>>>>>>>>>>> view, when I scale the view, every thing resize but the text, it's still in
+>>>>>>>>>>> the same size.
+>>>>>>>>>>>
+>>>>>>>>>>> library(qtpaint)
+>>>>>>>>>>> s <- qscene()
+>>>>>>>>>>> test_layer <- qlayer(s,function(layer,painter){
+>>>>>>>>>>>   qdrawRect(painter,30,30,70,70,stroke="blue")
+>>>>>>>>>>>   qdrawCircle(painter,50,50,20,stroke="red")
+>>>>>>>>>>>   qdrawText(painter,"TEST",50,50)
+>>>>>>>>>>> },limits=qrect(0,0,100,100))
+>>>>>>>>>>> v <- qplotView(s)
+>>>>>>>>>>> v$show()
+>>>>>>>>>>>
+>>>>>>>>>>> v$scale(1.5,1.5)
+>>>>>>>>>>>
+>>>>>>>>>>> Thanks
+>>>>>>>>>>>
+>>>>>>>>>>> Tengfei
+>>>>>>>>>>> --
+>>>>>>>>>>> Tengfei Yin
+>>>>>>>>>>> MCDB PhD student
+>>>>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>>>>> Iowa State University
+>>>>>>>>>>> Ames, IA,50011-2274
+>>>>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> _______________________________________________
+>>>>>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>>>>>
+>>>>>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> --
+>>>>>>>>> Tengfei Yin
+>>>>>>>>> MCDB PhD student
+>>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>>> Iowa State University
+>>>>>>>>> Ames, IA,50011-2274
+>>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> --
+>>>>>>>> Tengfei Yin
+>>>>>>>> MCDB PhD student
+>>>>>>>> 1620 Howe Hall, 2274,
+>>>>>>>> Iowa State University
+>>>>>>>> Ames, IA,50011-2274
+>>>>>>>> Homepage: www.tengfei.name
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> _______________________________________________
+>>>>>>>> Qtinterfaces-devel mailing list
+>>>>>>>> Qtinterfaces-devel at lists.r-forge.r-project.org
+>>>>>>>>
+>>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>>>>>>>>
+>>>>>>>>
+>>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> --
+>>>>>> Tengfei Yin
+>>>>>> MCDB PhD student
+>>>>>> 1620 Howe Hall, 2274,
+>>>>>> Iowa State University
+>>>>>> Ames, IA,50011-2274
+>>>>>> Homepage: www.tengfei.name
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>
+>>>>
+>>>>
+>>>> --
+>>>> Tengfei Yin
+>>>> MCDB PhD student
+>>>> 1620 Howe Hall, 2274,
+>>>> Iowa State University
+>>>> Ames, IA,50011-2274
+>>>> Homepage: www.tengfei.name
+>>>>
+>>>>
+>>>>
+>>>
+>>
+>>
+>> --
+>> Tengfei Yin
+>> MCDB PhD student
+>> 1620 Howe Hall, 2274,
+>> Iowa State University
+>> Ames, IA,50011-2274
+>> Homepage: www.tengfei.name
+>>
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20101113/153cb9ff/attachment-0001.htm>
+

@@ -1,0 +1,587 @@
+From dutangc at gmail.com  Tue Jan  3 08:55:35 2012
+From: dutangc at gmail.com (Christophe Dutang)
+Date: Tue, 3 Jan 2012 08:55:35 +0100
+Subject: [Riskassessment-news] Fwd: [R-SIG-Finance] fitdist in R
+References: <CAPPM_gQRAVoz2T1=fOzmHGe5NkArJqwVW1c7mcvPnYN+c9+AAA@mail.gmail.com>
+Message-ID: <BDA13EFF-5364-4060-8261-A178DC4F066D@gmail.com>
+
+Please find an answer to your fitdistrplus problem below.
+
+Kind regards
+
+Christophe
+________________________________________________________________
+
+
+library(fitdistrplus)
+
+
+A <- structure(list(V1 = c(-0.00707717, -0.000947418, -0.00189753, 
+-0.000474947, -0.00190205, -0.000476077, 0.00237812, 0.000949668, 
+0.000474496, 0.00284226, -0.000473149, -0.000473373, 0, 0, 0.00283688, 
+-0.0037843, -0.0047506, -0.00238379, -0.00286807, 0.000478583, 
+0.000478354, -0.00143575, 0.00143575, 0.00238835, 0.0042847, 
+0.00237248, -0.00142281, -0.00142484, 0, 0.00142484, 0.000948767, 
+0.00378609, -0.000472478, 0.000472478, -0.0014181, 0, -0.000946522, 
+-0.00284495, 0, 0.00331832, 0.00283554, 0.00141476, -0.00141476, 
+-0.00188947, 0.00141743, -0.00236351, 0.00236351, 0.00235794, 
+0.00235239, -0.000940292, -0.0014121, -0.00283019, 0.000472255, 
+0.000472032, 0.000471809, -0.0014161, 0.0014161, -0.000943842, 
+0.000472032, -0.000944287, -0.00094518, -0.00189304, -0.000473821, 
+-0.000474046, 0.00331361, -0.000472701, -0.000946074, 0.00141878, 
+-0.000945627, -0.00189394, -0.00189753, -0.0057143, -0.00143369, 
+-0.00383326, 0.00143919, 0.000479272, -0.00191847, -0.000480192, 
+0.000960154, 0.000479731, 0, 0.000479501, 0.000958313, -0.00383878, 
+-0.00240674, 0.000963391, 0.000962464, -0.00192586, 0.000481812, 
+-0.00241138, -0.00144963)), .Names = "V1", row.names = c(NA, 
+-91L), class = "data.frame")
+
+#your data are very small 
+summary(A$V1)
+
+#fit dist does not converge with parameter
+fitdist(A$V1,"norm",method="mge",gof="CvM")
+
+#arguments are correctly specified
+?fitdist
+
+#equivalent call of mgedist -> same problem
+mgedist(A$V1,"norm",gof="CvM")
+
+#with uniform distribution it works
+fitdist(A$V1,"unif",method="mge")
+
+#as well as with mme and mle
+fitdist(A$V1,"norm",method="mme")
+fitdist(A$V1,"norm",method="mle")
+
+#so the problem comes with the mean or the sd parameters of the normal distribution.
+#as returns a result, sd is the problem
+mgedist(A$V1,"norm",gof="CvM", fix.arg=list(sd=sd(A$V1)), start=list(mean=0))
+
+#fixing a lower bound for sd returns a result
+mgedist(A$V1,"norm",gof="CvM", lower=c(-1, .01))
+
+#but the appropriate answer to your problem is to rescale your data.
+#it works perfectly.
+mgedist(1000*A$V1,"norm",gof="CvM", lower=c(-1, 1e-3))
+#we don't even need to use lower bounds.
+mgedist(1000*A$V1,"norm",gof="CvM")
+
+
+#looking at the source code of mgedist, one can see, that the distance
+#of Cramer von Mises is defined as follows.
+fnobj <- function(par, fix.arg, obs, pdistnam) {
+                n <- length(obs)
+                s <- sort(obs)
+                theop <- do.call(pdistnam, c(list(q = s), as.list(par), 
+                  as.list(fix.arg)))
+                1/(12 * n) + sum((theop - (2 * seq(1:n) - 1)/(2 * 
+                  n))^2)
+            }
+            
+#a NaN is produced with negative sd            
+fnobj(c(1,1), NULL, A$V1, pnorm)
+fnobj(c(mean=1,sd=1), NULL, A$V1, pnorm)
+fnobj(c(mean=0,sd=0), NULL, A$V1, pnorm)
+fnobj(c(mean=0,sd=-1), NULL, A$V1, pnorm)
+
+
+--
+Christophe Dutang
+Ph.D. student at ISFA, Lyon, France
+website: http://dutangc.free.fr
+
+D?but du message r?exp?di? :
+
+> De : Joshua Ulrich <josh.m.ulrich at gmail.com>
+> Date : 3 janvier 2012 04:39:47 HNEC
+> ? : financial engineer <fin_engr at hotmail.com>
+> Cc : r-sig-finance at r-project.org
+> Objet : R?p : [R-SIG-Finance] fitdist in R
+> 
+> If you're going to cross-post
+> (http://stackoverflow.com/q/8707562/271616), please have the courtesy
+> to explicitly say so.  Otherwise, answers to your question may be
+> scattered across multiple sites.
+> 
+> On Mon, Jan 2, 2012 at 9:16 PM, financial engineer <fin_engr at hotmail.com> wrote:
+>> 
+>> apologies if this should be a general R question, but if someone has any suggestions to fix the problem, I'd certainly appreciate it.
+>> 
+> If you feel the need to start your email with an apology, you are
+> probably doing something wrong.  You're correct, this isn't a finance
+> question and is therefore off-topic.
+> 
+>> I am using the fitdist function in the package fitdistrplus in R.
+>> 
+>> I have the following data that I read using
+>> A<-read.table("test.dat")`
+>> this is the entire dataset
+>>> A
+>>             V1
+>> 1  -0.007077170
+>> 2  -0.000947418
+>> 3  -0.001897530
+>> 4  -0.000474947
+>> 5  -0.001902050
+>> 6  -0.000476077
+>> 7   0.002378120
+>> 8   0.000949668
+>> 9   0.000474496
+>> 10  0.002842260
+>> 11 -0.000473149
+>> 12 -0.000473373
+>> 13  0.000000000
+>> 14  0.000000000
+>> 15  0.002836880
+>> 16 -0.003784300
+>> 17 -0.004750600
+>> 18 -0.002383790
+>> 19 -0.002868070
+>> 20  0.000478583
+>> 21  0.000478354
+>> 22 -0.001435750
+>> 23  0.001435750
+>> 24  0.002388350
+>> 25  0.004284700
+>> 26  0.002372480
+>> 27 -0.001422810
+>> 28 -0.001424840
+>> 29  0.000000000
+>> 30  0.001424840
+>> 31  0.000948767
+>> 32  0.003786090
+>> 33 -0.000472478
+>> 34  0.000472478
+>> 35 -0.001418100
+>> 36  0.000000000
+>> 37 -0.000946522
+>> 38 -0.002844950
+>> 39  0.000000000
+>> 40  0.003318320
+>> 41  0.002835540
+>> 42  0.001414760
+>> 43 -0.001414760
+>> 44 -0.001889470
+>> 45  0.001417430
+>> 46 -0.002363510
+>> 47  0.002363510
+>> 48  0.002357940
+>> 49  0.002352390
+>> 50 -0.000940292
+>> 51 -0.001412100
+>> 52 -0.002830190
+>> 53  0.000472255
+>> 54  0.000472032
+>> 55  0.000471809
+>> 56 -0.001416100
+>> 57  0.001416100
+>> 58 -0.000943842
+>> 59  0.000472032
+>> 60 -0.000944287
+>> 61 -0.000945180
+>> 62 -0.001893040
+>> 63 -0.000473821
+>> 64 -0.000474046
+>> 65  0.003313610
+>> 66 -0.000472701
+>> 67 -0.000946074
+>> 68  0.001418780
+>> 69 -0.000945627
+>> 70 -0.001893940
+>> 71 -0.001897530
+>> 72 -0.005714300
+>> 73 -0.001433690
+>> 74 -0.003833260
+>> 75  0.001439190
+>> 76  0.000479272
+>> 77 -0.001918470
+>> 78 -0.000480192
+>> 79  0.000960154
+>> 80  0.000479731
+>> 81  0.000000000
+>> 82  0.000479501
+>> 83  0.000958313
+>> 84 -0.003838780
+>> 85 -0.002406740
+>> 86  0.000963391
+>> 87  0.000962464
+>> 88 -0.001925860
+>> 89  0.000481812
+>> 90 -0.002411380
+>> 91 -0.001449630
+>> `
+>> I ran the following command:
+>> 
+>>> fitdist(A$V1,"norm",method="mge",gof="CvM")`
+>> 
+>> and it generates the following:
+>> Fitting of the distribution ' norm ' by maximum goodness-of-fit
+>> Parameters:
+>>  estimate
+>> 1       NA
+>> 2       NA
+>> Warning message:
+>> In pnorm(q, mean, sd, lower.tail, log.p) : NaNs produced
+>> 
+>> given the above error message, I ran the below:
+>>> mu=mean(A$V1)
+>>> sigma=sd(A$V1)
+>>> mu
+>> [1] -0.0003091273
+>>> sigma
+>> [1] 0.002051825
+>>> pnorm(A$V1,mu,sigma)
+>>  [1] 0.0004859313 0.3778682282 0.2194235651 0.4677942525 0.2187728328
+>>  [6] 0.4675752645 0.9048490462 0.7302272325 0.6487379052 0.9377179215
+>> [11] 0.4681427154 0.4680993016 0.5598779146 0.5598779146 0.9373956798
+>> [16] 0.0451612910 0.0152074342 0.1559769817 0.1061704134 0.6494763806
+>> [21] 0.6494350178 0.2914741494 0.8024493726 0.9056899734 0.9874187360
+>> [26] 0.9043830715 0.2936417791 0.2933012328 0.5598779146 0.8009684336
+>> [31] 0.7300820807 0.9770270687 0.4682727654 0.6483730677 0.2944326177
+>> [36] 0.5598779146 0.3780342225 0.1082503682 0.5598779146 0.9614622560
+>> [41] 0.9373152170 0.7995942319 0.2949940199 0.2205866970 0.7999587855
+>> [46] 0.1583537921 0.9036385181 0.9031740418 0.9027096003 0.3791890228
+>> [51] 0.2954414771 0.1095934742 0.6483327428 0.6482924162 0.6482520879
+>> [56] 0.2947687275 0.7997772412 0.3785308577 0.6482924162 0.3784483801
+>> [61] 0.3782828856 0.2200710780 0.4680124750 0.4679688685 0.9612699580
+>> [66] 0.4682295443 0.3781172281 0.8001429585 0.3782000541 0.2199411992
+>> [71] 0.2194235651 0.0042152418 0.2918187280 0.0429384302 0.8029149383
+>> [76] 0.6496008197 0.2164182554 0.4667778828 0.7319136560 0.6496837100
+>> [81] 0.5598779146 0.6496421754 0.7316179594 0.0426934572 0.1533157552
+>> [86] 0.7324331764 0.7322844499 0.2153633562 0.6500594259 0.1527813896
+>> [91] 0.2891573876
+>> 
+>> now I am confused why I am getting an error message about NaN's.......anyone have any suggestions what might be the reason....thanks, Bobby
+>> 
+>>        [[alternative HTML version deleted]]
+>> 
+>> _______________________________________________
+>> R-SIG-Finance at r-project.org mailing list
+>> https://stat.ethz.ch/mailman/listinfo/r-sig-finance
+>> -- Subscriber-posting only. If you want to post, subscribe first.
+>> -- Also note that this is not the r-help list where general R questions should go.
+> 
+> _______________________________________________
+> R-SIG-Finance at r-project.org mailing list
+> https://stat.ethz.ch/mailman/listinfo/r-sig-finance
+> -- Subscriber-posting only. If you want to post, subscribe first.
+> -- Also note that this is not the r-help list where general R questions should go.
+
+
+From fin_engr at hotmail.com  Tue Jan  3 14:31:12 2012
+From: fin_engr at hotmail.com (financial engineer)
+Date: Tue, 3 Jan 2012 08:31:12 -0500
+Subject: [Riskassessment-news] [R-SIG-Finance] fitdist in R
+In-Reply-To: <BDA13EFF-5364-4060-8261-A178DC4F066D@gmail.com>
+References: <CAPPM_gQRAVoz2T1=fOzmHGe5NkArJqwVW1c7mcvPnYN+c9+AAA@mail.gmail.com>,
+	<BDA13EFF-5364-4060-8261-A178DC4F066D@gmail.com>
+Message-ID: <COL118-W43364FB34BEC804A183872EF960@phx.gbl>
+
+
+
+
+
+Thanks Christophe,
+
+I appreciate your response.
+
+I tried to fit a cauchy distribution as well - is it again a scaling issue with that distribution as well because these are the results I got...
+
+> fitdist(A$V1,"cauchy",method="mle")
+
+Error in fitdist(A$V1, "cauchy", method = "mle") : 
+
+  the function mle failed to estimate the parameters, 
+
+                with the error code 100
+
+In addition: Warning message:
+
+In dcauchy(x, location, scale, log) : NaNs produce
+
+>fitdist(A$V1*10^5,"cauchy",method="mle")
+Fitting of the distribution ' cauchy ' by maximum likelihood 
+Parameters:
+          estimate Std. Error
+location -29.03782   20.90514
+scale    119.30992   15.61003
+
+
+> Subject: Fwd: [R-SIG-Finance] fitdist in R
+> From: dutangc at gmail.com
+> Date: Tue, 3 Jan 2012 08:55:35 +0100
+> CC: RiskAssessment-News at lists.r-forge.r-project.org; ml.delignette at vetagro-sup.fr
+> To: fin_engr at hotmail.com; josh.m.ulrich at gmail.com
+> 
+> Please find an answer to your fitdistrplus problem below.
+> 
+> Kind regards
+> 
+> Christophe
+> ________________________________________________________________
+> 
+> 
+> library(fitdistrplus)
+> 
+> 
+> A <- structure(list(V1 = c(-0.00707717, -0.000947418, -0.00189753, 
+> -0.000474947, -0.00190205, -0.000476077, 0.00237812, 0.000949668, 
+> 0.000474496, 0.00284226, -0.000473149, -0.000473373, 0, 0, 0.00283688, 
+> -0.0037843, -0.0047506, -0.00238379, -0.00286807, 0.000478583, 
+> 0.000478354, -0.00143575, 0.00143575, 0.00238835, 0.0042847, 
+> 0.00237248, -0.00142281, -0.00142484, 0, 0.00142484, 0.000948767, 
+> 0.00378609, -0.000472478, 0.000472478, -0.0014181, 0, -0.000946522, 
+> -0.00284495, 0, 0.00331832, 0.00283554, 0.00141476, -0.00141476, 
+> -0.00188947, 0.00141743, -0.00236351, 0.00236351, 0.00235794, 
+> 0.00235239, -0.000940292, -0.0014121, -0.00283019, 0.000472255, 
+> 0.000472032, 0.000471809, -0.0014161, 0.0014161, -0.000943842, 
+> 0.000472032, -0.000944287, -0.00094518, -0.00189304, -0.000473821, 
+> -0.000474046, 0.00331361, -0.000472701, -0.000946074, 0.00141878, 
+> -0.000945627, -0.00189394, -0.00189753, -0.0057143, -0.00143369, 
+> -0.00383326, 0.00143919, 0.000479272, -0.00191847, -0.000480192, 
+> 0.000960154, 0.000479731, 0, 0.000479501, 0.000958313, -0.00383878, 
+> -0.00240674, 0.000963391, 0.000962464, -0.00192586, 0.000481812, 
+> -0.00241138, -0.00144963)), .Names = "V1", row.names = c(NA, 
+> -91L), class = "data.frame")
+> 
+> #your data are very small 
+> summary(A$V1)
+> 
+> #fit dist does not converge with parameter
+> fitdist(A$V1,"norm",method="mge",gof="CvM")
+> 
+> #arguments are correctly specified
+> ?fitdist
+> 
+> #equivalent call of mgedist -> same problem
+> mgedist(A$V1,"norm",gof="CvM")
+> 
+> #with uniform distribution it works
+> fitdist(A$V1,"unif",method="mge")
+> 
+> #as well as with mme and mle
+> fitdist(A$V1,"norm",method="mme")
+> fitdist(A$V1,"norm",method="mle")
+> 
+> #so the problem comes with the mean or the sd parameters of the normal distribution.
+> #as returns a result, sd is the problem
+> mgedist(A$V1,"norm",gof="CvM", fix.arg=list(sd=sd(A$V1)), start=list(mean=0))
+> 
+> #fixing a lower bound for sd returns a result
+> mgedist(A$V1,"norm",gof="CvM", lower=c(-1, .01))
+> 
+> #but the appropriate answer to your problem is to rescale your data.
+> #it works perfectly.
+> mgedist(1000*A$V1,"norm",gof="CvM", lower=c(-1, 1e-3))
+> #we don't even need to use lower bounds.
+> mgedist(1000*A$V1,"norm",gof="CvM")
+> 
+> 
+> #looking at the source code of mgedist, one can see, that the distance
+> #of Cramer von Mises is defined as follows.
+> fnobj <- function(par, fix.arg, obs, pdistnam) {
+>                 n <- length(obs)
+>                 s <- sort(obs)
+>                 theop <- do.call(pdistnam, c(list(q = s), as.list(par), 
+>                   as.list(fix.arg)))
+>                 1/(12 * n) + sum((theop - (2 * seq(1:n) - 1)/(2 * 
+>                   n))^2)
+>             }
+>             
+> #a NaN is produced with negative sd            
+> fnobj(c(1,1), NULL, A$V1, pnorm)
+> fnobj(c(mean=1,sd=1), NULL, A$V1, pnorm)
+> fnobj(c(mean=0,sd=0), NULL, A$V1, pnorm)
+> fnobj(c(mean=0,sd=-1), NULL, A$V1, pnorm)
+> 
+> 
+> --
+> Christophe Dutang
+> Ph.D. student at ISFA, Lyon, France
+> website: http://dutangc.free.fr
+> 
+> D?but du message r?exp?di? :
+> 
+> > De : Joshua Ulrich <josh.m.ulrich at gmail.com>
+> > Date : 3 janvier 2012 04:39:47 HNEC
+> > ? : financial engineer <fin_engr at hotmail.com>
+> > Cc : r-sig-finance at r-project.org
+> > Objet : R?p : [R-SIG-Finance] fitdist in R
+> > 
+> > If you're going to cross-post
+> > (http://stackoverflow.com/q/8707562/271616), please have the courtesy
+> > to explicitly say so.  Otherwise, answers to your question may be
+> > scattered across multiple sites.
+> > 
+> > On Mon, Jan 2, 2012 at 9:16 PM, financial engineer <fin_engr at hotmail.com> wrote:
+> >> 
+> >> apologies if this should be a general R question, but if someone has any suggestions to fix the problem, I'd certainly appreciate it.
+> >> 
+> > If you feel the need to start your email with an apology, you are
+> > probably doing something wrong.  You're correct, this isn't a finance
+> > question and is therefore off-topic.
+> > 
+> >> I am using the fitdist function in the package fitdistrplus in R.
+> >> 
+> >> I have the following data that I read using
+> >> A<-read.table("test.dat")`
+> >> this is the entire dataset
+> >>> A
+> >>             V1
+> >> 1  -0.007077170
+> >> 2  -0.000947418
+> >> 3  -0.001897530
+> >> 4  -0.000474947
+> >> 5  -0.001902050
+> >> 6  -0.000476077
+> >> 7   0.002378120
+> >> 8   0.000949668
+> >> 9   0.000474496
+> >> 10  0.002842260
+> >> 11 -0.000473149
+> >> 12 -0.000473373
+> >> 13  0.000000000
+> >> 14  0.000000000
+> >> 15  0.002836880
+> >> 16 -0.003784300
+> >> 17 -0.004750600
+> >> 18 -0.002383790
+> >> 19 -0.002868070
+> >> 20  0.000478583
+> >> 21  0.000478354
+> >> 22 -0.001435750
+> >> 23  0.001435750
+> >> 24  0.002388350
+> >> 25  0.004284700
+> >> 26  0.002372480
+> >> 27 -0.001422810
+> >> 28 -0.001424840
+> >> 29  0.000000000
+> >> 30  0.001424840
+> >> 31  0.000948767
+> >> 32  0.003786090
+> >> 33 -0.000472478
+> >> 34  0.000472478
+> >> 35 -0.001418100
+> >> 36  0.000000000
+> >> 37 -0.000946522
+> >> 38 -0.002844950
+> >> 39  0.000000000
+> >> 40  0.003318320
+> >> 41  0.002835540
+> >> 42  0.001414760
+> >> 43 -0.001414760
+> >> 44 -0.001889470
+> >> 45  0.001417430
+> >> 46 -0.002363510
+> >> 47  0.002363510
+> >> 48  0.002357940
+> >> 49  0.002352390
+> >> 50 -0.000940292
+> >> 51 -0.001412100
+> >> 52 -0.002830190
+> >> 53  0.000472255
+> >> 54  0.000472032
+> >> 55  0.000471809
+> >> 56 -0.001416100
+> >> 57  0.001416100
+> >> 58 -0.000943842
+> >> 59  0.000472032
+> >> 60 -0.000944287
+> >> 61 -0.000945180
+> >> 62 -0.001893040
+> >> 63 -0.000473821
+> >> 64 -0.000474046
+> >> 65  0.003313610
+> >> 66 -0.000472701
+> >> 67 -0.000946074
+> >> 68  0.001418780
+> >> 69 -0.000945627
+> >> 70 -0.001893940
+> >> 71 -0.001897530
+> >> 72 -0.005714300
+> >> 73 -0.001433690
+> >> 74 -0.003833260
+> >> 75  0.001439190
+> >> 76  0.000479272
+> >> 77 -0.001918470
+> >> 78 -0.000480192
+> >> 79  0.000960154
+> >> 80  0.000479731
+> >> 81  0.000000000
+> >> 82  0.000479501
+> >> 83  0.000958313
+> >> 84 -0.003838780
+> >> 85 -0.002406740
+> >> 86  0.000963391
+> >> 87  0.000962464
+> >> 88 -0.001925860
+> >> 89  0.000481812
+> >> 90 -0.002411380
+> >> 91 -0.001449630
+> >> `
+> >> I ran the following command:
+> >> 
+> >>> fitdist(A$V1,"norm",method="mge",gof="CvM")`
+> >> 
+> >> and it generates the following:
+> >> Fitting of the distribution ' norm ' by maximum goodness-of-fit
+> >> Parameters:
+> >>  estimate
+> >> 1       NA
+> >> 2       NA
+> >> Warning message:
+> >> In pnorm(q, mean, sd, lower.tail, log.p) : NaNs produced
+> >> 
+> >> given the above error message, I ran the below:
+> >>> mu=mean(A$V1)
+> >>> sigma=sd(A$V1)
+> >>> mu
+> >> [1] -0.0003091273
+> >>> sigma
+> >> [1] 0.002051825
+> >>> pnorm(A$V1,mu,sigma)
+> >>  [1] 0.0004859313 0.3778682282 0.2194235651 0.4677942525 0.2187728328
+> >>  [6] 0.4675752645 0.9048490462 0.7302272325 0.6487379052 0.9377179215
+> >> [11] 0.4681427154 0.4680993016 0.5598779146 0.5598779146 0.9373956798
+> >> [16] 0.0451612910 0.0152074342 0.1559769817 0.1061704134 0.6494763806
+> >> [21] 0.6494350178 0.2914741494 0.8024493726 0.9056899734 0.9874187360
+> >> [26] 0.9043830715 0.2936417791 0.2933012328 0.5598779146 0.8009684336
+> >> [31] 0.7300820807 0.9770270687 0.4682727654 0.6483730677 0.2944326177
+> >> [36] 0.5598779146 0.3780342225 0.1082503682 0.5598779146 0.9614622560
+> >> [41] 0.9373152170 0.7995942319 0.2949940199 0.2205866970 0.7999587855
+> >> [46] 0.1583537921 0.9036385181 0.9031740418 0.9027096003 0.3791890228
+> >> [51] 0.2954414771 0.1095934742 0.6483327428 0.6482924162 0.6482520879
+> >> [56] 0.2947687275 0.7997772412 0.3785308577 0.6482924162 0.3784483801
+> >> [61] 0.3782828856 0.2200710780 0.4680124750 0.4679688685 0.9612699580
+> >> [66] 0.4682295443 0.3781172281 0.8001429585 0.3782000541 0.2199411992
+> >> [71] 0.2194235651 0.0042152418 0.2918187280 0.0429384302 0.8029149383
+> >> [76] 0.6496008197 0.2164182554 0.4667778828 0.7319136560 0.6496837100
+> >> [81] 0.5598779146 0.6496421754 0.7316179594 0.0426934572 0.1533157552
+> >> [86] 0.7324331764 0.7322844499 0.2153633562 0.6500594259 0.1527813896
+> >> [91] 0.2891573876
+> >> 
+> >> now I am confused why I am getting an error message about NaN's.......anyone have any suggestions what might be the reason....thanks, Bobby
+> >> 
+> >>        [[alternative HTML version deleted]]
+> >> 
+> >> _______________________________________________
+> >> R-SIG-Finance at r-project.org mailing list
+> >> https://stat.ethz.ch/mailman/listinfo/r-sig-finance
+> >> -- Subscriber-posting only. If you want to post, subscribe first.
+> >> -- Also note that this is not the r-help list where general R questions should go.
+> > 
+> > _______________________________________________
+> > R-SIG-Finance at r-project.org mailing list
+> > https://stat.ethz.ch/mailman/listinfo/r-sig-finance
+> > -- Subscriber-posting only. If you want to post, subscribe first.
+> > -- Also note that this is not the r-help list where general R questions should go.
+> 
+
+ 		 	   		  
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/riskassessment-news/attachments/20120103/27739b84/attachment-0001.htm>
+

@@ -1,0 +1,1596 @@
+From d.orme at imperial.ac.uk  Wed May  5 11:54:05 2010
+From: d.orme at imperial.ac.uk (Orme, David)
+Date: Wed, 5 May 2010 10:54:05 +0100
+Subject: [Phylobase-devl] New phylobase build approach using static
+ libncl (Was: Rcpp and OS X compiliation)
+In-Reply-To: <F52CB040-BC2C-4767-999E-E65E3F32DBA7@gmail.com>
+References: <19304.22110.193.325453@ron.nulle.part>
+	<bf0d057b1002081052p5251b784m31a70588d4343691@mail.gmail.com>
+	<19312.25117.686228.181848@ron.nulle.part>
+	<B986C7A8-49FA-4200-AC95-8DBD9FEF2119@berkeley.edu>
+	<19312.42025.225305.415928@ron.nulle.part>
+	<19337.26927.255985.934447@ron.nulle.part>	<4B896DBF.3030407@ufl.edu>
+	<19337.29313.356523.491395@ron.nulle.part>
+	<bf0d057b1002271139y57604a09g1c8aa8a87be30edf@mail.gmail.com>
+	<8480AB58-8719-4B1D-8570-30DAF708CC63@berkeley.edu>
+	<bf0d057b1002271155v756f404ckdfe245414d675d3c@mail.gmail.com>
+	<E6459E9A-F07B-4D64-9C28-F860FFAA884C@berkeley.edu>
+	<4A95523C-9E24-41D5-BC6C-71CB33FD2278@gmail.com>
+	<3CD4FFE9-46AF-4054-8D45-8C90A8A12C07@berkeley.edu>
+	<D67BA0AB-AFED-407F-840C-EC5B57205785@gmail.com>
+	<99F57786-61B7-4086-BFE1-5BAB969FCD31@berkeley.edu>
+	<E366A1FF-864F-49CE-8E66-D0AC01AB9F09@imperial.ac.uk>
+	<1272029407.16870.13.camel@francois-laptop>
+	<83928BFA-C5C0-440F-A0FD-10DD34F2DE4D@imperial.ac.uk>
+	<1272490209.20555.38.camel@francois-laptop>
+	<ADBEFB71-2562-4EC7-82C3-F6F003535DF6@imperial.ac.uk>
+	<4E8511DB-568D-4382-BF5D-7B7A03A7847C@imperial.ac.uk>
+	<F52CB040-BC2C-4767-999E-E65E3F32DBA7@gmail.com>
+Message-ID: <26B03864-22C0-4E31-859C-43A7B5D63919@imperial.ac.uk>
+
+Hi,
+
+I'd agree with this - we have to be able to cope with any taxon names and, ideally, if we can avoid having to make the taxon names syntactically valid R, then we should change them as little as possible (apart from the obligatory unquoted underscore to space translation) and keep them as character strings.
+
+What would NCL pass as a token given these two?
+
+'taxon\1'
+'taxon"1'
+
+I think these are the problem cases - R needs to escape the backslash and double quote, but handles the double quote better than the backslash:
+
+> x <- c('taxon"1', 'taxon\1', 'taxon\\1', 'taxon\one', 'taxon\\one')
+Warning messages:
+1: '\o' is an unrecognized escape in a character string
+2: unrecognized escape removed from "taxon\one"
+> x
+[1] "taxon\"1"   "taxon\001"  "taxon\\1"   "taxonone"   "taxon\\one"
+
+Cheers,
+David
+
+
+
+
+
+
+On 29 Apr 2010, at 20:19, Mark Holder wrote:
+
+Hi,
+I'll chime in despite being fairly ignorant of a lot of the use cases for phylobase.
+
+My experience dealing with files from users is that you have to be prepared for anything occurring in a taxon name.  So I'd say that you have to have a system in which the name can be any character string, not a system in which the taxon name can be a variable name in R.  So I would recommend getting the charcter string from NCL, and then using whatever R-specific character escaping conventions are needed to generate the equivalent string literal in R (you'll have to use \ before any quote or \ characters).
+
+
+
+Phylobase *could* strip problematic symbols out of the names easily enough but:
+1. it is confusing to user's because the name of the taxon changes (usually only slightly, but it still changes), and
+2. then you have to deal with name clashes (if a file has 'a b' and 'ab' as taxa names, then stripping spaces will cause a clash).
+
+NEXUS has syntactic rules for tokenizing.  They usually don't change the internal representation much, but NCL uses the syntactic rules to build a character string in memory.  In the following table I'll use double-quotes to delimit the character string that NCL would store in memory (the quotes are not part of the name).
+
+Syntax                Internal representation
+t1                    "t1"
+'t 2'                 "t 2"
+t_2                   "t 2"
+t.3                   "t.3"
+'t.3'                 "t.3"
+t-4                   not a valid name this is 3 tokens "t", "-" and "4"
+'t-4'                 "t-4"
+'t''5 x'              "t'5 x"
+'t_6'                 "t_6"
+
+Basically, the syntactic rules just let you group tokens with token-breaking symbols (white space and punctuation).  The exceptions are the case t_2  and 't''5 x' above.  Both of those case involve substitution (in the second case the internal pair of single-quotes is collapsed to single quote in the internal representation).
+
+
+What really confuses users is the fact that in some formats a_b might refer to the name "a_b", but in NEXUS it is "a b" So the same syntax has different interpretation in different formatting rules.  NCL uses the NEXUS tokenizing for NEXUS files and newick tree files (NCL supports fasta, phylip, and relaxed phylip formats, but does not impose NEXUS quoting rules on those formats). So if you use NCL to read a FASTA and NEXUS file both of which use the name a_b (without any quotes) then in the taxa gleaned from the FASTA file, the internal name will be "a_b", but the same name will have the internal representation of "a b" when read from NEXUS.  That invariably trips people up, but I don't think that there is anyway to avoid it because that behavior is mandated by both standards.
+
+I think that if phylobase just include a brief discussion of this issue in a README or other documentation, then that is about as good as you can do.
+
+
+all the best,
+Mark
+
+On Apr 29, 2010, at 10:51 AM, Orme, David wrote:
+
+Sorry - I take it back about the 'not problematic in a character string' - the quotes and the backslash are of course fairly problematic.
+
+Cheers
+David
+
+On 29 Apr 2010, at 16:43, Orme, David wrote:
+
+Hi,
+
+I know this isn't the bible - but the PAUP manual specifies the following:
+
+"Identifiers" are simply names given to taxa, characters, and other PAUP input elements such as character-sets, taxon-sets, and exclusion-sets. They may include any combination of upper- and lower-case alphabetic characters, digits, and punctuation. If the identifier contains any of the following characters:
+( ) [ ] { } / \ , ; : = * ' "` + - < >
+or a blank, the entire identifier must be enclosed in single quotes.
+
+They're going to be rare but they will happen. Any of those are problematic in a valid R name - although not in a character string. The taxon identifiers could come into R as character vectors just as they appear in the Nexus file (possibly stripping the enclosing single quotes). The next question is then whether we need them to be valid R names rather than character strings - in which case make.names() could be invoked.
+
+Cheers,
+David
+
+
+On 28 Apr 2010, at 22:30, Fran?ois Michonneau wrote:
+
+
+Hi all,
+
+ Sorry if this is a dumb question, but why do we need to remove spaces
+and underscore from the species names when building the data frame? The
+only character that I can think of that could be an issue is ", and I
+don't think that it's allowed by software using NEXUS/used.
+
+ In other words, do we really need to use RemoveUnderscoresAndSpaces in
+NCLInterface.cpp?
+
+ Thanks,
+ -- Fran?ois
+
+On Mon, 2010-04-26 at 12:11 +0100, Orme, David wrote:
+I'd guess we want the names to be syntactically valid R names - and ideally that would be through running make.names() across them. The problem is then that the NCLInterface can easily pass the raw PAUP identifiers for the data (which we can then make.names()) but that the tree input is currently via a text string. Again, probably easy enough to have the raw PAUP names in the string but these would be horrible to extract with regex. Is there any way that NCLInterface can pass the tree using numeric symbols and then pass a translate block as a vector? Then make.names() could be run easily on both the data names and the tree names...
+
+Cheers,
+David
+
+
+
+On 23 Apr 2010, at 14:30, Fran?ois Michonneau wrote:
+
+
+Hi,
+
+Ouch! We need to fix this.
+
+There might be some hope if we use Rcpp to build the data frame
+instead of building and parsing a string.
+
+Let me talk to Dirk about it and see what we can do.
+
+Cheers,
+-- Fran?ois
+
+On Fri, 2010-04-23 at 13:59 +0100, Orme, David wrote:
+Hi all,
+
+
+From bogus@does.not.exist.com  Sun May  2 12:18:05 2010
+From: bogus@does.not.exist.com ()
+Date: Sun, 02 May 2010 10:18:05 -0000
+Subject: No subject
+Message-ID: <mailman.0.1273053254.1413.phylobase-devl@lists.r-forge.r-project.org>
+
+Mark then Peter
+
+The main potential problems that I see with the ways that phylobase is usin=
+g NCL now are:
+1. in NCLInterface.cpp there are lots of call to RemoveUnderscoresAndSpaces=
+ to get rid of spaces and _ in names.  That makes names easier to deal with=
+, but at some point will bite you (somebody will have dataset with a taxon =
+labelled "AB" and another with "A B", after transformation there will be a =
+name clash).
+
+I agree that this is something to address.  Not only might there be clashes=
+ but changing names, will be annoying to users.  Brian or Derrick could ans=
+wer better, but I assume this is because some of the code used to parse the=
+ tree string can't handle the underscores and spaces.
+
+Has just bitten me! There is a deeper problem here in that readNexus uses t=
+he NCLInterface code to get the data frame as parsable R code - with stripp=
+ed spaces and underscores - but the tree block is passed over as a block of=
+ raw text from the file. These names _aren't_ then stripped of underscores =
+and spaces by read.nexustreestring() and so the name checking throws an err=
+or.
+
+Obviously there is an ongoing deeper discussion about how to handle passing=
+ the tree from NCL and how to handle the dismayingly wide range of official=
+ valid PAUP identifiers using regex but currently we've got a simpler probl=
+em of different handling. Underscores in names are very commonly used to av=
+oid the quoting problem with spaces so I think this current problem will co=
+me up a lot.
+
+Cheers,
+David
+
+
+
+
+
+
+_______________________________________________
+Phylobase-devl mailing list
+Phylobase-devl at lists.r-forge.r-project.org<mailto:Phylobase-devl at lists.r-fo=
+rge.r-project.org>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+
+_______________________________________________
+Phylobase-devl mailing list
+Phylobase-devl at lists.r-forge.r-project.org<mailto:Phylobase-devl at lists.r-fo=
+rge.r-project.org>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+<ATT00002..txt>
+
+_______________________________________________
+Phylobase-devl mailing list
+Phylobase-devl at lists.r-forge.r-project.org<mailto:Phylobase-devl at lists.r-fo=
+rge.r-project.org>
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+Mark Holder
+
+mtholder at ku.edu<mailto:mtholder at ku.edu>
+http://phylo.bio.ku.edu/mark-holder
+
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+Department of Ecology and Evolutionary Biology
+University of Kansas
+6031 Haworth Hall
+1200 Sunnyside Avenue
+Lawrence, Kansas 66045
+
+lab phone:  785.864.5789
+
+fax (shared): 785.864.5860
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D
+
+
+
+
+
+
+
+
+
+
+--_000_26B0386422C04E31859C43A7B5D63919imperialacuk_
+Content-Type: text/html; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+
+<html><head></head><body style=3D"word-wrap: break-word; -webkit-nbsp-mode:=
+ space; -webkit-line-break: after-white-space; ">Hi,<div><br></div><div>I'd=
+ agree with this - we have to be able to cope with any taxon names and, ide=
+ally,&nbsp;if we can avoid having to make the taxon names syntactically val=
+id R, then we should change them as little as possible (apart from the obli=
+gatory unquoted underscore to space translation) and keep them as character=
+ strings.</div><div><br></div><div>What would NCL pass as a token given the=
+se two?</div><div><br></div><div>'taxon\1'</div><div>'taxon"1'</div><div><b=
+r></div><div>I think these are the problem cases - R needs to escape the ba=
+ckslash and double quote, but handles the double quote better than the back=
+slash:</div><div><br></div><div><div>&gt; x &lt;- c('taxon"1', 'taxon\1', '=
+taxon\\1', 'taxon\one', 'taxon\\one')</div><div>Warning messages:</div><div=
+>1: '\o' is an unrecognized escape in a character string&nbsp;</div><div>2:=
+ unrecognized escape removed from "taxon\one"&nbsp;</div><div>&gt; x</div><=
+div>[1] "taxon\"1" &nbsp; "taxon\001" &nbsp;"taxon\\1" &nbsp; "taxonone" &n=
+bsp; "taxon\\one"</div><div><br></div><div>Cheers,</div><div>David</div><di=
+v><br></div></div><div><br></div><div><br></div><div><br></div><div><br></d=
+iv><div><br></div><div><div><div>On 29 Apr 2010, at 20:19, Mark Holder wrot=
+e:</div><br class=3D"Apple-interchange-newline"><blockquote type=3D"cite"><=
+div style=3D"word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-=
+break: after-white-space; "><div><div>Hi,</div><div><span class=3D"Apple-ta=
+b-span" style=3D"white-space:pre">	</span>I'll chime in despite being fairl=
+y ignorant of a lot of the use cases for phylobase.</div><div><br></div><di=
+v>My experience dealing with files from users is that you have to be prepar=
+ed for anything occurring in a taxon name. &nbsp;So I'd say that you have t=
+o have a system in which the name can be any character string, not a system=
+ in which the taxon name can be a variable name in R. &nbsp;So I would reco=
+mmend getting the charcter string from NCL, and then using whatever R-speci=
+fic character escaping conventions are needed to generate the equivalent st=
+ring literal in R (you'll have to use \ before any quote or \ characters).<=
+/div><div><br></div><div><br></div><div><br></div><div>Phylobase *could* st=
+rip problematic symbols out of the names easily enough but:</div><div><span=
+ class=3D"Apple-tab-span" style=3D"white-space:pre">	</span>1. it is confus=
+ing to user's because the name of the taxon changes (usually only slightly,=
+ but it still changes), and</div><div><span class=3D"Apple-tab-span" style=
+=3D"white-space:pre">	</span>2. then you have to deal with name clashes (if=
+ a file has 'a b' and 'ab' as taxa names, then stripping spaces will cause =
+a clash).</div><div><br></div><div>NEXUS has syntactic rules for tokenizing=
+. &nbsp;They usually don't change the internal representation much, but NCL=
+ uses the syntactic rules to build a character string in memory. &nbsp;In t=
+he following table I'll use double-quotes to delimit the character string t=
+hat NCL would store in memory (the quotes are not part of the name).</div><=
+div><br></div><div>Syntax &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; =
+&nbsp;Internal representation</div><div>t1 &nbsp; &nbsp; &nbsp; &nbsp; &nbs=
+p; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;"t1"</div><div>'t 2' &nbsp; &nbsp; &nb=
+sp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "t 2"</div><div>t_2 &nbsp; &nbsp; &n=
+bsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "t 2"</div><div>t.3 &nbsp; &=
+nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "t.3"</div><div>'t.3=
+' &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "t.3"</div><div>t=
+-4 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; not a val=
+id name this is 3 tokens "t", "-" and "4"</div><div>'t-4' &nbsp; &nbsp; &nb=
+sp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "t-4"</div><div>'t''5 x' &nbsp; &nbs=
+p; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;"t'5 x"</div><div>'t_6' &nbsp; &nbsp; =
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; "t_6"&nbsp;</div><div><br></div><=
+div>Basically, the syntactic rules just let you group tokens with token-bre=
+aking symbols (white space and punctuation). &nbsp;The exceptions are the c=
+ase t_2 &nbsp;and 't''5 x' above. &nbsp;Both of those case involve substitu=
+tion&nbsp;(in the second case the internal pair of single-quotes is collaps=
+ed to single quote in the internal representation).</div><div><br></div><di=
+v><br></div><div>What really confuses users is the fact that in some format=
+s a_b might refer to the name "a_b", but in NEXUS it is "a b" So the same s=
+yntax has different interpretation in different formatting rules. &nbsp;NCL=
+ uses the NEXUS tokenizing for NEXUS files and newick tree files (NCL suppo=
+rts fasta, phylip, and relaxed phylip formats, but does not impose NEXUS qu=
+oting rules on those formats). So if you use NCL to read a FASTA and NEXUS =
+file both of which use the name a_b (without any quotes) then in the taxa g=
+leaned from the FASTA file, the internal name will be "a_b", but the same n=
+ame will have the internal representation of "a b" when read from NEXUS. &n=
+bsp;That invariably trips people up, but I don't think that there is anyway=
+ to avoid it because that behavior is mandated by both standards.</div><div=
+><br></div><div>I think that if phylobase just include a brief discussion o=
+f this issue in a README or other documentation, then that is about as good=
+ as you can do.</div></div><div><br></div><div><br></div><div>all the best,=
+</div><div>Mark</div><div><br></div><div><div><div>On Apr 29, 2010, at 10:5=
+1 AM, Orme, David wrote:</div><br class=3D"Apple-interchange-newline"><bloc=
+kquote type=3D"cite"><div style=3D"word-wrap: break-word; -webkit-nbsp-mode=
+: space; -webkit-line-break: after-white-space; ">Sorry - I take it back ab=
+out the 'not problematic in a character string' - the quotes and the backsl=
+ash are of course fairly problematic.<div><br></div><div>Cheers</div><div>D=
+avid</div><div><br><div><div>On 29 Apr 2010, at 16:43, Orme, David wrote:</=
+div><br class=3D"Apple-interchange-newline"><blockquote type=3D"cite"><div =
+style=3D"word-wrap: break-word; -webkit-nbsp-mode: space; -webkit-line-brea=
+k: after-white-space; ">Hi,<div><br></div><div>I know this isn't the bible =
+- but the PAUP manual specifies the following:</div><div><br></div><div><di=
+v style=3D"margin-top: 0px; margin-right: 0px; margin-bottom: 0px; margin-l=
+eft: 0px; font: normal normal normal 12px/normal Palatino; ">"Identifiers" =
+are simply names given to taxa, characters, and other PAUP input elements s=
+uch as character-sets, taxon-sets, and exclusion-sets. They may include any=
+ combination of upper- and lower-case alphabetic characters, digits, and pu=
+nctuation. If the identifier contains any of the following characters:</div=
+><div style=3D"margin-top: 0px; margin-right: 0px; margin-bottom: 0px; marg=
+in-left: 0px; font: normal normal normal 12px/normal Palatino; ">( ) [ ] { =
+} / \ , ; : =3D * ' "` + - &lt; &gt;</div><div style=3D"margin-top: 0px; ma=
+rgin-right: 0px; margin-bottom: 0px; margin-left: 0px; font: normal normal =
+normal 12px/normal Palatino; ">or a blank, the entire identifier must be en=
+closed in single quotes.</div><div style=3D"margin-top: 0px; margin-right: =
+0px; margin-bottom: 0px; margin-left: 0px; font: normal normal normal 12px/=
+normal Palatino; "><br></div><div style=3D"margin-top: 0px; margin-right: 0=
+px; margin-bottom: 0px; margin-left: 0px; font: normal normal normal 12px/n=
+ormal Palatino; "><div>They're going to be rare but they will happen.&nbsp;=
+Any of those are problematic in a valid R name - although not in a characte=
+r string. The taxon identifiers could come into R as character vectors just=
+ as they appear in the Nexus file (possibly stripping the enclosing single =
+quotes). The next question is then whether we need them to be valid R names=
+ rather than character strings - in which case make.names() could be invoke=
+d.</div><div><br></div><div>Cheers,</div><div>David</div><div><br></div><di=
+v><br></div></div><div><div>On 28 Apr 2010, at 22:30, Fran=E7ois Michonneau=
+ wrote:</div><br class=3D"Apple-interchange-newline"><blockquote type=3D"ci=
+te"><div><br>Hi all,<br><br> &nbsp;Sorry if this is a dumb question, but wh=
+y do we need to remove spaces<br>and underscore from the species names when=
+ building the data frame? The<br>only character that I can think of that co=
+uld be an issue is ", and I<br>don't think that it's allowed by software us=
+ing NEXUS/used.<br><br> &nbsp;In other words, do we really need to use Remo=
+veUnderscoresAndSpaces in<br>NCLInterface.cpp?<br><br> &nbsp;Thanks,<br> &n=
+bsp;-- Fran=E7ois <br><br>On Mon, 2010-04-26 at 12:11 +0100, Orme, David wr=
+ote:<br><blockquote type=3D"cite">I'd guess we want the names to be syntact=
+ically valid R names - and ideally that would be through running make.names=
+() across them. The problem is then that the NCLInterface can easily pass t=
+he raw PAUP identifiers for the data (which we can then make.names()) but t=
+hat the tree input is currently via a text string. Again, probably easy eno=
+ugh to have the raw PAUP names in the string but these would be horrible to=
+ extract with regex. Is there any way that NCLInterface can pass the tree u=
+sing numeric symbols and then pass a translate block as a vector? Then make=
+.names() could be run easily on both the data names and the tree names...<b=
+r></blockquote><blockquote type=3D"cite"><br></blockquote><blockquote type=
+=3D"cite">Cheers,<br></blockquote><blockquote type=3D"cite">David<br></bloc=
+kquote><blockquote type=3D"cite"><br></blockquote><blockquote type=3D"cite"=
+><br></blockquote><blockquote type=3D"cite"><br></blockquote><blockquote ty=
+pe=3D"cite">On 23 Apr 2010, at 14:30, Fran=E7ois Michonneau wrote:<br></blo=
+ckquote><blockquote type=3D"cite"><br></blockquote><blockquote type=3D"cite=
+"><blockquote type=3D"cite"><br></blockquote></blockquote><blockquote type=
+=3D"cite"><blockquote type=3D"cite">Hi,<br></blockquote></blockquote><block=
+quote type=3D"cite"><blockquote type=3D"cite"><br></blockquote></blockquote=
+><blockquote type=3D"cite"><blockquote type=3D"cite"> Ouch! We need to fix =
+this.<br></blockquote></blockquote><blockquote type=3D"cite"><blockquote ty=
+pe=3D"cite"><br></blockquote></blockquote><blockquote type=3D"cite"><blockq=
+uote type=3D"cite"> There might be some hope if we use Rcpp to build the da=
+ta frame<br></blockquote></blockquote><blockquote type=3D"cite"><blockquote=
+ type=3D"cite">instead of building and parsing a string.<br></blockquote></=
+blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><br></blockq=
+uote></blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"> Let =
+me talk to Dirk about it and see what we can do.<br></blockquote></blockquo=
+te><blockquote type=3D"cite"><blockquote type=3D"cite"><br></blockquote></b=
+lockquote><blockquote type=3D"cite"><blockquote type=3D"cite"> Cheers,<br><=
+/blockquote></blockquote><blockquote type=3D"cite"><blockquote type=3D"cite=
+"> -- Fran=E7ois<br></blockquote></blockquote><blockquote type=3D"cite"><bl=
+ockquote type=3D"cite"><br></blockquote></blockquote><blockquote type=3D"ci=
+te"><blockquote type=3D"cite">On Fri, 2010-04-23 at 13:59 +0100, Orme, Davi=
+d wrote:<br></blockquote></blockquote><blockquote type=3D"cite"><blockquote=
+ type=3D"cite"><blockquote type=3D"cite">Hi all,<br></blockquote></blockquo=
+te></blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><blockq=
+uote type=3D"cite"><br></blockquote></blockquote></blockquote><blockquote t=
+ype=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite">From an e-=
+mail on 03/03/10:<br></blockquote></blockquote></blockquote><blockquote typ=
+e=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite"><br></blockq=
+uote></blockquote></blockquote><blockquote type=3D"cite"><blockquote type=
+=3D"cite"><blockquote type=3D"cite">Mark then Peter<br></blockquote></block=
+quote></blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><blo=
+ckquote type=3D"cite"><br></blockquote></blockquote></blockquote><blockquot=
+e type=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite"><blockq=
+uote type=3D"cite"><blockquote type=3D"cite">The main potential problems th=
+at I see with the ways that phylobase is using NCL now are:<br></blockquote=
+></blockquote></blockquote></blockquote></blockquote><blockquote type=3D"ci=
+te"><blockquote type=3D"cite"><blockquote type=3D"cite"><blockquote type=3D=
+"cite"><blockquote type=3D"cite"><span class=3D"Apple-tab-span" style=3D"wh=
+ite-space:pre">	</span>1. in NCLInterface.cpp there are lots of call to Rem=
+oveUnderscoresAndSpaces to get rid of spaces and _ in names. &nbsp;That mak=
+es names easier to deal with, but at some point will bite you (somebody wil=
+l have dataset with a taxon labelled "AB" and another with "A B", after tra=
+nsformation there will be a name clash).<br></blockquote></blockquote></blo=
+ckquote></blockquote></blockquote><blockquote type=3D"cite"><blockquote typ=
+e=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite"><br></blockq=
+uote></blockquote></blockquote></blockquote><blockquote type=3D"cite"><bloc=
+kquote type=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite">I =
+agree that this is something to address. &nbsp;Not only might there be clas=
+hes but changing names, will be annoying to users. &nbsp;Brian or Derrick c=
+ould answer better, but I assume this is because some of the code used to p=
+arse the tree string can't handle the underscores and spaces.<br></blockquo=
+te></blockquote></blockquote></blockquote><blockquote type=3D"cite"><blockq=
+uote type=3D"cite"><blockquote type=3D"cite"><br></blockquote></blockquote>=
+</blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><blockquot=
+e type=3D"cite">Has just bitten me! There is a deeper problem here in that =
+readNexus uses the NCLInterface code to get the data frame as parsable R co=
+de - with stripped spaces and underscores - but the tree block is passed ov=
+er as a block of raw text from the file. These names _aren't_ then stripped=
+ of underscores and spaces by read.nexustreestring() and so the name checki=
+ng throws an error. <br></blockquote></blockquote></blockquote><blockquote =
+type=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite"><br></blo=
+ckquote></blockquote></blockquote><blockquote type=3D"cite"><blockquote typ=
+e=3D"cite"><blockquote type=3D"cite">Obviously there is an ongoing deeper d=
+iscussion about how to handle passing the tree from NCL and how to handle t=
+he dismayingly wide range of official valid PAUP identifiers using regex bu=
+t currently we've got a simpler problem of different handling. Underscores =
+in names are very commonly used to avoid the quoting problem with spaces so=
+ I think this current problem will come up a lot. <br></blockquote></blockq=
+uote></blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><bloc=
+kquote type=3D"cite"><br></blockquote></blockquote></blockquote><blockquote=
+ type=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite">Cheers,<=
+br></blockquote></blockquote></blockquote><blockquote type=3D"cite"><blockq=
+uote type=3D"cite"><blockquote type=3D"cite">David<br></blockquote></blockq=
+uote></blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><bloc=
+kquote type=3D"cite"><br></blockquote></blockquote></blockquote><blockquote=
+ type=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite"><br></bl=
+ockquote></blockquote></blockquote><blockquote type=3D"cite"><blockquote ty=
+pe=3D"cite"><blockquote type=3D"cite"><br></blockquote></blockquote></block=
+quote><blockquote type=3D"cite"><blockquote type=3D"cite"><blockquote type=
+=3D"cite"><br></blockquote></blockquote></blockquote><blockquote type=3D"ci=
+te"><blockquote type=3D"cite"><blockquote type=3D"cite"><br></blockquote></=
+blockquote></blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"=
+><blockquote type=3D"cite"><br></blockquote></blockquote></blockquote><bloc=
+kquote type=3D"cite"><blockquote type=3D"cite"><blockquote type=3D"cite">__=
+_____________________________________________<br></blockquote></blockquote>=
+</blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><blockquot=
+e type=3D"cite">Phylobase-devl mailing list<br></blockquote></blockquote></=
+blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><blockquote =
+type=3D"cite"><a href=3D"mailto:Phylobase-devl at lists.r-forge.r-project.org"=
+>Phylobase-devl at lists.r-forge.r-project.org</a><br></blockquote></blockquot=
+e></blockquote><blockquote type=3D"cite"><blockquote type=3D"cite"><blockqu=
+ote type=3D"cite"><a href=3D"https://lists.r-forge.r-project.org/cgi-bin/ma=
+ilman/listinfo/phylobase-devl">https://lists.r-forge.r-project.org/cgi-bin/=
+mailman/listinfo/phylobase-devl</a><br></blockquote></blockquote></blockquo=
+te><blockquote type=3D"cite"><blockquote type=3D"cite"><br></blockquote></b=
+lockquote><blockquote type=3D"cite"><br></blockquote><blockquote type=3D"ci=
+te">_______________________________________________<br></blockquote><blockq=
+uote type=3D"cite">Phylobase-devl mailing list<br></blockquote><blockquote =
+type=3D"cite"><a href=3D"mailto:Phylobase-devl at lists.r-forge.r-project.org"=
+>Phylobase-devl at lists.r-forge.r-project.org</a><br></blockquote><blockquote=
+ type=3D"cite"><a href=3D"https://lists.r-forge.r-project.org/cgi-bin/mailm=
+an/listinfo/phylobase-devl">https://lists.r-forge.r-project.org/cgi-bin/mai=
+lman/listinfo/phylobase-devl</a><br></blockquote></div></blockquote></div><=
+br></div></div><span>&lt;ATT00002..txt&gt;</span></blockquote></div><br></d=
+iv></div>_______________________________________________<br>Phylobase-devl =
+mailing list<br><a href=3D"mailto:Phylobase-devl at lists.r-forge.r-project.or=
+g">Phylobase-devl at lists.r-forge.r-project.org</a><br><a href=3D"https://lis=
+ts.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl">https://l=
+ists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl</a><br><=
+/blockquote></div><br><div>
+<span class=3D"Apple-style-span" style=3D"border-collapse: separate; font-f=
+amily: Monaco; font-size: medium; font-style: normal; font-variant: normal;=
+ font-weight: normal; letter-spacing: normal; line-height: normal; orphans:=
+ 2; text-indent: 0px; text-transform: none; white-space: normal; widows: 2;=
+ word-spacing: 0px; -webkit-border-horizontal-spacing: 0px; -webkit-border-=
+vertical-spacing: 0px; -webkit-text-decorations-in-effect: none; -webkit-te=
+xt-size-adjust: auto; -webkit-text-stroke-width: 0px; "><span class=3D"Appl=
+e-style-span" style=3D"border-collapse: separate; font-family: Monaco; font=
+-size: 12px; font-style: normal; font-variant: normal; font-weight: normal;=
+ letter-spacing: normal; line-height: normal; orphans: 2; text-indent: 0px;=
+ text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; -=
+webkit-border-horizontal-spacing: 0px; -webkit-border-vertical-spacing: 0px=
+; -webkit-text-decorations-in-effect: none; -webkit-text-size-adjust: auto;=
+ -webkit-text-stroke-width: 0px; "><div style=3D"word-wrap: break-word; -we=
+bkit-nbsp-mode: space; -webkit-line-break: after-white-space; "><span class=
+=3D"Apple-style-span" style=3D"border-collapse: separate; font-family: Aria=
+l; font-size: 14px; font-style: normal; font-variant: normal; font-weight: =
+normal; letter-spacing: normal; line-height: normal; orphans: 2; text-inden=
+t: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing:=
+ 0px; -webkit-border-horizontal-spacing: 0px; -webkit-border-vertical-spaci=
+ng: 0px; -webkit-text-decorations-in-effect: none; -webkit-text-size-adjust=
+: auto; -webkit-text-stroke-width: 0px; "><div style=3D"word-wrap: break-wo=
+rd; -webkit-nbsp-mode: space; -webkit-line-break: after-white-space; "><spa=
+n class=3D"Apple-style-span" style=3D"border-collapse: separate; font-famil=
+y: Arial; font-size: 14px; font-style: normal; font-variant: normal; font-w=
+eight: normal; letter-spacing: normal; line-height: normal; orphans: 2; tex=
+t-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-s=
+pacing: 0px; -webkit-border-horizontal-spacing: 0px; -webkit-border-vertica=
+l-spacing: 0px; -webkit-text-decorations-in-effect: none; -webkit-text-size=
+-adjust: auto; -webkit-text-stroke-width: 0px; "><span class=3D"Apple-style=
+-span" style=3D"border-collapse: separate; font-family: Courier; font-size:=
+ 14px; font-style: normal; font-variant: normal; font-weight: normal; lette=
+r-spacing: normal; line-height: normal; orphans: 2; text-indent: 0px; text-=
+transform: none; white-space: normal; widows: 2; word-spacing: 0px; -webkit=
+-border-horizontal-spacing: 0px; -webkit-border-vertical-spacing: 0px; -web=
+kit-text-decorations-in-effect: none; -webkit-text-size-adjust: auto; -webk=
+it-text-stroke-width: 0px; "><span class=3D"Apple-style-span" style=3D"bord=
+er-collapse: separate; font-family: Courier; font-size: 14px; font-style: n=
+ormal; font-variant: normal; font-weight: normal; letter-spacing: normal; l=
+ine-height: normal; orphans: 2; text-indent: 0px; text-transform: none; whi=
+te-space: normal; widows: 2; word-spacing: 0px; -webkit-border-horizontal-s=
+pacing: 0px; -webkit-border-vertical-spacing: 0px; -webkit-text-decorations=
+-in-effect: none; -webkit-text-size-adjust: auto; -webkit-text-stroke-width=
+: 0px; "><span class=3D"Apple-style-span" style=3D"border-collapse: separat=
+e; font-family: 'Andale Mono'; font-size: 14px; font-style: normal; font-va=
+riant: normal; font-weight: normal; letter-spacing: normal; line-height: no=
+rmal; orphans: 2; text-indent: 0px; text-transform: none; white-space: norm=
+al; widows: 2; word-spacing: 0px; -webkit-border-horizontal-spacing: 0px; -=
+webkit-border-vertical-spacing: 0px; -webkit-text-decorations-in-effect: no=
+ne; -webkit-text-size-adjust: auto; -webkit-text-stroke-width: 0px; "><span=
+ class=3D"Apple-style-span" style=3D"border-collapse: separate; font-family=
+: 'Andale Mono'; font-size: 14px; font-style: normal; font-variant: normal;=
+ font-weight: normal; letter-spacing: normal; line-height: normal; orphans:=
+ 2; text-indent: 0px; text-transform: none; white-space: normal; widows: 2;=
+ word-spacing: 0px; -webkit-border-horizontal-spacing: 0px; -webkit-border-=
+vertical-spacing: 0px; -webkit-text-decorations-in-effect: none; -webkit-te=
+xt-size-adjust: auto; -webkit-text-stroke-width: 0px; "><span class=3D"Appl=
+e-style-span" style=3D"border-collapse: separate; -webkit-border-horizontal=
+-spacing: 0px; -webkit-border-vertical-spacing: 0px; font-family: 'Andale M=
+ono'; font-size: 14px; font-style: normal; font-variant: normal; font-weigh=
+t: normal; letter-spacing: normal; line-height: normal; -webkit-text-decora=
+tions-in-effect: none; text-indent: 0px; -webkit-text-size-adjust: auto; te=
+xt-transform: none; orphans: 2; white-space: normal; widows: 2; word-spacin=
+g: 0px; "><span class=3D"Apple-style-span" style=3D"border-collapse: separa=
+te; -webkit-border-horizontal-spacing: 0px; -webkit-border-vertical-spacing=
+: 0px; font-family: 'Andale Mono'; font-size: 14px; font-style: normal; fon=
+t-variant: normal; font-weight: normal; letter-spacing: normal; line-height=
+: normal; -webkit-text-decorations-in-effect: none; text-indent: 0px; -webk=
+it-text-size-adjust: auto; text-transform: none; orphans: 2; white-space: n=
+ormal; widows: 2; word-spacing: 0px; "><span class=3D"Apple-style-span" sty=
+le=3D"border-collapse: separate; -webkit-border-horizontal-spacing: 0px; -w=
+ebkit-border-vertical-spacing: 0px; font-family: 'Andale Mono'; font-size: =
+14px; font-style: normal; font-variant: normal; font-weight: normal; letter=
+-spacing: normal; line-height: normal; -webkit-text-decorations-in-effect: =
+none; text-indent: 0px; -webkit-text-size-adjust: auto; text-transform: non=
+e; orphans: 2; white-space: normal; widows: 2; word-spacing: 0px; "><span c=
+lass=3D"Apple-style-span" style=3D"border-collapse: separate; -webkit-borde=
+r-horizontal-spacing: 0px; -webkit-border-vertical-spacing: 0px; font-famil=
+y: 'Andale Mono'; font-size: 14px; font-style: normal; font-variant: normal=
+; font-weight: normal; letter-spacing: normal; line-height: normal; -webkit=
+-text-decorations-in-effect: none; text-indent: 0px; -webkit-text-size-adju=
+st: auto; text-transform: none; orphans: 2; white-space: normal; widows: 2;=
+ word-spacing: 0px; "><div><div><span class=3D"Apple-style-span" style=3D"f=
+ont-family: Arial; "><div class=3D"AppleMailSignature" id=3D"BD214290-7324-=
+48EC-A16C-4BCD48002BDD"><span class=3D"Apple-style-span" style=3D"font-fami=
+ly: Courier; "><span class=3D"Apple-style-span" style=3D"font-family: 'Anda=
+le Mono'; "><div><div><span class=3D"Apple-style-span" style=3D"font-family=
+: Courier; "><div class=3D"AppleMailSignature" id=3D"BD214290-7324-48EC-A16=
+C-4BCD48002BDD"><span class=3D"Apple-style-span" style=3D"font-family: 'And=
+ale Mono'; "><div><div><font class=3D"Apple-style-span" face=3D"Arial">Mark=
+ Holder</font></div><div><font class=3D"Apple-style-span" face=3D"Arial"><b=
+r class=3D"webkit-block-placeholder"></font></div><div><font class=3D"Apple=
+-style-span" face=3D"Arial"><a href=3D"mailto:mtholder at ku.edu">mtholder at ku.=
+edu</a></font></div><div style=3D"margin-top: 0px; margin-right: 0px; margi=
+n-bottom: 0px; margin-left: 0px; "><font class=3D"Apple-style-span" face=3D=
+"Arial"><div style=3D"margin-top: 0px; margin-right: 0px; margin-bottom: 0p=
+x; margin-left: 0px; "><font style=3D"font: normal normal normal 12px/norma=
+l Helvetica; "><font class=3D"Apple-style-span" face=3D"Arial" size=3D"4"><=
+span class=3D"Apple-style-span" style=3D"font-size: 14px; "><a href=3D"http=
+://phylo.bio.ku.edu/mark-holder">http://phylo.bio.ku.edu/mark-holder</a></s=
+pan></font></font></div></font></div><div style=3D"margin-top: 0px; margin-=
+right: 0px; margin-bottom: 0px; margin-left: 0px; "><font class=3D"Apple-st=
+yle-span" face=3D"Arial"><br class=3D"webkit-block-placeholder"></font></di=
+v><div style=3D"margin-top: 0px; margin-right: 0px; margin-bottom: 0px; mar=
+gin-left: 0px; "><font class=3D"Apple-style-span" face=3D"Arial">=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D</font></div><div><fo=
+nt class=3D"Apple-style-span" face=3D"Arial">Department of Ecology and Evol=
+utionary Biology</font></div><div><font class=3D"Apple-style-span" face=3D"=
+Arial">University of Kansas</font></div><div><font class=3D"Apple-style-spa=
+n" face=3D"Arial">6031&nbsp;Haworth Hall</font></div><div><font class=3D"Ap=
+ple-style-span" face=3D"Arial">1200 Sunnyside Avenue</font></div><div><font=
+ class=3D"Apple-style-span" face=3D"Arial">Lawrence, Kansas 66045</font></d=
+iv><div><font class=3D"Apple-style-span" face=3D"Arial"><br class=3D"khtml-=
+block-placeholder"></font></div><div><font class=3D"Apple-style-span" face=
+=3D"Arial">lab phone: &nbsp;785.864.5789</font></div><div><br></div><div><f=
+ont class=3D"Apple-style-span" face=3D"Arial">fax (shared):&nbsp;785.864.58=
+60</font></div><div style=3D"margin-top: 0px; margin-right: 0px; margin-bot=
+tom: 0px; margin-left: 0px; "><font class=3D"Apple-style-span" face=3D"Aria=
+l">=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=
+=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D=3D</font></=
+div><div style=3D"margin-top: 0px; margin-right: 0px; margin-bottom: 0px; m=
+argin-left: 0px; "><font class=3D"Apple-style-span" face=3D"Arial"><br></fo=
+nt></div><font class=3D"Apple-style-span" face=3D"Arial"><br></font></div><=
+/span></div></span><font class=3D"Apple-style-span" face=3D"Arial"><br></fo=
+nt></div></div></span></span></div><font class=3D"Apple-style-span" face=3D=
+"Monaco"></font></span><br></div></div></span></span></span></span></span><=
+/span></span></span></span><br class=3D"Apple-interchange-newline"></div></=
+span></div></span><br class=3D"Apple-interchange-newline"></span><br class=
+=3D"Apple-interchange-newline">
+</div>
+<br></div></div></blockquote></div><br></div></body></html>=
+
+--_000_26B0386422C04E31859C43A7B5D63919imperialacuk_--
+
+From mtholder at gmail.com  Tue May 18 17:14:05 2010
+From: mtholder at gmail.com (Mark Holder)
+Date: Tue, 18 May 2010 10:14:05 -0500
+Subject: [Phylobase-devl] New phylobase build approach using static
+	libncl (Was: Rcpp and OS X compiliation)
+In-Reply-To: <26B03864-22C0-4E31-859C-43A7B5D63919@imperial.ac.uk>
+References: <19304.22110.193.325453@ron.nulle.part>
+	<bf0d057b1002081052p5251b784m31a70588d4343691@mail.gmail.com>
+	<19312.25117.686228.181848@ron.nulle.part>
+	<B986C7A8-49FA-4200-AC95-8DBD9FEF2119@berkeley.edu>
+	<19312.42025.225305.415928@ron.nulle.part>
+	<19337.26927.255985.934447@ron.nulle.part>	<4B896DBF.3030407@ufl.edu>
+	<19337.29313.356523.491395@ron.nulle.part>
+	<bf0d057b1002271139y57604a09g1c8aa8a87be30edf@mail.gmail.com>
+	<8480AB58-8719-4B1D-8570-30DAF708CC63@berkeley.edu>
+	<bf0d057b1002271155v756f404ckdfe245414d675d3c@mail.gmail.com>
+	<E6459E9A-F07B-4D64-9C28-F860FFAA884C@berkeley.edu>
+	<4A95523C-9E24-41D5-BC6C-71CB33FD2278@gmail.com>
+	<3CD4FFE9-46AF-4054-8D45-8C90A8A12C07@berkeley.edu>
+	<D67BA0AB-AFED-407F-840C-EC5B57205785@gmail.com>
+	<99F57786-61B7-4086-BFE1-5BAB969FCD31@berkeley.edu>
+	<E366A1FF-864F-49CE-8E66-D0AC01AB9F09@imperial.ac.uk>
+	<1272029407.16870.13.camel@francois-laptop>
+	<83928BFA-C5C0-440F-A0FD-10DD34F2DE4D@imperial.ac.uk>
+	<1272490209.20555.38.camel@francois-laptop>
+	<ADBEFB71-2562-4EC7-82C3-F6F003535DF6@imperial.ac.uk>
+	<4E8511DB-568D-4382-BF5D-7B7A03A7847C@imperial.ac.uk>
+	<F52CB040-BC2C-4767-999E-E65E3F32DBA7@gmail.com>
+	<26B03864-22C0-4E31-859C-43A7B5D63919@imperial.ac.uk>
+Message-ID: <EADBEC27-7F34-4C69-8B60-6DB44DE66FC6@gmail.com>
+
+Hi,
+	Sorry for the slow response.
+
+If you look at:
+
+	URL: https://ncl.svn.sourceforge.net/svnroot/ncl/branches/v2.1/example/phylobaseinterface/NCLInterface.cpp
+	URL: https://ncl.svn.sourceforge.net/svnroot/ncl/branches/v2.1/example/phylobaseinterface/NCLInterface.h
+	SVN Revision: 524
+
+you'll see what I would do if were a phylobase developer.  
+
+I wrote a generic function for quoting NEXUS labels to R string literals. The function would work on most strings, but it does not deal with things (like alarms, backspace...) which are not expressible in NEXUS tokens.  Here it is:
+
+
+/************************************************************/
+std::string GetRStringLiteral(const std::string & inp)
+{
+	std::string withQuotes;
+	unsigned len = (unsigned)inp.length();
+	withQuotes.reserve(len + 4);
+	withQuotes.append(1,'\"');
+	for (std::string::const_iterator sIt = inp.begin(); sIt != inp.end(); sIt++)
+		{
+		if (strchr("\'\"\\\n\t", *sIt) == NULL)
+			withQuotes.append(1, *sIt);
+		else if (strchr("\'\"\\", *sIt) != NULL)
+			{
+			withQuotes.append(1,'\\');
+			withQuotes.append(1, *sIt);
+			}
+		else if (*sIt == '\t')
+			{
+			withQuotes.append(1,'\\');
+			withQuotes.append(1, 't');
+			}
+		else
+			{
+			withQuotes.append(1,'\\');
+			withQuotes.append(1, 'n');
+			}
+		}
+	withQuotes.append(1,'\"');
+	return withQuotes;
+}
+/************************************************************/
+
+
+Then instead of the construct:
+
+	outputforR+='"';
+	outputforR+=RemoveUnderscoresAndSpaces(taxa->GetTaxonLabel(taxon));
+	outputforR+='"';
+
+
+I suggest just calling:
+	outputforR+=GetRStringLiteral(taxa->GetTaxonLabel(taxon));
+
+
+Note:
+	To get this to look reasonable (I still have not fully tested it, but the output looks OK to me), I had to comment out a line like this (on line 373 and 1164 of the version of NCLInterface.cpp that is in the phylobase repo):
+
+	nexuscharacters=RemoveUnderscoresAndSpaces(nexuscharacters);
+
+Commenting this out means that:
+	labels that used to come across to R as dnaalignment1, now would come across as dna_alignment_1 . This looks like it was an unintentional extra call to RemoveUnderscoresAndSpaces (the labels dna_alignment_1 is written to the nexuscharacters with the underscores, but then they are stripped).
+
+
+
+I tested the NCL code on the NEXUS content below, and it seemed to deal with the funky names.
+
+all the best,
+Mark Holder
+
+
+
+
+#NEXUS
+
+begin data;
+   dimensions ntax=17 nchar=432;
+   format datatype=dna missing=?;
+   matrix
+   'h uman'       ctgactcctgaggagaagtctgccgttactgccctgtggggcaaggtgaacgtggatgaagttggtggtgaggccctgggcaggctgctggtggtctacccttggacccagaggttctttgagtcctttggggatctgtccactcctgatgctgttatgggcaaccctaaggtgaaggctcatggcaagaaagtgctcggtgcctttagtgatggcctggctcacctggacaacctcaagggcacctttgccacactgagtgagctgcactgtgacaagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgctggtctgtgtgctggcccatcactttggcaaagaattcaccccaccagtgcaggctgcctatcagaaagtggtggctggtgtggctaatgccctggcccacaagtatcac
+   t_arsier     ctgactgctgaagagaaggccgccgtcactgccctgtggggcaaggtagacgtggaagatgttggtggtgaggccctgggcaggctgctggtcgtctacccatggacccagaggttctttgactcctttggggacctgtccactcctgccgctgttatgagcaatgctaaggtcaaggcccatggcaaaaaggtgctgaacgcctttagtgacggcatggctcatctggacaacctcaagggcacctttgctaagctgagtgagctgcactgtgacaaattgcacgtggatcctgagaatttcaggctcttgggcaatgtgctggtgtgtgtgctggcccaccactttggcaaagaattcaccccgcaggttcaggctgcctatcagaaggtggtggctggtgtggctactgccttggctcacaagtaccac
+   'b_ushbaby'    ctgactcctgatgagaagaatgccgtttgtgccctgtggggcaaggtgaatgtggaagaagttggtggtgaggccctgggcaggctgctggttgtctacccatggacccagaggttctttgactcctttggggacctgtcctctccttctgctgttatgggcaaccctaaagtgaaggcccacggcaagaaggtgctgagtgcctttagcgagggcctgaatcacctggacaacctcaagggcacctttgctaagctgagtgagctgcattgtgacaagctgcacgtggaccctgagaacttcaggctcctgggcaacgtgctggtggttgtcctggctcaccactttggcaaggatttcaccccacaggtgcaggctgcctatcagaaggtggtggctggtgtggctactgccctggctcacaaataccac
+   'ha	re'        ctgtccggtgaggagaagtctgcggtcactgccctgtggggcaaggtgaatgtggaagaagttggtggtgagaccctgggcaggctgctggttgtctacccatggacccagaggttcttcgagtcctttggggacctgtccactgcttctgctgttatgggcaaccctaaggtgaaggctcatggcaagaaggtgctggctgccttcagtgagggtctgagtcacctggacaacctcaaaggcaccttcgctaagctgagtgaactgcattgtgacaagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgctggttattgtgctgtctcatcactttggcaaagaattcactcctcaggtgcaggctgcctatcagaaggtggtggctggtgtggccaatgccctggctcacaaataccac
+   'ra\bbit'      ctgtccagtgaggagaagtctgcggtcactgccctgtggggcaaggtgaatgtggaagaagttggtggtgaggccctgggcaggctgctggttgtctacccatggacccagaggttcttcgagtcctttggggacctgtcctctgcaaatgctgttatgaacaatcctaaggtgaaggctcatggcaagaaggtgctggctgccttcagtgagggtctgagtcacctggacaacctcaaaggcacctttgctaagctgagtgaactgcactgtgacaagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgctggttattgtgctgtctcatcattttggcaaagaattcactcctcaggtgcaggctgcctatcagaaggtggtggctggtgtggccaatgccctggctcacaaataccac
+   'co''w'         ctgactgctgaggagaaggctgccgtcaccgccttttggggcaaggtgaaagtggatgaagttggtggtgaggccctgggcaggctgctggttgtctacccctggactcagaggttctttgagtcctttggggacttgtccactgctgatgctgttatgaacaaccctaaggtgaaggcccatggcaagaaggtgctagattcctttagtaatggcatgaagcatctcgatgacctcaagggcacctttgctgcgctgagtgagctgcactgtgataagctgcatgtggatcctgagaacttcaagctcctgggcaacgtgctagtggttgtgctggctcgcaattttggcaaggaattcaccccggtgctgcaggctgactttcagaaggtggtggctggtgtggccaatgccctggcccacagatatcat
+   'sh"eep'       ctgactgctgaggagaaggctgccgtcaccggcttctggggcaaggtgaaagtggatgaagttggtgctgaggccctgggcaggctgctggttgtctacccctggactcagaggttctttgagcactttggggacttgtccaatgctgatgctgttatgaacaaccctaaggtgaaggcccatggcaagaaggtgctagactcctttagtaacggcatgaagcatctcgatgacctcaagggcacctttgctcagctgagtgagctgcactgtgataagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgctggtggttgtgctggctcgccaccatggcaatgaattcaccccggtgctgcaggctgactttcagaaggtggtggctggtgttgccaatgccctggcccacaaatatcac
+   pig         ctgtctgctgaggagaaggaggccgtcctcggcctgtggggcaaagtgaatgtggacgaagttggtggtgaggccctgggcaggctgctggttgtctacccctggactcagaggttcttcgagtcctttggggacctgtccaatgccgatgccgtcatgggcaatcccaaggtgaaggcccacggcaagaaggtgctccagtccttcagtgacggcctgaaacatctcgacaacctcaagggcacctttgctaagctgagcgagctgcactgtgaccagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgatagtggttgttctggctcgccgccttggccatgacttcaacccgaatgtgcaggctgcttttcagaaggtggtggctggtgttgctaatgccctggcccacaagtaccac
+   elephseal   ttgacggcggaggagaagtctgccgtcacctccctgtggggcaaagtgaaggtggatgaagttggtggtgaagccctgggcaggctgctggttgtctacccctggactcagaggttctttgactcctttggggacctgtcctctcctaatgctattatgagcaaccccaaggtcaaggcccatggcaagaaggtgctgaattcctttagtgatggcctgaagaatctggacaacctcaagggcacctttgctaagctcagtgagctgcactgtgaccagctgcatgtggatcccgagaacttcaagctcctgggcaatgtgctggtgtgtgtgctggcccgccactttggcaaggaattcaccccacagatgcagggtgcctttcagaaggtggtagctggtgtggccaatgccctcgcccacaaatatcac
+   rat         ctaactgatgctgagaaggctgctgttaatgccctgtggggaaaggtgaaccctgatgatgttggtggcgaggccctgggcaggctgctggttgtctacccttggacccagaggtactttgatagctttggggacctgtcctctgcctctgctatcatgggtaaccctaaggtgaaggcccatggcaagaaggtgataaacgccttcaatgatggcctgaaacacttggacaacctcaagggcacctttgctcatctgagtgaactccactgtgacaagctgcatgtggatcctgagaacttcaggctcctgggcaatatgattgtgattgtgttgggccaccacctgggcaaggaattcaccccctgtgcacaggctgccttccagaaggtggtggctggagtggccagtgccctggctcacaagtaccac
+   mouse       ctgactgatgctgagaagtctgctgtctcttgcctgtgggcaaaggtgaaccccgatgaagttggtggtgaggccctgggcaggctgctggttgtctacccttggacccagcggtactttgatagctttggagacctatcctctgcctctgctatcatgggtaatcccaaggtgaaggcccatggcaaaaaggtgataactgcctttaacgagggcctgaaaaacctggacaacctcaagggcacctttgccagcctcagtgagctccactgtgacaagctgcatgtggatcctgagaacttcaggctcctaggcaatgcgatcgtgattgtgctgggccaccacctgggcaaggatttcacccctgctgcacaggctgccttccagaaggtggtggctggagtggccactgccctggctcacaagtaccac
+   hamster     ctgactgatgctgagaaggcccttgtcactggcctgtggggaaaggtgaacgccgatgcagttggcgctgaggccctgggcaggttgctggttgtctacccttggacccagaggttctttgaacactttggagacctgtctctgccagttgctgtcatgaataacccccaggtgaaggcccatggcaagaaggtgatccactccttcgctgatggcctgaaacacctggacaacctgaagggcgccttttccagcctgagtgagctccactgtgacaagctgcacgtggatcctgagaacttcaagctcctgggcaatatgatcatcattgtgctgatccacgacctgggcaaggacttcactcccagtgcacagtctgcctttcataaggtggtggctggtgtggccaatgccctggctcacaagtaccac
+   marsupial   ttgacttctgaggagaagaactgcatcactaccatctggtctaaggtgcaggttgaccagactggtggtgaggcccttggcaggatgctcgttgtctacccctggaccaccaggttttttgggagctttggtgatctgtcctctcctggcgctgtcatgtcaaattctaaggttcaagcccatggtgctaaggtgttgacctccttcggtgaagcagtcaagcatttggacaacctgaagggtacttatgccaagttgagtgagctccactgtgacaagctgcatgtggaccctgagaacttcaagatgctggggaatatcattgtgatctgcctggctgagcactttggcaaggattttactcctgaatgtcaggttgcttggcagaagctcgtggctggagttgcccatgccctggcccacaagtaccac
+   duck        tggacagccgaggagaagcagctcatcaccggcctctggggcaaggtcaatgtggccgactgtggagctgaggccctggccaggctgctgatcgtctacccctggacccagaggttcttcgcctccttcgggaacctgtccagccccactgccatccttggcaaccccatggtccgtgcccatggcaagaaagtgctcacctccttcggagatgctgtgaagaacctggacaacatcaagaacaccttcgcccagctgtccgagctgcactgcgacaagctgcacgtggaccctgagaacttcaggctcctgggtgacatcctcatcatcgtcctggccgcccacttcaccaaggatttcactcctgactgccaggccgcctggcagaagctggtccgcgtggtggcccacgctctggcccgcaagtaccac
+   chicken     tggactgctgaggagaagcagctcatcaccggcctctggggcaaggtcaatgtggccgaatgtggggccgaagccctggccaggctgctgatcgtctacccctggacccagaggttctttgcgtcctttgggaacctctccagccccactgccatccttggcaaccccatggtccgcgcccacggcaagaaagtgctcacctcctttggggatgctgtgaagaacctggacaacatcaagaacaccttctcccaactgtccgaactgcattgtgacaagctgcatgtggaccccgagaacttcaggctcctgggtgacatcctcatcattgtcctggccgcccacttcagcaaggacttcactcctgaatgccaggctgcctggcagaagctggtccgcgtggtggcccatgccctggctcgcaagtaccac
+   xenlaev     tggacagctgaagagaaggccgccatcacttctgtatggcagaaggtcaatgtagaacatgatggccatgatgccctgggcaggctgctgattgtgtacccctggacccagagatacttcagtaactttggaaacctctccaattcagctgctgttgctggaaatgccaaggttcaagcccatggcaagaaggttctttcagctgttggcaatgccattagccatattgacagtgtgaagtcctctctccaacaactcagtaagatccatgccactgaactgtttgtggaccctgagaactttaagcgttttggtggagttctggtcattgtcttgggtgccaaactgggaactgccttcactcctaaagttcaggctgcttgggagaaattcattgcagttttggttgatggtcttagccagggctataac
+   xentrop     tggacagctgaagaaaaagcaaccattgcttctgtgtgggggaaagtcgacattgaacaggatggccatgatgcattatccaggctgctggttgtttatccctggactcagaggtacttcagcagttttggaaacctctccaatgtctccgctgtctctggaaatgtcaaggttaaagcccatggaaataaagtcctgtcagctgttggcagtgcaatccagcatctggatgatgtgaagagccaccttaaaggtcttagcaagagccatgctgaggatcttcatgtggatcccgaaaacttcaagcgccttgcggatgttctggtgatcgttctggctgccaaacttggatctgccttcactccccaagtccaagctgtctgggagaagctcaatgcaactctggtggctgctcttagccatggctacttc
+   ;
+end;
+
+begin mrbayes;
+   [The following block illustrates how to set up two data partitions
+    and use different models for the different partitions.]
+   charset non_coding = 1-90 358-432;
+   charset coding     = 91-357;
+   partition region = 2:non_coding,coding;
+   set partition = region;
+   
+   [The following lines set a codon model for the second data partition (coding) and
+    allows the non_coding and coding partitions to have different overall rates.]
+   lset applyto=(2) nucmodel=codon;
+   prset ratepr=variable;
+   
+   [Codon models are computationally complex so the following lines set the parameters
+    of the MCMC such that only 1 chain is run for 100 generations and results are printed
+    to screen and to file every tenth generation. To start this chain, you need to type
+    'mcmc' after executing this block. You need to run the chain longer to get adequate
+    convergence.]
+   mcmcp ngen=100 nchains=1 printfreq=10 samplefreq=10;
+end;
+
+
+
+
+
+
+
+[################################NEXUS############################################]
+
+	
+On May 5, 2010, at 4:54 AM, Orme, David wrote:
+
+> Hi,
+> 
+> I'd agree with this - we have to be able to cope with any taxon names and, ideally, if we can avoid having to make the taxon names syntactically valid R, then we should change them as little as possible (apart from the obligatory unquoted underscore to space translation) and keep them as character strings.
+> 
+> What would NCL pass as a token given these two?
+> 
+> 'taxon\1'
+> 'taxon"1'
+> 
+> I think these are the problem cases - R needs to escape the backslash and double quote, but handles the double quote better than the backslash:
+> 
+> > x <- c('taxon"1', 'taxon\1', 'taxon\\1', 'taxon\one', 'taxon\\one')
+> Warning messages:
+> 1: '\o' is an unrecognized escape in a character string 
+> 2: unrecognized escape removed from "taxon\one" 
+> > x
+> [1] "taxon\"1"   "taxon\001"  "taxon\\1"   "taxonone"   "taxon\\one"
+> 
+> Cheers,
+> David
+> 
+> 
+> 
+> 
+> 
+> 
+> On 29 Apr 2010, at 20:19, Mark Holder wrote:
+> 
+>> Hi,
+>> 	I'll chime in despite being fairly ignorant of a lot of the use cases for phylobase.
+>> 
+>> My experience dealing with files from users is that you have to be prepared for anything occurring in a taxon name.  So I'd say that you have to have a system in which the name can be any character string, not a system in which the taxon name can be a variable name in R.  So I would recommend getting the charcter string from NCL, and then using whatever R-specific character escaping conventions are needed to generate the equivalent string literal in R (you'll have to use \ before any quote or \ characters).
+>> 
+>> 
+>> 
+>> Phylobase *could* strip problematic symbols out of the names easily enough but:
+>> 	1. it is confusing to user's because the name of the taxon changes (usually only slightly, but it still changes), and
+>> 	2. then you have to deal with name clashes (if a file has 'a b' and 'ab' as taxa names, then stripping spaces will cause a clash).
+>> 
+>> NEXUS has syntactic rules for tokenizing.  They usually don't change the internal representation much, but NCL uses the syntactic rules to build a character string in memory.  In the following table I'll use double-quotes to delimit the character string that NCL would store in memory (the quotes are not part of the name).
+>> 
+>> Syntax                Internal representation
+>> t1                    "t1"
+>> 't 2'                 "t 2"
+>> t_2                   "t 2"
+>> t.3                   "t.3"
+>> 't.3'                 "t.3"
+>> t-4                   not a valid name this is 3 tokens "t", "-" and "4"
+>> 't-4'                 "t-4"
+>> 't''5 x'              "t'5 x"
+>> 't_6'                 "t_6" 
+>> 
+>> Basically, the syntactic rules just let you group tokens with token-breaking symbols (white space and punctuation).  The exceptions are the case t_2  and 't''5 x' above.  Both of those case involve substitution (in the second case the internal pair of single-quotes is collapsed to single quote in the internal representation).
+>> 
+>> 
+>> What really confuses users is the fact that in some formats a_b might refer to the name "a_b", but in NEXUS it is "a b" So the same syntax has different interpretation in different formatting rules.  NCL uses the NEXUS tokenizing for NEXUS files and newick tree files (NCL supports fasta, phylip, and relaxed phylip formats, but does not impose NEXUS quoting rules on those formats). So if you use NCL to read a FASTA and NEXUS file both of which use the name a_b (without any quotes) then in the taxa gleaned from the FASTA file, the internal name will be "a_b", but the same name will have the internal representation of "a b" when read from NEXUS.  That invariably trips people up, but I don't think that there is anyway to avoid it because that behavior is mandated by both standards.
+>> 
+>> I think that if phylobase just include a brief discussion of this issue in a README or other documentation, then that is about as good as you can do.
+>> 
+>> 
+>> all the best,
+>> Mark
+>> 
+>> On Apr 29, 2010, at 10:51 AM, Orme, David wrote:
+>> 
+>>> Sorry - I take it back about the 'not problematic in a character string' - the quotes and the backslash are of course fairly problematic.
+>>> 
+>>> Cheers
+>>> David
+>>> 
+>>> On 29 Apr 2010, at 16:43, Orme, David wrote:
+>>> 
+>>>> Hi,
+>>>> 
+>>>> I know this isn't the bible - but the PAUP manual specifies the following:
+>>>> 
+>>>> "Identifiers" are simply names given to taxa, characters, and other PAUP input elements such as character-sets, taxon-sets, and exclusion-sets. They may include any combination of upper- and lower-case alphabetic characters, digits, and punctuation. If the identifier contains any of the following characters:
+>>>> ( ) [ ] { } / \ , ; : = * ' "` + - < >
+>>>> or a blank, the entire identifier must be enclosed in single quotes.
+>>>> 
+>>>> They're going to be rare but they will happen. Any of those are problematic in a valid R name - although not in a character string. The taxon identifiers could come into R as character vectors just as they appear in the Nexus file (possibly stripping the enclosing single quotes). The next question is then whether we need them to be valid R names rather than character strings - in which case make.names() could be invoked.
+>>>> 
+>>>> Cheers,
+>>>> David
+>>>> 
+>>>> 
+>>>> On 28 Apr 2010, at 22:30, Fran?ois Michonneau wrote:
+>>>> 
+>>>>> 
+>>>>> Hi all,
+>>>>> 
+>>>>>  Sorry if this is a dumb question, but why do we need to remove spaces
+>>>>> and underscore from the species names when building the data frame? The
+>>>>> only character that I can think of that could be an issue is ", and I
+>>>>> don't think that it's allowed by software using NEXUS/used.
+>>>>> 
+>>>>>  In other words, do we really need to use RemoveUnderscoresAndSpaces in
+>>>>> NCLInterface.cpp?
+>>>>> 
+>>>>>  Thanks,
+>>>>>  -- Fran?ois 
+>>>>> 
+>>>>> On Mon, 2010-04-26 at 12:11 +0100, Orme, David wrote:
+>>>>>> I'd guess we want the names to be syntactically valid R names - and ideally that would be through running make.names() across them. The problem is then that the NCLInterface can easily pass the raw PAUP identifiers for the data (which we can then make.names()) but that the tree input is currently via a text string. Again, probably easy enough to have the raw PAUP names in the string but these would be horrible to extract with regex. Is there any way that NCLInterface can pass the tree using numeric symbols and then pass a translate block as a vector? Then make.names() could be run easily on both the data names and the tree names...
+>>>>>> 
+>>>>>> Cheers,
+>>>>>> David
+>>>>>> 
+>>>>>> 
+>>>>>> 
+>>>>>> On 23 Apr 2010, at 14:30, Fran?ois Michonneau wrote:
+>>>>>> 
+>>>>>>> 
+>>>>>>> Hi,
+>>>>>>> 
+>>>>>>> Ouch! We need to fix this.
+>>>>>>> 
+>>>>>>> There might be some hope if we use Rcpp to build the data frame
+>>>>>>> instead of building and parsing a string.
+>>>>>>> 
+>>>>>>> Let me talk to Dirk about it and see what we can do.
+>>>>>>> 
+>>>>>>> Cheers,
+>>>>>>> -- Fran?ois
+>>>>>>> 
+>>>>>>> On Fri, 2010-04-23 at 13:59 +0100, Orme, David wrote:
+>>>>>>>> Hi all,
+>>>>>>>> 
+>>>>>>>> From an e-mail on 03/03/10:
+>>>>>>>> 
+>>>>>>>> Mark then Peter
+>>>>>>>> 
+>>>>>>>>>> The main potential problems that I see with the ways that phylobase is using NCL now are:
+>>>>>>>>>> 	1. in NCLInterface.cpp there are lots of call to RemoveUnderscoresAndSpaces to get rid of spaces and _ in names.  That makes names easier to deal with, but at some point will bite you (somebody will have dataset with a taxon labelled "AB" and another with "A B", after transformation there will be a name clash).
+>>>>>>>>> 
+>>>>>>>>> I agree that this is something to address.  Not only might there be clashes but changing names, will be annoying to users.  Brian or Derrick could answer better, but I assume this is because some of the code used to parse the tree string can't handle the underscores and spaces.
+>>>>>>>> 
+>>>>>>>> Has just bitten me! There is a deeper problem here in that readNexus uses the NCLInterface code to get the data frame as parsable R code - with stripped spaces and underscores - but the tree block is passed over as a block of raw text from the file. These names _aren't_ then stripped of underscores and spaces by read.nexustreestring() and so the name checking throws an error. 
+>>>>>>>> 
+>>>>>>>> Obviously there is an ongoing deeper discussion about how to handle passing the tree from NCL and how to handle the dismayingly wide range of official valid PAUP identifiers using regex but currently we've got a simpler problem of different handling. Underscores in names are very commonly used to avoid the quoting problem with spaces so I think this current problem will come up a lot. 
+>>>>>>>> 
+>>>>>>>> Cheers,
+>>>>>>>> David
+>>>>>>>> 
+>>>>>>>> 
+>>>>>>>> 
+>>>>>>>> 
+>>>>>>>> 
+>>>>>>>> 
+>>>>>>>> _______________________________________________
+>>>>>>>> Phylobase-devl mailing list
+>>>>>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>>>>>> 
+>>>>>> 
+>>>>>> _______________________________________________
+>>>>>> Phylobase-devl mailing list
+>>>>>> Phylobase-devl at lists.r-forge.r-project.org
+>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>>>> 
+>>>> <ATT00002..txt>
+>>> 
+>>> _______________________________________________
+>>> Phylobase-devl mailing list
+>>> Phylobase-devl at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+>> 
+>> Mark Holder
+>> 
+>> mtholder at ku.edu
+>> http://phylo.bio.ku.edu/mark-holder
+>> 
+>> ==============================================
+>> Department of Ecology and Evolutionary Biology
+>> University of Kansas
+>> 6031 Haworth Hall
+>> 1200 Sunnyside Avenue
+>> Lawrence, Kansas 66045
+>> 
+>> lab phone:  785.864.5789
+>> 
+>> fax (shared): 785.864.5860
+>> ==============================================
+>> 
+>> 
+>> 
+>> 
+>> 
+>> 
+>> 
+>> 
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20100518/8c35909a/attachment-0001.htm>
+
+From francois.michonneau at gmail.com  Tue May 18 19:13:07 2010
+From: francois.michonneau at gmail.com (=?ISO-8859-1?Q?Fran=E7ois?= Michonneau)
+Date: Tue, 18 May 2010 13:13:07 -0400
+Subject: [Phylobase-devl] New phylobase build approach using static
+ libncl (Was: Rcpp and OS X compiliation)
+In-Reply-To: <EADBEC27-7F34-4C69-8B60-6DB44DE66FC6@gmail.com>
+References: <19304.22110.193.325453@ron.nulle.part>
+	<bf0d057b1002081052p5251b784m31a70588d4343691@mail.gmail.com>
+	<19312.25117.686228.181848@ron.nulle.part>
+	<B986C7A8-49FA-4200-AC95-8DBD9FEF2119@berkeley.edu>
+	<19312.42025.225305.415928@ron.nulle.part>
+	<19337.26927.255985.934447@ron.nulle.part>	<4B896DBF.3030407@ufl.edu>
+	<19337.29313.356523.491395@ron.nulle.part>
+	<bf0d057b1002271139y57604a09g1c8aa8a87be30edf@mail.gmail.com>
+	<8480AB58-8719-4B1D-8570-30DAF708CC63@berkeley.edu>
+	<bf0d057b1002271155v756f404ckdfe245414d675d3c@mail.gmail.com>
+	<E6459E9A-F07B-4D64-9C28-F860FFAA884C@berkeley.edu>
+	<4A95523C-9E24-41D5-BC6C-71CB33FD2278@gmail.com>
+	<3CD4FFE9-46AF-4054-8D45-8C90A8A12C07@berkeley.edu>
+	<D67BA0AB-AFED-407F-840C-EC5B57205785@gmail.com>
+	<99F57786-61B7-4086-BFE1-5BAB969FCD31@berkeley.edu>
+	<E366A1FF-864F-49CE-8E66-D0AC01AB9F09@imperial.ac.uk>
+	<1272029407.16870.13.camel@francois-laptop>
+	<83928BFA-C5C0-440F-A0FD-10DD34F2DE4D@imperial.ac.uk>
+	<1272490209.20555.38.camel@francois-laptop>
+	<ADBEFB71-2562-4EC7-82C3-F6F003535DF6@imperial.ac.uk>
+	<4E8511DB-568D-4382-BF5D-7B7A03A7847C@imperial.ac.uk>
+	<F52CB040-BC2C-4767-999E-E65E3F32DBA7@gmail.com>
+	<26B03864-22C0-4E31-859C-43A7B5D63919@imperial.ac.uk>
+	<EADBEC27-7F34-4C69-8B60-6DB44DE66FC6@gmail.com>
+Message-ID: <1274202787.24794.0.camel@francois-laptop>
+
+
+Thanks Mark!
+
+  I'm working on putting and testing the code into phylobase. I'll keep
+you all posted.
+
+  Cheers,
+  -- Fran?ois 
+
+On Tue, 2010-05-18 at 10:14 -0500, Mark Holder wrote:
+> Hi,
+> Sorry for the slow response.
+> 
+> 
+> If you look at:
+> 
+> 
+> URL:
+> https://ncl.svn.sourceforge.net/svnroot/ncl/branches/v2.1/example/phylobaseinterface/NCLInterface.cpp
+> URL:
+> https://ncl.svn.sourceforge.net/svnroot/ncl/branches/v2.1/example/phylobaseinterface/NCLInterface.h
+> SVN Revision: 524
+> 
+> 
+> you'll see what I would do if were a phylobase developer.  
+> 
+> 
+> I wrote a generic function for quoting NEXUS labels to R string
+> literals. The function would work on most strings, but it does not
+> deal with things (like alarms, backspace...) which are not expressible
+> in NEXUS tokens.  Here it is:
+> 
+> 
+> 
+> 
+> /************************************************************/
+> std::string GetRStringLiteral(const std::string & inp)
+> {
+> std::string withQuotes;
+> unsigned len = (unsigned)inp.length();
+> withQuotes.reserve(len + 4);
+> withQuotes.append(1,'\"');
+> for (std::string::const_iterator sIt = inp.begin(); sIt != inp.end();
+> sIt++)
+> {
+> if (strchr("\'\"\\\n\t", *sIt) == NULL)
+> withQuotes.append(1, *sIt);
+> else if (strchr("\'\"\\", *sIt) != NULL)
+> {
+> withQuotes.append(1,'\\');
+> withQuotes.append(1, *sIt);
+> }
+> else if (*sIt == '\t')
+> {
+> withQuotes.append(1,'\\');
+> withQuotes.append(1, 't');
+> }
+> else
+> {
+> withQuotes.append(1,'\\');
+> withQuotes.append(1, 'n');
+> }
+> }
+> withQuotes.append(1,'\"');
+> return withQuotes;
+> }
+> /************************************************************/
+> 
+> 
+> 
+> 
+> Then instead of the construct:
+> 
+> 
+> outputforR+='"';
+> outputforR+=RemoveUnderscoresAndSpaces(taxa->GetTaxonLabel(taxon));
+> outputforR+='"';
+> 
+> 
+> 
+> 
+> I suggest just calling:
+> 
+> outputforR+=GetRStringLiteral(taxa->GetTaxonLabel(taxon));
+> 
+> 
+> 
+> 
+> Note:
+> To get this to look reasonable (I still have not fully tested it, but
+> the output looks OK to me), I had to comment out a line like this (on
+> line 373 and 1164 of the version of NCLInterface.cpp that is in the
+> phylobase repo):
+> 
+> 
+> nexuscharacters=RemoveUnderscoresAndSpaces(nexuscharacters);
+> 
+> 
+> Commenting this out means that:
+> labels that used to come across to R as dnaalignment1, now would come
+> across as dna_alignment_1 . This looks like it was an unintentional
+> extra call to RemoveUnderscoresAndSpaces (the labels dna_alignment_1
+> is written to the nexuscharacters with the underscores, but then they
+> are stripped).
+> 
+> 
+> 
+> 
+> 
+> 
+> I tested the NCL code on the NEXUS content below, and it seemed to
+> deal with the funky names.
+> 
+> 
+> all the best,
+> Mark Holder
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> #NEXUS
+> 
+> 
+> begin data;
+>    dimensions ntax=17 nchar=432;
+>    format datatype=dna missing=?;
+>    matrix
+>    'h uman'
+> ctgactcctgaggagaagtctgccgttactgccctgtggggcaaggtgaacgtggatgaagttggtggtgaggccctgggcaggctgctggtggtctacccttggacccagaggttctttgagtcctttggggatctgtccactcctgatgctgttatgggcaaccctaaggtgaaggctcatggcaagaaagtgctcggtgcctttagtgatggcctggctcacctggacaacctcaagggcacctttgccacactgagtgagctgcactgtgacaagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgctggtctgtgtgctggcccatcactttggcaaagaattcaccccaccagtgcaggctgcctatcagaaagtggtggctggtgtggctaatgccctggcccacaagtatcac
+>    t_arsier
+> ctgactgctgaagagaaggccgccgtcactgccctgtggggcaaggtagacgtggaagatgttggtggtgaggccctgggcaggctgctggtcgtctacccatggacccagaggttctttgactcctttggggacctgtccactcctgccgctgttatgagcaatgctaaggtcaaggcccatggcaaaaaggtgctgaacgcctttagtgacggcatggctcatctggacaacctcaagggcacctttgctaagctgagtgagctgcactgtgacaaattgcacgtggatcctgagaatttcaggctcttgggcaatgtgctggtgtgtgtgctggcccaccactttggcaaagaattcaccccgcaggttcaggctgcctatcagaaggtggtggctggtgtggctactgccttggctcacaagtaccac
+>    'b_ushbaby'
+>  ctgactcctgatgagaagaatgccgtttgtgccctgtggggcaaggtgaatgtggaagaagttggtggtgaggccctgggcaggctgctggttgtctacccatggacccagaggttctttgactcctttggggacctgtcctctccttctgctgttatgggcaaccctaaagtgaaggcccacggcaagaaggtgctgagtgcctttagcgagggcctgaatcacctggacaacctcaagggcacctttgctaagctgagtgagctgcattgtgacaagctgcacgtggaccctgagaacttcaggctcctgggcaacgtgctggtggttgtcctggctcaccactttggcaaggatttcaccccacaggtgcaggctgcctatcagaaggtggtggctggtgtggctactgccctggctcacaaataccac
+>    'ha re'
+>  ctgtccggtgaggagaagtctgcggtcactgccctgtggggcaaggtgaatgtggaagaagttggtggtgagaccctgggcaggctgctggttgtctacccatggacccagaggttcttcgagtcctttggggacctgtccactgcttctgctgttatgggcaaccctaaggtgaaggctcatggcaagaaggtgctggctgccttcagtgagggtctgagtcacctggacaacctcaaaggcaccttcgctaagctgagtgaactgcattgtgacaagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgctggttattgtgctgtctcatcactttggcaaagaattcactcctcaggtgcaggctgcctatcagaaggtggtggctggtgtggccaatgccctggctcacaaataccac
+>    'ra\bbit'
+>  ctgtccagtgaggagaagtctgcggtcactgccctgtggggcaaggtgaatgtggaagaagttggtggtgaggccctgggcaggctgctggttgtctacccatggacccagaggttcttcgagtcctttggggacctgtcctctgcaaatgctgttatgaacaatcctaaggtgaaggctcatggcaagaaggtgctggctgccttcagtgagggtctgagtcacctggacaacctcaaaggcacctttgctaagctgagtgaactgcactgtgacaagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgctggttattgtgctgtctcatcattttggcaaagaattcactcctcaggtgcaggctgcctatcagaaggtggtggctggtgtggccaatgccctggctcacaaataccac
+>    'co''w'
+> ctgactgctgaggagaaggctgccgtcaccgccttttggggcaaggtgaaagtggatgaagttggtggtgaggccctgggcaggctgctggttgtctacccctggactcagaggttctttgagtcctttggggacttgtccactgctgatgctgttatgaacaaccctaaggtgaaggcccatggcaagaaggtgctagattcctttagtaatggcatgaagcatctcgatgacctcaagggcacctttgctgcgctgagtgagctgcactgtgataagctgcatgtggatcctgagaacttcaagctcctgggcaacgtgctagtggttgtgctggctcgcaattttggcaaggaattcaccccggtgctgcaggctgactttcagaaggtggtggctggtgtggccaatgccctggcccacagatatcat
+>    'sh"eep'
+> ctgactgctgaggagaaggctgccgtcaccggcttctggggcaaggtgaaagtggatgaagttggtgctgaggccctgggcaggctgctggttgtctacccctggactcagaggttctttgagcactttggggacttgtccaatgctgatgctgttatgaacaaccctaaggtgaaggcccatggcaagaaggtgctagactcctttagtaacggcatgaagcatctcgatgacctcaagggcacctttgctcagctgagtgagctgcactgtgataagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgctggtggttgtgctggctcgccaccatggcaatgaattcaccccggtgctgcaggctgactttcagaaggtggtggctggtgttgccaatgccctggcccacaaatatcac
+>    pig
+> ctgtctgctgaggagaaggaggccgtcctcggcctgtggggcaaagtgaatgtggacgaagttggtggtgaggccctgggcaggctgctggttgtctacccctggactcagaggttcttcgagtcctttggggacctgtccaatgccgatgccgtcatgggcaatcccaaggtgaaggcccacggcaagaaggtgctccagtccttcagtgacggcctgaaacatctcgacaacctcaagggcacctttgctaagctgagcgagctgcactgtgaccagctgcacgtggatcctgagaacttcaggctcctgggcaacgtgatagtggttgttctggctcgccgccttggccatgacttcaacccgaatgtgcaggctgcttttcagaaggtggtggctggtgttgctaatgccctggcccacaagtaccac
+>    elephseal
+> ttgacggcggaggagaagtctgccgtcacctccctgtggggcaaagtgaaggtggatgaagttggtggtgaagccctgggcaggctgctggttgtctacccctggactcagaggttctttgactcctttggggacctgtcctctcctaatgctattatgagcaaccccaaggtcaaggcccatggcaagaaggtgctgaattcctttagtgatggcctgaagaatctggacaacctcaagggcacctttgctaagctcagtgagctgcactgtgaccagctgcatgtggatcccgagaacttcaagctcctgggcaatgtgctggtgtgtgtgctggcccgccactttggcaaggaattcaccccacagatgcagggtgcctttcagaaggtggtagctggtgtggccaatgccctcgcccacaaatatcac
+>    rat
+> ctaactgatgctgagaaggctgctgttaatgccctgtggggaaaggtgaaccctgatgatgttggtggcgaggccctgggcaggctgctggttgtctacccttggacccagaggtactttgatagctttggggacctgtcctctgcctctgctatcatgggtaaccctaaggtgaaggcccatggcaagaaggtgataaacgccttcaatgatggcctgaaacacttggacaacctcaagggcacctttgctcatctgagtgaactccactgtgacaagctgcatgtggatcctgagaacttcaggctcctgggcaatatgattgtgattgtgttgggccaccacctgggcaaggaattcaccccctgtgcacaggctgccttccagaaggtggtggctggagtggccagtgccctggctcacaagtaccac
+>    mouse
+> ctgactgatgctgagaagtctgctgtctcttgcctgtgggcaaaggtgaaccccgatgaagttggtggtgaggccctgggcaggctgctggttgtctacccttggacccagcggtactttgatagctttggagacctatcctctgcctctgctatcatgggtaatcccaaggtgaaggcccatggcaaaaaggtgataactgcctttaacgagggcctgaaaaacctggacaacctcaagggcacctttgccagcctcagtgagctccactgtgacaagctgcatgtggatcctgagaacttcaggctcctaggcaatgcgatcgtgattgtgctgggccaccacctgggcaaggatttcacccctgctgcacaggctgccttccagaaggtggtggctggagtggccactgccctggctcacaagtaccac
+>    hamster
+> ctgactgatgctgagaaggcccttgtcactggcctgtggggaaaggtgaacgccgatgcagttggcgctgaggccctgggcaggttgctggttgtctacccttggacccagaggttctttgaacactttggagacctgtctctgccagttgctgtcatgaataacccccaggtgaaggcccatggcaagaaggtgatccactccttcgctgatggcctgaaacacctggacaacctgaagggcgccttttccagcctgagtgagctccactgtgacaagctgcacgtggatcctgagaacttcaagctcctgggcaatatgatcatcattgtgctgatccacgacctgggcaaggacttcactcccagtgcacagtctgcctttcataaggtggtggctggtgtggccaatgccctggctcacaagtaccac
+>    marsupial
+> ttgacttctgaggagaagaactgcatcactaccatctggtctaaggtgcaggttgaccagactggtggtgaggcccttggcaggatgctcgttgtctacccctggaccaccaggttttttgggagctttggtgatctgtcctctcctggcgctgtcatgtcaaattctaaggttcaagcccatggtgctaaggtgttgacctccttcggtgaagcagtcaagcatttggacaacctgaagggtacttatgccaagttgagtgagctccactgtgacaagctgcatgtggaccctgagaacttcaagatgctggggaatatcattgtgatctgcctggctgagcactttggcaaggattttactcctgaatgtcaggttgcttggcagaagctcgtggctggagttgcccatgccctggcccacaagtaccac
+>    duck
+>  tggacagccgaggagaagcagctcatcaccggcctctggggcaaggtcaatgtggccgactgtggagctgaggccctggccaggctgctgatcgtctacccctggacccagaggttcttcgcctccttcgggaacctgtccagccccactgccatccttggcaaccccatggtccgtgcccatggcaagaaagtgctcacctccttcggagatgctgtgaagaacctggacaacatcaagaacaccttcgcccagctgtccgagctgcactgcgacaagctgcacgtggaccctgagaacttcaggctcctgggtgacatcctcatcatcgtcctggccgcccacttcaccaaggatttcactcctgactgccaggccgcctggcagaagctggtccgcgtggtggcccacgctctggcccgcaagtaccac
+>    chicken
+> tggactgctgaggagaagcagctcatcaccggcctctggggcaaggtcaatgtggccgaatgtggggccgaagccctggccaggctgctgatcgtctacccctggacccagaggttctttgcgtcctttgggaacctctccagccccactgccatccttggcaaccccatggtccgcgcccacggcaagaaagtgctcacctcctttggggatgctgtgaagaacctggacaacatcaagaacaccttctcccaactgtccgaactgcattgtgacaagctgcatgtggaccccgagaacttcaggctcctgggtgacatcctcatcattgtcctggccgcccacttcagcaaggacttcactcctgaatgccaggctgcctggcagaagctggtccgcgtggtggcccatgccctggctcgcaagtaccac
+>    xenlaev
+> tggacagctgaagagaaggccgccatcacttctgtatggcagaaggtcaatgtagaacatgatggccatgatgccctgggcaggctgctgattgtgtacccctggacccagagatacttcagtaactttggaaacctctccaattcagctgctgttgctggaaatgccaaggttcaagcccatggcaagaaggttctttcagctgttggcaatgccattagccatattgacagtgtgaagtcctctctccaacaactcagtaagatccatgccactgaactgtttgtggaccctgagaactttaagcgttttggtggagttctggtcattgtcttgggtgccaaactgggaactgccttcactcctaaagttcaggctgcttgggagaaattcattgcagttttggttgatggtcttagccagggctataac
+>    xentrop
+> tggacagctgaagaaaaagcaaccattgcttctgtgtgggggaaagtcgacattgaacaggatggccatgatgcattatccaggctgctggttgtttatccctggactcagaggtacttcagcagttttggaaacctctccaatgtctccgctgtctctggaaatgtcaaggttaaagcccatggaaataaagtcctgtcagctgttggcagtgcaatccagcatctggatgatgtgaagagccaccttaaaggtcttagcaagagccatgctgaggatcttcatgtggatcccgaaaacttcaagcgccttgcggatgttctggtgatcgttctggctgccaaacttggatctgccttcactccccaagtccaagctgtctgggagaagctcaatgcaactctggtggctgctcttagccatggctacttc
+>    ;
+> end;
+> 
+> 
+> begin mrbayes;
+>    [The following block illustrates how to set up two data partitions
+>     and use different models for the different partitions.]
+>    charset non_coding = 1-90 358-432;
+>    charset coding     = 91-357;
+>    partition region = 2:non_coding,coding;
+>    set partition = region;
+>    
+>    [The following lines set a codon model for the second data
+> partition (coding) and
+>     allows the non_coding and coding partitions to have different
+> overall rates.]
+>    lset applyto=(2) nucmodel=codon;
+>    prset ratepr=variable;
+>    
+>    [Codon models are computationally complex so the following lines
+> set the parameters
+>     of the MCMC such that only 1 chain is run for 100 generations and
+> results are printed
+>     to screen and to file every tenth generation. To start this chain,
+> you need to type
+>     'mcmc' after executing this block. You need to run the chain
+> longer to get adequate
+>     convergence.]
+>    mcmcp ngen=100 nchains=1 printfreq=10 samplefreq=10;
+> end;
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> [################################NEXUS############################################]
+> 
+> 
+> 
+> On May 5, 2010, at 4:54 AM, Orme, David wrote:
+> 
+> > Hi,
+> > 
+> > 
+> > I'd agree with this - we have to be able to cope with any taxon
+> > names and, ideally, if we can avoid having to make the taxon names
+> > syntactically valid R, then we should change them as little as
+> > possible (apart from the obligatory unquoted underscore to space
+> > translation) and keep them as character strings.
+> > 
+> > 
+> > What would NCL pass as a token given these two?
+> > 
+> > 
+> > 'taxon\1'
+> > 'taxon"1'
+> > 
+> > 
+> > I think these are the problem cases - R needs to escape the
+> > backslash and double quote, but handles the double quote better than
+> > the backslash:
+> > 
+> > 
+> > > x <- c('taxon"1', 'taxon\1', 'taxon\\1', 'taxon\one', 'taxon\
+> > \one')
+> > Warning messages:
+> > 1: '\o' is an unrecognized escape in a character string 
+> > 2: unrecognized escape removed from "taxon\one" 
+> > > x
+> > [1] "taxon\"1"   "taxon\001"  "taxon\\1"   "taxonone"   "taxon\\one"
+> > 
+> > 
+> > Cheers,
+> > David
+> > 
+> > 
+> > 
+> > 
+> > 
+> > 
+> > 
+> > 
+> > 
+> > 
+> > 
+> > 
+> > On 29 Apr 2010, at 20:19, Mark Holder wrote:
+> > 
+> > > Hi,
+> > > I'll chime in despite being fairly ignorant of a lot of the use
+> > > cases for phylobase.
+> > > 
+> > > 
+> > > My experience dealing with files from users is that you have to be
+> > > prepared for anything occurring in a taxon name.  So I'd say that
+> > > you have to have a system in which the name can be any character
+> > > string, not a system in which the taxon name can be a variable
+> > > name in R.  So I would recommend getting the charcter string from
+> > > NCL, and then using whatever R-specific character escaping
+> > > conventions are needed to generate the equivalent string literal
+> > > in R (you'll have to use \ before any quote or \ characters).
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > Phylobase *could* strip problematic symbols out of the names
+> > > easily enough but:
+> > > 1. it is confusing to user's because the name of the taxon changes
+> > > (usually only slightly, but it still changes), and
+> > > 2. then you have to deal with name clashes (if a file has 'a b'
+> > > and 'ab' as taxa names, then stripping spaces will cause a clash).
+> > > 
+> > > 
+> > > NEXUS has syntactic rules for tokenizing.  They usually don't
+> > > change the internal representation much, but NCL uses the
+> > > syntactic rules to build a character string in memory.  In the
+> > > following table I'll use double-quotes to delimit the character
+> > > string that NCL would store in memory (the quotes are not part of
+> > > the name).
+> > > 
+> > > 
+> > > Syntax                Internal representation
+> > > t1                    "t1"
+> > > 't 2'                 "t 2"
+> > > t_2                   "t 2"
+> > > t.3                   "t.3"
+> > > 't.3'                 "t.3"
+> > > t-4                   not a valid name this is 3 tokens "t", "-"
+> > > and "4"
+> > > 't-4'                 "t-4"
+> > > 't''5 x'              "t'5 x"
+> > > 't_6'                 "t_6" 
+> > > 
+> > > 
+> > > Basically, the syntactic rules just let you group tokens with
+> > > token-breaking symbols (white space and punctuation).  The
+> > > exceptions are the case t_2  and 't''5 x' above.  Both of those
+> > > case involve substitution (in the second case the internal pair of
+> > > single-quotes is collapsed to single quote in the internal
+> > > representation).
+> > > 
+> > > 
+> > > 
+> > > 
+> > > What really confuses users is the fact that in some formats a_b
+> > > might refer to the name "a_b", but in NEXUS it is "a b" So the
+> > > same syntax has different interpretation in different formatting
+> > > rules.  NCL uses the NEXUS tokenizing for NEXUS files and newick
+> > > tree files (NCL supports fasta, phylip, and relaxed phylip
+> > > formats, but does not impose NEXUS quoting rules on those
+> > > formats). So if you use NCL to read a FASTA and NEXUS file both of
+> > > which use the name a_b (without any quotes) then in the taxa
+> > > gleaned from the FASTA file, the internal name will be "a_b", but
+> > > the same name will have the internal representation of "a b" when
+> > > read from NEXUS.  That invariably trips people up, but I don't
+> > > think that there is anyway to avoid it because that behavior is
+> > > mandated by both standards.
+> > > 
+> > > 
+> > > I think that if phylobase just include a brief discussion of this
+> > > issue in a README or other documentation, then that is about as
+> > > good as you can do.
+> > > 
+> > > 
+> > > 
+> > > 
+> > > all the best,
+> > > Mark
+> > > 
+> > > 
+> > > On Apr 29, 2010, at 10:51 AM, Orme, David wrote:
+> > > 
+> > > > Sorry - I take it back about the 'not problematic in a character
+> > > > string' - the quotes and the backslash are of course fairly
+> > > > problematic.
+> > > > 
+> > > > 
+> > > > Cheers
+> > > > David
+> > > > 
+> > > > On 29 Apr 2010, at 16:43, Orme, David wrote:
+> > > > 
+> > > > > Hi,
+> > > > > 
+> > > > > 
+> > > > > I know this isn't the bible - but the PAUP manual specifies
+> > > > > the following:
+> > > > > 
+> > > > > 
+> > > > > "Identifiers" are simply names given to taxa, characters, and
+> > > > > other PAUP input elements such as character-sets, taxon-sets,
+> > > > > and exclusion-sets. They may include any combination of upper-
+> > > > > and lower-case alphabetic characters, digits, and punctuation.
+> > > > > If the identifier contains any of the following characters:
+> > > > > ( ) [ ] { } / \ , ; : = * ' "` + - < >
+> > > > > or a blank, the entire identifier must be enclosed in single
+> > > > > quotes.
+> > > > > 
+> > > > > 
+> > > > > They're going to be rare but they will happen. Any of those
+> > > > > are problematic in a valid R name - although not in a
+> > > > > character string. The taxon identifiers could come into R as
+> > > > > character vectors just as they appear in the Nexus file
+> > > > > (possibly stripping the enclosing single quotes). The next
+> > > > > question is then whether we need them to be valid R names
+> > > > > rather than character strings - in which case make.names()
+> > > > > could be invoked.
+> > > > > 
+> > > > > 
+> > > > > Cheers,
+> > > > > David
+> > > > > 
+> > > > > 
+> > > > > 
+> > > > > 
+> > > > > On 28 Apr 2010, at 22:30, Fran?ois Michonneau wrote:
+> > > > > 
+> > > > > > 
+> > > > > > Hi all,
+> > > > > > 
+> > > > > >  Sorry if this is a dumb question, but why do we need to
+> > > > > > remove spaces
+> > > > > > and underscore from the species names when building the data
+> > > > > > frame? The
+> > > > > > only character that I can think of that could be an issue is
+> > > > > > ", and I
+> > > > > > don't think that it's allowed by software using NEXUS/used.
+> > > > > > 
+> > > > > >  In other words, do we really need to use
+> > > > > > RemoveUnderscoresAndSpaces in
+> > > > > > NCLInterface.cpp?
+> > > > > > 
+> > > > > >  Thanks,
+> > > > > >  -- Fran?ois 
+> > > > > > 
+> > > > > > On Mon, 2010-04-26 at 12:11 +0100, Orme, David wrote:
+> > > > > > > I'd guess we want the names to be syntactically valid R
+> > > > > > > names - and ideally that would be through running
+> > > > > > > make.names() across them. The problem is then that the
+> > > > > > > NCLInterface can easily pass the raw PAUP identifiers for
+> > > > > > > the data (which we can then make.names()) but that the
+> > > > > > > tree input is currently via a text string. Again, probably
+> > > > > > > easy enough to have the raw PAUP names in the string but
+> > > > > > > these would be horrible to extract with regex. Is there
+> > > > > > > any way that NCLInterface can pass the tree using numeric
+> > > > > > > symbols and then pass a translate block as a vector? Then
+> > > > > > > make.names() could be run easily on both the data names
+> > > > > > > and the tree names...
+> > > > > > > 
+> > > > > > > Cheers,
+> > > > > > > David
+> > > > > > > 
+> > > > > > > 
+> > > > > > > 
+> > > > > > > On 23 Apr 2010, at 14:30, Fran?ois Michonneau wrote:
+> > > > > > > 
+> > > > > > > > 
+> > > > > > > > Hi,
+> > > > > > > > 
+> > > > > > > > Ouch! We need to fix this.
+> > > > > > > > 
+> > > > > > > > There might be some hope if we use Rcpp to build the
+> > > > > > > > data frame
+> > > > > > > > instead of building and parsing a string.
+> > > > > > > > 
+> > > > > > > > Let me talk to Dirk about it and see what we can do.
+> > > > > > > > 
+> > > > > > > > Cheers,
+> > > > > > > > -- Fran?ois
+> > > > > > > > 
+> > > > > > > > On Fri, 2010-04-23 at 13:59 +0100, Orme, David wrote:
+> > > > > > > > > Hi all,
+> > > > > > > > > 
+> > > > > > > > > From an e-mail on 03/03/10:
+> > > > > > > > > 
+> > > > > > > > > Mark then Peter
+> > > > > > > > > 
+> > > > > > > > > > > The main potential problems that I see with the
+> > > > > > > > > > > ways that phylobase is using NCL now are:
+> > > > > > > > > > > 1. in NCLInterface.cpp there are lots of call to
+> > > > > > > > > > > RemoveUnderscoresAndSpaces to get rid of spaces
+> > > > > > > > > > > and _ in names.  That makes names easier to deal
+> > > > > > > > > > > with, but at some point will bite you (somebody
+> > > > > > > > > > > will have dataset with a taxon labelled "AB" and
+> > > > > > > > > > > another with "A B", after transformation there
+> > > > > > > > > > > will be a name clash).
+> > > > > > > > > > 
+> > > > > > > > > > I agree that this is something to address.  Not only
+> > > > > > > > > > might there be clashes but changing names, will be
+> > > > > > > > > > annoying to users.  Brian or Derrick could answer
+> > > > > > > > > > better, but I assume this is because some of the
+> > > > > > > > > > code used to parse the tree string can't handle the
+> > > > > > > > > > underscores and spaces.
+> > > > > > > > > 
+> > > > > > > > > Has just bitten me! There is a deeper problem here in
+> > > > > > > > > that readNexus uses the NCLInterface code to get the
+> > > > > > > > > data frame as parsable R code - with stripped spaces
+> > > > > > > > > and underscores - but the tree block is passed over as
+> > > > > > > > > a block of raw text from the file. These names
+> > > > > > > > > _aren't_ then stripped of underscores and spaces by
+> > > > > > > > > read.nexustreestring() and so the name checking throws
+> > > > > > > > > an error. 
+> > > > > > > > > 
+> > > > > > > > > Obviously there is an ongoing deeper discussion about
+> > > > > > > > > how to handle passing the tree from NCL and how to
+> > > > > > > > > handle the dismayingly wide range of official valid
+> > > > > > > > > PAUP identifiers using regex but currently we've got a
+> > > > > > > > > simpler problem of different handling. Underscores in
+> > > > > > > > > names are very commonly used to avoid the quoting
+> > > > > > > > > problem with spaces so I think this current problem
+> > > > > > > > > will come up a lot. 
+> > > > > > > > > 
+> > > > > > > > > Cheers,
+> > > > > > > > > David
+> > > > > > > > > 
+> > > > > > > > > 
+> > > > > > > > > 
+> > > > > > > > > 
+> > > > > > > > > 
+> > > > > > > > > 
+> > > > > > > > > _______________________________________________
+> > > > > > > > > Phylobase-devl mailing list
+> > > > > > > > > Phylobase-devl at lists.r-forge.r-project.org
+> > > > > > > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> > > > > > > > 
+> > > > > > > 
+> > > > > > > _______________________________________________
+> > > > > > > Phylobase-devl mailing list
+> > > > > > > Phylobase-devl at lists.r-forge.r-project.org
+> > > > > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> > > > > 
+> > > > > 
+> > > > > <ATT00002..txt>
+> > > > 
+> > > > 
+> > > > _______________________________________________
+> > > > Phylobase-devl mailing list
+> > > > Phylobase-devl at lists.r-forge.r-project.org
+> > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> > > 
+> > > Mark Holder
+> > > 
+> > > 
+> > > mtholder at ku.edu
+> > > http://phylo.bio.ku.edu/mark-holder
+> > > 
+> > > 
+> > > ==============================================
+> > > Department of Ecology and Evolutionary Biology
+> > > University of Kansas
+> > > 6031 Haworth Hall
+> > > 1200 Sunnyside Avenue
+> > > Lawrence, Kansas 66045
+> > > 
+> > > 
+> > > lab phone:  785.864.5789
+> > > 
+> > > 
+> > > fax (shared): 785.864.5860
+> > > ==============================================
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > > 
+> > 
+> > 
+> > _______________________________________________
+> > Phylobase-devl mailing list
+> > Phylobase-devl at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+> 
+> 
+> _______________________________________________
+> Phylobase-devl mailing list
+> Phylobase-devl at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/phylobase-devl
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.r-forge.r-project.org/pipermail/phylobase-devl/attachments/20100518/bb913c7c/attachment.pgp>
+

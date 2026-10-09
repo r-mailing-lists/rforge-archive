@@ -1,0 +1,3004 @@
+From mdowle at mdowle.plus.com  Mon Jul  1 15:19:36 2013
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 01 Jul 2013 14:19:36 +0100
+Subject: [datatable-help] =?utf-8?q?What_is_the_point_of_SJ=3F?=
+In-Reply-To: <CAP01uRkTZcs-mAWO5yh4gXoVo0OzftVnqtWkZTXNzAcFnaaViw@mail.gmail.com>
+References: <CAP01uRkTZcs-mAWO5yh4gXoVo0OzftVnqtWkZTXNzAcFnaaViw@mail.gmail.com>
+Message-ID: <8668cbb51786fdb9d7f5a2cc5c16b9f0@imap.plus.net>
+
+
+Hi,
+
+I don't use SJ very much admittedly.  ?SJ says it's for :
+    DT[SJ(...)]
+where ... has :
+    "Each argument is a vector. Generally each vector is the same length 
+but if they are not then usual silent repitition is applied."
+So it's not really for :
+    X[ SJ(Y) ]
+since
+    X[Y]
+is already that. Or maybe other ways I use sometimes :
+    X[setkey(Y)]
+or
+    X[setkey(Y,...)]
+or
+    X[setkey(copy(Y),...)]
+
+So SJ() is more for constructing a data.table from vectors, in the 
+spirit of J() originally being a mere alias for data.table().
+
+Let's say you have randomly ordered ids in vector 'ids' and X is keyed 
+by id.
+
+X[J(ids)]   # look up data and return it in the same order as ids is 
+ordered (each lookup is a new binary search)
+X[SJ(ids)]  # sort ids first, binary merge (bit faster if i is keyed 
+too), and return data in sorted order, keyed by id too
+
+That's the idea anyway. Sometimes if I'm not sure the input vector is 
+sorted or not, I'll use SJ() just to make sure.  There may be a shortcut 
+in there that uses is.unsorted first to save the cost of sorting (and if 
+not there probably should be).
+
+X must be keyed. Y having a key is optional, but if Y has a key too it 
+will take advantage of it.  Obviously speed differences will depend on 
+many factors including the number of rows in Y, the number of columns in 
+the join, the number of rows in X and the number of rows in the result.  
+And there is a known potential performance improvement in this area 
+(i.e. when both X and Y are keyed), although quite a bit was done 
+already last year in particular for character vector joins. [Types make 
+a large difference in benchmarks.]
+
+Matthew
+
+
+On 30.06.2013 15:04, Gabor Grothendieck wrote:
+> Consider SJ which I assume was intended to be used like this
+>    X[ SJ(Y) ]
+> where X and Y are two data tables.  What is the point of SJ?  It 
+> seems
+> similar to J except it also adds a key to its argument; however, is 
+> it
+> not the case that that the key on Y will not be used since it has to
+> do a full scan of Y anyways?
+>
+> --
+> Statistics & Software Consulting
+> GKX Group, GKX Associates Inc.
+> tel: 1-877-GKX-GROUP
+> email: ggrothendieck at gmail.com
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From eduard.antonyan at gmail.com  Tue Jul  2 17:29:57 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Tue, 2 Jul 2013 10:29:57 -0500
+Subject: [datatable-help] fread -- multiple header lines and multiple
+ whitespace characters
+In-Reply-To: <1372580496.84142.YahooMailNeo@web120202.mail.ne1.yahoo.com>
+References: <1372580496.84142.YahooMailNeo@web120202.mail.ne1.yahoo.com>
+Message-ID: <CAHZcBOpkh+05wNLYD17YQxXx+JbOL3SmkwoP+Y=dWZ5hNEKzog@mail.gmail.com>
+
+I don't know how to do this with fread, but it sounds like a good feature
+request.
+
+If you want to do this in R (without fread), you could use readLines to
+read until you get to the header, count the number of lines it took and use
+'skip' param in read.table to read the file in. I think I remember seeing
+smth like that done on SO at some point, but you can always post there to
+get more advice as there is generally more people who'll be able to help
+you there.
+
+
+On Sun, Jun 30, 2013 at 3:21 AM, Harish <harishv_99 at yahoo.com> wrote:
+
+> Hi,
+>
+> I am wondering whether it is possible to read a file using fread() with:
+> 1) Multiple header lines, and
+> 2) Multiple whitespace characters separating fields
+>
+> The sample of the input file is as follows:
+> -------------
+> Garbage header information
+> that I need to skip when reading...
+> Number of lines here are variable.
+>
+>              Serial_Number   PHIv     Lu/W
+>                     (-)      (lm)     (lm/W)
+>            ABCDEFG  27.0264 103.58
+>            HIJKLMNO  33.9143  91.03
+>
+> Some footer information
+> that spans multiple lines
+> -------------
+>
+> To handle the multiple lines of headers, I would have to read the file
+> using fread() first, reprocess the file using a similar algorithm to
+> identify the actual header -- i.e. one line above what fread() would
+> identify as the header, then throw away the names of the columns fread()
+> created and rename it to the actual ones I find.  However, this seems to be
+> highly inefficient since I would replicate what fread() did within R -- not
+> to mention I do not quite know how to do that.
+>
+> As far as handling the multiple (and variable) spaces for separator, I do
+> not see fread() being able to handle this either.  read.table() however
+> does with the default sep="" value.  Of course, that does not handle the
+> garbage headers and footers that fread() so beautifully avoids with its
+> autostart algorithm.
+>
+> Any suggestions as to how I would do this easily?  I have lots of these
+> files to read, and doing manual editing is not desirable.  If there is a
+> hack I can do with fread(), that would be ideal.
+>
+> Thanks a lot for your help.
+>
+>
+> Regards,
+> Harish
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130702/8fb5e48d/attachment.html>
+
+From p.harding at paniscus.com  Wed Jul  3 12:56:09 2013
+From: p.harding at paniscus.com (Paul Harding)
+Date: Wed, 3 Jul 2013 11:56:09 +0100
+Subject: [datatable-help] datatable-help Digest, Vol 41, Issue 3
+In-Reply-To: <mailman.5.1372845603.31625.datatable-help@lists.r-forge.r-project.org>
+References: <mailman.5.1372845603.31625.datatable-help@lists.r-forge.r-project.org>
+Message-ID: <CAMSrYkdx6LYAWtiWB0KAUKCtpFX0GUktMK8huKdw+TLzan70=Q@mail.gmail.com>
+
+For me, in a similar context, this would be particularly useful with SQL
+Server output, where if you need head headers it's not possible to lose the
+second line of underlining:
+
+header1 header2 header3
+------- ------- -------
+tom   dick   harry
+
+and possibly for other flavours of SQL too. For the huge files (20GB) I use
+fread for I use a perl script, for smaller ones
+  df <- read.csv(con, header=F, skip=2, na.strings="NULL")
+  names(df)<-do.call(rbind,(strsplit(readLines(con,1),",")))[1,]
+
+Such a pain. So as this is an SQL server 'feature' it would be really
+useful if fread could discard unwanted lines of header. Perhaps a regexp
+parameter?
+
+Regards
+Paul
+
+
+
+
+On 3 July 2013 11:00, <datatable-help-request at lists.r-forge.r-project.org>wrote:
+
+> Send datatable-help mailing list submissions to
+>         datatable-help at lists.r-forge.r-project.org
+>
+> To subscribe or unsubscribe via the World Wide Web, visit
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+> or, via email, send a message with subject or body 'help' to
+>         datatable-help-request at lists.r-forge.r-project.org
+>
+> You can reach the person managing the list at
+>         datatable-help-owner at lists.r-forge.r-project.org
+>
+> When replying, please edit your Subject line so it is more specific
+> than "Re: Contents of datatable-help digest..."
+>
+>
+> Today's Topics:
+>
+>    1. Re: fread -- multiple header lines and multiple whitespace
+>       characters (Eduard Antonyan)
+>
+>
+> ----------------------------------------------------------------------
+>
+> Message: 1
+> Date: Tue, 2 Jul 2013 10:29:57 -0500
+> From: Eduard Antonyan <eduard.antonyan at gmail.com>
+> To: Harish <harishv_99 at yahoo.com>
+> Cc: "datatable-help at lists.r-forge.r-project.org"
+>         <datatable-help at lists.r-forge.r-project.org>
+> Subject: Re: [datatable-help] fread -- multiple header lines and
+>         multiple whitespace characters
+> Message-ID:
+>         <CAHZcBOpkh+05wNLYD17YQxXx+JbOL3SmkwoP+Y=
+> dWZ5hNEKzog at mail.gmail.com>
+> Content-Type: text/plain; charset="iso-8859-1"
+>
+> I don't know how to do this with fread, but it sounds like a good feature
+> request.
+>
+> If you want to do this in R (without fread), you could use readLines to
+> read until you get to the header, count the number of lines it took and use
+> 'skip' param in read.table to read the file in. I think I remember seeing
+> smth like that done on SO at some point, but you can always post there to
+> get more advice as there is generally more people who'll be able to help
+> you there.
+>
+>
+> On Sun, Jun 30, 2013 at 3:21 AM, Harish <harishv_99 at yahoo.com> wrote:
+>
+> > Hi,
+> >
+> > I am wondering whether it is possible to read a file using fread() with:
+> > 1) Multiple header lines, and
+> > 2) Multiple whitespace characters separating fields
+> >
+> > The sample of the input file is as follows:
+> > -------------
+> > Garbage header information
+> > that I need to skip when reading...
+> > Number of lines here are variable.
+> >
+> >              Serial_Number   PHIv     Lu/W
+> >                     (-)      (lm)     (lm/W)
+> >            ABCDEFG  27.0264 103.58
+> >            HIJKLMNO  33.9143  91.03
+> >
+> > Some footer information
+> > that spans multiple lines
+> > -------------
+> >
+> > To handle the multiple lines of headers, I would have to read the file
+> > using fread() first, reprocess the file using a similar algorithm to
+> > identify the actual header -- i.e. one line above what fread() would
+> > identify as the header, then throw away the names of the columns fread()
+> > created and rename it to the actual ones I find.  However, this seems to
+> be
+> > highly inefficient since I would replicate what fread() did within R --
+> not
+> > to mention I do not quite know how to do that.
+> >
+> > As far as handling the multiple (and variable) spaces for separator, I do
+> > not see fread() being able to handle this either.  read.table() however
+> > does with the default sep="" value.  Of course, that does not handle the
+> > garbage headers and footers that fread() so beautifully avoids with its
+> > autostart algorithm.
+> >
+> > Any suggestions as to how I would do this easily?  I have lots of these
+> > files to read, and doing manual editing is not desirable.  If there is a
+> > hack I can do with fread(), that would be ideal.
+> >
+> > Thanks a lot for your help.
+> >
+> >
+> > Regards,
+> > Harish
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> -------------- next part --------------
+> An HTML attachment was scrubbed...
+> URL: <
+> http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130702/8fb5e48d/attachment-0001.html
+> >
+>
+> ------------------------------
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+> End of datatable-help Digest, Vol 41, Issue 3
+> *********************************************
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130703/4190ec71/attachment.html>
+
+From ggrothendieck at gmail.com  Thu Jul  4 15:59:38 2013
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Thu, 4 Jul 2013 09:59:38 -0400
+Subject: [datatable-help] datatable-help Digest, Vol 41, Issue 3
+In-Reply-To: <CAMSrYkdx6LYAWtiWB0KAUKCtpFX0GUktMK8huKdw+TLzan70=Q@mail.gmail.com>
+References: <mailman.5.1372845603.31625.datatable-help@lists.r-forge.r-project.org>
+ <CAMSrYkdx6LYAWtiWB0KAUKCtpFX0GUktMK8huKdw+TLzan70=Q@mail.gmail.com>
+Message-ID: <CAP01uR=zBE7o9502gV8gGBKnUi1qa1zWiDpQVKs5hwGxKEVX+w@mail.gmail.com>
+
+On Wed, Jul 3, 2013 at 6:56 AM, Paul Harding <p.harding at paniscus.com> wrote:
+> For me, in a similar context, this would be particularly useful with SQL
+> Server output, where if you need head headers it's not possible to lose the
+> second line of underlining:
+>
+> header1 header2 header3
+> ------- ------- -------
+> tom   dick   harry
+>
+> and possibly for other flavours of SQL too. For the huge files (20GB) I use
+> fread for I use a perl script, for smaller ones
+>   df <- read.csv(con, header=F, skip=2, na.strings="NULL")
+>   names(df)<-do.call(rbind,(strsplit(readLines(con,1),",")))[1,]
+>
+> Such a pain. So as this is an SQL server 'feature' it would be really useful
+> if fread could discard unwanted lines of header. Perhaps a regexp parameter?
+>
+
+1. If fread supported read.table's comment.char argument and extended
+that to allow regular exprexsions or longer strings than just one
+character that might do it; however,.iIt might have a performance
+impact.
+
+2. In the development version of data.table on R-Forge there is a
+skip= argument to fread which would let one do something analogous to
+what you show in your post.
+
+3. One possible extension to fread that would address this and other
+variations would be to allow connections. For example, this works with
+read.table:
+
+    read.table(pipe("sed 2d myfile.txt"), header = TRUE)
+
+(assuming UNIX or Windows with Rtools installed).
+
+[I didn't see this show up the first time I posted so I am re-posting.
+ Hopefully it does not show up twice.]
+
+From hideyoshi.maeda at gmail.com  Fri Jul  5 15:55:38 2013
+From: hideyoshi.maeda at gmail.com (Hideyoshi Maeda)
+Date: Fri, 5 Jul 2013 14:55:38 +0100
+Subject: [datatable-help] fread colClasses or skip
+Message-ID: <782AC665-F473-4A28-AC28-E26D1ADD6CEE@gmail.com>
+
+Hi,
+
+I would like to be able to skip a column that is read into R via fread. But the csv I am reading in, has no column headers?which appears to be a problem for fread?is there a way to just specify that I don't want specific columns?
+
+To give an example?
+
+I downloaded the data from the following URL
+
+http://www.truefx.com/dev/data/2013/JUNE-2013/AUDUSD-2013-05.zip
+
+unzipped it?
+
+and read the csv into R using fread and it has pretty much the same file name just with the csv extension.
+
+> system.time(pp <- fread("AUDUSD-2013-05.csv",sep=","))
+   user  system elapsed 
+ 16.427   0.257  16.682 
+> head(pp)
+        V1                    V2      V3      V4
+1: AUD/USD 20130501 00:00:04.728 1.03693 1.03721
+2: AUD/USD 20130501 00:00:21.540 1.03695 1.03721
+3: AUD/USD 20130501 00:00:33.789 1.03694 1.03721
+4: AUD/USD 20130501 00:00:37.499 1.03692 1.03724
+5: AUD/USD 20130501 00:00:37.524 1.03697 1.03719
+6: AUD/USD 20130501 00:00:39.789 1.03697 1.03717
+> str(pp)
+Classes ?data.table? and 'data.frame':	4060762 obs. of  4 variables:
+ $ V1: chr  "AUD/USD" "AUD/USD" "AUD/USD" "AUD/USD" ...
+ $ V2: chr  "20130501 00:00:04.728" "20130501 00:00:21.540" "20130501 00:00:33.789" "20130501 00:00:37.499" ...
+ $ V3: num  1.04 1.04 1.04 1.04 1.04 ...
+ $ V4: num  1.04 1.04 1.04 1.04 1.04 ...
+ - attr(*, ".internal.selfref")=<externalptr> 
+
+I tried using the new(ish) colClasses or skip arguments to ignore the fact that the first column is all the same?and is unnecessary.
+
+but doing:
+
+pp1 <- fread("AUDUSD-2013-05.csv",sep=",",skip=1)
+
+doesn't omit the reading in of the first column
+
+and using colClasses leads to the following error
+
+pp1 <- fread("AUDUSD-2013-05.csv",sep=",",colClasses=list(NULL,"character","numeric","numeric"))
+
+Error in fread("AUDUSD-2013-05.csv", sep = ",", colClasses = list(NULL,  : 
+  colClasses is type list but has no names
+
+Are there any suggestions to be able to speed up the reading in of data by omitting the first column?
+
+Also perhaps a bit much to ask, but is it possible to directly read a zip file rather than unzipping it first and then reading in the csv?
+
+Oh and if it wasn't clear I'm using v1.8.9
+
+As always, thanks for all of your help, effort and advice in advance.
+
+HLM
+
+From hideyoshi.maeda at gmail.com  Fri Jul  5 16:24:45 2013
+From: hideyoshi.maeda at gmail.com (Hideyoshi Maeda)
+Date: Fri, 5 Jul 2013 15:24:45 +0100
+Subject: [datatable-help] fread colClasses or skip
+In-Reply-To: <782AC665-F473-4A28-AC28-E26D1ADD6CEE@gmail.com>
+References: <782AC665-F473-4A28-AC28-E26D1ADD6CEE@gmail.com>
+Message-ID: <6F8AE598-566F-43CA-8A49-43A002ED651E@gmail.com>
+
+One other thought I had was perhaps it might be better to just preallocate column names if need be and then read in?
+
+
+On 5 Jul 2013, at 14:55, Hideyoshi Maeda <hideyoshi.maeda at gmail.com> wrote:
+
+> Hi,
+> 
+> I would like to be able to skip a column that is read into R via fread. But the csv I am reading in, has no column headers?which appears to be a problem for fread?is there a way to just specify that I don't want specific columns?
+> 
+> To give an example?
+> 
+> I downloaded the data from the following URL
+> 
+> http://www.truefx.com/dev/data/2013/JUNE-2013/AUDUSD-2013-05.zip
+> 
+> unzipped it?
+> 
+> and read the csv into R using fread and it has pretty much the same file name just with the csv extension.
+> 
+>> system.time(pp <- fread("AUDUSD-2013-05.csv",sep=","))
+>   user  system elapsed 
+> 16.427   0.257  16.682 
+>> head(pp)
+>        V1                    V2      V3      V4
+> 1: AUD/USD 20130501 00:00:04.728 1.03693 1.03721
+> 2: AUD/USD 20130501 00:00:21.540 1.03695 1.03721
+> 3: AUD/USD 20130501 00:00:33.789 1.03694 1.03721
+> 4: AUD/USD 20130501 00:00:37.499 1.03692 1.03724
+> 5: AUD/USD 20130501 00:00:37.524 1.03697 1.03719
+> 6: AUD/USD 20130501 00:00:39.789 1.03697 1.03717
+>> str(pp)
+> Classes ?data.table? and 'data.frame':	4060762 obs. of  4 variables:
+> $ V1: chr  "AUD/USD" "AUD/USD" "AUD/USD" "AUD/USD" ...
+> $ V2: chr  "20130501 00:00:04.728" "20130501 00:00:21.540" "20130501 00:00:33.789" "20130501 00:00:37.499" ...
+> $ V3: num  1.04 1.04 1.04 1.04 1.04 ...
+> $ V4: num  1.04 1.04 1.04 1.04 1.04 ...
+> - attr(*, ".internal.selfref")=<externalptr> 
+> 
+> I tried using the new(ish) colClasses or skip arguments to ignore the fact that the first column is all the same?and is unnecessary.
+> 
+> but doing:
+> 
+> pp1 <- fread("AUDUSD-2013-05.csv",sep=",",skip=1)
+> 
+> doesn't omit the reading in of the first column
+> 
+> and using colClasses leads to the following error
+> 
+> pp1 <- fread("AUDUSD-2013-05.csv",sep=",",colClasses=list(NULL,"character","numeric","numeric"))
+> 
+> Error in fread("AUDUSD-2013-05.csv", sep = ",", colClasses = list(NULL,  : 
+>  colClasses is type list but has no names
+> 
+> Are there any suggestions to be able to speed up the reading in of data by omitting the first column?
+> 
+> Also perhaps a bit much to ask, but is it possible to directly read a zip file rather than unzipping it first and then reading in the csv?
+> 
+> Oh and if it wasn't clear I'm using v1.8.9
+> 
+> As always, thanks for all of your help, effort and advice in advance.
+> 
+> HLM
+
+
+From hideyoshi.maeda at gmail.com  Fri Jul  5 16:34:12 2013
+From: hideyoshi.maeda at gmail.com (Hideyoshi Maeda)
+Date: Fri, 5 Jul 2013 15:34:12 +0100
+Subject: [datatable-help] fread colClasses or skip
+In-Reply-To: <6F8AE598-566F-43CA-8A49-43A002ED651E@gmail.com>
+References: <782AC665-F473-4A28-AC28-E26D1ADD6CEE@gmail.com>
+ <6F8AE598-566F-43CA-8A49-43A002ED651E@gmail.com>
+Message-ID: <0C5BD940-A4EF-4ACB-94A9-2DC6C7F74583@gmail.com>
+
+sorry also error in the URL should be?.
+
+>> http://www.truefx.com/dev/data/2013/MAY-2013/AUDUSD-2013-05.zip
+On 5 Jul 2013, at 15:24, Hideyoshi Maeda <hideyoshi.maeda at gmail.com> wrote:
+
+> One other thought I had was perhaps it might be better to just preallocate column names if need be and then read in?
+> 
+> 
+> On 5 Jul 2013, at 14:55, Hideyoshi Maeda <hideyoshi.maeda at gmail.com> wrote:
+> 
+>> Hi,
+>> 
+>> I would like to be able to skip a column that is read into R via fread. But the csv I am reading in, has no column headers?which appears to be a problem for fread?is there a way to just specify that I don't want specific columns?
+>> 
+>> To give an example?
+>> 
+>> I downloaded the data from the following URL
+>> 
+>> http://www.truefx.com/dev/data/2013/JUNE-2013/AUDUSD-2013-05.zip
+>> 
+>> unzipped it?
+>> 
+>> and read the csv into R using fread and it has pretty much the same file name just with the csv extension.
+>> 
+>>> system.time(pp <- fread("AUDUSD-2013-05.csv",sep=","))
+>>  user  system elapsed 
+>> 16.427   0.257  16.682 
+>>> head(pp)
+>>       V1                    V2      V3      V4
+>> 1: AUD/USD 20130501 00:00:04.728 1.03693 1.03721
+>> 2: AUD/USD 20130501 00:00:21.540 1.03695 1.03721
+>> 3: AUD/USD 20130501 00:00:33.789 1.03694 1.03721
+>> 4: AUD/USD 20130501 00:00:37.499 1.03692 1.03724
+>> 5: AUD/USD 20130501 00:00:37.524 1.03697 1.03719
+>> 6: AUD/USD 20130501 00:00:39.789 1.03697 1.03717
+>>> str(pp)
+>> Classes ?data.table? and 'data.frame':	4060762 obs. of  4 variables:
+>> $ V1: chr  "AUD/USD" "AUD/USD" "AUD/USD" "AUD/USD" ...
+>> $ V2: chr  "20130501 00:00:04.728" "20130501 00:00:21.540" "20130501 00:00:33.789" "20130501 00:00:37.499" ...
+>> $ V3: num  1.04 1.04 1.04 1.04 1.04 ...
+>> $ V4: num  1.04 1.04 1.04 1.04 1.04 ...
+>> - attr(*, ".internal.selfref")=<externalptr> 
+>> 
+>> I tried using the new(ish) colClasses or skip arguments to ignore the fact that the first column is all the same?and is unnecessary.
+>> 
+>> but doing:
+>> 
+>> pp1 <- fread("AUDUSD-2013-05.csv",sep=",",skip=1)
+>> 
+>> doesn't omit the reading in of the first column
+>> 
+>> and using colClasses leads to the following error
+>> 
+>> pp1 <- fread("AUDUSD-2013-05.csv",sep=",",colClasses=list(NULL,"character","numeric","numeric"))
+>> 
+>> Error in fread("AUDUSD-2013-05.csv", sep = ",", colClasses = list(NULL,  : 
+>> colClasses is type list but has no names
+>> 
+>> Are there any suggestions to be able to speed up the reading in of data by omitting the first column?
+>> 
+>> Also perhaps a bit much to ask, but is it possible to directly read a zip file rather than unzipping it first and then reading in the csv?
+>> 
+>> Oh and if it wasn't clear I'm using v1.8.9
+>> 
+>> As always, thanks for all of your help, effort and advice in advance.
+>> 
+>> HLM
+> 
+
+
+From saporta at scarletmail.rutgers.edu  Sun Jul  7 02:55:26 2013
+From: saporta at scarletmail.rutgers.edu (Ricardo Saporta)
+Date: Sat, 6 Jul 2013 20:55:26 -0400
+Subject: [datatable-help] NA's & Inconsistent behavior
+Message-ID: <CAE7Aa4TxArOxXR2TR1qAiVQLU6w_7=u3u_fnhf8=+n2gLrOHuw@mail.gmail.com>
+
+This is regarding:
+http://stackoverflow.com/questions/17508127/na-in-i-expression-of-data-table-possible-bug
+
+x = data.table(a=c(NA, 1:3, NA))
+
+As @flodel points out in the comments
+x[as.logical(a)] and x[!!as.logical(a)]
+do not return the same value
+
+I think this can be fixed rather simply by modifying one line in
+`[.data.table`, but confirmation would be helpful:
+
+    notjoin = FALSE
+    if (!missing(i)) {
+        isub = substitute(i)
+        .
+        .
+        .
+        if (is.logical(i)) {
+            if (identical(i, NA))
+                i = NA_integer_
+            else i[is.na(i)] = FALSE  <~~~  = FALSE || notjoin
+        }
+        .
+        .
+    }
+
+If that last copied line is changed
+  from:   else i[is.na(i)] = FALSE
+  to    :   else i[is.na(i)] = FALSE || notjoin
+I believe this would resolve the issue.
+
+The question is, would it introduce any other issues?  Are there other
+corner cases we might be overlooking.
+
+Cheers
+Rick
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130706/e884b0c5/attachment.html>
+
+From aragorn168b at gmail.com  Sun Jul  7 09:46:35 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Sun, 7 Jul 2013 09:46:35 +0200
+Subject: [datatable-help] Follow-up on subsetting data.table with NAs
+In-Reply-To: <CDA017C0F196495082F1FC6558C69591@gmail.com>
+References: <0F051BE2E84B407D8E1D630107CFF5EB@gmail.com>
+ <114784a0d4675127913b6b4b903d9a0c@imap.plus.net>
+ <FECC1D988E064F2BA9803F59B65A5F6D@gmail.com>
+ <EBE18DECB852400285D7E743ACDECE55@gmail.com>
+ <CD97DB1AA65B4A7EA056F246C78F8466@gmail.com>
+ <C6252A94BC14493A85310BD365FC0419@gmail.com>
+ <77fc9f2e9a18ca56c511ca1cced6af51@imap.plus.net>
+ <2C19FA7BF7224CC581A6A909CAADF830@gmail.com>
+ <265F40BB318541E99B6FF75F0C3115AD@gmail.com>
+ <8540a4a91743d5afab595132dd41eb7b@imap.plus.net>
+ <C733189ACB294FF2A42821315DD6E43F@gmail.com>
+ <CAP01uRn_PPSir7WMqezN0DayZGD8T9cmGC_dq4NHTcep=ZWoZA@mail.gmail.com>
+ <344d331d407432f6ae7b71cec416e065@imap.plus.net>
+ <A367DBD8F8BE45DFA721DA6CEC6F97DA@gmail.com>
+ <12b1525284509899b7897fe8f5ef0839@imap.plus.net>
+ <CDA017C0F196495082F1FC6558C69591@gmail.com>
+Message-ID: <1A0E91C9BD3D40DBA7205EE88ADBDE74@gmail.com>
+
+Hello all,
+
+I thought it might be useful to connect a recent post on SO discussing more or less the same issue: 
+http://stackoverflow.com/questions/17508127/na-in-i-expression-of-data-table-possible-bug
+
+Arun
+
+
+On Monday, June 10, 2013 at 7:01 PM, Arunkumar Srinivasan wrote:
+
+> Hi Matthew, 
+> Thanks for clarifying this. To me the "not join" operation is very similar to "setdiff" operation but for a data.frame/data.table. So DT[!J(.)] could be interpreted as setdiff(DT, DT[J(.)]).
+> 
+> No, I'm with you in that it makes much sense in extending it to logical vectors operations as well. And so far, I guess all of them who wrote back also agree with the idea of:
+> 
+> 1) !(x == .) and x != . being identical
+> 2) ~(.) (or) NJ(.) (or) -(.) being a NOT JOIN on data.table/list/vectors etc..
+> 
+> I'd love for these two to be on the feature list. I really don't mind the "~", "NJ" or "-". 
+> 
+> Thanks again,
+> Arun
+> 
+> 
+> On Monday, June 10, 2013 at 5:28 PM, Matthew Dowle wrote:
+> 
+> >  
+> > Hi Arun,
+> > Indeed.  ! was introduced for not-join i.e. X[!Y] where i is type data.table.  Extending it to vectors seemed to make sense at the time; e.g., X[!"foo"] and X[!3:6] (rather than the X[-3:6] mistake where X[-(3:6)] was intended) were in my mind.   I think of everything as a join really; e.g., "where rownumber = i".
+> > But I think I'm fine with ! being not-join for data.table/list i only.  Or is it just logical vector i to be turned off only, and could leave ! as-is for character and integer vector i?
+> > Matthew
+> >  
+> > On 10.06.2013 15:52, Arunkumar Srinivasan wrote:
+> > > Matthew, 
+> > > It just occurred to me. I'd be glad if you can clarify this. The operation is supposed to be "Not Join". Which means, I'd expect the "!" to be used with "J" as in:
+> > > dt <- data.table(x=c(0,0,1,1,3), y=1:5)
+> > > setkey(dt, "x")
+> > > dt[J(c(1,3))] # join
+> > >    x y
+> > > 1: 1 3
+> > > 2: 1 4
+> > > 3: 3 5
+> > > 
+> > > dt[!J(c(1,3))]
+> > >    x y
+> > > 1: 0 1
+> > > 2: 0 2
+> > > 
+> > > Here the concept of "Not Join" with the use of "!J(.)" makes total sense. However, extending it to not-join for logical vectors is what seems to be an issue. It's more of a logical indexing than a join (at least in my mind). So, if it is possible to distinguish between "!" and "!J" (by checking if `i` is a data.table or not) to tell if it's a subsetting by logical vector or subsetting by "data.table" and then deciding what to do, would that resolve this issue? If not, what's the reason behind using "!" as a not-join during logical indexing? Is it still considered as a not-join?? 
+> > > Just a thought. I hope it makes at least a little sense.
+> > > Best,
+> > > Arun
+> > > 
+> > > 
+> > > On Monday, June 10, 2013 at 4:35 PM, Matthew Dowle wrote:
+> > > 
+> > > > Hm, another good point. We need ~ for formulae, although I can't
+> > > > imagine a formula in i (only in j). But in both i and j we might want
+> > > > to get(x).
+> > > > I thought about ^ i.e. X[^Y] in the spirit of regular expression
+> > > > syntax, but ^ doesn't parse with a RHS only. Needs to be parsable as a
+> > > > prefix.
+> > > > - maybe then? Consistent with - meaning in R. I don't think I
+> > > > actually had a specific use in mind for - and +, to reserve them for,
+> > > > but at the time it just seemed a shame to use up one of -/+ without
+> > > > defining the other. If - does a not join, then, might + be more like
+> > > > merge() (i.e. returning the union of the rows in x and i by join). I
+> > > > think I had something like that in mind, but hadn't thought it through.
+> > > > Some might say it should be a new argument e.g. notjoin=TRUE, but my
+> > > > thinking there is readability, since we often have many lines in i, j
+> > > > and by in that order, and if the "notjoin=TRUE" followed afterwards it
+> > > > would be far away from the i argument to which it applies. If we
+> > > > incorporate merge() into X[Y] using X[+Y] then it might avoid adding yet
+> > > > more parameters, too.
+> > > > On 10.06.2013 15:02, Gabor Grothendieck wrote:
+> > > > > The problem with ~ is that it is using up a special character (of
+> > > > > which there are only a few) for a case that does not occur much.
+> > > > > I can think of other things that ~ might be better used for. For
+> > > > > example, perhaps ~ x could mean get(x). One aspect of data.table
+> > > > > that
+> > > > > tends to be difficult is when you don't know the variable name ahead
+> > > > > of time and this woiuld give a way to specify it concisely.
+> > > > > On Mon, Jun 10, 2013 at 5:21 AM, Arunkumar Srinivasan
+> > > > > <aragorn168b at gmail.com (mailto:aragorn168b at gmail.com)> wrote:
+> > > > > > Matthew,
+> > > > > > How about ~ instead of ! ? I ruled out - previously to leave +
+> > > > > > and -
+> > > > > > available for future use. NJ() may be possible too.
+> > > > > > Both "NJ()" and "~" are okay for me.
+> > > > > > That result makes perfect sense to me. I don't think of !(x==.)
+> > > > > > being the
+> > > > > > same as x!=. ! is simply a prefix. It's all the rows that
+> > > > > > aren't
+> > > > > > returned if the ! prefix wasn't there.
+> > > > > > I understand that `DT[!(x)]` does what `data.table` is designed to
+> > > > > > do
+> > > > > > currently. What I failed to mention was that if one were to consider
+> > > > > > implementing `!(x==.)` as the same as `x != .` then this behaviour
+> > > > > > has to be
+> > > > > > changed. Let's forget this point for a moment.
+> > > > > > That needs to be fixed. But we're getting quite theoretical here
+> > > > > > and far
+> > > > > > away from common use cases. Why would we ever have row numbers of
+> > > > > > the
+> > > > > > table, as a column of the table itself and want to select the rows
+> > > > > > by number
+> > > > > > not mentioned in that column?
+> > > > > > Probably I did not choose a good example. Suppose that I've a
+> > > > > > data.table and
+> > > > > > I want to get all rows where "x == 0". Let's say:
+> > > > > > set.seed(45)
+> > > > > > DT <- data.table( x = sample(c(0,5,10,15), 10, replace=TRUE), y =
+> > > > > > sample(15))
+> > > > > > DF <- as.data.frame(DT)
+> > > > > > To get all rows where x == 0, it could be done with DT[x == 0]. But
+> > > > > > it makes
+> > > > > > sense, at least in the context of data.frames, to do equivalently,
+> > > > > > DF[!(DF$x), ] (or) DF[DF$x == 0, ]
+> > > > > > All I want to say is, I expect `DT[!(x)]` should give the same
+> > > > > > result as
+> > > > > > `DT[x == 0]` (even though I fully understand it's not the intended
+> > > > > > behaviour
+> > > > > > of data.table), as it's more intuitive and less confusing.
+> > > > > > So, changing `!` to `~` or `NJ` is one half of the issue for me. The
+> > > > > > other
+> > > > > > is to replace the actual function of `!` in all contexts. I hope I
+> > > > > > came
+> > > > > > across with what I wanted to say, better this time.
+> > > > > > Best,
+> > > > > > Arun
+> > > > > > On Monday, June 10, 2013 at 10:52 AM, Matthew Dowle wrote:
+> > > > > > Hi,
+> > > > > > How about ~ instead of ! ? I ruled out - previously to leave +
+> > > > > > and -
+> > > > > > available for future use. NJ() may be possible too.
+> > > > > > Matthew
+> > > > > > On 10.06.2013 09:35, Arunkumar Srinivasan wrote:
+> > > > > > Hi Matthew,
+> > > > > > My view (from the last reply) more or less reflects mnel's comments
+> > > > > > here:
+> > > > > > http://stackoverflow.com/questions/16239153/dtx-and-dtx-treat-na-in-x-inconsistently#comment23317096_16240143
+> > > > > > Pasted here for convenience:
+> > > > > > data.table is mimicing subset in its handling of NA values in
+> > > > > > logical i
+> > > > > > arguments. -- the only issue is the ! prefix signifying a not-join,
+> > > > > > not the
+> > > > > > way one might expect. Perhaps the not join prefix could have been NJ
+> > > > > > not !
+> > > > > > to avoid this confusion -- this might be another discussion to have
+> > > > > > on the
+> > > > > > mailing list -- (I think it is a discussion worth having)
+> > > > > > Arun
+> > > > > > On Monday, June 10, 2013 at 10:28 AM, Arunkumar Srinivasan wrote:
+> > > > > > Hm, good point. Is data.table consistent with SQL already, for both
+> > > > > > == and
+> > > > > > !=, and so no change needed?
+> > > > > > Yes, I believe it's already consistent with SQL. However, the
+> > > > > > current
+> > > > > > interpretation of NA (documentation) being treated as FALSE is not
+> > > > > > needed /
+> > > > > > untrue, imho (Please see below).
+> > > > > > And it was correct for Frank to be mistaken.
+> > > > > > Yes, it seems like he was mistaken.
+> > > > > > Maybe just some more documentation and examples needed then.
+> > > > > > It'd be much more appropriate if the documentation reflects the role
+> > > > > > of
+> > > > > > subsetting in data.table mimicking "subset" function (in order to be
+> > > > > > in line
+> > > > > > with SQL) by dropping NA evaluated logicals. From a couple of posts
+> > > > > > before,
+> > > > > > where I pasted the code where NAs are replaced to FALSE were not
+> > > > > > necessary
+> > > > > > as `irows <- which(i)` makes clear that `which` is being used to get
+> > > > > > indices
+> > > > > > and then subset, this fits perfectly well with the interpretation of
+> > > > > > NA in
+> > > > > > data.table.
+> > > > > > Are you happy that DT[!(x==.)] and DT[x!=.] do treat NA
+> > > > > > inconsistently? :
+> > > > > > http://stackoverflow.com/questions/16239153/dtx-and-dtx-treat-na-in-x-inconsistently
+> > > > > > Ha, I like the idea behind the use of () in evaluating expressions.
+> > > > > > It's
+> > > > > > another nice layer towards simplicity in data.table. But I still
+> > > > > > think there
+> > > > > > should not be an inconsistency in equivalent logical operations to
+> > > > > > provide
+> > > > > > different results. If !(x== .) and x != . are indeed different, then
+> > > > > > I'd
+> > > > > > suppose replacing `!` with a more appropriate name as it's much
+> > > > > > easier to
+> > > > > > get confused otherwise.
+> > > > > > In essence, either !(x == .) must evaluate to (x != .) if the
+> > > > > > underlying
+> > > > > > meaning of these are the same, or the `!` in `!(x==.)` must be
+> > > > > > replaced to
+> > > > > > something that's more appropriate for what it's supposed to be.
+> > > > > > Personally,
+> > > > > > I prefer the former. It would greatly tighten the structure and
+> > > > > > consistency.
+> > > > > > "na.rm = TRUE/FALSE" sounds good to me. I'd only considered nomatch
+> > > > > > before
+> > > > > > in the context of joins, not logical subsets.
+> > > > > > Yes, I find this option would give more control in evaluating
+> > > > > > expressions
+> > > > > > with ease in `i`, by providing both "subset" (default) and the
+> > > > > > typical
+> > > > > > data.frame subsetting (na.rm = FALSE).
+> > > > > > Best regards,
+> > > > > > Arun
+> > > > > > _______________________________________________
+> > > > > > datatable-help mailing list
+> > > > > > datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> > > > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > > > > > 
+> > > > > > 
+> > > > > 
+> > > > > 
+> > > > > 
+> > > > 
+> > > > 
+> > > > 
+> > > 
+> > > 
+> > 
+> >  
+> >  
+> > 
+> > 
+> > 
+> 
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130707/f0edaec6/attachment-0001.html>
+
+From aragorn168b at gmail.com  Sun Jul  7 12:08:14 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Sun, 7 Jul 2013 12:08:14 +0200
+Subject: [datatable-help] NA's & Inconsistent behavior
+In-Reply-To: <CAE7Aa4TxArOxXR2TR1qAiVQLU6w_7=u3u_fnhf8=+n2gLrOHuw@mail.gmail.com>
+References: <CAE7Aa4TxArOxXR2TR1qAiVQLU6w_7=u3u_fnhf8=+n2gLrOHuw@mail.gmail.com>
+Message-ID: <ED00D20AE9674E699371836C104466AD@gmail.com>
+
+Hi Rick, 
+
+That post is very much related to this discussion:
+http://lists.r-forge.r-project.org/pipermail/datatable-help/2013-June/001856.html
+
+I've also linked the same post to that thread. 
+
+Arun
+
+
+On Sunday, July 7, 2013 at 2:55 AM, Ricardo Saporta wrote:
+
+> This is regarding: 
+> http://stackoverflow.com/questions/17508127/na-in-i-expression-of-data-table-possible-bug
+> 
+> x = data.table(a=c(NA, 1:3, NA)) 
+> As @flodel points out in the comments 
+> x[as.logical(a)] and x[!!as.logical(a)]
+> do not return the same value
+> 
+> I think this can be fixed rather simply by modifying one line in `[.data.table`, but confirmation would be helpful: 
+> 
+>     notjoin = FALSE
+>     if (!missing(i)) {
+>         isub = substitute(i)
+>         .
+>         .
+>         .
+>         if (is.logical(i)) {
+>             if (identical(i, NA)) 
+>                 i = NA_integer_
+>             else i[is.na (http://is.na)(i)] = FALSE  <~~~  = FALSE || notjoin
+>         }
+>         .
+> 
+>         .
+> 
+>     }
+> 
+> 
+> If that last copied line is changed 
+>   from:   else i[is.na (http://is.na)(i)] = FALSE
+>   to    :   else i[is.na (http://is.na)(i)] = FALSE || notjoin
+> I believe this would resolve the issue. 
+> 
+> The question is, would it introduce any other issues?  Are there other corner cases we might be overlooking. 
+> 
+> Cheers 
+> Rick
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130707/f433c814/attachment.html>
+
+From chenhuashan at gmail.com  Mon Jul  8 11:30:49 2013
+From: chenhuashan at gmail.com (Huashan Chen)
+Date: Mon, 8 Jul 2013 02:30:49 -0700 (PDT)
+Subject: [datatable-help] Is data.table efficient for sparse data?
+Message-ID: <1373275849445-4671081.post@n4.nabble.com>
+
+ have a huge (over 10 million rows, 5000 columns) sparse matrix stored as
+simple_triplet_matrix. I also want to utilize the fast index feature (among
+others) of data.table. So I am wondering if data.table is memory efficient
+for sparse data? And, is there anyway to convert simple_triplet_matrix into
+data.table without the intermediate as.matrix() operation which is way too
+slow.
+
+Thanks.
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Is-data-table-efficient-for-sparse-data-tp4671081.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From lianoglou.steve at gene.com  Mon Jul  8 19:02:52 2013
+From: lianoglou.steve at gene.com (Steve Lianoglou)
+Date: Mon, 8 Jul 2013 10:02:52 -0700
+Subject: [datatable-help] Is data.table efficient for sparse data?
+In-Reply-To: <1373275849445-4671081.post@n4.nabble.com>
+References: <1373275849445-4671081.post@n4.nabble.com>
+Message-ID: <CAHA9McPmjMS5J38J8RdCjB1i6y3fzqC00bw9qdKS9H8DuyweHA@mail.gmail.com>
+
+Hi,
+
+On Mon, Jul 8, 2013 at 2:30 AM, Huashan Chen <chenhuashan at gmail.com> wrote:
+>  have a huge (over 10 million rows, 5000 columns) sparse matrix stored as
+> simple_triplet_matrix. I also want to utilize the fast index feature (among
+> others) of data.table. So I am wondering if data.table is memory efficient
+> for sparse data? And, is there anyway to convert simple_triplet_matrix into
+> data.table without the intermediate as.matrix() operation which is way too
+> slow.
+
+To help get a better idea of what you are after, can you explain some
+sample queries you'd like to use that you think would leverage
+data.table's fast indexing?
+
+There is no "sparse data.table" type of support, so you'd have to have
+a "full" data.table with elements for all rows and all columns -- you
+can always create your triplet data (row,col,val) as a data.table,
+which may or not be helpful depending on what you want to do with this
+thing, which is why I'm asking about some example queries you'd want
+to run.
+
+-steve
+
+--
+Steve Lianoglou
+Computational Biologist
+Bioinformatics and Computational Biology
+Genentech
+
+From xbsd at yahoo.com  Sat Jul 13 01:57:36 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 16:57:36 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673456.21917.YahooMailNeo@web140003.mail.bf1.yahoo.com>
+
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster would be very helpful. At the moment.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/da354020/attachment.html>
+
+From xbsd at yahoo.com  Sat Jul 13 01:57:51 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 16:57:51 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673471.95333.YahooMailNeo@web140006.mail.bf1.yahoo.com>
+
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster would be very helpful. At the moment.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/012ad903/attachment.html>
+
+From xbsd at yahoo.com  Sat Jul 13 01:58:09 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 16:58:09 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673489.95602.YahooMailNeo@web140006.mail.bf1.yahoo.com>
+
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster would be very helpful. At the moment.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/9f4c6d2d/attachment.html>
+
+From xbsd at yahoo.com  Sat Jul 13 02:00:14 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 17:00:14 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673614.24771.YahooMailNeo@web140003.mail.bf1.yahoo.com>
+
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster using a RAM Disk would be very helpful.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/b1729a7f/attachment-0001.html>
+
+From xbsd at yahoo.com  Sat Jul 13 02:00:25 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 17:00:25 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673625.25841.YahooMailNeo@web140003.mail.bf1.yahoo.com>
+
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster using a RAM Disk would be very helpful.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/818038b0/attachment.html>
+
+From xbsd at yahoo.com  Sat Jul 13 02:00:46 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 17:00:46 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673646.99733.YahooMailNeo@web140006.mail.bf1.yahoo.com>
+
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster using a RAM Disk would be very helpful.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/260a86be/attachment.html>
+
+From xbsd at yahoo.com  Sat Jul 13 02:04:12 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 17:04:12 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673852.81719.YahooMailNeo@web140004.mail.bf1.yahoo.com>
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM and requires more effort rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster using a RAM Disk would be very helpful.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/a64fb99b/attachment.html>
+
+From xbsd at yahoo.com  Sat Jul 13 02:04:32 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 17:04:32 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673872.32012.YahooMailNeo@web140003.mail.bf1.yahoo.com>
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM and requires more effort rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster using a RAM Disk would be very helpful.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/e63556e5/attachment-0001.html>
+
+From xbsd at yahoo.com  Sat Jul 13 02:04:44 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Fri, 12 Jul 2013 17:04:44 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+Message-ID: <1373673884.32814.YahooMailNeo@web140002.mail.bf1.yahoo.com>
+
+
+Hi all,
+
+I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+
+I presume this has to do with the fact that the data is being copied from RAM to RAM and requires more effort rather than from Disk to RAM.
+
+Any suggestions on if there are alternative methods to read files in faster using a RAM Disk would be very helpful.
+
+Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+
+####
+
+> timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+? ?user ?system elapsed?
+?25.067 ? 0.433 ?25.485 ?##### Read from RAMDisk
+
+> setwd("/Users/xbsd/")
+> timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+? ?user ?system elapsed?
+? 5.507 ? 0.177 ? 5.680 ? ###### Read from SSD
+
+> system("ls -alh test.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:30 test.csv
+
+> system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+-rw-r--r-- ?1 xbsd ?staff ? 416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+
+Thanks in advance,
+
+- Raj.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130712/b8abc561/attachment.html>
+
+From aragorn168b at gmail.com  Sat Jul 13 07:44:21 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Sat, 13 Jul 2013 07:44:21 +0200
+Subject: [datatable-help] fread from RAM DIsk
+In-Reply-To: <1373673884.32814.YahooMailNeo@web140002.mail.bf1.yahoo.com>
+References: <1373673884.32814.YahooMailNeo@web140002.mail.bf1.yahoo.com>
+Message-ID: <B2F3441F4D194D75A1F0EF67AB1FEB59@gmail.com>
+
+Hi Raj,
+You've sent a total of 9 messages so far. Please, STOP spamming the list.
+http://lists.r-forge.r-project.org/pipermail/datatable-help/2013-July/thread.html
+
+
+Arun
+
+
+On Saturday, July 13, 2013 at 2:04 AM, Raj Dasgupta wrote:
+
+> 
+> Hi all,
+> 
+> I have been looking at lowering the time spent in I/O while using fread on a csv file. Following a suggestion on the mailing list, I attempted to use fread on a csv file stored on a ramdisk. It took 5 times longer to read from the Ram Disk than it did to read from the SSD.
+> 
+> I presume this has to do with the fact that the data is being copied from RAM to RAM and requires more effort rather than from Disk to RAM.
+> 
+> Any suggestions on if there are alternative methods to read files in faster using a RAM Disk would be very helpful.
+> 
+> Benchmarks on time taken for reading from SSD vs Ramdisk on the same 416MB file is given below
+> 
+> ####
+> 
+> > timer = proc.time(); z <- fread("testInRAM.csv"); proc.time() - timer
+>    user  system elapsed 
+>  25.067   0.433  25.485  ##### Read from RAMDisk
+> 
+> > setwd("/Users/xbsd/")
+> > timer = proc.time(); z <- fread("test.csv"); proc.time() - timer
+>    user  system elapsed 
+>   5.507   0.177   5.680   ###### Read from SSD
+> 
+> > system("ls -alh test.csv")
+> -rw-r--r--  1 xbsd  staff   416M Jul 12 19:30 test.csv
+> 
+> > system("ls -alh /Volumes/ramdisk/testInRAM.csv")
+> -rw-r--r--  1 xbsd  staff   416M Jul 12 19:32 /Volumes/ramdisk/testInRAM.csv
+> 
+> Thanks in advance,
+> 
+> - Raj.
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130713/8c725ee3/attachment.html>
+
+From xbsd at yahoo.com  Sat Jul 13 17:01:33 2013
+From: xbsd at yahoo.com (Raj Dasgupta)
+Date: Sat, 13 Jul 2013 08:01:33 -0700 (PDT)
+Subject: [datatable-help] fread from RAM DIsk
+In-Reply-To: <1373673456.21917.YahooMailNeo@web140003.mail.bf1.yahoo.com>
+References: <1373673456.21917.YahooMailNeo@web140003.mail.bf1.yahoo.com>
+Message-ID: <1373727693.81198.YahooMailNeo@web140001.mail.bf1.yahoo.com>
+
+
+
+Hi Arun,
+
+The mails got sent due to an issue with Yahoo Mail. It kept issuing error messages stating that the mails could not be sent, when it fact it was being sent !
+
+Either way, do not assume the intention of someone posting messages. Try to write to the individual poster first, before reaching premature conclusions.
+
+If you have further comments, please reply to my address separately and we can discuss as I'd like to close this thread with the explanation and apologies with the disclaimer that it was unintended,
+
+
+Thanks.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130713/db74dcc2/attachment.html>
+
+From dieter.menne at menne-biomed.de  Wed Jul 17 16:32:08 2013
+From: dieter.menne at menne-biomed.de (Dieter Menne)
+Date: Wed, 17 Jul 2013 07:32:08 -0700 (PDT)
+Subject: [datatable-help] Sample fread failure
+Message-ID: <1374071528843-4671753.post@n4.nabble.com>
+
+Here is an example from the output of nonmem (Pharmacokinetic program) which
+could profit a lot from a fast reader. However, I was not successful in
+getting fread to do the job, probably because of ( in the header, which I
+cannot change.
+
+You can download the data and program from 
+
+http://www.menne-biomed.de/uni/freadBayes.zip
+
+
+library(data.table)
+# These files are MUCH larger normally, and one has to
+# skip the first line. Since fread does not have a skip
+# I have manually removed it from the sample
+## This works (yes, sep="", don't know why)
+dcsv = read.table("BAYES.EXT",header=TRUE,sep="")
+# this seems to work, but gives wrong results. 
+# Possibly the ( ) in the column names kill it
+d = fread("BAYES.EXT",sep=" ")
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Sample-fread-failure-tp4671753.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From aragorn168b at gmail.com  Sat Jul 27 21:07:36 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Sat, 27 Jul 2013 21:07:36 +0200
+Subject: [datatable-help] probably undesirable function of `rbindlist`
+Message-ID: <9275D33A4CE041A1AB4EB8AF9E26D7E2@gmail.com>
+
+Hi all, 
+
+Here's a behaviour of `rbindlist` that I came across that I think is undesirable. If the columns to be "rbind" are of type "integer" and "numeric", then, the class "integer" is retained which results in different results than intended.
+
+require(data.table)
+DT1 <- data.table(x = 1:5, y = 1:5)
+   x y
+1: 1 1
+2: 2 2
+3: 3 3
+4: 4 4
+5: 5 5
+
+
+DT2 <- data.table(x = 6:10, y = 1:5/10)
+    x   y
+1:  6 0.1
+2:  7 0.2
+3:  8 0.3
+4:  9 0.4
+5: 10 0.5
+
+
+sapply(DT1, class)
+        x         y 
+"integer" "integer" 
+
+
+sapply(DT2, class)
+        x         y 
+"integer" "numeric" 
+
+
+rbindlist(list(DT1, DT2)) 
+     x y
+ 1:  1 1
+ 2:  2 2
+ 3:  3 3
+ 4:  4 4
+ 5:  5 5
+ 6:  6 0 <~~~~ from here, the result should be 0.1 to 0.5 for the next 5 rows or y.
+ 7:  7 0
+ 8:  8 0
+ 9:  9 0
+10: 10 0
+
+
+Is this behaviour unexpected or we've to manually take care of this? Seems more proper to be taken care of internally to me though.
+
+Best,
+Arun.
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130727/b100ea92/attachment.html>
+
+From saporta at scarletmail.rutgers.edu  Sun Jul 28 05:39:02 2013
+From: saporta at scarletmail.rutgers.edu (Ricardo Saporta)
+Date: Sat, 27 Jul 2013 23:39:02 -0400
+Subject: [datatable-help] probably undesirable function of `rbindlist`
+In-Reply-To: <9275D33A4CE041A1AB4EB8AF9E26D7E2@gmail.com>
+References: <9275D33A4CE041A1AB4EB8AF9E26D7E2@gmail.com>
+Message-ID: <CAE7Aa4Q-+3u1OW8X8ejSztcQp_9g_Lof2LB8B0xrCOZRJ3xFDQ@mail.gmail.com>
+
+Arun,
+
+Im pretty sure `rbindlist` identifies column class based on the first
+argument.
+
+compare
+  rbindlist(list(DT2, DT1))
+  rbindlist(list(DT1, DT2))
+
+
+I agree with you though that a more ideal behavior would be one that mimics
+`c( )`
+
+
+-Rick
+
+
+On Sat, Jul 27, 2013 at 3:07 PM, Arunkumar Srinivasan <aragorn168b at gmail.com
+> wrote:
+
+>  Hi all,
+>
+> Here's a behaviour of `rbindlist` that I came across that I think is
+> undesirable. If the columns to be "rbind" are of type "integer" and
+> "numeric", then, the class "integer" is retained which results in different
+> results than intended.
+>
+> require(data.table)
+> DT1 <- data.table(x = 1:5, y = 1:5)
+>    x y
+> 1: 1 1
+> 2: 2 2
+> 3: 3 3
+> 4: 4 4
+> 5: 5 5
+>
+> DT2 <- data.table(x = 6:10, y = 1:5/10)
+>     x   y
+> 1:  6 0.1
+> 2:  7 0.2
+> 3:  8 0.3
+> 4:  9 0.4
+> 5: 10 0.5
+>
+> sapply(DT1, class)
+>         x         y
+> "integer" "integer"
+>
+> sapply(DT2, class)
+>         x         y
+> "integer" "numeric"
+>
+> rbindlist(list(DT1, DT2))
+>      x y
+>  1:  1 1
+>  2:  2 2
+>  3:  3 3
+>  4:  4 4
+>  5:  5 5
+>  6:  6 0 <~~~~ from here, the result should be 0.1 to 0.5 for the next 5
+> rows or y.
+>  7:  7 0
+>  8:  8 0
+>  9:  9 0
+> 10: 10 0
+>
+> Is this behaviour unexpected or we've to manually take care of this? Seems
+> more proper to be taken care of internally to me though.
+>
+> Best,
+> Arun.
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130727/8965712a/attachment.html>
+
+From aragorn168b at gmail.com  Sun Jul 28 12:16:09 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Sun, 28 Jul 2013 12:16:09 +0200
+Subject: [datatable-help] probably undesirable function of `rbindlist`
+In-Reply-To: <CAE7Aa4Q-+3u1OW8X8ejSztcQp_9g_Lof2LB8B0xrCOZRJ3xFDQ@mail.gmail.com>
+References: <9275D33A4CE041A1AB4EB8AF9E26D7E2@gmail.com>
+ <CAE7Aa4Q-+3u1OW8X8ejSztcQp_9g_Lof2LB8B0xrCOZRJ3xFDQ@mail.gmail.com>
+Message-ID: <22497E4514B843FFACA3B4C210BE2210@gmail.com>
+
+Ricardo, 
+
+Thanks for your reply. Yes, the question comes down to: is it better to retain the type of the first input or the most general input? Even if 1 data.table has a factor input, is it better to retain "factor" instead of "character"? If one of them has a numeric column, then is it better to retain numeric even if the first data.table has integer column?
+
+And if the first data.table through a division operation yielded integers, then this'll cause an issue, unless one manually typesets. data.table is consistent, alright. But maybe a "warning" or a "message" would be nice. 
+
+Arun
+
+
+On Sunday, July 28, 2013 at 5:39 AM, Ricardo Saporta wrote:
+
+> Arun, 
+> 
+> Im pretty sure `rbindlist` identifies column class based on the first argument.   
+> 
+> compare 
+>   rbindlist(list(DT2, DT1))
+> 
+>   rbindlist(list(DT1, DT2))
+> 
+> 
+> 
+> I agree with you though that a more ideal behavior would be one that mimics `c( )`
+> 
+> 
+> -Rick 
+> 
+> On Sat, Jul 27, 2013 at 3:07 PM, Arunkumar Srinivasan <aragorn168b at gmail.com (mailto:aragorn168b at gmail.com)> wrote:
+> > Hi all, 
+> > 
+> > Here's a behaviour of `rbindlist` that I came across that I think is undesirable. If the columns to be "rbind" are of type "integer" and "numeric", then, the class "integer" is retained which results in different results than intended. 
+> > 
+> > require(data.table)
+> > DT1 <- data.table(x = 1:5, y = 1:5)
+> >    x y
+> > 1: 1 1
+> > 2: 2 2
+> > 3: 3 3
+> > 4: 4 4
+> > 5: 5 5
+> > 
+> > 
+> > DT2 <- data.table(x = 6:10, y = 1:5/10)
+> >     x   y
+> > 1:  6 0.1
+> > 2:  7 0.2
+> > 3:  8 0.3
+> > 4:  9 0.4
+> > 5: 10 0.5
+> > 
+> > 
+> > sapply(DT1, class) 
+> >         x         y 
+> > "integer" "integer" 
+> > 
+> > 
+> > sapply(DT2, class)
+> >         x         y 
+> > "integer" "numeric" 
+> > 
+> > 
+> > rbindlist(list(DT1, DT2)) 
+> >      x y
+> >  1:  1 1
+> >  2:  2 2
+> >  3:  3 3
+> >  4:  4 4
+> >  5:  5 5
+> >  6:  6 0 <~~~~ from here, the result should be 0.1 to 0.5 for the next 5 rows or y.
+> >  7:  7 0
+> >  8:  8 0
+> >  9:  9 0
+> > 10: 10 0
+> > 
+> > 
+> > Is this behaviour unexpected or we've to manually take care of this? Seems more proper to be taken care of internally to me though. 
+> > 
+> > Best,
+> > Arun.
+> > 
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130728/142858f1/attachment.html>
+
+From saporta at scarletmail.rutgers.edu  Mon Jul 29 15:29:32 2013
+From: saporta at scarletmail.rutgers.edu (Ricardo Saporta)
+Date: Mon, 29 Jul 2013 09:29:32 -0400
+Subject: [datatable-help] probably undesirable function of `rbindlist`
+In-Reply-To: <22497E4514B843FFACA3B4C210BE2210@gmail.com>
+References: <9275D33A4CE041A1AB4EB8AF9E26D7E2@gmail.com>
+ <CAE7Aa4Q-+3u1OW8X8ejSztcQp_9g_Lof2LB8B0xrCOZRJ3xFDQ@mail.gmail.com>
+ <22497E4514B843FFACA3B4C210BE2210@gmail.com>
+Message-ID: <CAE7Aa4Sw4ECaspAG0E2VTNVvySZ89pu8NNaU017yHsyhqv4K0A@mail.gmail.com>
+
+<< the question comes down to: is it better to retain the type of the first
+input or the most general input? >>
+
+My personal preference is to use the class that preservers the most amount
+of information.  Between numeric & integer, that is clearly numeric.
+ (Between factor and character, there is the question of losing the
+levels).
+
+I'm not sure how others feel, but I wouldn't mind seeing a change in
+rbindlist where
+* For each column, all elements are coerced to the most generic class
+* An optional flag where factors will not be coerced into characters (this
+might end up being useless, and in the end better for the user to preserve
+the levels and then reapply them as needed).
+
+-Rick
+
+
+On Sun, Jul 28, 2013 at 6:16 AM, Arunkumar Srinivasan <aragorn168b at gmail.com
+> wrote:
+
+>  Ricardo,
+>
+> Thanks for your reply. Yes, the question comes down to: is it better to
+> retain the type of the first input or the most general input? Even if 1
+> data.table has a factor input, is it better to retain "factor" instead of
+> "character"? If one of them has a numeric column, then is it better to
+> retain numeric even if the first data.table has integer column?
+>
+> And if the first data.table through a division operation yielded integers,
+> then this'll cause an issue, unless one manually typesets. data.table is
+> consistent, alright. But maybe a "warning" or a "message" would be nice.
+>
+> Arun
+>
+> On Sunday, July 28, 2013 at 5:39 AM, Ricardo Saporta wrote:
+>
+> Arun,
+>
+> Im pretty sure `rbindlist` identifies column class based on the first
+> argument.
+>
+> compare
+>   rbindlist(list(DT2, DT1))
+>   rbindlist(list(DT1, DT2))
+>
+>
+> I agree with you though that a more ideal behavior would be one that
+> mimics `c( )`
+>
+>
+> -Rick
+>
+>
+> On Sat, Jul 27, 2013 at 3:07 PM, Arunkumar Srinivasan <
+> aragorn168b at gmail.com> wrote:
+>
+>  Hi all,
+>
+> Here's a behaviour of `rbindlist` that I came across that I think is
+> undesirable. If the columns to be "rbind" are of type "integer" and
+> "numeric", then, the class "integer" is retained which results in different
+> results than intended.
+>
+> require(data.table)
+> DT1 <- data.table(x = 1:5, y = 1:5)
+>    x y
+> 1: 1 1
+> 2: 2 2
+> 3: 3 3
+> 4: 4 4
+> 5: 5 5
+>
+> DT2 <- data.table(x = 6:10, y = 1:5/10)
+>     x   y
+> 1:  6 0.1
+> 2:  7 0.2
+> 3:  8 0.3
+> 4:  9 0.4
+> 5: 10 0.5
+>
+> sapply(DT1, class)
+>         x         y
+> "integer" "integer"
+>
+> sapply(DT2, class)
+>         x         y
+> "integer" "numeric"
+>
+> rbindlist(list(DT1, DT2))
+>      x y
+>  1:  1 1
+>  2:  2 2
+>  3:  3 3
+>  4:  4 4
+>  5:  5 5
+>  6:  6 0 <~~~~ from here, the result should be 0.1 to 0.5 for the next 5
+> rows or y.
+>  7:  7 0
+>  8:  8 0
+>  9:  9 0
+> 10: 10 0
+>
+> Is this behaviour unexpected or we've to manually take care of this? Seems
+> more proper to be taken care of internally to me though.
+>
+> Best,
+> Arun.
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130729/0b1179e7/attachment.html>
+
+From aragorn168b at gmail.com  Mon Jul 29 16:10:56 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Mon, 29 Jul 2013 16:10:56 +0200
+Subject: [datatable-help] probably undesirable function of `rbindlist`
+In-Reply-To: <CAE7Aa4Sw4ECaspAG0E2VTNVvySZ89pu8NNaU017yHsyhqv4K0A@mail.gmail.com>
+References: <9275D33A4CE041A1AB4EB8AF9E26D7E2@gmail.com>
+ <CAE7Aa4Q-+3u1OW8X8ejSztcQp_9g_Lof2LB8B0xrCOZRJ3xFDQ@mail.gmail.com>
+ <22497E4514B843FFACA3B4C210BE2210@gmail.com>
+ <CAE7Aa4Sw4ECaspAG0E2VTNVvySZ89pu8NNaU017yHsyhqv4K0A@mail.gmail.com>
+Message-ID: <E04697CCC9754667B1C7AF730C8307CF@gmail.com>
+
+Ricardo, 
+
+I feel the same way between "numeric" and "integer"; "numeric" should be preserved. 
+
+I don't mind if I get back a "character" or "factor" as long as the data is right. "character" may be faster, allowing the user to decide if he wants to "factor" or not, but I don't mind either ways here. 
+
+Arun
+
+
+On Monday, July 29, 2013 at 3:29 PM, Ricardo Saporta wrote:
+
+> << the question comes down to: is it better to retain the type of the first input or the most general input? >>
+> 
+> My personal preference is to use the class that preservers the most amount of information.  Between numeric & integer, that is clearly numeric.  (Between factor and character, there is the question of losing the levels).  
+> 
+> I'm not sure how others feel, but I wouldn't mind seeing a change in rbindlist where 
+> * For each column, all elements are coerced to the most generic class
+> * An optional flag where factors will not be coerced into characters (this might end up being useless, and in the end better for the user to preserve the levels and then reapply them as needed). 
+> 
+> -Rick
+> 
+> 
+> On Sun, Jul 28, 2013 at 6:16 AM, Arunkumar Srinivasan <aragorn168b at gmail.com (mailto:aragorn168b at gmail.com)> wrote:
+> > Ricardo, 
+> > 
+> > Thanks for your reply. Yes, the question comes down to: is it better to retain the type of the first input or the most general input? Even if 1 data.table has a factor input, is it better to retain "factor" instead of "character"? If one of them has a numeric column, then is it better to retain numeric even if the first data.table has integer column? 
+> > 
+> > And if the first data.table through a division operation yielded integers, then this'll cause an issue, unless one manually typesets. data.table is consistent, alright. But maybe a "warning" or a "message" would be nice. 
+> > 
+> > Arun
+> > 
+> > 
+> > On Sunday, July 28, 2013 at 5:39 AM, Ricardo Saporta wrote:
+> > 
+> > > Arun, 
+> > > 
+> > > Im pretty sure `rbindlist` identifies column class based on the first argument.   
+> > > 
+> > > compare 
+> > >   rbindlist(list(DT2, DT1))
+> > > 
+> > >   rbindlist(list(DT1, DT2))
+> > > 
+> > > 
+> > > 
+> > > I agree with you though that a more ideal behavior would be one that mimics `c( )`
+> > > 
+> > > 
+> > > -Rick 
+> > > 
+> > > On Sat, Jul 27, 2013 at 3:07 PM, Arunkumar Srinivasan <aragorn168b at gmail.com (mailto:aragorn168b at gmail.com)> wrote:
+> > > > Hi all, 
+> > > > 
+> > > > Here's a behaviour of `rbindlist` that I came across that I think is undesirable. If the columns to be "rbind" are of type "integer" and "numeric", then, the class "integer" is retained which results in different results than intended. 
+> > > > 
+> > > > require(data.table)
+> > > > DT1 <- data.table(x = 1:5, y = 1:5)
+> > > >    x y
+> > > > 1: 1 1
+> > > > 2: 2 2
+> > > > 3: 3 3
+> > > > 4: 4 4
+> > > > 5: 5 5
+> > > > 
+> > > > 
+> > > > DT2 <- data.table(x = 6:10, y = 1:5/10)
+> > > >     x   y
+> > > > 1:  6 0.1
+> > > > 2:  7 0.2
+> > > > 3:  8 0.3
+> > > > 4:  9 0.4
+> > > > 5: 10 0.5
+> > > > 
+> > > > 
+> > > > sapply(DT1, class) 
+> > > >         x         y 
+> > > > "integer" "integer" 
+> > > > 
+> > > > 
+> > > > sapply(DT2, class)
+> > > >         x         y 
+> > > > "integer" "numeric" 
+> > > > 
+> > > > 
+> > > > rbindlist(list(DT1, DT2)) 
+> > > >      x y
+> > > >  1:  1 1
+> > > >  2:  2 2
+> > > >  3:  3 3
+> > > >  4:  4 4
+> > > >  5:  5 5
+> > > >  6:  6 0 <~~~~ from here, the result should be 0.1 to 0.5 for the next 5 rows or y.
+> > > >  7:  7 0
+> > > >  8:  8 0
+> > > >  9:  9 0
+> > > > 10: 10 0
+> > > > 
+> > > > 
+> > > > Is this behaviour unexpected or we've to manually take care of this? Seems more proper to be taken care of internally to me though. 
+> > > > 
+> > > > Best,
+> > > > Arun.
+> > > > 
+> > > > 
+> > > > _______________________________________________
+> > > > datatable-help mailing list
+> > > > datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > > 
+> > 
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130729/37e12181/attachment.html>
+
+From FErickson at psu.edu  Wed Jul 31 00:07:45 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Tue, 30 Jul 2013 17:07:45 -0500
+Subject: [datatable-help] unique.data.frame should create a copy, right?
+Message-ID: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+
+I expect DT2 <- unique.data.frame(DT1) to be a new object, but get a
+warning about pointers, so apparently it is not...?
+
+A short example:
+
+DT1 <- data.table(1)
+DT2 <- unique.data.frame(DT1)
+DT2[,gah:=1]
+
+
+An example closer to my application, undoing a cartesian/cross join:
+
+DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+setkey(DT1,A)
+DT2 <- unique.data.frame(DT1[,-which(names(DT1)%in%'B'),with=FALSE])
+DT2[,gah:=1] # warning: I should have made a copy, apparently
+
+
+I'm fine with explicitly making a copy, of course, and don't really know
+anything about pointers. I just thought I'd bring it up.
+
+--Frank
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130730/e381439a/attachment.html>
+
+From aragorn168b at gmail.com  Wed Jul 31 12:10:38 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Wed, 31 Jul 2013 12:10:38 +0200
+Subject: [datatable-help] unique.data.frame should create a copy, right?
+In-Reply-To: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+References: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+Message-ID: <0F857B92DB0744C69CFC07AAE0C4DCF4@gmail.com>
+
+Frank,  
+
+The answer to your problem is that you should be using `unique(DT1)` instead of `unique.data.frame(DT1)` because `unique` will call the "correct" `unique.data.table` method on DT1.  
+
+Now, as to why this is happening? You should know that data.table over allocates a list of column pointers in order to add columns by reference (you can read about this more, if you wish, by looking at ?`:=`). That is, if you do:
+
+DT1 <- data.table(1)
+
+You've created 1 column. But you've (or data.table has) allocated vector of a 100 column pointers (by default). You can see this by using the function `truelength`.
+
+truelength(DT1)
+> 100
+
+Your problem with `unique.data.frame` is that this `truelength` is not maintained after doing this copy. That is:
+
+DT2 <- unique(DT1) # <~~~ correct way
+DT3 <- unique.data.frame(DT1) # <~~~ incorrect way
+
+truelength(DT2)
+> 100
+truelength(DT3)
+> 0
+
+Therefore, we've a problem now. The over-allocated memory is somehow "gone" after this copy. Therefore when you do a `:=` after this, we will be writing to a memory location which isn't allocated. And this would normally lead to a segmentation fault (IIUC).  
+
+And this is what happened with an earlier version of data.table in a similar context - setting the key of data.table. In version  1.7.8, the key of a data.table was set by:
+
+key(DT) <- ?
+
+And this resulted in a "copy" that set the true length to 0. So assigning by reference after this step lead to a segmentation fault. This is why now we have a "setkey" function or more general "setattr" function to assign things without R's copy screwing things up.
+
+In order to catch this issue and rectify it without throwing a segmentation fault, the attribute ".internal.selfref" was designed. Basically it finds these situations and in that case gets a copy before assigning by reference. I can't find a documentation on "how" it's done. But the way I think of it is that when you assign by reference the existing .internal.selfref attribute (which is of class externalptr) is compared with the actual value of your data.table and if they match, then everything's good. Else, it has to make a copy and set the correct ptr as the attribute.
+
+You can read about this in ?setkey. So in essence use `unique` which'll call the correct `unique.data.table` (hidden) function. Hope this helps. If there's ambiguity or I got something wrong, please point out.
+
+Arun
+
+
+On Wednesday, July 31, 2013 at 12:07 AM, Frank Erickson wrote:
+
+> I expect DT2 <- unique.data.frame(DT1) to be a new object, but get a warning about pointers, so apparently it is not...?  
+>  
+> A short example:
+>  
+> > DT1 <- data.table(1)
+> > DT2 <- unique.data.frame(DT1)
+> >  
+> > DT2[,gah:=1]
+> >  
+>  
+>  
+> An example closer to my application, undoing a cartesian/cross join:  
+>  
+> > DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+> > setkey(DT1,A)
+> >  
+> > DT2 <- unique.data.frame(DT1[,-which(names(DT1)%in%'B'),with=FALSE])
+> >  
+> > DT2[,gah:=1] # warning: I should have made a copy, apparently
+> >  
+>  
+>  
+> I'm fine with explicitly making a copy, of course, and don't really know anything about pointers. I just thought I'd bring it up.  
+>  
+> --Frank  
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>  
+>  
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130731/de69f943/attachment.html>
+
+From saporta at scarletmail.rutgers.edu  Wed Jul 31 15:49:04 2013
+From: saporta at scarletmail.rutgers.edu (Ricardo Saporta)
+Date: Wed, 31 Jul 2013 09:49:04 -0400
+Subject: [datatable-help] unique.data.frame should create a copy, right?
+In-Reply-To: <0F857B92DB0744C69CFC07AAE0C4DCF4@gmail.com>
+References: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+ <0F857B92DB0744C69CFC07AAE0C4DCF4@gmail.com>
+Message-ID: <CAE7Aa4SyCbQBP0tH-HGVNYbLTeGoKp4CkPiOKkwMwX6nT5Ed3A@mail.gmail.com>
+
+Arun, just to comment on this part:
+
+<<The answer to your problem is that you should be using `unique(DT1)`
+instead of `unique.data.frame(DT1)` because `unique` will call the
+"correct" `unique.data.table` method on DT1. >>
+
+I use `unique.data.frame(DT)` all the time.
+The reason being that I often have data with multiple rows per key.  If I
+want all unique rows, `unique.data.table` gives me a result other than what
+I need.   Any thoughts on a better way?
+
+On Wednesday, July 31, 2013, Arunkumar Srinivasan wrote:
+
+> Frank,
+>
+> The answer to your problem is that you should be using `unique(DT1)`
+> instead of `unique.data.frame(DT1)` because `unique` will call the
+> "correct" `unique.data.table` method on DT1.
+>
+> Now, as to why this is happening? You should know that data.table over
+> allocates a list of column pointers in order to add columns by reference
+> (you can read about this more, if you wish, by looking at ?`:=`). That is,
+> if you do:
+>
+> DT1 <- data.table(1)
+>
+> You've created 1 column. But you've (or data.table has) allocated vector
+> of a 100 column pointers (by default). You can see this by using the
+> function `truelength`.
+>
+> truelength(DT1)
+> > 100
+>
+> Your problem with `unique.data.frame` is that this `truelength` is not
+> maintained after doing this copy. That is:
+>
+> DT2 <- unique(DT1) # <~~~ correct way
+> DT3 <- unique.data.frame(DT1) # <~~~ incorrect way
+>
+> truelength(DT2)
+> > 100
+> truelength(DT3)
+> > 0
+>
+> Therefore, we've a problem now. The over-allocated memory is somehow
+> "gone" after this copy. Therefore when you do a `:=` after this, we will be
+> writing to a memory location which isn't allocated. And this would normally
+> lead to a segmentation fault (IIUC).
+>
+> And this is what happened with an earlier version of data.table in a
+> similar context - setting the key of data.table. In version  1.7.8, the key
+> of a data.table was set by:
+>
+> key(DT) <- ?
+>
+> And this resulted in a "copy" that set the true length to 0. So assigning
+> by reference after this step lead to a segmentation fault. This is why now
+> we have a "setkey" function or more general "setattr" function to assign
+> things without R's copy screwing things up.
+>
+> In order to catch this issue and rectify it without throwing a
+> segmentation fault, the attribute ".internal.selfref" was designed.
+> Basically it finds these situations and in that case gets a copy before
+> assigning by reference. I can't find a documentation on "how" it's done.
+> But the way I think of it is that when you assign by reference the existing
+> .internal.selfref attribute (which is of class externalptr) is compared
+> with the actual value of your data.table and if they match, then
+> everything's good. Else, it has to make a copy and set the correct ptr as
+> the attribute.
+>
+> You can read about this in ?setkey. So in essence use `unique` which'll
+> call the correct `unique.data.table` (hidden) function. Hope this helps. If
+> there's ambiguity or I got something wrong, please point out.
+>
+> Arun
+>
+> On Wednesday, July 31, 2013 at 12:07 AM, Frank Erickson wrote:
+>
+> I expect DT2 <- unique.data.frame(DT1) to be a new object, but get a
+> warning about pointers, so apparently it is not...?
+>
+> A short example:
+>
+> DT1 <- data.table(1)
+> DT2 <- unique.data.frame(DT1)
+> DT2[,gah:=1]
+>
+>
+> An example closer to my application, undoing a cartesian/cross join:
+>
+> DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+> setkey(DT1,A)
+> DT2 <- unique.data.frame(DT1[,-which(names(DT1)%in%'B'),with=FALSE])
+> DT2[,gah:=1] # warning: I should have made a copy, apparently
+>
+>
+> I'm fine with explicitly making a copy, of course, and don't really know
+> anything about pointers. I just thought I'd bring it up.
+>
+> --Frank
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org <javascript:_e({}, 'cvml',
+> 'datatable-help at lists.r-forge.r-project.org');>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+
+-- 
+Ricardo Saporta
+Graduate Student, Data Analytics
+Rutgers University, New Jersey
+e: saporta at rutgers.edu
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130731/b096ba25/attachment.html>
+
+From aragorn168b at gmail.com  Wed Jul 31 17:06:20 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Wed, 31 Jul 2013 17:06:20 +0200
+Subject: [datatable-help] unique.data.frame should create a copy, right?
+In-Reply-To: <CAE7Aa4SyCbQBP0tH-HGVNYbLTeGoKp4CkPiOKkwMwX6nT5Ed3A@mail.gmail.com>
+References: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+ <0F857B92DB0744C69CFC07AAE0C4DCF4@gmail.com>
+ <CAE7Aa4SyCbQBP0tH-HGVNYbLTeGoKp4CkPiOKkwMwX6nT5Ed3A@mail.gmail.com>
+Message-ID: <2A8FA620F9814DE48058FCA9F41C0AE6@gmail.com>
+
+Ricardo,  
+
+Yes, I was also thinking of this, because of precisely the issue you mention. In this case, I'd do `invisible(alloc.col(DT2))` before assigning by reference. The typical way of converting from a data.frame to a data.table (without complete copy or rather with a "shallow" copy) is:
+
+DF <- data.frame(x=1:5, y=6:10)
+tracemem(DF)
+[1] "<0x100f08678>"
+
+setattr(DF, 'class', c('data.table', 'data.frame'))
+data.table:::settruelength(DF, 0)
+invisible(alloc.col(DF))
+tracemem(DF)
+[1] "<0x103c23b30>"
+
+DF[, z := 1]
+
+Even thought there's a copy happening, this, as I understand is a "shallow" copy (copying only references/pointers and not the entire data) and therefore should have almost negligible time in copying). Now, if you look at the second line, it first sets the "truelength" attribute to 0 (which is set to NULL for a data.frame, if you look at as.data.frame.data.table function). Then it allocates the columns with "alloc.col". So,  
+
+DT1 <- data.table(1)
+DT2 <- unique.data.frame(DT1) # <~~~ your true length is screwed up
+truelength(DT2)
+# [1] 0
+
+invisible(alloc.col(DT2))
+truelength(DT2)
+# [1] 100
+
+DT2[, w := 2]
+# no warning / full copy.
+
+So, Frank, I guess this is an alternate way if you don't want the warning/full copy, but you want to specifically use `unique.data.frame`.
+
+Thanks for bringing it up Ricardo. If I've gotten something wrong, feel free to correct me..
+
+Arun
+
+
+On Wednesday, July 31, 2013 at 3:49 PM, Ricardo Saporta wrote:
+
+> Arun, just to comment on this part:  
+>  
+> <<The answer to your problem is that you should be using `unique(DT1)` instead of `unique.data.frame(DT1)` because `unique` will call the "correct" `unique.data.table` method on DT1. >>  
+>  
+> I use `unique.data.frame(DT)` all the time.  
+> The reason being that I often have data with multiple rows per key.  If I want all unique rows, `unique.data.table` gives me a result other than what I need.   Any thoughts on a better way?  
+>  
+> On Wednesday, July 31, 2013, Arunkumar Srinivasan wrote:
+> > Frank,  
+> >  
+> > The answer to your problem is that you should be using `unique(DT1)` instead of `unique.data.frame(DT1)` because `unique` will call the "correct" `unique.data.table` method on DT1.   
+> >  
+> > Now, as to why this is happening? You should know that data.table over allocates a list of column pointers in order to add columns by reference (you can read about this more, if you wish, by looking at ?`:=`). That is, if you do:  
+> >  
+> > DT1 <- data.table(1)
+> >  
+> > You've created 1 column. But you've (or data.table has) allocated vector of a 100 column pointers (by default). You can see this by using the function `truelength`.  
+> >  
+> > truelength(DT1)
+> > > 100
+> >  
+> > Your problem with `unique.data.frame` is that this `truelength` is not maintained after doing this copy. That is:
+> >  
+> > DT2 <- unique(DT1) # <~~~ correct way  
+> > DT3 <- unique.data.frame(DT1) # <~~~ incorrect way
+> >  
+> > truelength(DT2)
+> > > 100
+> > truelength(DT3)
+> > > 0
+> >  
+> > Therefore, we've a problem now. The over-allocated memory is somehow "gone" after this copy. Therefore when you do a `:=` after this, we will be writing to a memory location which isn't allocated. And this would normally lead to a segmentation fault (IIUC).   
+> >  
+> > And this is what happened with an earlier version of data.table in a similar context - setting the key of data.table. In version  1.7.8, the key of a data.table was set by:
+> >  
+> > key(DT) <- ?  
+> >  
+> > And this resulted in a "copy" that set the true length to 0. So assigning by reference after this step lead to a segmentation fault. This is why now we have a "setkey" function or more general "setattr" function to assign things without R's copy screwing things up.  
+> >  
+> > In order to catch this issue and rectify it without throwing a segmentation fault, the attribute ".internal.selfref" was designed. Basically it finds these situations and in that case gets a copy before assigning by reference. I can't find a documentation on "how" it's done. But the way I think of it is that when you assign by reference the existing .internal.selfref attribute (which is of class externalptr) is compared with the actual value of your data.table and if they match, then everything's good. Else, it has to make a copy and set the correct ptr as the attribute.  
+> >  
+> > You can read about this in ?setkey. So in essence use `unique` which'll call the correct `unique.data.table` (hidden) function. Hope this helps. If there's ambiguity or I got something wrong, please point out.  
+> >  
+> > Arun
+> >  
+> >  
+> > On Wednesday, July 31, 2013 at 12:07 AM, Frank Erickson wrote:
+> >  
+> > > I expect DT2 <- unique.data.frame(DT1) to be a new object, but get a warning about pointers, so apparently it is not...?  
+> > >  
+> > > A short example:
+> > >  
+> > > > DT1 <- data.table(1)
+> > > > DT2 <- unique.data.frame(DT1)
+> > > >  
+> > > > DT2[,gah:=1]
+> > > >  
+> > >  
+> > >  
+> > > An example closer to my application, undoing a cartesian/cross join:  
+> > >  
+> > > > DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+> > > > setkey(DT1,A)
+> > > >  
+> > > > DT2 <- unique.data.frame(DT1[,-which(names(DT1)%in%'B'),with=FALSE])
+> > > >  
+> > > > DT2[,gah:=1] # warning: I should have made a copy, apparently
+> > > >  
+> > >  
+> > >  
+> > > I'm fine with explicitly making a copy, of course, and don't really know anything about pointers. I just thought I'd bring it up.  
+> > >  
+> > > --Frank  
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org (javascript:_e({}, 'cvml', 'datatable-help at lists.r-forge.r-project.org');)
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > >  
+> > >  
+> > >  
+> >  
+> >  
+>  
+>  
+> --  
+> Ricardo Saporta
+> Graduate Student, Data Analytics
+> Rutgers University, New Jersey
+> e: saporta at rutgers.edu (mailto:saporta at rutgers.edu)
+>  
+>  
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130731/7070400d/attachment-0001.html>
+
+From FErickson at psu.edu  Wed Jul 31 17:33:45 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Wed, 31 Jul 2013 10:33:45 -0500
+Subject: [datatable-help] unique.data.frame should create a copy, right?
+In-Reply-To: <2A8FA620F9814DE48058FCA9F41C0AE6@gmail.com>
+References: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+ <0F857B92DB0744C69CFC07AAE0C4DCF4@gmail.com>
+ <CAE7Aa4SyCbQBP0tH-HGVNYbLTeGoKp4CkPiOKkwMwX6nT5Ed3A@mail.gmail.com>
+ <2A8FA620F9814DE48058FCA9F41C0AE6@gmail.com>
+Message-ID: <CAJd-hdkvfcF5ngop1rHGaXOzvGmH8T-9QhW7wbfqTNyh_rswLw@mail.gmail.com>
+
+Okay, thanks Arun and Ricardo. I'll try out this alloc.col way. --Frank
+
+On Wed, Jul 31, 2013 at 10:06 AM, Arunkumar Srinivasan <
+aragorn168b at gmail.com> wrote:
+
+>  Ricardo,
+>
+> Yes, I was also thinking of this, because of precisely the issue you
+> mention. In this case, I'd do `invisible(alloc.col(DT2))` before assigning
+> by reference. The typical way of converting from a data.frame to a
+> data.table (without complete copy or rather with a "shallow" copy) is:
+>
+> DF <- data.frame(x=1:5, y=6:10)
+> tracemem(DF)
+> [1] "<0x100f08678>"
+>
+> setattr(DF, 'class', c('data.table', 'data.frame'))
+> data.table:::settruelength(DF, 0)
+> invisible(alloc.col(DF))
+> tracemem(DF)
+> [1] "<0x103c23b30>"
+>
+> DF[, z := 1]
+>
+> Even thought there's a copy happening, this, as I understand is a
+> "shallow" copy (copying only references/pointers and not the entire data)
+> and therefore should have almost negligible time in copying). Now, if you
+> look at the second line, it first sets the "truelength" attribute to 0
+> (which is set to NULL for a data.frame, if you look at
+> as.data.frame.data.table function). Then it allocates the columns with
+> "alloc.col". So,
+>
+> DT1 <- data.table(1)
+> DT2 <- unique.data.frame(DT1) # <~~~ your true length is screwed up
+> truelength(DT2)
+> # [1] 0
+>
+> invisible(alloc.col(DT2))
+> truelength(DT2)
+> # [1] 100
+>
+> DT2[, w := 2]
+> # no warning / full copy.
+>
+> So, Frank, I guess this is an alternate way if you don't want the
+> warning/full copy, but you want to specifically use `unique.data.frame`.
+>
+> Thanks for bringing it up Ricardo. If I've gotten something wrong, feel
+> free to correct me..
+>
+> Arun
+>
+> On Wednesday, July 31, 2013 at 3:49 PM, Ricardo Saporta wrote:
+>
+> Arun, just to comment on this part:
+>
+> <<The answer to your problem is that you should be using `unique(DT1)`
+> instead of `unique.data.frame(DT1)` because `unique` will call the
+> "correct" `unique.data.table` method on DT1. >>
+>
+> I use `unique.data.frame(DT)` all the time.
+> The reason being that I often have data with multiple rows per key.  If I
+> want all unique rows, `unique.data.table` gives me a result other than
+> what I need.   Any thoughts on a better way?
+>
+> On Wednesday, July 31, 2013, Arunkumar Srinivasan wrote:
+>
+> Frank,
+>
+> The answer to your problem is that you should be using `unique(DT1)`
+> instead of `unique.data.frame(DT1)` because `unique` will call the
+> "correct" `unique.data.table` method on DT1.
+>
+> Now, as to why this is happening? You should know that data.table over
+> allocates a list of column pointers in order to add columns by reference
+> (you can read about this more, if you wish, by looking at ?`:=`). That is,
+> if you do:
+>
+> DT1 <- data.table(1)
+>
+> You've created 1 column. But you've (or data.table has) allocated vector
+> of a 100 column pointers (by default). You can see this by using the
+> function `truelength`.
+>
+> truelength(DT1)
+> > 100
+>
+> Your problem with `unique.data.frame` is that this `truelength` is not
+> maintained after doing this copy. That is:
+>
+> DT2 <- unique(DT1) # <~~~ correct way
+> DT3 <- unique.data.frame(DT1) # <~~~ incorrect way
+>
+> truelength(DT2)
+> > 100
+> truelength(DT3)
+> > 0
+>
+> Therefore, we've a problem now. The over-allocated memory is somehow
+> "gone" after this copy. Therefore when you do a `:=` after this, we will be
+> writing to a memory location which isn't allocated. And this would normally
+> lead to a segmentation fault (IIUC).
+>
+> And this is what happened with an earlier version of data.table in a
+> similar context - setting the key of data.table. In version  1.7.8, the key
+> of a data.table was set by:
+>
+> key(DT) <- ?
+>
+> And this resulted in a "copy" that set the true length to 0. So assigning
+> by reference after this step lead to a segmentation fault. This is why now
+> we have a "setkey" function or more general "setattr" function to assign
+> things without R's copy screwing things up.
+>
+> In order to catch this issue and rectify it without throwing a
+> segmentation fault, the attribute ".internal.selfref" was designed.
+> Basically it finds these situations and in that case gets a copy before
+> assigning by reference. I can't find a documentation on "how" it's done.
+> But the way I think of it is that when you assign by reference the existing
+> .internal.selfref attribute (which is of class externalptr) is compared
+> with the actual value of your data.table and if they match, then
+> everything's good. Else, it has to make a copy and set the correct ptr as
+> the attribute.
+>
+> You can read about this in ?setkey. So in essence use `unique` which'll
+> call the correct `unique.data.table` (hidden) function. Hope this helps. If
+> there's ambiguity or I got something wrong, please point out.
+>
+> Arun
+>
+> On Wednesday, July 31, 2013 at 12:07 AM, Frank Erickson wrote:
+>
+> I expect DT2 <- unique.data.frame(DT1) to be a new object, but get a
+> warning about pointers, so apparently it is not...?
+>
+> A short example:
+>
+>  DT1 <- data.table(1)
+> DT2 <- unique.data.frame(DT1)
+> DT2[,gah:=1]
+>
+>
+> An example closer to my application, undoing a cartesian/cross join:
+>
+> DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+> setkey(DT1,A)
+> DT2 <- unique.data.frame(DT1[,-which(names(DT1)%in%'B'),with=FALSE])
+> DT2[,gah:=1] # warning: I should have made a copy, apparently
+>
+>
+> I'm fine with explicitly making a copy, of course, and don't really know
+> anything about pointers. I just thought I'd bring it up.
+>
+> --Frank
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+>
+> --
+> Ricardo Saporta
+> Graduate Student, Data Analytics
+> Rutgers University, New Jersey
+> e: saporta at rutgers.edu
+>
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130731/a9936eb3/attachment.html>
+
+From saporta at scarletmail.rutgers.edu  Wed Jul 31 18:04:38 2013
+From: saporta at scarletmail.rutgers.edu (Ricardo Saporta)
+Date: Wed, 31 Jul 2013 12:04:38 -0400
+Subject: [datatable-help] unique.data.frame should create a copy, right?
+In-Reply-To: <2A8FA620F9814DE48058FCA9F41C0AE6@gmail.com>
+References: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+ <0F857B92DB0744C69CFC07AAE0C4DCF4@gmail.com>
+ <CAE7Aa4SyCbQBP0tH-HGVNYbLTeGoKp4CkPiOKkwMwX6nT5Ed3A@mail.gmail.com>
+ <2A8FA620F9814DE48058FCA9F41C0AE6@gmail.com>
+Message-ID: <CAE7Aa4R+uRUxaBrgwJYKWAZpE4TbtKR4JCavarCB8rhVgzLnXQ@mail.gmail.com>
+
+Hey Arun,
+
+great call on using `alloc.col()`   I would not have thought of that.
+
+Since we were previously talking about updates to common functions in the
+package, I wouldnt mind seeing a arugment added to `unique.data.table`
+along the lines of `useKey=FALSE`  (perhaps better named).   Thoughts?
+
+Rick
+
+
+On Wed, Jul 31, 2013 at 11:06 AM, Arunkumar Srinivasan <
+aragorn168b at gmail.com> wrote:
+
+>  Ricardo,
+>
+> Yes, I was also thinking of this, because of precisely the issue you
+> mention. In this case, I'd do `invisible(alloc.col(DT2))` before assigning
+> by reference. The typical way of converting from a data.frame to a
+> data.table (without complete copy or rather with a "shallow" copy) is:
+>
+> DF <- data.frame(x=1:5, y=6:10)
+> tracemem(DF)
+> [1] "<0x100f08678>"
+>
+> setattr(DF, 'class', c('data.table', 'data.frame'))
+> data.table:::settruelength(DF, 0)
+> invisible(alloc.col(DF))
+> tracemem(DF)
+> [1] "<0x103c23b30>"
+>
+> DF[, z := 1]
+>
+> Even thought there's a copy happening, this, as I understand is a
+> "shallow" copy (copying only references/pointers and not the entire data)
+> and therefore should have almost negligible time in copying). Now, if you
+> look at the second line, it first sets the "truelength" attribute to 0
+> (which is set to NULL for a data.frame, if you look at
+> as.data.frame.data.table function). Then it allocates the columns with
+> "alloc.col". So,
+>
+> DT1 <- data.table(1)
+> DT2 <- unique.data.frame(DT1) # <~~~ your true length is screwed up
+> truelength(DT2)
+> # [1] 0
+>
+> invisible(alloc.col(DT2))
+> truelength(DT2)
+> # [1] 100
+>
+> DT2[, w := 2]
+> # no warning / full copy.
+>
+> So, Frank, I guess this is an alternate way if you don't want the
+> warning/full copy, but you want to specifically use `unique.data.frame`.
+>
+> Thanks for bringing it up Ricardo. If I've gotten something wrong, feel
+> free to correct me..
+>
+> Arun
+>
+> On Wednesday, July 31, 2013 at 3:49 PM, Ricardo Saporta wrote:
+>
+> Arun, just to comment on this part:
+>
+> <<The answer to your problem is that you should be using `unique(DT1)`
+> instead of `unique.data.frame(DT1)` because `unique` will call the
+> "correct" `unique.data.table` method on DT1. >>
+>
+> I use `unique.data.frame(DT)` all the time.
+> The reason being that I often have data with multiple rows per key.  If I
+> want all unique rows, `unique.data.table` gives me a result other than
+> what I need.   Any thoughts on a better way?
+>
+> On Wednesday, July 31, 2013, Arunkumar Srinivasan wrote:
+>
+> Frank,
+>
+> The answer to your problem is that you should be using `unique(DT1)`
+> instead of `unique.data.frame(DT1)` because `unique` will call the
+> "correct" `unique.data.table` method on DT1.
+>
+> Now, as to why this is happening? You should know that data.table over
+> allocates a list of column pointers in order to add columns by reference
+> (you can read about this more, if you wish, by looking at ?`:=`). That is,
+> if you do:
+>
+> DT1 <- data.table(1)
+>
+> You've created 1 column. But you've (or data.table has) allocated vector
+> of a 100 column pointers (by default). You can see this by using the
+> function `truelength`.
+>
+> truelength(DT1)
+> > 100
+>
+> Your problem with `unique.data.frame` is that this `truelength` is not
+> maintained after doing this copy. That is:
+>
+> DT2 <- unique(DT1) # <~~~ correct way
+> DT3 <- unique.data.frame(DT1) # <~~~ incorrect way
+>
+> truelength(DT2)
+> > 100
+> truelength(DT3)
+> > 0
+>
+> Therefore, we've a problem now. The over-allocated memory is somehow
+> "gone" after this copy. Therefore when you do a `:=` after this, we will be
+> writing to a memory location which isn't allocated. And this would normally
+> lead to a segmentation fault (IIUC).
+>
+> And this is what happened with an earlier version of data.table in a
+> similar context - setting the key of data.table. In version  1.7.8, the key
+> of a data.table was set by:
+>
+> key(DT) <- ?
+>
+> And this resulted in a "copy" that set the true length to 0. So assigning
+> by reference after this step lead to a segmentation fault. This is why now
+> we have a "setkey" function or more general "setattr" function to assign
+> things without R's copy screwing things up.
+>
+> In order to catch this issue and rectify it without throwing a
+> segmentation fault, the attribute ".internal.selfref" was designed.
+> Basically it finds these situations and in that case gets a copy before
+> assigning by reference. I can't find a documentation on "how" it's done.
+> But the way I think of it is that when you assign by reference the existing
+> .internal.selfref attribute (which is of class externalptr) is compared
+> with the actual value of your data.table and if they match, then
+> everything's good. Else, it has to make a copy and set the correct ptr as
+> the attribute.
+>
+> You can read about this in ?setkey. So in essence use `unique` which'll
+> call the correct `unique.data.table` (hidden) function. Hope this helps. If
+> there's ambiguity or I got something wrong, please point out.
+>
+> Arun
+>
+> On Wednesday, July 31, 2013 at 12:07 AM, Frank Erickson wrote:
+>
+> I expect DT2 <- unique.data.frame(DT1) to be a new object, but get a
+> warning about pointers, so apparently it is not...?
+>
+> A short example:
+>
+>  DT1 <- data.table(1)
+> DT2 <- unique.data.frame(DT1)
+> DT2[,gah:=1]
+>
+>
+> An example closer to my application, undoing a cartesian/cross join:
+>
+> DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+> setkey(DT1,A)
+> DT2 <- unique.data.frame(DT1[,-which(names(DT1)%in%'B'),with=FALSE])
+> DT2[,gah:=1] # warning: I should have made a copy, apparently
+>
+>
+> I'm fine with explicitly making a copy, of course, and don't really know
+> anything about pointers. I just thought I'd bring it up.
+>
+> --Frank
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+>
+> --
+> Ricardo Saporta
+> Graduate Student, Data Analytics
+> Rutgers University, New Jersey
+> e: saporta at rutgers.edu
+>
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130731/d8dc964a/attachment-0001.html>
+
+From aragorn168b at gmail.com  Wed Jul 31 18:09:58 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Wed, 31 Jul 2013 18:09:58 +0200
+Subject: [datatable-help] unique.data.frame should create a copy, right?
+In-Reply-To: <CAE7Aa4R+uRUxaBrgwJYKWAZpE4TbtKR4JCavarCB8rhVgzLnXQ@mail.gmail.com>
+References: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+ <0F857B92DB0744C69CFC07AAE0C4DCF4@gmail.com>
+ <CAE7Aa4SyCbQBP0tH-HGVNYbLTeGoKp4CkPiOKkwMwX6nT5Ed3A@mail.gmail.com>
+ <2A8FA620F9814DE48058FCA9F41C0AE6@gmail.com>
+ <CAE7Aa4R+uRUxaBrgwJYKWAZpE4TbtKR4JCavarCB8rhVgzLnXQ@mail.gmail.com>
+Message-ID: <6C1BF9F6C1454190AA0457AA23DFB386@gmail.com>
+
+Ricardo,
+
+You read my mind.. :) I was thinking of the same as well.. Whether the community agrees or not would be interesting as well. It could save trouble with "alloc.col" manually.
+
+
+Arun
+
+
+On Wednesday, July 31, 2013 at 6:04 PM, Ricardo Saporta wrote:
+
+> Hey Arun,  
+>  
+> great call on using `alloc.col()`   I would not have thought of that.  
+>  
+> Since we were previously talking about updates to common functions in the package, I wouldnt mind seeing a arugment added to `unique.data.table` along the lines of `useKey=FALSE`  (perhaps better named).   Thoughts?   
+>  
+> Rick  
+>  
+> On Wed, Jul 31, 2013 at 11:06 AM, Arunkumar Srinivasan <aragorn168b at gmail.com (mailto:aragorn168b at gmail.com)> wrote:
+> > Ricardo,  
+> >  
+> > Yes, I was also thinking of this, because of precisely the issue you mention. In this case, I'd do `invisible(alloc.col(DT2))` before assigning by reference. The typical way of converting from a data.frame to a data.table (without complete copy or rather with a "shallow" copy) is:  
+> >  
+> > DF <- data.frame(x=1:5, y=6:10)
+> > tracemem(DF)
+> > [1] "<0x100f08678>"
+> >  
+> > setattr(DF, 'class', c('data.table', 'data.frame'))  
+> > data.table:::settruelength(DF, 0)
+> > invisible(alloc.col(DF))
+> > tracemem(DF)
+> > [1] "<0x103c23b30>"
+> >  
+> > DF[, z := 1]
+> >  
+> > Even thought there's a copy happening, this, as I understand is a "shallow" copy (copying only references/pointers and not the entire data) and therefore should have almost negligible time in copying). Now, if you look at the second line, it first sets the "truelength" attribute to 0 (which is set to NULL for a data.frame, if you look at as.data.frame.data.table function). Then it allocates the columns with "alloc.col". So,   
+> >  
+> > DT1 <- data.table(1)
+> > DT2 <- unique.data.frame(DT1) # <~~~ your true length is screwed up
+> > truelength(DT2)
+> > # [1] 0
+> >  
+> > invisible(alloc.col(DT2))  
+> > truelength(DT2)
+> > # [1] 100
+> >  
+> > DT2[, w := 2]
+> > # no warning / full copy.
+> >  
+> > So, Frank, I guess this is an alternate way if you don't want the warning/full copy, but you want to specifically use `unique.data.frame`.
+> >  
+> > Thanks for bringing it up Ricardo. If I've gotten something wrong, feel free to correct me..  
+> >  
+> > Arun
+> >  
+> >  
+> > On Wednesday, July 31, 2013 at 3:49 PM, Ricardo Saporta wrote:
+> >  
+> > > Arun, just to comment on this part:  
+> > >  
+> > > <<The answer to your problem is that you should be using `unique(DT1)` instead of `unique.data.frame(DT1)` because `unique` will call the "correct" `unique.data.table` method on DT1. >>  
+> > >  
+> > > I use `unique.data.frame(DT)` all the time.  
+> > > The reason being that I often have data with multiple rows per key.  If I want all unique rows, `unique.data.table` gives me a result other than what I need.   Any thoughts on a better way?  
+> > >  
+> > > On Wednesday, July 31, 2013, Arunkumar Srinivasan wrote:
+> > > > Frank,  
+> > > >  
+> > > > The answer to your problem is that you should be using `unique(DT1)` instead of `unique.data.frame(DT1)` because `unique` will call the "correct" `unique.data.table` method on DT1.   
+> > > >  
+> > > > Now, as to why this is happening? You should know that data.table over allocates a list of column pointers in order to add columns by reference (you can read about this more, if you wish, by looking at ?`:=`). That is, if you do:  
+> > > >  
+> > > > DT1 <- data.table(1)
+> > > >  
+> > > > You've created 1 column. But you've (or data.table has) allocated vector of a 100 column pointers (by default). You can see this by using the function `truelength`.  
+> > > >  
+> > > > truelength(DT1)
+> > > > > 100
+> > > >  
+> > > > Your problem with `unique.data.frame` is that this `truelength` is not maintained after doing this copy. That is:
+> > > >  
+> > > > DT2 <- unique(DT1) # <~~~ correct way  
+> > > > DT3 <- unique.data.frame(DT1) # <~~~ incorrect way
+> > > >  
+> > > > truelength(DT2)
+> > > > > 100
+> > > > truelength(DT3)
+> > > > > 0
+> > > >  
+> > > > Therefore, we've a problem now. The over-allocated memory is somehow "gone" after this copy. Therefore when you do a `:=` after this, we will be writing to a memory location which isn't allocated. And this would normally lead to a segmentation fault (IIUC).   
+> > > >  
+> > > > And this is what happened with an earlier version of data.table in a similar context - setting the key of data.table. In version  1.7.8, the key of a data.table was set by:
+> > > >  
+> > > > key(DT) <- ?  
+> > > >  
+> > > > And this resulted in a "copy" that set the true length to 0. So assigning by reference after this step lead to a segmentation fault. This is why now we have a "setkey" function or more general "setattr" function to assign things without R's copy screwing things up.  
+> > > >  
+> > > > In order to catch this issue and rectify it without throwing a segmentation fault, the attribute ".internal.selfref" was designed. Basically it finds these situations and in that case gets a copy before assigning by reference. I can't find a documentation on "how" it's done. But the way I think of it is that when you assign by reference the existing .internal.selfref attribute (which is of class externalptr) is compared with the actual value of your data.table and if they match, then everything's good. Else, it has to make a copy and set the correct ptr as the attribute.  
+> > > >  
+> > > > You can read about this in ?setkey. So in essence use `unique` which'll call the correct `unique.data.table` (hidden) function. Hope this helps. If there's ambiguity or I got something wrong, please point out.  
+> > > >  
+> > > > Arun
+> > > >  
+> > > >  
+> > > > On Wednesday, July 31, 2013 at 12:07 AM, Frank Erickson wrote:
+> > > >  
+> > > > > I expect DT2 <- unique.data.frame(DT1) to be a new object, but get a warning about pointers, so apparently it is not...?  
+> > > > >  
+> > > > > A short example:
+> > > > >  
+> > > > > > DT1 <- data.table(1)
+> > > > > > DT2 <- unique.data.frame(DT1)
+> > > > > >  
+> > > > > > DT2[,gah:=1]
+> > > > > >  
+> > > > >  
+> > > > >  
+> > > > > An example closer to my application, undoing a cartesian/cross join:  
+> > > > >  
+> > > > > > DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+> > > > > > setkey(DT1,A)
+> > > > > >  
+> > > > > > DT2 <- unique.data.frame(DT1[,-which(names(DT1)%in%'B'),with=FALSE])
+> > > > > >  
+> > > > > > DT2[,gah:=1] # warning: I should have made a copy, apparently
+> > > > > >  
+> > > > >  
+> > > > >  
+> > > > > I'm fine with explicitly making a copy, of course, and don't really know anything about pointers. I just thought I'd bring it up.  
+> > > > >  
+> > > > > --Frank  
+> > > > > _______________________________________________
+> > > > > datatable-help mailing list
+> > > > > datatable-help at lists.r-forge.r-project.org
+> > > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > > > >  
+> > > > >  
+> > > > >  
+> > > >  
+> > > >  
+> > >  
+> > >  
+> > > --  
+> > > Ricardo Saporta
+> > > Graduate Student, Data Analytics
+> > > Rutgers University, New Jersey
+> > > e: saporta at rutgers.edu (mailto:saporta at rutgers.edu)
+> > >  
+> > >  
+> >  
+>  
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20130731/e3f61eba/attachment.html>
+
+From lianoglou.steve at gene.com  Wed Jul 31 20:02:11 2013
+From: lianoglou.steve at gene.com (Steve Lianoglou)
+Date: Wed, 31 Jul 2013 11:02:11 -0700
+Subject: [datatable-help] unique.data.frame should create a copy, right?
+In-Reply-To: <6C1BF9F6C1454190AA0457AA23DFB386@gmail.com>
+References: <CAJd-hd=bu141Pscnh-XuZMSvYsnJP9soxrNciozyOPrZyV6iyQ@mail.gmail.com>
+ <0F857B92DB0744C69CFC07AAE0C4DCF4@gmail.com>
+ <CAE7Aa4SyCbQBP0tH-HGVNYbLTeGoKp4CkPiOKkwMwX6nT5Ed3A@mail.gmail.com>
+ <2A8FA620F9814DE48058FCA9F41C0AE6@gmail.com>
+ <CAE7Aa4R+uRUxaBrgwJYKWAZpE4TbtKR4JCavarCB8rhVgzLnXQ@mail.gmail.com>
+ <6C1BF9F6C1454190AA0457AA23DFB386@gmail.com>
+Message-ID: <CAHA9McMpt8SqPHrsEVuU4tUQhECBfdBxPgBMUJnuVtoMP0Fauw@mail.gmail.com>
+
+Hi all,
+
+On Wed, Jul 31, 2013 at 9:09 AM, Arunkumar Srinivasan
+<aragorn168b at gmail.com> wrote:
+> Ricardo,
+>
+> You read my mind.. :) I was thinking of the same as well.. Whether the
+> community agrees or not would be interesting as well. It could save trouble
+> with "alloc.col" manually.
+
+It's easy enough to add -- just to be sure, the behavior required from
+the OP would be equivalent to calling unique on a data.table that has
+no key, right? For example, instead of this:
+
+R> DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+R> setkey(DT1,A)
+R> DT2 <- unique.data.frame(DT1[,-which(names(DT1)%in%'B'),with=FALSE])
+R> DT2[,gah:=1] # warning: I should have made a copy, apparently
+
+You could just do:
+
+R> DT1 <- CJ(A=0:1,B=1:6,D0=0:1,D=0:1)[D>=D0]
+R> DT2 <- unique(DT1[, -which(names(DT1)%in%'B'), with=FALSE])
+R> DT2[,gah:=1]
+
+Right?
+
+-steve
+
+-- 
+Steve Lianoglou
+Computational Biologist
+Bioinformatics and Computational Biology
+Genentech
+

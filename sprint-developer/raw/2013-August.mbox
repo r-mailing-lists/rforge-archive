@@ -1,0 +1,474 @@
+From tms at epcc.ed.ac.uk  Fri Aug 23 17:58:13 2013
+From: tms at epcc.ed.ac.uk (Terry Sloan)
+Date: Fri, 23 Aug 2013 16:58:13 +0100
+Subject: [Sprint-developer] Fwd: Dev guide
+In-Reply-To: <645CA8BA-EEF6-4445-8DFD-E8E122C553AE@epcc.ed.ac.uk>
+References: <645CA8BA-EEF6-4445-8DFD-E8E122C553AE@epcc.ed.ac.uk>
+Message-ID: <52178695.5050809@epcc.ed.ac.uk>
+
+
+
+-------- Original Message --------
+Subject: 	Dev guide
+Date: 	Mon, 12 Aug 2013 20:55:32 +0100
+From: 	Luis Cebamanos <l.cebamanos at epcc.ed.ac.uk>
+To: 	e.troup at epcc.ed.ac.uk
+CC: 	Terry Sloan <tms at epcc.ed.ac.uk>
+
+
+
+Hi Eilidh,
+
+Please find attached the documents I mentioned in our last meeting.
+
+Best,
+Luis
+
+
+-- 
+The University of Edinburgh is a charitable body, registered in
+Scotland, with registration number SC005336.
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/sprint-developer/attachments/20130823/0c60a4ae/attachment.html>
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: devguide.txt
+URL: <http://lists.r-forge.r-project.org/pipermail/sprint-developer/attachments/20130823/0c60a4ae/attachment.txt>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pexample.tar.gz
+Type: application/x-gzip
+Size: 839 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/sprint-developer/attachments/20130823/0c60a4ae/attachment.bin>
+
+From tms at epcc.ed.ac.uk  Fri Aug 23 18:11:42 2013
+From: tms at epcc.ed.ac.uk (Terry Sloan)
+Date: Fri, 23 Aug 2013 17:11:42 +0100
+Subject: [Sprint-developer] SPRINT Developers guide
+In-Reply-To: <645CA8BA-EEF6-4445-8DFD-E8E122C553AE@epcc.ed.ac.uk>
+References: <645CA8BA-EEF6-4445-8DFD-E8E122C553AE@epcc.ed.ac.uk>
+Message-ID: <521789BE.90006@epcc.ed.ac.uk>
+
+This a draft guide for developing SPRINT functions that has been 
+floating around the SPRINT team. We are not quite sure who in the team 
+wrote it but we wanted to make it available to prospective developers.
+
+There's an example tar file that goes with this that can be obtained by 
+contacting the SPRINT team.
+
+Cheers,
+
+Terry
+
+Adding a new function to Simple Parallel R INTerface (SPRINT)
+=============================================================
+
+
+SPRINT is a framework for make parallel algorithms available to R users.
+It is designed to be relatively easy to extend.
+
+
+SPRINT is made up of two components: R<->SPRINT interface and the compute
+cluster itself. The two communicate via files.
+
+
+	     Processor 0                Processors 1-n
+
+	+-------------------+     +-------------------------+
+
+	| +---------------+ |     |    +---------------+    |
+
+	| |       R       | |     |    |       R       |    |
+
+	| |               | |     |    |               |    |
+
+	| +---------------+ |     |    +---------------+    |
+
+	| | SPRINT-R stub | |     |  | Wait for cmd code |  |
+
+	| +-----------------------------------------------+ |
+
+	| |                    SPRINT                     | |
+
+	| |     +-----------------------------------+     | |
+
+	| |     |               ptest               |     | |
+
+	| |     |               pcor                |     | |
+
+	| |     +-----------------------------------+     | |
+
+	| +-----------------------------------------------+ |
+
+	+-------------------+     +-------------------------+
+
+	
+
+When the user starts R with SPRINT loaded, the compute cluster goes into
+a wait state. When R reaches a function that is in SPRINT, the SPRINT-R stub
+sends a command to SPRINT via MPI. The MPI message contains an enumeration
+code that represents a function, which forces SPRINT to wake up and execute
+that function.
+
+The idea behind SPRINT is to allow parallel processing of data from within R
+without being restrained by R. Functions created in SPRINT should have
+similar interfaces to the serial R equivalent.
+	
+Data required by the parallelised funciton is also passed via MPI. The creator
+of the function is responsible for creating that data flow.
+
+Afterwards, the function created is also responsible for passing the
+data back to R. This does not have to be the result of the processing,
+it could be a file handle, or a simple error code. However, bear in
+mind that the parallelised funciton should match the funcitonality of
+the original R function as much as possible.
+
+This document develops an example SPRINT function, which requires:
+  o creating an R stub (such that R can call the function)
+  o the C equivalent of the R stub
+  o the function to run in the computer cluster
+  o finally, connecting the different parts
+	
+SPRINT is organised into the following directory structure:
+
+
+	 / -- root dir        Contains configure scripts, etc.
+
+	   |
+
+	   |- exec
+
+	   |- inst
+
+	   |- man
+
+	   |- po              Contains translation (not used).
+
+	   |- R               Contains the R stubs (see 1. below)
+
+	   |- src             Functions header files and sprint itself.
+
+	      |               The source code for the R<->sprint interface (also called sprint!) here.
+
+	      |- sprint       The source code the compute farm executable, sprint
+
+	      |- algorithms   Where you place your new functions in a directory
+
+	         |- pcor
+
+	            |- implementation
+
+	            |- interface
+
+	         |- ptest
+
+	            |- implementation
+
+	            |- interface
+
+	         |- pFunction
+
+	            |- implementation
+
+	            |- interface
+
+	   |- tests
+
+	
+
+1. Create a Stub in R
+---------------------
+
+Add a file in the "R" directory to perform any appropriate actions (in the R
+domain), then call the underlying C. Appropriate actions may include parameter
+sanity checking and other housekeeping.
+
+We start off with two R functions which call the same backend function
+with different parameters.
+
+
+	--- R/pexample.R --------------------------------------------------------------
+
+	pexample<-function()
+
+	{
+
+	
+
+	    .Call("pexample")
+
+	}
+
+	-------------------------------------------------------------------------------
+
+	
+
+2. Add the interface function
+-----------------------------
+
+These are the C functions which are called by the R stubs. Like the R stubs
+which they mirror they are likely to perform argument checking and general
+housekeeping. For each new function create a directory in the "algorithms"
+directory and add directories "implementation" and "interface". This function
+lives in the "interface" directory and most won't need much editing, apart from the
+commandCode
+	
+
+	--- src/algorithms/pexample/interfaces/pexample.c -------------------------------------------------
+
+	#include<stdout.h>
+
+	#include<Rdefines.h>
+
+	#include "../sprint.h"
+
+	#include "pexample.h"
+
+	
+
+	// note that all data from R is of type SEXP
+
+	SEXP pexample()
+
+	{
+
+	    SEXP result;
+
+     	    int response;
+
+	    enum commandCodes commandCode;
+
+	    int message = 10;
+
+	
+
+	    MPI_Initialized(&response);
+
+	    if (response) {
+
+	        DEBUG("MPI is init'ed in ptest\n");
+
+	    } else {
+
+	        DEBUG("MPI is NOT init'ed in ptest\n");
+
+	    }
+
+	
+
+	    // broadcast command to other processors
+
+	    commandCode = PEXAMPLE;
+
+	    MPI_Bcast(&commandCode, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
+
+	
+
+	    response = example(1,message);
+
+	
+
+     	    result = NEW_NUMERIC(response);
+
+	
+
+	    return result;
+
+	}
+
+-------------------------------------------------------------------------------
+
+	
+
+--- pexample.h ----------------------------------------------------------------
+
+	#ifndef _INTERFACE_PEXAMPLE_H
+
+	#define _INTERFACE_PEXAMPLE_H
+
+	
+
+	// anything you want
+
+	
+
+	#endif
+
+------------------------------------------------------------------------------
+
+	
+
+3. Implement the main function
+------------------------------
+
+These functions, again written in C, implement the actual parallel algorithm
+you are interested in performing. They will make use of MPI for communication
+and perform some useful work. This functions runs in the compute cluster.
+
+This file can be saved in the "implementation" directory for your function.
+
+
+--- algorithms/pexample/implementation/example.c ---------------------------------------------
+
+     #include<stdio.h>
+
+     #include "mpi.h"
+
+	
+
+	
+
+	int example(int message)
+
+	{
+
+	    int result = 1;
+
+	    int pool, rank;
+
+	
+
+	    MPI_Comm_size(MPI_COMM_WORLD,&pool);
+
+	    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+
+	
+
+	    LOG(stdout, "Process %i of %i says '%d'\n", rank, pool, message);
+
+	
+
+	    result = 0;
+
+	
+
+	    return result;
+
+	}
+
+-------------------------------------------------------------------------------
+
+	
+
+4. Connecting the R/C stubs to the compute cluster
+---------------------------------------------------
+
+Declare the new functions and include them in the command code list.
+
+
+--- src/functions.h -----------------------------------------------------------
+
+	/** Lists all the functions available, ensure that TERMINATE is first and
+
+     	*  LAST is last
+
+	**/
+
+	enum commandCodes {TERMINATE = 0, TEST, EXAMPLE, LAST};
+
+	
+
+-------------------------------------------------------------------------------
+
+
+Then add them to the look-up table in common/functions.c.  These
+are extern function with variable number of arguments. The functions also
+need adding to the look-up table in the*same order*  as the enumeration.
+
+
+--- src/common/algorithms/functions.c ------------------------------------------------------
+
+	#include<stdio.h>
+
+	#include "../functions.h"
+
+	
+
+	/**
+
+	 * Declare the various command functions as external
+
+	 **/
+
+	extern int test(int n,...);
+
+	extern int example(int n,...);
+
+	
+
+	/**
+
+	 * This is a dummy operation which can be used where a command code exists
+
+      * but does not represent a useful function.
+
+	 **/
+
+	
+
+	int voidCommand()
+
+	{
+
+	    printf("Void command called, I would not expect this.\n");
+
+	
+
+	    return 1;
+
+	}
+
+
+
+	/**
+
+	 * This array of function pointers ties up with the commandCode enumeration.
+
+	 **/
+
+	commandFunction commandLUT[] = {voidCommand, \
+
+	                                test, \
+
+	                                example, \
+
+	                                voidCommand};
+
+------------------------------------------------------------------------------
+
+	
+Update the NAMESPACE file so R can find the new functions:
+
+
+
+--- NAMESPACE -----------------------------------------------------------------
+
+	# Namespace file for sprint
+
+	
+
+	useDynLib(sprint)
+
+	
+
+	export(ptest)
+
+	export(pexample)
+
+-------------------------------------------------------------------------------
+Finally, include the object files to the Makefile as it is done with previous functions.
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/sprint-developer/attachments/20130823/b187ac27/attachment-0001.html>
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/sprint-developer/attachments/20130823/b187ac27/attachment-0001.ksh>
+

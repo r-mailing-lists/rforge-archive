@@ -1,0 +1,59 @@
+From Joachim.Topper at uib.no  Fri May 31 14:38:52 2019
+From: Joachim.Topper at uib.no (=?UTF-8?Q?Joachim_Paul_T=C3=B6pper?=)
+Date: Fri, 31 May 2019 14:38:52 +0200
+Subject: [Ipmpack-users] makeIPMFmatrix when having discrete stages that
+ fecundity functions do not contribute to
+Message-ID: <0a574c0290ec4ca5521f84c267ef841d@webmail.uib.no>
+
+Hi!
+
+I'm building an IPM for a clonal species with 2 discrete stages. One 
+stage is a seedbank (SB), and one is related to vegetative dormancy 
+(VD).
+The functions for entering and leaving the vegetativ dormancy stage are 
+covered in the Pmatrix, but there is no vital rates related to clonality 
+or fecundity that contribute to vegetative dormancy.
+However, since the discreteTransitionObject contains 2 discrete stages 
+and the Pmatrix thus has n+2 bins, all discrete stages must be defined 
+in clonalObj and fecObj as well so that the Cmatrix and Fmatrix end up 
+with the same n+2 dimensions. This worked fine for the Cmatrix, but 
+makeIPMFmatrix crashed.
+
+Error in to.discrete[i, ] <- .fecRaw(x = y, cov = chosenCov, fecObj = 
+fecObj)[[2]][which(fecObj at vitalRatesPerOffspringType[,  :
+   replacement has length zero
+
+What happened is that when calculating 'to.discrete' for the veg. 
+dormant stage (VD) the else-part (line 102) failed since none of the 
+fecundity-functions apply to this stage (there's only zeros there, see 
+vitalRatesPerOffspringType below), and thus the calculated vector for VD 
+contains nothing and cause the coercing into to.discrete of course to 
+crash.
+
+
+
+vitalRatesPerOffspringType = data.frame(VD=c(0,0,0,0),
+                                         SB=c(1,1,1,0),
+                                         continuous=c(1,1,1,1),
+                                         
+row.names=c("flowering","flowers","seedsPerCap","seedlingEstablishmentRate"))
+
+
+I then changed the 'else' in line 102 to
+
+       if 
+(length(which(fecObj at vitalRatesPerOffspringType[,namesDiscrete[i]] == 
+1)) == 1)
+
+so that this part works for stages with 1 applying fecfunction, while 
+simply nothing happens for those stages with 0 applying fecfunctions, 
+i.e. for such stages to.discrete contains only the zeros that were 
+predefined in line 94.
+
+
+So, now my question is, whether this is an ok solution for a potential 
+bug? Or did I make a mistake to get that error in the first place?
+
+Thanks & cheers,
+Joachim
+

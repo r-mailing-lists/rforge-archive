@@ -1,0 +1,224 @@
+From kimai at Princeton.EDU  Sat Oct  6 16:31:02 2012
+From: kimai at Princeton.EDU (Kosuke Imai)
+Date: Sat, 6 Oct 2012 14:31:02 +0000
+Subject: [Mediation-information] Fwd: Moderated mediation / mediated
+ moderation using the mediation package
+References: <506F7DBF.1010201@mit.edu>
+Message-ID: <359D4A0624B67A48B862B678C04D46642AB5D998@CSGMBX204W.pu.win.princeton.edu>
+
+FYI.
+
+Department of Politics
+Princeton University
+http://imai.princeton.edu
+
+Begin forwarded message:
+
+> From: Teppei Yamamoto <teppei at mit.edu>
+> Subject: Re: Moderated mediation / mediated moderation using the mediation package
+> Date: October 5, 2012 8:39:27 PM EDT
+> To: Patrick S Forscher <schnarrenber at wisc.edu>
+> Cc: dustin tingley <dtingley at gov.harvard.edu>, Kosuke Imai <kimai at princeton.edu>, Markus Brauer <brauer2 at wisc.edu>
+> 
+> Hi Patrick,
+> 
+> Yes, we have implemented moderated mediation as of version 4.0 (the package is now at 4.1.2). Please take a look at Section 3.2 of our updated vignette about the implementation; essentially you fit the mediator and/or outcome models with appropriate interaction terms, and tell the mediate function what values of the moderators you want to condition on.
+> 
+> Thank you for your good words on our package! Feedback, feature requests, etc. are always welcome.
+> 
+> Best,
+> Teppei
+> 
+> Patrick S Forscher wrote:
+>> Hi all,
+>> 
+>> I emailed you all about a year ago about whether it was possible to
+>> implement moderated mediation / mediated moderation models using the
+>> mediation package you developed. I am interested because Prof Markus
+>> Brauer and Prof John Curtin are teaching a graduate methods class in the
+>> Psychology Department here at UW-Madison, and I am helping teach the lab
+>> section of this class. We'd like to teach our students an R
+>> implementation of these models that is relatively easy to use. Last time
+>> I contacted you all about this issue, Dustin mentioned that you all
+>> might investigate implementing these models in the mediation package
+>> sometime in the future. Have you all made any progress on this front?
+>> 
+>> (Also, I should mention that I loved the fact last year that mediate()
+>> was so clean and easy to use. I ended up mentioning this package in a
+>> talk I gave on mediation in one of the social psychology brownbags last
+>> semester. I have also noticed that Prof Imai is giving a talk here at
+>> UW-Madison in December, and I'm looking forward to seeing it!)
+>> 
+>> Regards,
+>> 
+>> --
+>> Patrick S Forscher
+>> PhD Candidate
+>> University of Wisconsin-Madison
+>> 
+> 
+> -- 
+> ====================================
+> Teppei Yamamoto
+> Assistant Professor
+> Department of Political Science
+> Massachusetts Institute of Technology
+> http://web.mit.edu/teppei/www/
+> ====================================
+
+
+From weichaobao at gmail.com  Sat Oct  6 16:47:05 2012
+From: weichaobao at gmail.com (Weichao Bao)
+Date: Sat, 6 Oct 2012 10:47:05 -0400
+Subject: [Mediation-information] unscribe
+Message-ID: <CAORmpANapr4B4daTEC97bFbPbH20mW8_M6CC7JvnSFeo6Uu6xw@mail.gmail.com>
+
+Please unscribe me.
+
+Thanks
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/mediation-information/attachments/20121006/951ad719/attachment.html>
+
+From teppei at MIT.EDU  Thu Oct 11 16:26:41 2012
+From: teppei at MIT.EDU (Teppei Yamamoto)
+Date: Thu, 11 Oct 2012 10:26:41 -0400
+Subject: [Mediation-information] moderated mediation
+Message-ID: <5076D721.9000505@mit.edu>
+
+Hello list,
+
+Patrick Forscher sent us the following question about "moderated
+mediation" in our package:
+
+===
+One thing that's still a little ambiguous to me from examining section
+3.2 of the vignette is how we would obtain a direct test of the
+interaction between the mediation effect and the covariate of interest.
+ For example, in 3.2 of the vignette, it looks like you observe how the
+mediation effect of the treatment on the probability of sending a letter
+to congress (through anxiety) might change depending on the age of the
+participant.  It looks like you essentially obtain point estimates of
+the mediation effect at age 20 and 60.  However, I'm having trouble
+figuring out how you would obtain a direct estimate of the magnitude of
+the change in the mediation relationship per extra year of age and a
+test of this relationship against 0.  One could, theoretically,
+calculate the magnitude of the coefficient for the mediation effect *
+age interaction by, for example, setting the age covariate to 20 in the
+first model and 21 in the second.  However, manually calculating the
+appropriate standard error for this coefficient would be much harder.
+===
+
+We don't have a built-in option or command to directly compute the
+difference in two conditional average causal mediation effects along its
+uncertainty estimate, but it's fairly simple to do. Below is a little
+example code snippet and its output; it's a modified version of what we
+have as part of example(mediate).
+
+> library(mediation)
+Loading required package: MASS
+Loading required package: Matrix
+Loading required package: lattice
+Loading required package: lpSolve
+mediation: R Package for Causal Mediation Analysis
+Version: 4.1.2
+
+> data(jobs)
+>
+> b.int <- lm(job_seek ~ treat*age + econ_hard + sex, data=jobs)
+> d.int <- lm(depress2 ~ treat*job_seek*age + econ_hard + sex, data=jobs)
+>
+> set.seed(1)
+> contcont.age20 <- mediate(b.int, d.int, sims=1000, treat="treat",
+mediator="job_seek", covariates = list(age = 20), long = T)
+>
+> set.seed(1)
+> contcont.age70 <- mediate(b.int, d.int, sims=1000, treat="treat",
+mediator="job_seek", covariates = list(age = 70), long = T)
+> d1.diff <- contcont.age70$d1.sims - contcont.age20$d1.sims
+> d0.diff <- contcont.age70$d0.sims - contcont.age20$d0.sims
+>
+> # Point estimate for the difference
+> (contcont.age70$d1 - contcont.age20$d1)
+[1] 0.03794978
+> (contcont.age70$d0 - contcont.age20$d0)
+[1] 0.05439293
+>
+> quantile(d1.diff, c(0.025, 0.975))
+       2.5%       97.5%
+-0.07538785  0.15124192
+> quantile(d0.diff, c(0.025, 0.975))
+      2.5%      97.5%
+-0.1073592  0.2160822
+====
+
+The key trick is to set the randomness seed to the same value before
+each of the mediate run.
+
+Teppei
+
+-- 
+====================================
+Teppei Yamamoto
+Assistant Professor
+Department of Political Science
+Massachusetts Institute of Technology
+http://web.mit.edu/teppei/www/
+====================================
+
+From kimai at Princeton.EDU  Thu Oct 25 02:19:15 2012
+From: kimai at Princeton.EDU (Kosuke Imai)
+Date: Thu, 25 Oct 2012 00:19:15 +0000
+Subject: [Mediation-information] Inquiry about sensitivity analysis
+In-Reply-To: <20121025003312.HM.000000000000PA2@postcentre.wwl1556.hanmail.net>
+References: <20121025003312.HM.000000000000PA2@postcentre.wwl1556.hanmail.net>
+Message-ID: <359D4A0624B67A48B862B678C04D46642ABB0358@CSGMBX204W.pu.win.princeton.edu>
+
+If you believe that you've controlled for many covariates, you might want to parameterize the sensitivity analysis by R^2 rather than correlation.  Have a look at this as all of our proposed methods are implemented via an R package: http://imai.princeton.edu/research/files/mediationR2.pdf
+
+Best,
+Kosuke
+
+Department of Politics
+Princeton University
+http://imai.princeton.edu
+
+On Oct 24, 2012, at 11:33 AM, Baek-san Yu <postcentre at hanmail.net> wrote:
+
+> 
+> Dear, Dr. Imai
+> I am a MA student in South Korea.
+> I have read your "Identification, Inference and Sensitivity
+> Analysis for Causal Mediation Effects", and I appreciate 
+> your commitment. Since I am not much good at SEM, still
+> I have few questions.I look forward to your advice. 
+> 
+> following your procedure, I could draw the following picture.
+> 
+> This picture shows that when rho overcomes .04  the significance of indirect effect
+> will be lost and over .10, it would lead to opposite direction. In this sense, it appears
+> that the indirect effects(.034, rho=0) are vulnerable to unobserved confounders. 
+> 
+> However, given that I controlled confounding variables which are well known, and 
+> the estimated residual co-variance is about  .05, can I say the indirect effects still can be hold? 
+> I am not sure that estimated residual co-variance between mediator and outcome variable in
+> the model could be adequate reference. Or this result only can tell that the estimated indirect 
+> effect is weak to hidden bias.
+> 
+> <output_1.jpeg>
+> 
+> 
+> Thanks you for reading.
+> I would appreciate your answer.
+> 
+> 
+> 
+> 
+> 
+> 
+> Baek-San Yu. 
+> The Sociology of Education. Master's Candidate 
+> Department of Education, Korea University 
+> Mobile: +82-10-2895-4280 
+
+

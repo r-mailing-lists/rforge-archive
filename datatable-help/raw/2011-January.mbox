@@ -1,0 +1,3364 @@
+From mdowle at mdowle.plus.com  Sun Jan  2 09:21:11 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 02 Jan 2011 08:21:11 +0000
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <70EFCDD908F9264785FA08EC3A47132016CC0D6D84@ex02mail01.ad.rit.edu>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+	<1293139983.2693.28.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6CB5@ex02mail01.ad.rit.edu>
+	<1293556910.2756.43.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6D1F@ex02mail01.ad.rit.edu>
+	<1293804792.1566.56.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6D84@ex02mail01.ad.rit.edu>
+Message-ID: <1293956471.2151.1.camel@Adam>
+
+Thanks again. Yes looks like a bug. Added here :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1243&group_id=240&atid=975
+Matthew
+
+On Fri, 2010-12-31 at 17:10 -0500, Joseph Voelkel wrote:
+> Matthew, just to address point 5 (double eval of quoted works, single eval on unquoted does not):
+> 
+> > dt1key<-data.table(A1=1:100,onekey=rep(1:2,each=50))
+> > setkey(dt1key,onekey)
+> > ASumExpr<-parse(text="quote(sum(A1))")
+> > ASumExpr
+> expression(quote(sum(A1)))
+> attr(,"srcfile")
+> <text> 
+> > str(eval(ASumExpr))
+>  language sum(A1)
+> > 
+> > ASumExprNoQ<-parse(text="sum(A1)")
+> > ASumExprNoQ
+> expression(sum(A1))
+> attr(,"srcfile")
+> <text> 
+> > str(ASumExprNoQ) # not the same as eval(ASumExpr)
+> length 1 expression(sum(A1))
+>  - attr(*, "srcref")=List of 1
+>   ..$ :Class 'srcref'  atomic [1:6] 1 1 1 7 1 7
+>   .. .. ..- attr(*, "srcfile")=Classes 'srcfilecopy', 'srcfile' <environment: 0x060cef18> 
+>  - attr(*, "srcfile")=Classes 'srcfilecopy', 'srcfile' <environment: 0x060cef18> 
+> > 
+> > # test of 3 ways to obtain results
+> > dt1key[,sum(A1),by=onekey]
+>      onekey   V1
+> [1,]      1 1275
+> [2,]      2 3775
+> > dt1key[,eval(eval(ASumExpr)),by=onekey]
+>      onekey   V1
+> [1,]      1 1275
+> [2,]      2 3775
+> > dt1key[,eval(ASumExprNoQ),by=onekey]
+> Error in `[.data.table`(dt1key, , eval(ASumExprNoQ), by = onekey) : 
+>   columns of j don't evaluate to consistent types for each group
+> In addition: Warning message:
+> In if (as.character(jsub[[1]]) %in% c("list", "DT")) { :
+>   the condition has length > 1 and only the first element will be used
+> >  
+> >
+> 
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> Sent: Friday, December 31, 2010 9:13 AM
+> To: Joseph Voelkel
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: RE: [datatable-help] Summing over many variables
+> 
+> Hi,
+> 
+> I don't quite follow all of that e.g. I'm thinking secondary keys at
+> points (manual now, or 'built-in' feature request). Anyway, sounds like
+> it's working. On point 3 I'm not sure that's really data.table, rather
+> the difference between a vectorized sum and apply()-ed sum. You should
+> see the same difference with a data.frame.
+> 
+> Where it isn't working (point 5) was there an error message or was the
+> result incorrect? Might be a clue that reveals a bug.
+> 
+> Matthew
+> 
+> On Wed, 2010-12-29 at 12:57 -0500, Joseph Voelkel wrote:
+> > Thanks, Matthew.
+> > 
+> > 1. Yes, you have the subsetting of j on your faq.
+> > 2. The double eval appears to handle this subsetting. In my smaller problem, which I am working on first, I have about 55K records and 250 variables. Using either A1+A2+A3+A4+A5 or eval(eval()) takes about 0.22 sec of user time. So, from this indirect measure, the two are equally efficient.
+> > 3. By the way, for this example, I used 6 keys, which happened for this problem to correspond to 1 record for each unique key. That is, my output also contained 55K records. I originally solved the problem by using apply with sum on the five columns that contained the A1 through A5 value, e.g. apply(DT1[,11:15,with=FALSE],1,sum). This operation took about 0.62 sec. So, even here, data.table is 3x faster than apply.
+> > 4. Of course, no key is really needed here, so if I just want to return the sum along with the key vars, I can just use DT1[,list(key1,key2,key3,key4,key5,key6,sum=A1+A2+A3+A4+A5)] which runs in under 0.01 seconds.
+> > 5. Finally, I tried your idea of removing the quote and just trying the one eval(). It worked with a simple contrived example, but not for my more complex one--I have no idea why not, because the two seem analogous...
+> > 
+> >  
+> > 
+> > -----Original Message-----
+> > From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> > Sent: Tuesday, December 28, 2010 12:22 PM
+> > To: Joseph Voelkel
+> > Cc: datatable-help at lists.r-forge.r-project.org
+> > Subject: Re: [datatable-help] Summing over many variables
+> > 
+> > Glad that works. Thanks for posting back. One thintg with that approach
+> > is that data.table inspects the j expression to see which columns it
+> > uses. It only subsets the ones that are used, for efficiency. There's a
+> > faq on that I think. If the expression is wrapped up inside an eval I
+> > think it still inspects the j but I can't quite remember. I'd be
+> > surprised if that works with the double eval like that. If A runs from 1
+> > to 100 in your real data and you're taking many sub-sums of 5, then this
+> > could make a big difference. Try timing sum(A1) vs sum(A2+A3+A4+A5) with
+> > and without the eval(eval()). That should reveal whether the j is being
+> > inspected ok.
+> > Also looking at it again, you shouldn't need the quote() inside the text
+> > passed to parse. Then it's just a single eval and j inspection should be
+> > ok I think i.e. DT1[,eval(ASumExpr),by=grp] rather than
+> > DT1[,eval(eval(ASumExpr)),by=grp]
+> > 
+> > Matthew
+> > 
+> > 
+> > On Mon, 2010-12-27 at 13:23 -0500, Joseph Voelkel wrote:
+> > > I like Matthew's idea of flattening tables. But, as usual, I did not tell the whole story in my first post. I will probably want to look at many expressions, for example,
+> > > 
+> > > sum(A1+A2+A3+A4+A5)
+> > > sum(A2+A3+A4+A5+A6)
+> > > sum(A3+A4+A5+A6+A7)
+> > > sum((A1+A2)/2 - (A3+A4)/2)
+> > > 
+> > > To be able to investigate a sequence of these easily, I found (after some trial and error, and then thinking about it a bit more to try to make my problem look like one from the datatable-faq) that this will do the trick:
+> > > 
+> > > library(data.table)
+> > > 
+> > > # create data table
+> > > DT1<-data.table(A1=1:1000000,A2=1:1000000,A3=1:1000000,A4=1:1000000,A5=1:1000000,grp=rep(1:50000,each=20))
+> > > setkey(DT1,grp)
+> > > 
+> > > # Say I want DT1[,sum(A1+A2+A3+A4+A5),by=grp]
+> > > 
+> > > # First, create expression of interest, and convert it to data-table-useful form
+> > > ASumExpr<-parse(text=paste("quote(sum(",paste("A",1:5,sep="",collapse="+"),"))",sep=""))
+> > > # (Next few lines: to help me and maybe you see what this looks like...)
+> > > ASumExpr
+> > > str(ASumExpr)
+> > > eval(ASumExpr)
+> > > str(eval(ASumExpr))
+> > > str(quote(mean(x))) # from example in datatable-faq.pdf. So eval(ASumExpr) looks good
+> > > 
+> > > # long-hand typing method. OK for one or two, but not in general
+> > > system.time(dt2a<-DT1[,sum(A1+A2+A3+A4+A5),by=grp])
+> > > # formula method. This will be useful.
+> > > system.time(dt2b<-DT1[,eval(eval(ASumExpr)),by=grp])
+> > > 
+> > > identical(dt2a, dt2b)
+> > > 
+> > > # Fast and easy to write. Just what I wanted. Thanks again for the ideas that lead to this useful solution.
+> > > 
+> > > Joe V.
+> > > 
+> > > -----Original Message-----
+> > > From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> > > Sent: Thursday, December 23, 2010 4:33 PM
+> > > To: Joseph Voelkel
+> > > Cc: datatable-help at lists.r-forge.r-project.org
+> > > Subject: Re: [datatable-help] Summing over many variables
+> > > 
+> > > 
+> > > Yes that's one way. We aren't that happy with using lapply in j as it
+> > > loses the benefit of data.table.
+> > > 
+> > > I tend to 'flatten' tables like this. Try to have few columns. In this
+> > > case it would be either a 3 column table (grp,colname,value) or maybe a
+> > > 4 column table if you ever want to group by "A" or
+> > > "B" (grp,letter,number,value). The query would then be
+> > > DT[,sum(value),by=list(grp,letter,number)]. You can then do pattern
+> > > matches and filters etc in the i rather than in the j e.g.
+> > > DT[letter=="A",sum(value),by=group] for just the "A"s. The answer comes
+> > > out in 'flat' format but you can always 'unflatten' the result to make
+> > > it look pretty or easier to read.  [Note that I sinned by using '==' in
+> > > the i just then invoking vector scan, so to avoid that for speed you
+> > > would setkey(letter,group) then DT["A",sum(value),by=group]], or getting
+> > > fancy if you only wanted some groups (say 1 and 3) then 'by without by'
+> > > e.g. DT[list("A",c(1,3)),sum(value)].
+> > > 
+> > > 'flat' is a common way to use data.table to store higher dimensional
+> > > data, and especially sparse higher dimensional data.
+> > > 
+> > > The 'grp.1' repetition is a problem I'd like to remove. It's related to
+> > > this feature request (but is almost a bug). At the moment you have to
+> > > remove the grp.1 afterwards.
+> > > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=978&group_id=240&atid=978
+> > > 
+> > > Matthew
+> > > 
+> > > _______________________________________________
+> > > datatable-help mailing list
+> > > datatable-help at lists.r-forge.r-project.org
+> > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > 
+> > 
+> 
+> 
+
+
+
+From novelaspect1 at gmail.com  Wed Jan  5 06:51:39 2011
+From: novelaspect1 at gmail.com (amberjoe)
+Date: Tue, 4 Jan 2011 21:51:39 -0800 (PST)
+Subject: [datatable-help] QuickBooks
+Message-ID: <1294206699782-3174863.post@n4.nabble.com>
+
+
+Can QuickBooks or Peachtree accounting application be hosted along with
+Proseries Tax softrware?
+-- 
+View this message in context: http://r.789695.n4.nabble.com/QuickBooks-tp3174863p3174863.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Wed Jan  5 10:00:14 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 05 Jan 2011 09:00:14 +0000
+Subject: [datatable-help] Streamlining unit tests with test_that
+In-Reply-To: <AANLkTinD-nGjpATnvo2nOs2rQg0-z5o+-mtuz_6AN8ss@mail.gmail.com>
+References: <AANLkTinAd0Wmfu+6Ue2gQy2uPjdqLkdm=fMHe5g9gg5B@mail.gmail.com>
+	<AANLkTi=J+VCp6zrXU0Wb4sgdi1itc=KB3gFqMrqTDCTz@mail.gmail.com>
+	<AANLkTimzqBw=xkeRDpKkzYP77kXMkOX+mQs8KD6AcZQE@mail.gmail.com>
+	<AANLkTimX1ctpK0v3x3s2FmTY1ppa0XeAB_72scemnLdq@mail.gmail.com>
+	<AANLkTimvjgzjjJSuWkoix-iXMQnj_XKYzyqfhyjOpZXJ@mail.gmail.com>
+	<AANLkTikXNJYcn7dxBC+Gq6C01bO54uMcjp63gtL_8AKK@mail.gmail.com>
+	<AANLkTinSaUdJPFGDopRyiS4Lnr5M7r1zoYDuevTmPw8G@mail.gmail.com>
+	<1291688257.2433.132.camel@Adam>
+	<AANLkTikev8aGYYouz_94s5kfUjZ1Er30m+wY2tHnV8ph@mail.gmail.com>
+	<1292456828.1824.26.camel@Adam>
+	<AANLkTinD-nGjpATnvo2nOs2rQg0-z5o+-mtuz_6AN8ss@mail.gmail.com>
+Message-ID: <1294218014.11109.1.camel@netbook>
+
+Ok, done.
+Matthew
+
+On Fri, 2010-12-31 at 09:59 -0500, Tom Short wrote:
+> Matthew, do you mind just doing the cedta fix? I keep meaning to do
+> this. On my end, it's not hard, but my local repository isn't up to
+> date, and I don't have much time in the next month or so.
+> 
+> - Tom
+> 
+> On Wed, Dec 15, 2010 at 6:47 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > Hi Tom,
+> >
+> > I tested your change to cedta - passes build, tests and vignettes. Looks
+> > good. It didn't fix bug 1131 (I had hoped it might too) but I fixed that
+> > by adding a check on whether the caller is the debugger frame.
+> >
+> > Could you commit your change please then I'll do mine on top.
+> >
+> > Matthew
+> >
+> >
+
+
+From mailinglist.honeypot at gmail.com  Wed Jan  5 23:41:41 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 5 Jan 2011 17:41:41 -0500
+Subject: [datatable-help] Bug in subsetting/iterating over a data.table with
+	1 row(?)
+Message-ID: <AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk@mail.gmail.com>
+
+Hi,
+
+I'm calculating some statistics over a large data.table via `dt[,
+{somestuff}, by=list(key1,key2)]`.
+Sometimes my dt data.table ends up only having one row, which results
+in the following error:
+
+  "Didn't allocate enough rows for result of first group."
+
+Here is a toy/trivial example.
+
+R> dt1 <- data.table(name='a', place='home', count=1, key='name,place')
+R> dt2 <- data.table(name=c('a', 'a', 'a', 'b'),
+                  place=c('home', 'work', 'home', 'work'),
+                  length=c(10,20,100, 20), key='name,place')
+
+R> dt1[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+mult='all']$length), by=list(name, place)]
+Error in `[.data.table`(dt1, , list(length = dt2[J(.SD$name[1],
+.SD$place[1]),  :
+  Didn't allocate enough rows for result of first group.
+
+When my data.table has > 1 row, it works:
+
+R> dt3 <- data.table(name=c('a', 'b'), place=c('home', 'work'),
+count=1:2, key='name,place')
+R> dt3[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+mult='all']$length), by=list(name, place)]
+     name place length
+[1,]    a  home     10
+[2,]    a  home    100
+[3,]    b  work     20
+
+I believe if the result of my {somestuff} expression only ever
+returned one row, this bug wouldn't happen, but .... it doesn't just
+do that :-)
+
+It looks like the fix is where the `byretn` value is calculated in the
+`[.data.table` but that code is a somehow inscrutable at first glance
+... can anyone propose a quick fix?
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From jgvcqa at rit.edu  Thu Jan  6 00:20:49 2011
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Wed, 05 Jan 2011 18:20:49 -0500
+Subject: [datatable-help] key disappears after merge of data tables
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC45F47C@ex02mail01.ad.rit.edu>
+
+See code below. When two data tables are merged (by their key variable(s)), that key disappears in the resulting table. While this is probably not strictly a bug, it would seem that the user would most likely want to preserve the key in the output (especially if just enlarging the original data table, e.g. dt2<-merge(dt1,dt2).)
+
+
+> dt1<-data.table(a=1:6,b=11:16,key="a")
+> dt2<-data.table(a=1:6,c=21:26,key="a")
+> dt3<-merge(dt1,dt2)
+> 
+> 
+     NAME NROW MB COLS  KEY
+[1,] dt1     6 1  a,b   a  
+[2,] dt2     6 1  a,c   a  
+[3,] dt3     6 1  a,b,c    
+Total: 3MB
+
+
+Joseph G. Voelkel, Ph.D.
+Professor, Center for Quality and Applied Statistics
+Kate Gleason College of Engineering
+Rochester Institute of Technology
+V 585-475-2231
+F 585-475-5959
+joseph.voelkel at rit.edu
+
+
+From mdowle at mdowle.plus.com  Thu Jan  6 11:26:17 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 6 Jan 2011 10:26:17 -0000
+Subject: [datatable-help] Bug in subsetting/iterating over a data.table
+	with1 row(?)
+References: <AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk@mail.gmail.com>
+Message-ID: <ig45cb$mm2$1@dough.gmane.org>
+
+
+How about writing it this way. This way should invoke the incremental binary 
+search for efficiency too, rather than a repeated binary search for each by.
+
+> dt2[dt1[, .SD[1], by=list(name, place)],mult="all"]
+     name place length
+[1,]    a  home     10
+[2,]    a  home    100
+
+> dt2[dt3[, .SD[1], by=list(name, place)],mult="all"]
+     name place length
+[1,]    a  home     10
+[2,]    a  home    100
+[3,]    b  work     20
+>
+
+But doing it your way should work too, so I'll add as a bug.
+
+Another way to get the first row of each group is a fast self-join via i. 
+There was a thread on that some time ago when i was changed to be evaluated 
+within the frame of DT too. Something like :
+
+   dt3[J(unique(name)), mult="first"]    # first of each group
+
+HTH
+Matthew
+
+
+"Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote in message 
+news:AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk at mail.gmail.com...
+Hi,
+
+I'm calculating some statistics over a large data.table via `dt[,
+{somestuff}, by=list(key1,key2)]`.
+Sometimes my dt data.table ends up only having one row, which results
+in the following error:
+
+  "Didn't allocate enough rows for result of first group."
+
+Here is a toy/trivial example.
+
+R> dt1 <- data.table(name='a', place='home', count=1, key='name,place')
+R> dt2 <- data.table(name=c('a', 'a', 'a', 'b'),
+                  place=c('home', 'work', 'home', 'work'),
+                  length=c(10,20,100, 20), key='name,place')
+
+R> dt1[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+mult='all']$length), by=list(name, place)]
+Error in `[.data.table`(dt1, , list(length = dt2[J(.SD$name[1],
+.SD$place[1]),  :
+  Didn't allocate enough rows for result of first group.
+
+When my data.table has > 1 row, it works:
+
+R> dt3 <- data.table(name=c('a', 'b'), place=c('home', 'work'),
+count=1:2, key='name,place')
+R> dt3[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+mult='all']$length), by=list(name, place)]
+     name place length
+[1,]    a  home     10
+[2,]    a  home    100
+[3,]    b  work     20
+
+I believe if the result of my {somestuff} expression only ever
+returned one row, this bug wouldn't happen, but .... it doesn't just
+do that :-)
+
+It looks like the fix is where the `byretn` value is calculated in the
+`[.data.table` but that code is a somehow inscrutable at first glance
+... can anyone propose a quick fix?
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+| Memorial Sloan-Kettering Cancer Center
+| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact 
+
+
+
+
+From mdowle at mdowle.plus.com  Thu Jan  6 11:40:58 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 6 Jan 2011 10:40:58 -0000
+Subject: [datatable-help] key disappears after merge of data tables
+References: <70EFCDD908F9264785FA08EC3A47132016CC45F47C@ex02mail01.ad.rit.edu>
+Message-ID: <ig467r$qo6$1@dough.gmane.org>
+
+If all is TRUE (or just all.x or all.y is TRUE) then result is keyed.
+
+Why the key is not set when all is FALSE (default) I'm not sure.  Tom - can 
+you remember?  Something to do with NAs in keys seems to ring a bell.
+
+Matthew
+
+
+"Joseph Voelkel" <jgvcqa at rit.edu> wrote in message 
+news:70EFCDD908F9264785FA08EC3A47132016CC45F47C at ex02mail01.ad.rit.edu...
+> See code below. When two data tables are merged (by their key 
+> variable(s)), that key disappears in the resulting table. While this is 
+> probably not strictly a bug, it would seem that the user would most likely 
+> want to preserve the key in the output (especially if just enlarging the 
+> original data table, e.g. dt2<-merge(dt1,dt2).)
+>
+>
+>> dt1<-data.table(a=1:6,b=11:16,key="a")
+>> dt2<-data.table(a=1:6,c=21:26,key="a")
+>> dt3<-merge(dt1,dt2)
+>>
+>>
+>     NAME NROW MB COLS  KEY
+> [1,] dt1     6 1  a,b   a
+> [2,] dt2     6 1  a,c   a
+> [3,] dt3     6 1  a,b,c
+> Total: 3MB
+>
+>
+> Joseph G. Voelkel, Ph.D.
+> Professor, Center for Quality and Applied Statistics
+> Kate Gleason College of Engineering
+> Rochester Institute of Technology
+> V 585-475-2231
+> F 585-475-5959
+> joseph.voelkel at rit.edu 
+
+
+
+
+From anaircatarino at gmail.com  Thu Jan  6 11:53:22 2011
+From: anaircatarino at gmail.com (anairc)
+Date: Thu, 6 Jan 2011 02:53:22 -0800 (PST)
+Subject: [datatable-help] Unbalanced nested repeated measures ANOVA
+Message-ID: <1294311202155-3177210.post@n4.nabble.com>
+
+
+Dear all,
+
+I would like to know if anyone has ever done an unbalanced nested repeated
+measures ANOVA analysis using "Satterthwaite" correction (Sokal and Rohlf,
+1995 - Biometry).
+
+Thank you.
+
+Best regards,
+Ana
+-- 
+View this message in context: http://r.789695.n4.nabble.com/Unbalanced-nested-repeated-measures-ANOVA-tp3177210p3177210.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Thu Jan  6 12:35:51 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 6 Jan 2011 11:35:51 -0000
+Subject: [datatable-help] Unbalanced nested repeated measures ANOVA
+In-Reply-To: <1294311202155-3177210.post@n4.nabble.com>
+References: <1294311202155-3177210.post@n4.nabble.com>
+Message-ID: <bc1eb7b2c2725b4ae02f9b4cf924ccf4.squirrel@webmail.plus.net>
+
+Ana,
+
+This is datatable-help not r-help. You have to subscribe to post here, as
+I see you did. You should have seen quite detailed information at the
+subscribe stage. Is there anything we can do to improve the messages?
+
+Very kindly suggest you read the r-help posting guide before reposting to
+r-help. Suggest read it 3 times before your first post. The post currently
+*looks like* a request for free help to 10,000 people when you didn't even
+use Google first. If nothing came up, say so, and what you searched for.
+However I found package GRRGI within 10 seconds by using a google search
+on the R homepage for "Satterthwaite" (first link). Also a search for
+"Sokal and Rohalf" returns package GAD as the first link. That appears to
+reference their 1995 paper. Does that help?  If not, say that you found
+them in your post to r-help and why specifically they don't help.
+
+Thanks,
+Matthew
+
+>
+> Dear all,
+>
+> I would like to know if anyone has ever done an unbalanced nested repeated
+> measures ANOVA analysis using "Satterthwaite" correction (Sokal and Rohlf,
+> 1995 - Biometry).
+>
+> Thank you.
+>
+> Best regards,
+> Ana
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/Unbalanced-nested-repeated-measures-ANOVA-tp3177210p3177210.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From mailinglist.honeypot at gmail.com  Thu Jan  6 15:48:03 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Thu, 6 Jan 2011 09:48:03 -0500
+Subject: [datatable-help] Bug in subsetting/iterating over a data.table
+ with1 row(?)
+In-Reply-To: <ig45cb$mm2$1@dough.gmane.org>
+References: <AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk@mail.gmail.com>
+	<ig45cb$mm2$1@dough.gmane.org>
+Message-ID: <AANLkTinP4G+ucFJ=zUpy6vNtx=2qKqFyWKwYJ5LJy-OT@mail.gmail.com>
+
+Hi Matthew,
+
+On Thu, Jan 6, 2011 at 5:26 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> How about writing it this way. This way should invoke the incremental binary
+> search for efficiency too, rather than a repeated binary search for each by.
+>
+>> dt2[dt1[, .SD[1], by=list(name, place)],mult="all"]
+> ? ? name place length
+> [1,] ? ?a ?home ? ? 10
+> [2,] ? ?a ?home ? ?100
+>
+>> dt2[dt3[, .SD[1], by=list(name, place)],mult="all"]
+> ? ? name place length
+> [1,] ? ?a ?home ? ? 10
+> [2,] ? ?a ?home ? ?100
+> [3,] ? ?b ?work ? ? 20
+
+While doing it this way works for this trivial case, I'm actually
+doing a fair bit of book keeping/computation in my j expression and
+returning a list of elements that you can't really get from simple
+joins and stuff.
+
+> But doing it your way should work too, so I'll add as a bug.
+
+Thanks. I'm currently working around this by adding a dummy row into
+my dt1 data.table, which I then remove after the `dogroups` stuff
+finishes.
+
+-steve
+
+> Another way to get the first row of each group is a fast self-join via i.
+> There was a thread on that some time ago when i was changed to be evaluated
+> within the frame of DT too. Something like :
+>
+> ? dt3[J(unique(name)), mult="first"] ? ?# first of each group
+>
+> HTH
+> Matthew
+>
+>
+> "Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote in message
+> news:AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk at mail.gmail.com...
+> Hi,
+>
+> I'm calculating some statistics over a large data.table via `dt[,
+> {somestuff}, by=list(key1,key2)]`.
+> Sometimes my dt data.table ends up only having one row, which results
+> in the following error:
+>
+> ?"Didn't allocate enough rows for result of first group."
+>
+> Here is a toy/trivial example.
+>
+> R> dt1 <- data.table(name='a', place='home', count=1, key='name,place')
+> R> dt2 <- data.table(name=c('a', 'a', 'a', 'b'),
+> ? ? ? ? ? ? ? ? ?place=c('home', 'work', 'home', 'work'),
+> ? ? ? ? ? ? ? ? ?length=c(10,20,100, 20), key='name,place')
+>
+> R> dt1[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+> mult='all']$length), by=list(name, place)]
+> Error in `[.data.table`(dt1, , list(length = dt2[J(.SD$name[1],
+> .SD$place[1]), ?:
+> ?Didn't allocate enough rows for result of first group.
+>
+> When my data.table has > 1 row, it works:
+>
+> R> dt3 <- data.table(name=c('a', 'b'), place=c('home', 'work'),
+> count=1:2, key='name,place')
+> R> dt3[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+> mult='all']$length), by=list(name, place)]
+> ? ? name place length
+> [1,] ? ?a ?home ? ? 10
+> [2,] ? ?a ?home ? ?100
+> [3,] ? ?b ?work ? ? 20
+>
+> I believe if the result of my {somestuff} expression only ever
+> returned one row, this bug wouldn't happen, but .... it doesn't just
+> do that :-)
+>
+> It looks like the fix is where the `byretn` value is calculated in the
+> `[.data.table` but that code is a somehow inscrutable at first glance
+> ... can anyone propose a quick fix?
+>
+> Thanks,
+> -steve
+>
+> --
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+> | Memorial Sloan-Kettering Cancer Center
+> | Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Fri Jan  7 09:23:17 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 07 Jan 2011 08:23:17 +0000
+Subject: [datatable-help] [SOLVED] Something strange with scoping(?)
+ when data.table is used inside a package I'm developing.
+In-Reply-To: <ec5f9312326eb082b0ae6dedd5351e9e.squirrel@webmail.plus.net>
+References: <AANLkTimzGUnPBncs-qHCT7oHpAAngZvsuHHp_Uem9kK6@mail.gmail.com>
+	<AANLkTin+Nm-9OKwwAondeH1SHtOHAMfRX3rpZKU52R-Y@mail.gmail.com>
+	<AANLkTimgHw8d8uHRFZnGLyULb64yXFLyEE-=oWYwZayL@mail.gmail.com>
+	<08139b25d31830f275a1245e8382c5a0.squirrel@webmail.plus.net>
+	<AANLkTimRjUz=Yu1ajLKJPzPJfy-oYuBZURG0CCt99A-m@mail.gmail.com>
+	<ec5f9312326eb082b0ae6dedd5351e9e.squirrel@webmail.plus.net>
+Message-ID: <1294388597.1693.0.camel@netbook>
+
+Tried again with fresh eyes and this is fixed now. Including in v1.5.1
+sent to CRAN last night.
+
+On Thu, 2010-11-04 at 14:32 +0000, Matthew Dowle wrote:
+> When cedta (Calling Environment Data.Table Aware) runs it finds the
+> namespace calling data.table no problem. getNamespaceImports() on that
+> namespace will then return "data.table" if that package Imports it,
+> distinguishing it as a data.table aware package. So far so good. For
+> Depends though, .Depends is (I think) not in the namespace environment but
+> the corresponding package environment for that namespace. The nut is going
+> from namespace to package environment.
+> 
+> I tried a more robust version of the following but it doesn't seem very
+> neat, and it didn't work. Might be just a case of trying again with fresh
+> eyes :
+> 
+>   name = getNamespaceName(te)
+>   pkg = as.environment(paste("package:",name,sep=""))
+>   "data.table" %in% get(".Depends",envir=pkg)
+> 
+> Also R changed in this area fairly recently (name change from .required to
+> .Depends).
+> 
+> 
+> 
+> > Thanks for the reply ... I actually moved it over to the Imports
+> > anyway .. but still, it's probably a good thing to fix at some point
+> > :-)
+> >
+> > It's kind of weird though ... do you know what "the nut" of the problem
+> > is?
+> > -steve
+> >
+> > On Thu, Nov 4, 2010 at 9:36 AM, Matthew Dowle <mdowle at mdowle.plus.com>
+> > wrote:
+> >>
+> >> Yes that was an off list fix for importing data.table (Imports field in
+> >> DESCRIPTON). There is still likely a problem with the Depends field of
+> >> DESCRIPTION, though. If you need to Depend rather than Import then let
+> >> me
+> >> know and I'll try again to fix it.
+> >>
+> >> Note also that data.table queries don't work from a browser prompt (bug
+> >> #1131).
+> >>
+> >> Matthew
+> >>
+> >>
+> >>> I just `svn up`'ed my data.table package to see if I can dig into the
+> >>> code and I noticed that this issue was previously reported and fixed
+> >>> in 1.5.1.
+> >>>
+> >>> Seems like I stumbled on the same issue ... sorry, I didn't see this
+> >>> in the mailing list.
+> >>>
+> >>> Thanks,
+> >>> -steve
+> >>>
+> >>> On Tue, Nov 2, 2010 at 6:20 PM, Steve Lianoglou
+> >>> <mailinglist.honeypot at gmail.com> wrote:
+> >>>> More info on my problem:
+> >>>>
+> >>>> I'm loading my package, and passing an object to a function defined
+> >>>> (and exported) in my library that does the fast dt[, SOMETHING,
+> >>>> by='entrez.id']. I call this function, and it bombs when I try to
+> >>>> access "things" (columns) of the data.table in my SOMEHTING
+> >>>> expression.
+> >>>>
+> >>>> Given the same object, I then execute the lines of the function that
+> >>>> failing one by one (I don't call the function), and it executes
+> >>>> normally.
+> >>>>
+> >>>> I wonder if this is relevant:
+> >>>>
+> >>>> (I). After the functions bombs, this is the result of traceback() --
+> >>>> is it normal for the deepest call to actually be to `[.data.frame`?
+> >>>>
+> >>>> R> traceback()
+> >>>> 4: `[.data.frame`(x, i, j)
+> >>>> 3: `[.data.table`(dt, , list(seqnames = seqnames[1], strand =
+> >>>> strand[1],
+> >>>>       start = min(start), end = max(end)), by = "entrez.id")
+> >>>> 2: dt[, list(seqnames = seqnames[1], strand = strand[1], start =
+> >>>> min(start),
+> >>>>       end = max(end)), by = "entrez.id"]
+> >>>> 1: annotatedTxBounds(annotated)
+> >>>>
+> >>>> (II) Bioconductor packages use the S4 system. I've defined some
+> >>>> conversion functions on objects in my package so that I can convert
+> >>>> them to data.table's in the "expected way", a la:
+> >>>>
+> >>>> R> my.dt <- as(MyOwnClass, 'data.table')
+> >>>>
+> >>>> In order for me to do that, I've had to S4-ize the S3 data.table
+> >>>> class,
+> >>>> like so:
+> >>>>
+> >>>> setOldClass("data.table")
+> >>>> (I also had `setOldClass(c('data.table', 'data.frame'))`, both have
+> >>>> the same error)
+> >>>>
+> >>>> So ... it has something to do with my function as its run from within
+> >>>> my package's environment -- but I don't know what to do about it.
+> >>>>
+> >>>> I tried adding `import(data.table)` into NAMESPACE file as well, but
+> >>>> no
+> >>>> dice.
+> >>>>
+> >>>> Thanks,
+> >>>> -steve
+> >>>>
+> >>>> On Tue, Nov 2, 2010 at 3:14 PM, Steve Lianoglou
+> >>>> <mailinglist.honeypot at gmail.com> wrote:
+> >>>>> Hi,
+> >>>>>
+> >>>>> Sorry for what is about to be a vaguely described problem I'm having,
+> >>>>> but here goes.
+> >>>>>
+> >>>>> I'm developing some R/bioconductor packages and have been using
+> >>>>> data.table for a few things in them quite happily. Although my
+> >>>>> packages are written to be properly installed, as I develop with
+> >>>>> them,
+> >>>>> I just source their "R" directories to make my life easier so I can
+> >>>>> easily modify them and update my R environment when I find something
+> >>>>> wrong (w/o having to restart R, then call library(MyPackage), etc ..)
+> >>>>>
+> >>>>> So, I just went through my package to make sure my NAMESPACE stuffs
+> >>>>> are kosher -- that I export the classes, methods, and functions I
+> >>>>> need
+> >>>>> to export.
+> >>>>>
+> >>>>> In my DESCRIPTION file, data.table is listed in the "Depends"
+> >>>>> section.
+> >>>>>
+> >>>>> I'm only mentioning this because now that I've successfully done all
+> >>>>> that, I installed my package and am now using it by calling
+> >>>>> library(MyPackage). Now there is something strange happening with my
+> >>>>> data.table stuff.
+> >>>>>
+> >>>>> The column names of my data.table are no longer recognized in my j
+> >>>>> functions. For instance:,
+> >>>>>
+> >>>>> R> library(data.table)
+> >>>>> R> df <- structure(list(seqnames = c("chr22", "chr22", "chr22",
+> >>>>> "chr22",
+> >>>>> "chr22", "chr22", "chr22", "chr22", "chr22", "chr22"), start =
+> >>>>> c(22639026L,
+> >>>>> 22639103L, 22639574L, 22643475L, 22643596L, 28059152L, 15897460L,
+> >>>>> 15905763L, 15908214L, 15917963L), end = c(22639102L, 22639210L,
+> >>>>> 22639749L, 22643595L, 22644748L, 28059247L, 15898234L, 15905890L,
+> >>>>> 15908316L, 15919682L), width = c(77L, 108L, 176L, 121L, 1153L,
+> >>>>> 96L, 775L, 128L, 103L, 1720L), strand = structure(c(1L, 1L, 1L,
+> >>>>> 1L, 1L, 2L, 1L, 1L, 1L, 1L), .Label = c("+", "-", "*"), class =
+> >>>>> "factor"),
+> >>>>>    exon.anno = structure(c(5L, 1L, 1L, 1L, 4L, 3L, 3L, 3L, 3L,
+> >>>>>    3L), .Label = c("cds", "overlap", "utr", "utr3", "utr5"), class =
+> >>>>> "factor"),
+> >>>>>    symbol = c("DDTL", "DDTL", "DDTL", "DDTL", "DDTL", "SNORD125",
+> >>>>>    "CECR7", "CECR7", "CECR7", "CECR7"), entrez.id = c("100037417",
+> >>>>>    "100037417", "100037417", "100037417", "100037417", "100113380",
+> >>>>>    "100130418", "100130418", "100130418", "100130418")), .Names =
+> >>>>> c("seqnames",
+> >>>>> "start", "end", "width", "strand", "exon.anno", "symbol", "entrez.id"
+> >>>>> ), row.names = c(NA, -10L), class = "data.frame")
+> >>>>> R> dt <- data.table(df, key='entrez.id')
+> >>>>>
+> >>>>> Now, something like this should work (and in fact does when I have a
+> >>>>> clean environment like you would by just starting R and pasting the
+> >>>>> above code):
+> >>>>>
+> >>>>> R> bounds <- dt[, list(start=min(start), end=min(end)),
+> >>>>> by='entrez.id']
+> >>>>>
+> >>>>> But when the "bowels" of my code in my package are running this (only
+> >>>>> when it's attached with library(MyLibrary), I'm not getting this
+> >>>>> error:
+> >>>>>   Error in min(start) : invalid 'type' (closure) of argument
+> >>>>>
+> >>>>> If I try to use the .SD object in the same place, I also get an other
+> >>>>> error:
+> >>>>>
+> >>>>> R> bounds2 <- dt[, {
+> >>>>>  .sd <- .SD[1]
+> >>>>>  .sd$start <- min(start)
+> >>>>>  .sd$end <- max(end)
+> >>>>>  .sd
+> >>>>> }, by='entrez.id']
+> >>>>>
+> >>>>> (The code here is simplified, but assume I need to use .SD -- I want
+> >>>>> to get the rest of the columns in the dt data.table w/o referencing
+> >>>>> them explicitly)
+> >>>>>
+> >>>>> The error when the code is run from within my package is:
+> >>>>>
+> >>>>>   Error in `[.data.frame`(x, i, j) : object '.SD' not found
+> >>>>>
+> >>>>> Even though it works in a "clean" R environment.
+> >>>>>
+> >>>>> Can anyone take a stab at why this might be happening? I'm at a bit
+> >>>>> of
+> >>>>> a loss.
+> >>>>>
+> >>>>> For what it's worth, this is the sessionInfo of my R environment when
+> >>>>> my package is installed (my package is called GenomicFeaturesX). Most
+> >>>>> of the packages in "other attached packages" are from biocondutcor.
+> >>>>>
+> >>>>> R version 2.12.0 (2010-10-15)
+> >>>>> Platform: x86_64-unknown-linux-gnu (64-bit)
+> >>>>>
+> >>>>> locale:
+> >>>>>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+> >>>>>  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+> >>>>>  [5] LC_MONETARY=C              LC_MESSAGES=en_US.UTF-8
+> >>>>>  [7] LC_PAPER=en_US.UTF-8       LC_NAME=C
+> >>>>>  [9] LC_ADDRESS=C               LC_TELEPHONE=C
+> >>>>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+> >>>>>
+> >>>>> attached base packages:
+> >>>>> [1] stats     graphics  grDevices utils     datasets  methods   base
+> >>>>>
+> >>>>> other attached packages:
+> >>>>>  [1] BSgenome.Hsapiens.UCSC.hg18_1.3.16 BSgenome_1.18.0
+> >>>>>  [3] Biostrings_2.18.0                  doMC_1.2.1
+> >>>>>  [5] multicore_0.1-3                    foreach_1.3.0
+> >>>>>  [7] codetools_0.2-2                    iterators_1.0.3
+> >>>>>  [9] GenomicFeaturesX_0.2               data.table_1.5
+> >>>>> [11] GenomicFeatures_1.2.0              GenomicRanges_1.2.1
+> >>>>> [13] IRanges_1.8.2
+> >>>>>
+> >>>>> loaded via a namespace (and not attached):
+> >>>>>  [1] annotate_1.28.0      AnnotationDbi_1.12.0 Biobase_2.10.0
+> >>>>>  [4] biomaRt_2.6.0        DBI_0.2-5            RCurl_1.4-3
+> >>>>>  [7] RSQLite_0.9-2        rtracklayer_1.10.2   tools_2.12.0
+> >>>>> [10] XML_3.2-0            xtable_1.5-6
+> >>>>>
+> >>>>> Thanks,
+> >>>>> -steve
+> >>>>>
+> >>>>> --
+> >>>>> Steve Lianoglou
+> >>>>> Graduate Student: Computational Systems Biology
+> >>>>>  | Memorial Sloan-Kettering Cancer Center
+> >>>>>  | Weill Medical College of Cornell University
+> >>>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> >>>>>
+> >>>>
+> >>>>
+> >>>>
+> >>>> --
+> >>>> Steve Lianoglou
+> >>>> Graduate Student: Computational Systems Biology
+> >>>>  | Memorial Sloan-Kettering Cancer Center
+> >>>>  | Weill Medical College of Cornell University
+> >>>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> >>>>
+> >>>
+> >>>
+> >>>
+> >>> --
+> >>> Steve Lianoglou
+> >>> Graduate Student: Computational Systems Biology
+> >>>  | Memorial Sloan-Kettering Cancer Center
+> >>>  | Weill Medical College of Cornell University
+> >>> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> >>> _______________________________________________
+> >>> datatable-help mailing list
+> >>> datatable-help at lists.r-forge.r-project.org
+> >>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >>>
+> >>
+> >>
+> >>
+> >
+> >
+> >
+> > --
+> > Steve Lianoglou
+> > Graduate Student: Computational Systems Biology
+> >  | Memorial Sloan-Kettering Cancer Center
+> >  | Weill Medical College of Cornell University
+> > Contact Info: http://cbio.mskcc.org/~lianos/contact
+> >
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Sat Jan  8 09:48:52 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 08 Jan 2011 08:48:52 +0000
+Subject: [datatable-help] Summing over many variables
+In-Reply-To: <1293956471.2151.1.camel@Adam>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6C3A@ex02mail01.ad.rit.edu>
+	<AANLkTi=9xjT=zu_Lg30_t5_Ng8BUuaLFZ+1i5nKSuT_m@mail.gmail.com>
+	<1293139983.2693.28.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6CB5@ex02mail01.ad.rit.edu>
+	<1293556910.2756.43.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6D1F@ex02mail01.ad.rit.edu>
+	<1293804792.1566.56.camel@Adam>
+	<70EFCDD908F9264785FA08EC3A47132016CC0D6D84@ex02mail01.ad.rit.edu>
+	<1293956471.2151.1.camel@Adam>
+Message-ID: <1294476532.1693.8.camel@netbook>
+
+Hi Joseph,
+Fixed, in 1.5.2 i.e. the ugly double eval no longer needed. Just eval
+the parse()-ed expression with no need for the quote().
+Thanks for finding this one.
+Matthew
+
+On Sun, 2011-01-02 at 08:21 +0000, Matthew Dowle wrote:
+> Thanks again. Yes looks like a bug. Added here :
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1243&group_id=240&atid=975
+> Matthew
+> 
+> On Fri, 2010-12-31 at 17:10 -0500, Joseph Voelkel wrote:
+> > Matthew, just to address point 5 (double eval of quoted works, single eval on unquoted does not):
+> > 
+> > > dt1key<-data.table(A1=1:100,onekey=rep(1:2,each=50))
+> > > setkey(dt1key,onekey)
+> > > ASumExpr<-parse(text="quote(sum(A1))")
+> > > ASumExpr
+> > expression(quote(sum(A1)))
+> > attr(,"srcfile")
+> > <text> 
+> > > str(eval(ASumExpr))
+> >  language sum(A1)
+> > > 
+> > > ASumExprNoQ<-parse(text="sum(A1)")
+> > > ASumExprNoQ
+> > expression(sum(A1))
+> > attr(,"srcfile")
+> > <text> 
+> > > str(ASumExprNoQ) # not the same as eval(ASumExpr)
+> > length 1 expression(sum(A1))
+> >  - attr(*, "srcref")=List of 1
+> >   ..$ :Class 'srcref'  atomic [1:6] 1 1 1 7 1 7
+> >   .. .. ..- attr(*, "srcfile")=Classes 'srcfilecopy', 'srcfile' <environment: 0x060cef18> 
+> >  - attr(*, "srcfile")=Classes 'srcfilecopy', 'srcfile' <environment: 0x060cef18> 
+> > > 
+> > > # test of 3 ways to obtain results
+> > > dt1key[,sum(A1),by=onekey]
+> >      onekey   V1
+> > [1,]      1 1275
+> > [2,]      2 3775
+> > > dt1key[,eval(eval(ASumExpr)),by=onekey]
+> >      onekey   V1
+> > [1,]      1 1275
+> > [2,]      2 3775
+> > > dt1key[,eval(ASumExprNoQ),by=onekey]
+> > Error in `[.data.table`(dt1key, , eval(ASumExprNoQ), by = onekey) : 
+> >   columns of j don't evaluate to consistent types for each group
+> > In addition: Warning message:
+> > In if (as.character(jsub[[1]]) %in% c("list", "DT")) { :
+> >   the condition has length > 1 and only the first element will be used
+> > >  
+> > >
+> > 
+> > -----Original Message-----
+> > From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> > Sent: Friday, December 31, 2010 9:13 AM
+> > To: Joseph Voelkel
+> > Cc: datatable-help at lists.r-forge.r-project.org
+> > Subject: RE: [datatable-help] Summing over many variables
+> > 
+> > Hi,
+> > 
+> > I don't quite follow all of that e.g. I'm thinking secondary keys at
+> > points (manual now, or 'built-in' feature request). Anyway, sounds like
+> > it's working. On point 3 I'm not sure that's really data.table, rather
+> > the difference between a vectorized sum and apply()-ed sum. You should
+> > see the same difference with a data.frame.
+> > 
+> > Where it isn't working (point 5) was there an error message or was the
+> > result incorrect? Might be a clue that reveals a bug.
+> > 
+> > Matthew
+> > 
+> > On Wed, 2010-12-29 at 12:57 -0500, Joseph Voelkel wrote:
+> > > Thanks, Matthew.
+> > > 
+> > > 1. Yes, you have the subsetting of j on your faq.
+> > > 2. The double eval appears to handle this subsetting. In my smaller problem, which I am working on first, I have about 55K records and 250 variables. Using either A1+A2+A3+A4+A5 or eval(eval()) takes about 0.22 sec of user time. So, from this indirect measure, the two are equally efficient.
+> > > 3. By the way, for this example, I used 6 keys, which happened for this problem to correspond to 1 record for each unique key. That is, my output also contained 55K records. I originally solved the problem by using apply with sum on the five columns that contained the A1 through A5 value, e.g. apply(DT1[,11:15,with=FALSE],1,sum). This operation took about 0.62 sec. So, even here, data.table is 3x faster than apply.
+> > > 4. Of course, no key is really needed here, so if I just want to return the sum along with the key vars, I can just use DT1[,list(key1,key2,key3,key4,key5,key6,sum=A1+A2+A3+A4+A5)] which runs in under 0.01 seconds.
+> > > 5. Finally, I tried your idea of removing the quote and just trying the one eval(). It worked with a simple contrived example, but not for my more complex one--I have no idea why not, because the two seem analogous...
+> > > 
+> > >  
+> > > 
+> > > -----Original Message-----
+> > > From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> > > Sent: Tuesday, December 28, 2010 12:22 PM
+> > > To: Joseph Voelkel
+> > > Cc: datatable-help at lists.r-forge.r-project.org
+> > > Subject: Re: [datatable-help] Summing over many variables
+> > > 
+> > > Glad that works. Thanks for posting back. One thintg with that approach
+> > > is that data.table inspects the j expression to see which columns it
+> > > uses. It only subsets the ones that are used, for efficiency. There's a
+> > > faq on that I think. If the expression is wrapped up inside an eval I
+> > > think it still inspects the j but I can't quite remember. I'd be
+> > > surprised if that works with the double eval like that. If A runs from 1
+> > > to 100 in your real data and you're taking many sub-sums of 5, then this
+> > > could make a big difference. Try timing sum(A1) vs sum(A2+A3+A4+A5) with
+> > > and without the eval(eval()). That should reveal whether the j is being
+> > > inspected ok.
+> > > Also looking at it again, you shouldn't need the quote() inside the text
+> > > passed to parse. Then it's just a single eval and j inspection should be
+> > > ok I think i.e. DT1[,eval(ASumExpr),by=grp] rather than
+> > > DT1[,eval(eval(ASumExpr)),by=grp]
+> > > 
+> > > Matthew
+> > > 
+> > > 
+> > > On Mon, 2010-12-27 at 13:23 -0500, Joseph Voelkel wrote:
+> > > > I like Matthew's idea of flattening tables. But, as usual, I did not tell the whole story in my first post. I will probably want to look at many expressions, for example,
+> > > > 
+> > > > sum(A1+A2+A3+A4+A5)
+> > > > sum(A2+A3+A4+A5+A6)
+> > > > sum(A3+A4+A5+A6+A7)
+> > > > sum((A1+A2)/2 - (A3+A4)/2)
+> > > > 
+> > > > To be able to investigate a sequence of these easily, I found (after some trial and error, and then thinking about it a bit more to try to make my problem look like one from the datatable-faq) that this will do the trick:
+> > > > 
+> > > > library(data.table)
+> > > > 
+> > > > # create data table
+> > > > DT1<-data.table(A1=1:1000000,A2=1:1000000,A3=1:1000000,A4=1:1000000,A5=1:1000000,grp=rep(1:50000,each=20))
+> > > > setkey(DT1,grp)
+> > > > 
+> > > > # Say I want DT1[,sum(A1+A2+A3+A4+A5),by=grp]
+> > > > 
+> > > > # First, create expression of interest, and convert it to data-table-useful form
+> > > > ASumExpr<-parse(text=paste("quote(sum(",paste("A",1:5,sep="",collapse="+"),"))",sep=""))
+> > > > # (Next few lines: to help me and maybe you see what this looks like...)
+> > > > ASumExpr
+> > > > str(ASumExpr)
+> > > > eval(ASumExpr)
+> > > > str(eval(ASumExpr))
+> > > > str(quote(mean(x))) # from example in datatable-faq.pdf. So eval(ASumExpr) looks good
+> > > > 
+> > > > # long-hand typing method. OK for one or two, but not in general
+> > > > system.time(dt2a<-DT1[,sum(A1+A2+A3+A4+A5),by=grp])
+> > > > # formula method. This will be useful.
+> > > > system.time(dt2b<-DT1[,eval(eval(ASumExpr)),by=grp])
+> > > > 
+> > > > identical(dt2a, dt2b)
+> > > > 
+> > > > # Fast and easy to write. Just what I wanted. Thanks again for the ideas that lead to this useful solution.
+> > > > 
+> > > > Joe V.
+> > > > 
+> > > > -----Original Message-----
+> > > > From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+> > > > Sent: Thursday, December 23, 2010 4:33 PM
+> > > > To: Joseph Voelkel
+> > > > Cc: datatable-help at lists.r-forge.r-project.org
+> > > > Subject: Re: [datatable-help] Summing over many variables
+> > > > 
+> > > > 
+> > > > Yes that's one way. We aren't that happy with using lapply in j as it
+> > > > loses the benefit of data.table.
+> > > > 
+> > > > I tend to 'flatten' tables like this. Try to have few columns. In this
+> > > > case it would be either a 3 column table (grp,colname,value) or maybe a
+> > > > 4 column table if you ever want to group by "A" or
+> > > > "B" (grp,letter,number,value). The query would then be
+> > > > DT[,sum(value),by=list(grp,letter,number)]. You can then do pattern
+> > > > matches and filters etc in the i rather than in the j e.g.
+> > > > DT[letter=="A",sum(value),by=group] for just the "A"s. The answer comes
+> > > > out in 'flat' format but you can always 'unflatten' the result to make
+> > > > it look pretty or easier to read.  [Note that I sinned by using '==' in
+> > > > the i just then invoking vector scan, so to avoid that for speed you
+> > > > would setkey(letter,group) then DT["A",sum(value),by=group]], or getting
+> > > > fancy if you only wanted some groups (say 1 and 3) then 'by without by'
+> > > > e.g. DT[list("A",c(1,3)),sum(value)].
+> > > > 
+> > > > 'flat' is a common way to use data.table to store higher dimensional
+> > > > data, and especially sparse higher dimensional data.
+> > > > 
+> > > > The 'grp.1' repetition is a problem I'd like to remove. It's related to
+> > > > this feature request (but is almost a bug). At the moment you have to
+> > > > remove the grp.1 afterwards.
+> > > > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=978&group_id=240&atid=978
+> > > > 
+> > > > Matthew
+> > > > 
+> > > > _______________________________________________
+> > > > datatable-help mailing list
+> > > > datatable-help at lists.r-forge.r-project.org
+> > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > > 
+> > > 
+> > 
+> > 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Mon Jan 10 09:18:22 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 10 Jan 2011 08:18:22 +0000
+Subject: [datatable-help] Bug in subsetting/iterating over a data.table
+ with1 row(?)
+In-Reply-To: <AANLkTinP4G+ucFJ=zUpy6vNtx=2qKqFyWKwYJ5LJy-OT@mail.gmail.com>
+References: <AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk@mail.gmail.com>
+	<ig45cb$mm2$1@dough.gmane.org>
+	<AANLkTinP4G+ucFJ=zUpy6vNtx=2qKqFyWKwYJ5LJy-OT@mail.gmail.com>
+Message-ID: <1294647502.5777.19.camel@netbook>
+
+Hi Steve,
+Fixed now.
+Thanks, Matthew
+
+On Thu, 2011-01-06 at 09:48 -0500, Steve Lianoglou wrote:
+> Hi Matthew,
+> 
+> On Thu, Jan 6, 2011 at 5:26 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> >
+> > How about writing it this way. This way should invoke the incremental binary
+> > search for efficiency too, rather than a repeated binary search for each by.
+> >
+> >> dt2[dt1[, .SD[1], by=list(name, place)],mult="all"]
+> >     name place length
+> > [1,]    a  home     10
+> > [2,]    a  home    100
+> >
+> >> dt2[dt3[, .SD[1], by=list(name, place)],mult="all"]
+> >     name place length
+> > [1,]    a  home     10
+> > [2,]    a  home    100
+> > [3,]    b  work     20
+> 
+> While doing it this way works for this trivial case, I'm actually
+> doing a fair bit of book keeping/computation in my j expression and
+> returning a list of elements that you can't really get from simple
+> joins and stuff.
+> 
+> > But doing it your way should work too, so I'll add as a bug.
+> 
+> Thanks. I'm currently working around this by adding a dummy row into
+> my dt1 data.table, which I then remove after the `dogroups` stuff
+> finishes.
+> 
+> -steve
+> 
+> > Another way to get the first row of each group is a fast self-join via i.
+> > There was a thread on that some time ago when i was changed to be evaluated
+> > within the frame of DT too. Something like :
+> >
+> >   dt3[J(unique(name)), mult="first"]    # first of each group
+> >
+> > HTH
+> > Matthew
+> >
+> >
+> > "Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote in message
+> > news:AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk at mail.gmail.com...
+> > Hi,
+> >
+> > I'm calculating some statistics over a large data.table via `dt[,
+> > {somestuff}, by=list(key1,key2)]`.
+> > Sometimes my dt data.table ends up only having one row, which results
+> > in the following error:
+> >
+> >  "Didn't allocate enough rows for result of first group."
+> >
+> > Here is a toy/trivial example.
+> >
+> > R> dt1 <- data.table(name='a', place='home', count=1, key='name,place')
+> > R> dt2 <- data.table(name=c('a', 'a', 'a', 'b'),
+> >                  place=c('home', 'work', 'home', 'work'),
+> >                  length=c(10,20,100, 20), key='name,place')
+> >
+> > R> dt1[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+> > mult='all']$length), by=list(name, place)]
+> > Error in `[.data.table`(dt1, , list(length = dt2[J(.SD$name[1],
+> > .SD$place[1]),  :
+> >  Didn't allocate enough rows for result of first group.
+> >
+> > When my data.table has > 1 row, it works:
+> >
+> > R> dt3 <- data.table(name=c('a', 'b'), place=c('home', 'work'),
+> > count=1:2, key='name,place')
+> > R> dt3[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+> > mult='all']$length), by=list(name, place)]
+> >     name place length
+> > [1,]    a  home     10
+> > [2,]    a  home    100
+> > [3,]    b  work     20
+> >
+> > I believe if the result of my {somestuff} expression only ever
+> > returned one row, this bug wouldn't happen, but .... it doesn't just
+> > do that :-)
+> >
+> > It looks like the fix is where the `byretn` value is calculated in the
+> > `[.data.table` but that code is a somehow inscrutable at first glance
+> > ... can anyone propose a quick fix?
+> >
+> > Thanks,
+> > -steve
+> >
+> > --
+> > Steve Lianoglou
+> > Graduate Student: Computational Systems Biology
+> > | Memorial Sloan-Kettering Cancer Center
+> > | Weill Medical College of Cornell University
+> > Contact Info: http://cbio.mskcc.org/~lianos/contact
+> >
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> 
+> 
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Mon Jan 10 17:08:53 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Mon, 10 Jan 2011 11:08:53 -0500
+Subject: [datatable-help] Bug in subsetting/iterating over a data.table
+ with1 row(?)
+In-Reply-To: <1294647502.5777.19.camel@netbook>
+References: <AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk@mail.gmail.com>
+	<ig45cb$mm2$1@dough.gmane.org>
+	<AANLkTinP4G+ucFJ=zUpy6vNtx=2qKqFyWKwYJ5LJy-OT@mail.gmail.com>
+	<1294647502.5777.19.camel@netbook>
+Message-ID: <AANLkTi=TkcYVYojZN9Cz4tmM3BemHd7GnoYzjAQeF4=A@mail.gmail.com>
+
+Thanks Matthew .. I'll update my local copy.
+
+-steve
+
+
+On Mon, Jan 10, 2011 at 3:18 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Hi Steve,
+> Fixed now.
+> Thanks, Matthew
+>
+> On Thu, 2011-01-06 at 09:48 -0500, Steve Lianoglou wrote:
+>> Hi Matthew,
+>>
+>> On Thu, Jan 6, 2011 at 5:26 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>> >
+>> > How about writing it this way. This way should invoke the incremental binary
+>> > search for efficiency too, rather than a repeated binary search for each by.
+>> >
+>> >> dt2[dt1[, .SD[1], by=list(name, place)],mult="all"]
+>> > ? ? name place length
+>> > [1,] ? ?a ?home ? ? 10
+>> > [2,] ? ?a ?home ? ?100
+>> >
+>> >> dt2[dt3[, .SD[1], by=list(name, place)],mult="all"]
+>> > ? ? name place length
+>> > [1,] ? ?a ?home ? ? 10
+>> > [2,] ? ?a ?home ? ?100
+>> > [3,] ? ?b ?work ? ? 20
+>>
+>> While doing it this way works for this trivial case, I'm actually
+>> doing a fair bit of book keeping/computation in my j expression and
+>> returning a list of elements that you can't really get from simple
+>> joins and stuff.
+>>
+>> > But doing it your way should work too, so I'll add as a bug.
+>>
+>> Thanks. I'm currently working around this by adding a dummy row into
+>> my dt1 data.table, which I then remove after the `dogroups` stuff
+>> finishes.
+>>
+>> -steve
+>>
+>> > Another way to get the first row of each group is a fast self-join via i.
+>> > There was a thread on that some time ago when i was changed to be evaluated
+>> > within the frame of DT too. Something like :
+>> >
+>> > ? dt3[J(unique(name)), mult="first"] ? ?# first of each group
+>> >
+>> > HTH
+>> > Matthew
+>> >
+>> >
+>> > "Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote in message
+>> > news:AANLkTinEhEXFGKWNze8goCn-67fuJmcE3Zu8YOZAxPYk at mail.gmail.com...
+>> > Hi,
+>> >
+>> > I'm calculating some statistics over a large data.table via `dt[,
+>> > {somestuff}, by=list(key1,key2)]`.
+>> > Sometimes my dt data.table ends up only having one row, which results
+>> > in the following error:
+>> >
+>> > ?"Didn't allocate enough rows for result of first group."
+>> >
+>> > Here is a toy/trivial example.
+>> >
+>> > R> dt1 <- data.table(name='a', place='home', count=1, key='name,place')
+>> > R> dt2 <- data.table(name=c('a', 'a', 'a', 'b'),
+>> > ? ? ? ? ? ? ? ? ?place=c('home', 'work', 'home', 'work'),
+>> > ? ? ? ? ? ? ? ? ?length=c(10,20,100, 20), key='name,place')
+>> >
+>> > R> dt1[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+>> > mult='all']$length), by=list(name, place)]
+>> > Error in `[.data.table`(dt1, , list(length = dt2[J(.SD$name[1],
+>> > .SD$place[1]), ?:
+>> > ?Didn't allocate enough rows for result of first group.
+>> >
+>> > When my data.table has > 1 row, it works:
+>> >
+>> > R> dt3 <- data.table(name=c('a', 'b'), place=c('home', 'work'),
+>> > count=1:2, key='name,place')
+>> > R> dt3[, list(length=dt2[J(.SD$name[1], .SD$place[1]),
+>> > mult='all']$length), by=list(name, place)]
+>> > ? ? name place length
+>> > [1,] ? ?a ?home ? ? 10
+>> > [2,] ? ?a ?home ? ?100
+>> > [3,] ? ?b ?work ? ? 20
+>> >
+>> > I believe if the result of my {somestuff} expression only ever
+>> > returned one row, this bug wouldn't happen, but .... it doesn't just
+>> > do that :-)
+>> >
+>> > It looks like the fix is where the `byretn` value is calculated in the
+>> > `[.data.table` but that code is a somehow inscrutable at first glance
+>> > ... can anyone propose a quick fix?
+>> >
+>> > Thanks,
+>> > -steve
+>> >
+>> > --
+>> > Steve Lianoglou
+>> > Graduate Student: Computational Systems Biology
+>> > | Memorial Sloan-Kettering Cancer Center
+>> > | Weill Medical College of Cornell University
+>> > Contact Info: http://cbio.mskcc.org/~lianos/contact
+>> >
+>> >
+>> >
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>> >
+>>
+>>
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From jgvcqa at rit.edu  Thu Jan 13 21:17:26 2011
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Thu, 13 Jan 2011 15:17:26 -0500
+Subject: [datatable-help] Summing over many variables. A new approach;
+	a new problem
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC53D42E@ex02mail01.ad.rit.edu>
+
+In an earlier post, I had a large number of variables in a data table that I wanted to summarize. For example, I had A1-A30 and wanted to find the mean of A1-A30, by certain groups.
+
+While I (with help!) eventually found a solution for this, I am finding out that I need something more sophisticated. For example, sometimes I want to only find the mean of A1-A10, or I may want to find a more complex function of the Ai's. I would like to be able to vary these functions of A1-A30 very easily.
+
+For this reason, I decided to restructure the data table so that, for each row, A1-A30 (30 individual numbers) is expressed as A, a list of length 1 whose first (and only) entry is the vector of the 30 A1-A30 values.
+
+The problem I am now having is shown below (first, prompt+code & o/p, then just pure code in case you want to try it). While I can make this work for data frames, I am hoping I can find a work to have it work for data tables. (This can be really useful, by the way. In a recent project, my data frame included lists of 4D arrays, which was the perfect structure for summing, e.g. in a variety of dimensions.)
+
+
+> #create matrix that includes list elements A
+> (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(31:41))))
+     index var A
+[1,] 1     101 Integer,5
+[2,] 2     102 Integer,5
+[3,] 3     103 Integer,11
+> class(mat)
+[1] "matrix"
+> # convert to data frame and "fix" the first two entries
+> (df<-as.data.frame(mat))
+  index var                                          A
+1     1 101                         11, 12, 13, 14, 15
+2     2 102                         21, 22, 23, 24, 25
+3     3 103 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41
+> class(df$index) # because mat is atomic
+[1] "list"
+> df$index<-as.integer(df$index) # convert to integer
+> df$var<-as.integer(df$var) # likewise
+> # conver to data table
+> dt<-data.table(df)
+> setkey(dt,index)
+>
+> # try some operations
+> dt[,A] # works
+[[1]]
+[1] 11 12 13 14 15
+
+[[2]]
+[1] 21 22 23 24 25
+
+[[3]]
+[1] 31 32 33 34 35 36 37 38 39 40 41
+
+> dt[,mean(A)] # Does not work. each row of A is a list
+[1] NA
+Warning message:
+In mean.default(A) : argument is not numeric or logical: returning NA
+> dt[,mean(unlist(A))] # But here is an easy fix to make this work
+[1] 27.42857
+>
+> dt[,mean(var),by=index] # works (of course)
+     index  V1
+[1,]     1 101
+[2,]     2 102
+[3,]     3 103
+>
+> dt[,mean(unlist(A)),by=index] # does not work!
+Error in `[.data.table`(dt, , mean(unlist(A)), by = index) :
+  only integer,double,logical and character vectors are allowed so far. Type 19 would need to be added.
+>
+>
+
+#### Pure code ####
+#create matrix that includes list elements A
+(mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(31:41))))
+class(mat)
+# convert to data frame and "fix" the first two entries
+(df<-as.data.frame(mat))
+class(df$index) # because mat is atomic
+df$index<-as.integer(df$index) # convert to integer
+df$var<-as.integer(df$var) # likewise
+# conver to data table
+dt<-data.table(df)
+setkey(dt,index)
+
+# try some operations
+dt[,A] # works
+dt[,mean(A)] # Does not work. each row of A is a list
+dt[,mean(unlist(A))] # But here is an easy fix to make this
+
+dt[,mean(var),by=index] # works (of course)
+
+dt[,mean(unlist(A)),by=index] # does not work!
+
+
+
+
+Joseph G. Voelkel, Ph.D.
+Professor, Center for Quality and Applied Statistics
+Kate Gleason College of Engineering
+Rochester Institute of Technology
+V 585-475-2231
+F 585-475-5959
+joseph.voelkel at rit.edu
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110113/d8ce15fa/attachment.htm>
+
+From mdowle at mdowle.plus.com  Thu Jan 13 22:07:49 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 13 Jan 2011 21:07:49 +0000
+Subject: [datatable-help] Summing over many variables. A new approach;
+ a new problem
+In-Reply-To: <70EFCDD908F9264785FA08EC3A47132016CC53D42E@ex02mail01.ad.rit.edu>
+References: <70EFCDD908F9264785FA08EC3A47132016CC53D42E@ex02mail01.ad.rit.edu>
+Message-ID: <1294952869.15216.8.camel@netbook>
+
+Hi Joseph,
+You've found feature request #1092 'Make 'by' work for list() columns' :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1092&group_id=240&atid=978
+
+Notes on the FR have this though :
+   Currently type 19 isn't supported in dogroups (both input and
+output). This might be straightforward (with luck) to implement.
+   See
+http://r.789695.n4.nabble.com/Suggest-a-cool-feature-Use-data-table-like-a-sorted-indexed-data-list-tp2544213p2544213.html
+   Note this is related but different to FR#202 since a list() column
+*is* a vector [is.vector()=TRUE].
+
+Matthew
+
+On Thu, 2011-01-13 at 15:17 -0500, Joseph Voelkel wrote:
+> > #create matrix that includes list elements A
+> 
+> >
+> (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(31:41))))
+> 
+>      index var A         
+> 
+> [1,] 1     101 Integer,5 
+> 
+> [2,] 2   &nbsp ; 102 In class=MsoNormal>[3,] 3     103 Integer,11
+> 
+> > class(mat)
+> 
+> [1] "matrix"
+> 
+> > # convert to data frame and "fix" the first two entries
+> 
+> > (df<-as.data.frame(mat))
+> 
+>   index var                                          A
+> 
+> 1     1 101                         11, 12, 13, 14, 15
+> 
+> 2     2 102          &n bsp;&nbs ;         21, 22, 23, 24, 25
+> 
+> 3     3 103 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41
+> 
+> > class(df$index) # because mat is atomic
+> 
+> [1] "list"
+> 
+> > df$index<-as.integer(df$index) # convert to integer
+> 
+> > df$var<-as.integer(df$var) # likewise
+> 
+> > # conver to data table
+> 
+> > dt<-data.table(df)
+> 
+> > setkey(dt,index)
+> 
+> > 
+> 
+> > # try some operations
+> 
+> > dt[,A] # works
+> 
+> [[1]]
+> 
+> [1] 11 12 13 14 15
+> 
+>  
+> 
+> [[2]]< /p>
+> 
+>  
+> 
+> [[3]]
+> 
+> [1] 31 32 33 34 35 36 37 38 39 40 41
+> 
+>  
+> 
+> > dt[,mean(A)] # Does not work. each row of A is a list
+> 
+> [1] NA
+> 
+> Warning message:
+> 
+> In mean.default(A) : argument is not numeric or logical: returning NA
+> 
+> > dt[,mean(unlist(A))] # But here is an easy fix to make this work
+> 
+> [1] 27.42857
+> 
+> > 
+> 
+> > dt[,mean(var),by=index] # works (of course)
+> 
+>      index  V1
+> 
+> [1,]     1 101
+> 
+> [2,]     2 102
+> 
+> [3, 3 103
+> 
+> > 
+> 
+> > dt[,mean(unlist(A)),by=index] # does not work! 
+> 
+> Error in `[.data.table`(dt, , mean(unlist(A)), by = index) : 
+> 
+>   only integer,double,logical and character vectors are allowed so
+> far. Type 19 would need to be added.
+> 
+> > 
+> 
+> > 
+> 
+>  
+> 
+> #### Pure code ####
+> 
+> #create matrix that includes list elements A
+> 
+> (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(31:41))))
+> 
+> class(mat)
+> 
+> # convert to data frame and "fix" the first two entries
+> 
+> (df<-as.data.frame(mat))
+> 
+> class(df$ind ex) # be /o:p>
+> 
+> df$index<-as.integer(df$index) # convert to integer
+> 
+> df$var<-as.integer(df$var) # likewise
+> 
+> # conver to data table
+> 
+> dt<-data.table(df)
+> 
+> setkey(dt,index)
+> 
+>  
+> 
+> # try some operations
+> 
+> dt[,A] # works
+> 
+> dt[,mean(A)] # Does not work. each row of A is a list
+> 
+> dt[,mean(unlist(A))] # But here is an easy fix to make this
+> 
+>  
+> 
+> dt[,mean(var),by=index] # works (of course)
+> 
+>  
+> 
+> dt[,mean(unlist(A)),by=index] # does not work! 
+> 
+>   
+
+
+From mdowle at mdowle.plus.com  Thu Jan 13 23:21:16 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 13 Jan 2011 22:21:16 +0000
+Subject: [datatable-help] Summing over many variables. A new approach;
+ a new problem
+In-Reply-To: <1294952869.15216.8.camel@netbook>
+References: <70EFCDD908F9264785FA08EC3A47132016CC53D42E@ex02mail01.ad.rit.edu>
+	<1294952869.15216.8.camel@netbook>
+Message-ID: <1294957276.15216.21.camel@netbook>
+
+Which is now implemented and committed. Either
+install.packages(...,type="source") from R-Forge on unix/mac, or wait a
+day or two for the R-Forge binary if you're on Windows.
+Thanks for the nudge on this one.
+
+> dt = data.table(a=c(1,1,2,3,3),key="a")
+> dt$b=list(1:2,1:3,1:4,1:5,1:6)
+> dt
+     a                b
+[1,] 1             1, 2
+[2,] 1          1, 2, 3
+[3,] 2       1, 2, 3, 4
+[4,] 3    1, 2, 3, 4, 5
+[5,] 3 1, 2, 3, 4, 5, 6
+> dt[,mean(unlist(b)),by=a]
+     a       V1
+[1,] 1 1.800000
+[2,] 2 2.500000
+[3,] 3 3.272727
+> dt[,sapply(b,mean),by=a]
+     a  V1
+[1,] 1 1.5
+[2,] 1 2.0
+[3,] 2 2.5
+[4,] 3 3.0
+[5,] 3 3.5
+> 
+
+
+On Thu, 2011-01-13 at 21:07 +0000, Matthew Dowle wrote:
+> Hi Joseph,
+> You've found feature request #1092 'Make 'by' work for list() columns' :
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1092&group_id=240&atid=978
+> 
+> Notes on the FR have this though :
+>    Currently type 19 isn't supported in dogroups (both input and
+> output). This might be straightforward (with luck) to implement.
+>    See
+> http://r.789695.n4.nabble.com/Suggest-a-cool-feature-Use-data-table-like-a-sorted-indexed-data-list-tp2544213p2544213.html
+>    Note this is related but different to FR#202 since a list() column
+> *is* a vector [is.vector()=TRUE].
+> 
+> Matthew
+> 
+> On Thu, 2011-01-13 at 15:17 -0500, Joseph Voelkel wrote:
+> > > #create matrix that includes list elements A
+> > 
+> > >
+> > (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(31:41))))
+> > 
+> >      index var A         
+> > 
+> > [1,] 1     101 Integer,5 
+> > 
+> > [2,] 2   &nbsp ; 102 In class=MsoNormal>[3,] 3     103 Integer,11
+> > 
+> > > class(mat)
+> > 
+> > [1] "matrix"
+> > 
+> > > # convert to data frame and "fix" the first two entries
+> > 
+> > > (df<-as.data.frame(mat))
+> > 
+> >   index var                                          A
+> > 
+> > 1     1 101                         11, 12, 13, 14, 15
+> > 
+> > 2     2 102          &n bsp;&nbs ;         21, 22, 23, 24, 25
+> > 
+> > 3     3 103 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41
+> > 
+> > > class(df$index) # because mat is atomic
+> > 
+> > [1] "list"
+> > 
+> > > df$index<-as.integer(df$index) # convert to integer
+> > 
+> > > df$var<-as.integer(df$var) # likewise
+> > 
+> > > # conver to data table
+> > 
+> > > dt<-data.table(df)
+> > 
+> > > setkey(dt,index)
+> > 
+> > > 
+> > 
+> > > # try some operations
+> > 
+> > > dt[,A] # works
+> > 
+> > [[1]]
+> > 
+> > [1] 11 12 13 14 15
+> > 
+> >  
+> > 
+> > [[2]]< /p>
+> > 
+> >  
+> > 
+> > [[3]]
+> > 
+> > [1] 31 32 33 34 35 36 37 38 39 40 41
+> > 
+> >  
+> > 
+> > > dt[,mean(A)] # Does not work. each row of A is a list
+> > 
+> > [1] NA
+> > 
+> > Warning message:
+> > 
+> > In mean.default(A) : argument is not numeric or logical: returning NA
+> > 
+> > > dt[,mean(unlist(A))] # But here is an easy fix to make this work
+> > 
+> > [1] 27.42857
+> > 
+> > > 
+> > 
+> > > dt[,mean(var),by=index] # works (of course)
+> > 
+> >      index  V1
+> > 
+> > [1,]     1 101
+> > 
+> > [2,]     2 102
+> > 
+> > [3, 3 103
+> > 
+> > > 
+> > 
+> > > dt[,mean(unlist(A)),by=index] # does not work! 
+> > 
+> > Error in `[.data.table`(dt, , mean(unlist(A)), by = index) : 
+> > 
+> >   only integer,double,logical and character vectors are allowed so
+> > far. Type 19 would need to be added.
+> > 
+> > > 
+> > 
+> > > 
+> > 
+> >  
+> > 
+> > #### Pure code ####
+> > 
+> > #create matrix that includes list elements A
+> > 
+> > (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(31:41))))
+> > 
+> > class(mat)
+> > 
+> > # convert to data frame and "fix" the first two entries
+> > 
+> > (df<-as.data.frame(mat))
+> > 
+> > class(df$ind ex) # be /o:p>
+> > 
+> > df$index<-as.integer(df$index) # convert to integer
+> > 
+> > df$var<-as.integer(df$var) # likewise
+> > 
+> > # conver to data table
+> > 
+> > dt<-data.table(df)
+> > 
+> > setkey(dt,index)
+> > 
+> >  
+> > 
+> > # try some operations
+> > 
+> > dt[,A] # works
+> > 
+> > dt[,mean(A)] # Does not work. each row of A is a list
+> > 
+> > dt[,mean(unlist(A))] # But here is an easy fix to make this
+> > 
+> >  
+> > 
+> > dt[,mean(var),by=index] # works (of course)
+> > 
+> >  
+> > 
+> > dt[,mean(unlist(A)),by=index] # does not work! 
+> > 
+> >   
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From TShort at epri.com  Fri Jan 14 00:37:26 2011
+From: TShort at epri.com (Short, Tom)
+Date: Thu, 13 Jan 2011 15:37:26 -0800
+Subject: [datatable-help] Summing over many variables. A new approach;
+	a new problem
+In-Reply-To: <1294957276.15216.21.camel@netbook>
+References: <70EFCDD908F9264785FA08EC3A47132016CC53D42E@ex02mail01.ad.rit.edu><1294952869.15216.8.camel@netbook>
+	<1294957276.15216.21.camel@netbook>
+Message-ID: <72CF3C50F4AF5B4BB678383F11CEF0E3065649A7@uspalex03.epri.com>
+
+Matthew fixed you case, but the following workaround may be helpful if
+you have other types of data stuffed in a data table. Basically, you use
+one table to index another. Of course, you need to remember to keep them
+in sync. It doesn't work for a table to index itself in this manner.
+
+> dt1 <- dt[,1:2,with=FALSE]
+> dt2 <- dt[,3, with=FALSE]
+> # try some operations
+> dt1[,mean(dt2[index, unlist(A)]),by=index]
+     index V1
+[1,]     1 13
+[2,]     2 23
+[3,]     3 36
+
+- Tom
+ 
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Matthew Dowle
+> Sent: Thursday, January 13, 2011 17:21
+> To: Joseph Voelkel
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Summing over many variables. A 
+> new approach; a new problem
+> 
+> Which is now implemented and committed. Either
+> install.packages(...,type="source") from R-Forge on unix/mac, 
+> or wait a day or two for the R-Forge binary if you're on Windows.
+> Thanks for the nudge on this one.
+> 
+> > dt = data.table(a=c(1,1,2,3,3),key="a")
+> > dt$b=list(1:2,1:3,1:4,1:5,1:6)
+> > dt
+>      a                b
+> [1,] 1             1, 2
+> [2,] 1          1, 2, 3
+> [3,] 2       1, 2, 3, 4
+> [4,] 3    1, 2, 3, 4, 5
+> [5,] 3 1, 2, 3, 4, 5, 6
+> > dt[,mean(unlist(b)),by=a]
+>      a       V1
+> [1,] 1 1.800000
+> [2,] 2 2.500000
+> [3,] 3 3.272727
+> > dt[,sapply(b,mean),by=a]
+>      a  V1
+> [1,] 1 1.5
+> [2,] 1 2.0
+> [3,] 2 2.5
+> [4,] 3 3.0
+> [5,] 3 3.5
+> > 
+> 
+> 
+> On Thu, 2011-01-13 at 21:07 +0000, Matthew Dowle wrote:
+> > Hi Joseph,
+> > You've found feature request #1092 'Make 'by' work for 
+> list() columns' :
+> > 
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1092&g
+> > roup_id=240&atid=978
+> > 
+> > Notes on the FR have this though :
+> >    Currently type 19 isn't supported in dogroups (both input and 
+> > output). This might be straightforward (with luck) to implement.
+> >    See
+> > 
+> http://r.789695.n4.nabble.com/Suggest-a-cool-feature-Use-data-
+> table-like-a-sorted-indexed-data-list-tp2544213p2544213.html
+> >    Note this is related but different to FR#202 since a 
+> list() column
+> > *is* a vector [is.vector()=TRUE].
+> > 
+> > Matthew
+> > 
+> > On Thu, 2011-01-13 at 15:17 -0500, Joseph Voelkel wrote:
+> > > > #create matrix that includes list elements A
+> > > 
+> > > >
+> > > 
+> (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(3
+> > > 1:41))))
+> > > 
+> > >      index var A         
+> > > 
+> > > [1,] 1     101 Integer,5 
+> > > 
+> > > [2,] 2   &nbsp ; 102 In class=MsoNormal>[3,] 3     103 Integer,11
+> > > 
+> > > > class(mat)
+> > > 
+> > > [1] "matrix"
+> > > 
+> > > > # convert to data frame and "fix" the first two entries
+> > > 
+> > > > (df<-as.data.frame(mat))
+> > > 
+> > >   index var                                          A
+> > > 
+> > > 1     1 101                         11, 12, 13, 14, 15
+> > > 
+> > > 2     2 102          &n bsp;&nbs ;         21, 22, 23, 24, 25
+> > > 
+> > > 3     3 103 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41
+> > > 
+> > > > class(df$index) # because mat is atomic
+> > > 
+> > > [1] "list"
+> > > 
+> > > > df$index<-as.integer(df$index) # convert to integer
+> > > 
+> > > > df$var<-as.integer(df$var) # likewise
+> > > 
+> > > > # conver to data table
+> > > 
+> > > > dt<-data.table(df)
+> > > 
+> > > > setkey(dt,index)
+> > > 
+> > > > 
+> > > 
+> > > > # try some operations
+> > > 
+> > > > dt[,A] # works
+> > > 
+> > > [[1]]
+> > > 
+> > > [1] 11 12 13 14 15
+> > > 
+> > >  
+> > > 
+> > > [[2]]< /p>
+> > > 
+> > >  
+> > > 
+> > > [[3]]
+> > > 
+> > > [1] 31 32 33 34 35 36 37 38 39 40 41
+> > > 
+> > >  
+> > > 
+> > > > dt[,mean(A)] # Does not work. each row of A is a list
+> > > 
+> > > [1] NA
+> > > 
+> > > Warning message:
+> > > 
+> > > In mean.default(A) : argument is not numeric or logical: 
+> returning 
+> > > NA
+> > > 
+> > > > dt[,mean(unlist(A))] # But here is an easy fix to make this work
+> > > 
+> > > [1] 27.42857
+> > > 
+> > > > 
+> > > 
+> > > > dt[,mean(var),by=index] # works (of course)
+> > > 
+> > >      index  V1
+> > > 
+> > > [1,]     1 101
+> > > 
+> > > [2,]     2 102
+> > > 
+> > > [3, 3 103
+> > > 
+> > > > 
+> > > 
+> > > > dt[,mean(unlist(A)),by=index] # does not work! 
+> > > 
+> > > Error in `[.data.table`(dt, , mean(unlist(A)), by = index) : 
+> > > 
+> > >   only integer,double,logical and character vectors are 
+> allowed so 
+> > > far. Type 19 would need to be added.
+> > > 
+> > > > 
+> > > 
+> > > > 
+> > > 
+> > >  
+> > > 
+> > > #### Pure code ####
+> > > 
+> > > #create matrix that includes list elements A
+> > > 
+> > > 
+> (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(3
+> > > 1:41))))
+> > > 
+> > > class(mat)
+> > > 
+> > > # convert to data frame and "fix" the first two entries
+> > > 
+> > > (df<-as.data.frame(mat))
+> > > 
+> > > class(df$ind ex) # be /o:p>
+> > > 
+> > > df$index<-as.integer(df$index) # convert to integer
+> > > 
+> > > df$var<-as.integer(df$var) # likewise
+> > > 
+> > > # conver to data table
+> > > 
+> > > dt<-data.table(df)
+> > > 
+> > > setkey(dt,index)
+> > > 
+> > >  
+> > > 
+> > > # try some operations
+> > > 
+> > > dt[,A] # works
+> > > 
+> > > dt[,mean(A)] # Does not work. each row of A is a list
+> > > 
+> > > dt[,mean(unlist(A))] # But here is an easy fix to make this
+> > > 
+> > >  
+> > > 
+> > > dt[,mean(var),by=index] # works (of course)
+> > > 
+> > >  
+> > > 
+> > > dt[,mean(unlist(A)),by=index] # does not work! 
+> > > 
+> > >   
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable
+> > -help
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From jgvcqa at rit.edu  Fri Jan 14 19:18:17 2011
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Fri, 14 Jan 2011 13:18:17 -0500
+Subject: [datatable-help] Summing over many variables. A new approach;
+ a new problem
+In-Reply-To: <1294957276.15216.21.camel@netbook>
+References: <70EFCDD908F9264785FA08EC3A47132016CC53D42E@ex02mail01.ad.rit.edu>
+	<1294952869.15216.8.camel@netbook> <1294957276.15216.21.camel@netbook>
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC53D69B@ex02mail01.ad.rit.edu>
+
+Great! Thanks, Matthew. This should be a big help. (It was also nice to see that others are using lists in as well. Use of lists here--well, in data frames--was an "aha" moment for me about a year ago.)
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+Sent: Thursday, January 13, 2011 5:21 PM
+To: Joseph Voelkel
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Summing over many variables. A new approach; a new problem
+
+Which is now implemented and committed. Either
+install.packages(...,type="source") from R-Forge on unix/mac, or wait a
+day or two for the R-Forge binary if you're on Windows.
+Thanks for the nudge on this one.
+
+> dt = data.table(a=c(1,1,2,3,3),key="a")
+> dt$b=list(1:2,1:3,1:4,1:5,1:6)
+> dt
+     a                b
+[1,] 1             1, 2
+[2,] 1          1, 2, 3
+[3,] 2       1, 2, 3, 4
+[4,] 3    1, 2, 3, 4, 5
+[5,] 3 1, 2, 3, 4, 5, 6
+> dt[,mean(unlist(b)),by=a]
+     a       V1
+[1,] 1 1.800000
+[2,] 2 2.500000
+[3,] 3 3.272727
+> dt[,sapply(b,mean),by=a]
+     a  V1
+[1,] 1 1.5
+[2,] 1 2.0
+[3,] 2 2.5
+[4,] 3 3.0
+[5,] 3 3.5
+> 
+
+
+On Thu, 2011-01-13 at 21:07 +0000, Matthew Dowle wrote:
+> Hi Joseph,
+> You've found feature request #1092 'Make 'by' work for list() columns' :
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1092&group_id=240&atid=978
+> 
+> Notes on the FR have this though :
+>    Currently type 19 isn't supported in dogroups (both input and
+> output). This might be straightforward (with luck) to implement.
+>    See
+> http://r.789695.n4.nabble.com/Suggest-a-cool-feature-Use-data-table-like-a-sorted-indexed-data-list-tp2544213p2544213.html
+>    Note this is related but different to FR#202 since a list() column
+> *is* a vector [is.vector()=TRUE].
+> 
+> Matthew
+> 
+> On Thu, 2011-01-13 at 15:17 -0500, Joseph Voelkel wrote:
+> > > #create matrix that includes list elements A
+> > 
+> > >
+> > (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(31:41))))
+> > 
+> >      index var A         
+> > 
+> > [1,] 1     101 Integer,5 
+> > 
+> > [2,] 2   &nbsp ; 102 In class=MsoNormal>[3,] 3     103 Integer,11
+> > 
+> > > class(mat)
+> > 
+> > [1] "matrix"
+> > 
+> > > # convert to data frame and "fix" the first two entries
+> > 
+> > > (df<-as.data.frame(mat))
+> > 
+> >   index var                                          A
+> > 
+> > 1     1 101                         11, 12, 13, 14, 15
+> > 
+> > 2     2 102          &n bsp;&nbs ;         21, 22, 23, 24, 25
+> > 
+> > 3     3 103 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41
+> > 
+> > > class(df$index) # because mat is atomic
+> > 
+> > [1] "list"
+> > 
+> > > df$index<-as.integer(df$index) # convert to integer
+> > 
+> > > df$var<-as.integer(df$var) # likewise
+> > 
+> > > # conver to data table
+> > 
+> > > dt<-data.table(df)
+> > 
+> > > setkey(dt,index)
+> > 
+> > > 
+> > 
+> > > # try some operations
+> > 
+> > > dt[,A] # works
+> > 
+> > [[1]]
+> > 
+> > [1] 11 12 13 14 15
+> > 
+> >  
+> > 
+> > [[2]]< /p>
+> > 
+> >  
+> > 
+> > [[3]]
+> > 
+> > [1] 31 32 33 34 35 36 37 38 39 40 41
+> > 
+> >  
+> > 
+> > > dt[,mean(A)] # Does not work. each row of A is a list
+> > 
+> > [1] NA
+> > 
+> > Warning message:
+> > 
+> > In mean.default(A) : argument is not numeric or logical: returning NA
+> > 
+> > > dt[,mean(unlist(A))] # But here is an easy fix to make this work
+> > 
+> > [1] 27.42857
+> > 
+> > > 
+> > 
+> > > dt[,mean(var),by=index] # works (of course)
+> > 
+> >      index  V1
+> > 
+> > [1,]     1 101
+> > 
+> > [2,]     2 102
+> > 
+> > [3, 3 103
+> > 
+> > > 
+> > 
+> > > dt[,mean(unlist(A)),by=index] # does not work! 
+> > 
+> > Error in `[.data.table`(dt, , mean(unlist(A)), by = index) : 
+> > 
+> >   only integer,double,logical and character vectors are allowed so
+> > far. Type 19 would need to be added.
+> > 
+> > > 
+> > 
+> > > 
+> > 
+> >  
+> > 
+> > #### Pure code ####
+> > 
+> > #create matrix that includes list elements A
+> > 
+> > (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(31:41))))
+> > 
+> > class(mat)
+> > 
+> > # convert to data frame and "fix" the first two entries
+> > 
+> > (df<-as.data.frame(mat))
+> > 
+> > class(df$ind ex) # be /o:p>
+> > 
+> > df$index<-as.integer(df$index) # convert to integer
+> > 
+> > df$var<-as.integer(df$var) # likewise
+> > 
+> > # conver to data table
+> > 
+> > dt<-data.table(df)
+> > 
+> > setkey(dt,index)
+> > 
+> >  
+> > 
+> > # try some operations
+> > 
+> > dt[,A] # works
+> > 
+> > dt[,mean(A)] # Does not work. each row of A is a list
+> > 
+> > dt[,mean(unlist(A))] # But here is an easy fix to make this
+> > 
+> >  
+> > 
+> > dt[,mean(var),by=index] # works (of course)
+> > 
+> >  
+> > 
+> > dt[,mean(unlist(A)),by=index] # does not work! 
+> > 
+> >   
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From jgvcqa at rit.edu  Sat Jan 15 00:13:51 2011
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Fri, 14 Jan 2011 18:13:51 -0500
+Subject: [datatable-help] Summing over many variables. A new approach;
+ a new problem
+In-Reply-To: <72CF3C50F4AF5B4BB678383F11CEF0E3065649A7@uspalex03.epri.com>
+References: <70EFCDD908F9264785FA08EC3A47132016CC53D42E@ex02mail01.ad.rit.edu>
+	<1294952869.15216.8.camel@netbook> <1294957276.15216.21.camel@netbook>
+	<72CF3C50F4AF5B4BB678383F11CEF0E3065649A7@uspalex03.epri.com>
+Message-ID: <70EFCDD908F9264785FA08EC3A47132016CC53D7B3@ex02mail01.ad.rit.edu>
+
+Thanks, Tom. I've added this to my list of data.table ideas.
+
+Joe
+
+-----Original Message-----
+From: Short, Tom [mailto:TShort at epri.com] 
+Sent: Thursday, January 13, 2011 6:37 PM
+To: mdowle at mdowle.plus.com; Joseph Voelkel
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: RE: [datatable-help] Summing over many variables. A new approach; a new problem
+
+Matthew fixed you case, but the following workaround may be helpful if
+you have other types of data stuffed in a data table. Basically, you use
+one table to index another. Of course, you need to remember to keep them
+in sync. It doesn't work for a table to index itself in this manner.
+
+> dt1 <- dt[,1:2,with=FALSE]
+> dt2 <- dt[,3, with=FALSE]
+> # try some operations
+> dt1[,mean(dt2[index, unlist(A)]),by=index]
+     index V1
+[1,]     1 13
+[2,]     2 23
+[3,]     3 36
+
+- Tom
+ 
+
+> -----Original Message-----
+> From: datatable-help-bounces at lists.r-forge.r-project.org 
+> [mailto:datatable-help-bounces at lists.r-forge.r-project.org] 
+> On Behalf Of Matthew Dowle
+> Sent: Thursday, January 13, 2011 17:21
+> To: Joseph Voelkel
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] Summing over many variables. A 
+> new approach; a new problem
+> 
+> Which is now implemented and committed. Either
+> install.packages(...,type="source") from R-Forge on unix/mac, 
+> or wait a day or two for the R-Forge binary if you're on Windows.
+> Thanks for the nudge on this one.
+> 
+> > dt = data.table(a=c(1,1,2,3,3),key="a")
+> > dt$b=list(1:2,1:3,1:4,1:5,1:6)
+> > dt
+>      a                b
+> [1,] 1             1, 2
+> [2,] 1          1, 2, 3
+> [3,] 2       1, 2, 3, 4
+> [4,] 3    1, 2, 3, 4, 5
+> [5,] 3 1, 2, 3, 4, 5, 6
+> > dt[,mean(unlist(b)),by=a]
+>      a       V1
+> [1,] 1 1.800000
+> [2,] 2 2.500000
+> [3,] 3 3.272727
+> > dt[,sapply(b,mean),by=a]
+>      a  V1
+> [1,] 1 1.5
+> [2,] 1 2.0
+> [3,] 2 2.5
+> [4,] 3 3.0
+> [5,] 3 3.5
+> > 
+> 
+> 
+> On Thu, 2011-01-13 at 21:07 +0000, Matthew Dowle wrote:
+> > Hi Joseph,
+> > You've found feature request #1092 'Make 'by' work for 
+> list() columns' :
+> > 
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1092&g
+> > roup_id=240&atid=978
+> > 
+> > Notes on the FR have this though :
+> >    Currently type 19 isn't supported in dogroups (both input and 
+> > output). This might be straightforward (with luck) to implement.
+> >    See
+> > 
+> http://r.789695.n4.nabble.com/Suggest-a-cool-feature-Use-data-
+> table-like-a-sorted-indexed-data-list-tp2544213p2544213.html
+> >    Note this is related but different to FR#202 since a 
+> list() column
+> > *is* a vector [is.vector()=TRUE].
+> > 
+> > Matthew
+> > 
+> > On Thu, 2011-01-13 at 15:17 -0500, Joseph Voelkel wrote:
+> > > > #create matrix that includes list elements A
+> > > 
+> > > >
+> > > 
+> (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(3
+> > > 1:41))))
+> > > 
+> > >      index var A         
+> > > 
+> > > [1,] 1     101 Integer,5 
+> > > 
+> > > [2,] 2   &nbsp ; 102 In class=MsoNormal>[3,] 3     103 Integer,11
+> > > 
+> > > > class(mat)
+> > > 
+> > > [1] "matrix"
+> > > 
+> > > > # convert to data frame and "fix" the first two entries
+> > > 
+> > > > (df<-as.data.frame(mat))
+> > > 
+> > >   index var                                          A
+> > > 
+> > > 1     1 101                         11, 12, 13, 14, 15
+> > > 
+> > > 2     2 102          &n bsp;&nbs ;         21, 22, 23, 24, 25
+> > > 
+> > > 3     3 103 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41
+> > > 
+> > > > class(df$index) # because mat is atomic
+> > > 
+> > > [1] "list"
+> > > 
+> > > > df$index<-as.integer(df$index) # convert to integer
+> > > 
+> > > > df$var<-as.integer(df$var) # likewise
+> > > 
+> > > > # conver to data table
+> > > 
+> > > > dt<-data.table(df)
+> > > 
+> > > > setkey(dt,index)
+> > > 
+> > > > 
+> > > 
+> > > > # try some operations
+> > > 
+> > > > dt[,A] # works
+> > > 
+> > > [[1]]
+> > > 
+> > > [1] 11 12 13 14 15
+> > > 
+> > >  
+> > > 
+> > > [[2]]< /p>
+> > > 
+> > >  
+> > > 
+> > > [[3]]
+> > > 
+> > > [1] 31 32 33 34 35 36 37 38 39 40 41
+> > > 
+> > >  
+> > > 
+> > > > dt[,mean(A)] # Does not work. each row of A is a list
+> > > 
+> > > [1] NA
+> > > 
+> > > Warning message:
+> > > 
+> > > In mean.default(A) : argument is not numeric or logical: 
+> returning 
+> > > NA
+> > > 
+> > > > dt[,mean(unlist(A))] # But here is an easy fix to make this work
+> > > 
+> > > [1] 27.42857
+> > > 
+> > > > 
+> > > 
+> > > > dt[,mean(var),by=index] # works (of course)
+> > > 
+> > >      index  V1
+> > > 
+> > > [1,]     1 101
+> > > 
+> > > [2,]     2 102
+> > > 
+> > > [3, 3 103
+> > > 
+> > > > 
+> > > 
+> > > > dt[,mean(unlist(A)),by=index] # does not work! 
+> > > 
+> > > Error in `[.data.table`(dt, , mean(unlist(A)), by = index) : 
+> > > 
+> > >   only integer,double,logical and character vectors are 
+> allowed so 
+> > > far. Type 19 would need to be added.
+> > > 
+> > > > 
+> > > 
+> > > > 
+> > > 
+> > >  
+> > > 
+> > > #### Pure code ####
+> > > 
+> > > #create matrix that includes list elements A
+> > > 
+> > > 
+> (mat<-cbind(index=1:3,var=101:103,A=c(list(11:15),list(21:25),list(3
+> > > 1:41))))
+> > > 
+> > > class(mat)
+> > > 
+> > > # convert to data frame and "fix" the first two entries
+> > > 
+> > > (df<-as.data.frame(mat))
+> > > 
+> > > class(df$ind ex) # be /o:p>
+> > > 
+> > > df$index<-as.integer(df$index) # convert to integer
+> > > 
+> > > df$var<-as.integer(df$var) # likewise
+> > > 
+> > > # conver to data table
+> > > 
+> > > dt<-data.table(df)
+> > > 
+> > > setkey(dt,index)
+> > > 
+> > >  
+> > > 
+> > > # try some operations
+> > > 
+> > > dt[,A] # works
+> > > 
+> > > dt[,mean(A)] # Does not work. each row of A is a list
+> > > 
+> > > dt[,mean(unlist(A))] # But here is an easy fix to make this
+> > > 
+> > >  
+> > > 
+> > > dt[,mean(var),by=index] # works (of course)
+> > > 
+> > >  
+> > > 
+> > > dt[,mean(unlist(A)),by=index] # does not work! 
+> > > 
+> > >   
+> > 
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > 
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable
+> > -help
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+atatable-help
+> 
+
+From mdowle at mdowle.plus.com  Tue Jan 18 00:15:20 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 17 Jan 2011 23:15:20 +0000
+Subject: [datatable-help] key disappears after merge of data tables
+In-Reply-To: <ig467r$qo6$1@dough.gmane.org>
+References: <70EFCDD908F9264785FA08EC3A47132016CC45F47C@ex02mail01.ad.rit.edu>
+	<ig467r$qo6$1@dough.gmane.org>
+Message-ID: <1295306120.1682.12.camel@netbook>
+
+Just to update this thread, Tom added this FR(#1244). The result of
+merge is now keyed when all=FALSE, too. In 1.5.2.
+Matthew
+
+On Thu, 2011-01-06 at 10:40 +0000, Matthew Dowle wrote:
+> If all is TRUE (or just all.x or all.y is TRUE) then result is keyed.
+> 
+> Why the key is not set when all is FALSE (default) I'm not sure.  Tom - can 
+> you remember?  Something to do with NAs in keys seems to ring a bell.
+> 
+> Matthew
+> 
+> 
+> "Joseph Voelkel" <jgvcqa at rit.edu> wrote in message 
+> news:70EFCDD908F9264785FA08EC3A47132016CC45F47C at ex02mail01.ad.rit.edu...
+> > See code below. When two data tables are merged (by their key 
+> > variable(s)), that key disappears in the resulting table. While this is 
+> > probably not strictly a bug, it would seem that the user would most likely 
+> > want to preserve the key in the output (especially if just enlarging the 
+> > original data table, e.g. dt2<-merge(dt1,dt2).)
+> >
+> >
+> >> dt1<-data.table(a=1:6,b=11:16,key="a")
+> >> dt2<-data.table(a=1:6,c=21:26,key="a")
+> >> dt3<-merge(dt1,dt2)
+> >>
+> >>
+> >     NAME NROW MB COLS  KEY
+> > [1,] dt1     6 1  a,b   a
+> > [2,] dt2     6 1  a,c   a
+> > [3,] dt3     6 1  a,b,c
+> > Total: 3MB
+> >
+> >
+> > Joseph G. Voelkel, Ph.D.
+> > Professor, Center for Quality and Applied Statistics
+> > Kate Gleason College of Engineering
+> > Rochester Institute of Technology
+> > V 585-475-2231
+> > F 585-475-5959
+> > joseph.voelkel at rit.edu 
+> 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Tue Jan 18 00:21:16 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 17 Jan 2011 23:21:16 +0000
+Subject: [datatable-help] Bug in merge for data.table?
+In-Reply-To: <AANLkTi=bg7UfhJdqWOazia15wAYGwr9z8bPFc8_PnO_q@mail.gmail.com>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6D20@ex02mail01.ad.rit.edu>
+	<1293807177.2046.0.camel@Adam>
+	<AANLkTi=bg7UfhJdqWOazia15wAYGwr9z8bPFc8_PnO_q@mail.gmail.com>
+Message-ID: <1295306476.1682.18.camel@netbook>
+
+Just to close this thread, Tom fixed that bug too. In 1.5.2. Tests
+added.
+Matthew
+
+On Fri, 2010-12-31 at 09:56 -0500, Tom Short wrote:
+> Agreed. There are a couple of bugs in merge that need to be fixed.
+> It's not as well used as the main data.table indexing.
+> 
+> - Tom
+> 
+> On Fri, Dec 31, 2010 at 9:52 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> >
+> > Looks like a bug to me. Thanks for raising it.
+> > Added here:
+> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1241&group_id=240&atid=975
+> > Matthew
+> >
+> > On Wed, 2010-12-29 at 13:00 -0500, Joseph Voelkel wrote:
+> >> Consider the following code. It seems like the errors that occur when
+> >> y only has a key column is a bug. Yes?
+> >>
+> >>
+> >>
+> >> DT<-data.table(a=rep(1:2,each=3),b=1:6,key="a")
+> >>
+> >>
+> >>
+> >> y<-J(a=c(0,1),bb=c(10,11),key="a") # y, with key column and one more
+> >> column
+> >>
+> >> merge(y,DT) # fine
+> >>
+> >> merge(y,DT,all=TRUE) # fine
+> >>
+> >>
+> >>
+> >> y<-J(a=c(0,1),key="a") # y with only a key column
+> >>
+> >> merge(y,DT) # fine
+> >>
+> >> merge(y,DT,all=TRUE) # error
+> >>
+> >>
+> >>
+> >>
+> >> _______________________________________________
+> >> datatable-help mailing list
+> >> datatable-help at lists.r-forge.r-project.org
+> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+
+
+
+From mdowle at mdowle.plus.com  Tue Jan 18 00:34:29 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 17 Jan 2011 23:34:29 +0000
+Subject: [datatable-help] Stackoverflow thread comparing merge times
+In-Reply-To: <idnhsv$ek8$1@dough.gmane.org>
+References: <9d325b78134dfb5456414742ced21034.squirrel@webmail.plus.net>
+	<AANLkTik-xC1ksVtFLnB=9-KETTCDyBj9sgJCy2VLft2b@mail.gmail.com>
+	<AANLkTint_CMfpQC_jxDP51zNN8zBvdKqTs=wcrK1G6Xk@mail.gmail.com>
+	<idnhsv$ek8$1@dough.gmane.org>
+Message-ID: <1295307269.1682.31.camel@netbook>
+
+
+Steve,
+The "x" problem you found in merge has been fixed now. In 1.5.2.
+There was a subtle issue here, which new FAQs 2.12 and 2.13 cover.
+Matthew
+
+
+On Wed, 2010-12-08 at 09:07 +0000, Matthew Dowle wrote:
+> Bug raised for this one :
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1229&group_id=240&atid=975
+> 
+> The "x" issue was fixed in [.data.table. It wasn't a specific fix as far as 
+> I remember but when the internal scoping was tidied up and made more robust. 
+> Maybe this is a new one in merge.data.table when it calls [.data.table.
+> 
+> I don't use merge() btw, preferring d1[d2] syntax instead which may explain 
+> why this got missed.
+> 
+> Matthew
+> 
+> "Tom Short" <tshort.rlists at gmail.com> wrote in message 
+> news:AANLkTint_CMfpQC_jxDP51zNN8zBvdKqTs=wcrK1G6Xk at mail.gmail.com...
+> On Tue, Dec 7, 2010 at 2:36 PM, Steve Lianoglou
+> <mailinglist.honeypot at gmail.com> wrote:
+> > Hi,
+> >
+> > On Tue, Dec 7, 2010 at 2:07 PM, Matthew Dowle <mdowle at mdowle.plus.com> 
+> > wrote:
+> >>
+> >> Does anyone have time to see if this post uses data.table correctly :
+> >>
+> >> http://stackoverflow.com/questions/4322219/whats-the-fastest-way-to-merge-join-data-frames-in-r
+> >>
+> >> The dt[, colMeans(cbind(x, y)), by="g1,g2"] bit looks wrong to me. Is
+> >> that why it takes 131 seconds vs 2.73 for sqldf ? Shouldn't it be
+> >> dt[,list(mean(x),mean(y)),by="g1,g2"] ?
+> >>
+> >> And also the y2= bit of dt1[dt2,list(x,y1,y2=dt2$y2)] looks odd.
+> >
+> > Don't know what's wrong with me today, but running this part of the
+> > given example in "the obvious way" is causing data.table to error and
+> > I'm not sure what I'm (obviously(?)) doing wrong:
+> >
+> > set.seed(123)
+> > N <- 1e5
+> > d1 <- data.frame(x=sample(N,N), y1=rnorm(N))
+> > d2 <- data.frame(x=sample(N,N), y2=rnorm(N))
+> >
+> > d1 <- data.table(d1, key="x")
+> > d2 <- data.table(d2, key="x")
+> > merge(d1, d2, by="x")
+> >
+> > Error in x[, key, with = FALSE] : incorrect number of dimensions
+> >
+> > What am I missing?
+> 
+> It's a problem with the column name "x". I thought we got rid of the
+> naming issues a while ago. The following seems to work:
+> 
+> set.seed(123)
+> N <- 1e5
+> d1 <- data.frame(xx=sample(N,N), y1=rnorm(N))
+> d2 <- data.frame(xx=sample(N,N), y2=rnorm(N))
+> 
+> d1 <- data.table(d1, key="xx")
+> d2 <- data.table(d2, key="xx")
+> merge(d1, d2)
+> 
+> Right now, I don't have time to dig further.
+> 
+> - Tom 
+> 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From jgvcqa at rit.edu  Tue Jan 18 16:04:36 2011
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Tue, 18 Jan 2011 10:04:36 -0500
+Subject: [datatable-help] key disappears after merge of data tables
+In-Reply-To: <1295306120.1682.12.camel@netbook>
+References: <70EFCDD908F9264785FA08EC3A47132016CC45F47C@ex02mail01.ad.rit.edu>
+	<ig467r$qo6$1@dough.gmane.org> <1295306120.1682.12.camel@netbook>
+Message-ID: <70EFCDD908F9264785FA08EC3A47132018BBEF572E@ex02mail01.ad.rit.edu>
+
+Thanks for the update, Matthew.
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+Sent: Monday, January 17, 2011 6:15 PM
+To: Joseph Voelkel
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] key disappears after merge of data tables
+
+Just to update this thread, Tom added this FR(#1244). The result of
+merge is now keyed when all=FALSE, too. In 1.5.2.
+Matthew
+
+On Thu, 2011-01-06 at 10:40 +0000, Matthew Dowle wrote:
+> If all is TRUE (or just all.x or all.y is TRUE) then result is keyed.
+> 
+> Why the key is not set when all is FALSE (default) I'm not sure.  Tom - can 
+> you remember?  Something to do with NAs in keys seems to ring a bell.
+> 
+> Matthew
+> 
+> 
+> "Joseph Voelkel" <jgvcqa at rit.edu> wrote in message 
+> news:70EFCDD908F9264785FA08EC3A47132016CC45F47C at ex02mail01.ad.rit.edu...
+> > See code below. When two data tables are merged (by their key 
+> > variable(s)), that key disappears in the resulting table. While this is 
+> > probably not strictly a bug, it would seem that the user would most likely 
+> > want to preserve the key in the output (especially if just enlarging the 
+> > original data table, e.g. dt2<-merge(dt1,dt2).)
+> >
+> >
+> >> dt1<-data.table(a=1:6,b=11:16,key="a")
+> >> dt2<-data.table(a=1:6,c=21:26,key="a")
+> >> dt3<-merge(dt1,dt2)
+> >>
+> >>
+> >     NAME NROW MB COLS  KEY
+> > [1,] dt1     6 1  a,b   a
+> > [2,] dt2     6 1  a,c   a
+> > [3,] dt3     6 1  a,b,c
+> > Total: 3MB
+> >
+> >
+> > Joseph G. Voelkel, Ph.D.
+> > Professor, Center for Quality and Applied Statistics
+> > Kate Gleason College of Engineering
+> > Rochester Institute of Technology
+> > V 585-475-2231
+> > F 585-475-5959
+> > joseph.voelkel at rit.edu 
+> 
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From jgvcqa at rit.edu  Tue Jan 18 16:05:07 2011
+From: jgvcqa at rit.edu (Joseph Voelkel)
+Date: Tue, 18 Jan 2011 10:05:07 -0500
+Subject: [datatable-help] Bug in merge for data.table?
+In-Reply-To: <1295306476.1682.18.camel@netbook>
+References: <70EFCDD908F9264785FA08EC3A47132016CC0D6D20@ex02mail01.ad.rit.edu>
+	<1293807177.2046.0.camel@Adam>
+	<AANLkTi=bg7UfhJdqWOazia15wAYGwr9z8bPFc8_PnO_q@mail.gmail.com>
+	<1295306476.1682.18.camel@netbook>
+Message-ID: <70EFCDD908F9264785FA08EC3A47132018BBEF572F@ex02mail01.ad.rit.edu>
+
+And another thanks!
+
+-----Original Message-----
+From: datatable-help-bounces at lists.r-forge.r-project.org [mailto:datatable-help-bounces at lists.r-forge.r-project.org] On Behalf Of Matthew Dowle
+Sent: Monday, January 17, 2011 6:21 PM
+To: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Bug in merge for data.table?
+
+Just to close this thread, Tom fixed that bug too. In 1.5.2. Tests
+added.
+Matthew
+
+On Fri, 2010-12-31 at 09:56 -0500, Tom Short wrote:
+> Agreed. There are a couple of bugs in merge that need to be fixed.
+> It's not as well used as the main data.table indexing.
+> 
+> - Tom
+> 
+> On Fri, Dec 31, 2010 at 9:52 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> >
+> > Looks like a bug to me. Thanks for raising it.
+> > Added here:
+> > https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1241&group_id=240&atid=975
+> > Matthew
+> >
+> > On Wed, 2010-12-29 at 13:00 -0500, Joseph Voelkel wrote:
+> >> Consider the following code. It seems like the errors that occur when
+> >> y only has a key column is a bug. Yes?
+> >>
+> >>
+> >>
+> >> DT<-data.table(a=rep(1:2,each=3),b=1:6,key="a")
+> >>
+> >>
+> >>
+> >> y<-J(a=c(0,1),bb=c(10,11),key="a") # y, with key column and one more
+> >> column
+> >>
+> >> merge(y,DT) # fine
+> >>
+> >> merge(y,DT,all=TRUE) # fine
+> >>
+> >>
+> >>
+> >> y<-J(a=c(0,1),key="a") # y with only a key column
+> >>
+> >> merge(y,DT) # fine
+> >>
+> >> merge(y,DT,all=TRUE) # error
+> >>
+> >>
+> >>
+> >>
+> >> _______________________________________________
+> >> datatable-help mailing list
+> >> datatable-help at lists.r-forge.r-project.org
+> >> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> >
+
+
+_______________________________________________
+datatable-help mailing list
+datatable-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From pchalasani at gmail.com  Sat Jan 22 16:41:21 2011
+From: pchalasani at gmail.com (Prasad Chalasani)
+Date: Sat, 22 Jan 2011 10:41:21 -0500
+Subject: [datatable-help] Cannot access cols of y when doing x[y, ...]
+Message-ID: <AANLkTinQooVbS5bRrV_Gi=M674oqHTwPKS5cnsf8iib8@mail.gmail.com>
+
+The Data-table FAQ 1.11 states:
+
+"When you write x[y,foo*boo], data.table automatically inspects the j
+expression to see which columns it uses.
+
+It will only subset, or group, those columns only. Memory is only created
+for the columns the j uses.
+
+Let?s say foo is in x, and boo is in y (along with 20 other columns in y).
+
+Isn?t x[y,foo*boo] quicker to program and quicker to run than a merge step
+followed by another subset step ?"
+
+
+Contrary to what it says above, I get an error when I try to access a
+y-column in the "j" argument of x[y,j].
+
+See the sequence of code below.
+
+
+> x <- data.table( foo = c(1,1,1,2,2,3), a = 1:6, key = 'foo')
+
+
+> y <- data.table( foo = c(1,2), boo = 10:11, key = 'foo')
+
+
+
+# the below works as expected
+
+> x[y]
+
+     foo a
+
+[1,]   1 1
+
+[2,]   2 4
+
+
+> with( merge(x,y), foo*boo)
+
+[1] 10 10 10 22 22
+
+
+# I want to acheive the same result as the above using the
+
+# syntactically more compact (and faster?) code below:
+
+
+> x[y, foo * boo ]
+
+Error in eval(expr, envir, enclos) : object 'boo' not found
+
+
+So is the FAQ just wrong, or am I misunderstanding something?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110122/6f4c5df6/attachment.htm>
+
+From mdowle at mdowle.plus.com  Sat Jan 22 17:56:23 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 22 Jan 2011 16:56:23 +0000
+Subject: [datatable-help] Fixed 'grp.1' annoyance when j returns a subset of
+	.SD
+Message-ID: <1295715383.2870.175.camel@netbook>
+
+All,
+
+Now that 1.5.2 is on CRAN I've made this change which may introduce
+incompatibilities for existing code.
+
+This is in 1.5.3 on R-Forge to be tried out for a while, discussed, and
+rolled back or done differently if need be. Please let us know if this
+causes any difficulties.
+
+Tests 104, 144 and 229 have been changed accordingly.
+
+A side effect of this change is that it should be faster for two
+reasons: i) the grp columns were redundant in .SD (repeated values) so
+taking them out leaves less for dogroups to do and ii) less need to take
+a subset of columns of .SD merely to remove the grp columns to do
+something on the others (code that does that may be up to twice as fast
+when the subset of .SD is removed). 
+
+
+From bogus@does.not.exist.com  Fri Jan 14 16:09:15 2011
+From: bogus@does.not.exist.com ()
+Date: Fri, 14 Jan 2011 15:09:15 -0000
+Subject: No subject
+Message-ID: <mailman.1.1295715391.20536.datatable-help@lists.r-forge.r-project.org>
+
+  o    .SD no longer includes 'by' columns, FR#978. This resolves
+        the long standing annoyance of duplicated 'by' columns
+        when the j expression returns a subset of rows from .SD. 
+        For example, the following query no longer contains
+        a redundant 'colA.1' duplicate.
+            DT[,.SD[2],by=colA] #  2nd row of each group
+        Any existing code that uses .SD may require simple
+        changes to remove workarounds. If columns have been
+        referenced by name, as recommended where possible, then
+        no changes to existing code should be required.
+
+Matthew
+
+
+
+From mdowle at mdowle.plus.com  Sat Jan 22 22:48:00 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 22 Jan 2011 21:48:00 +0000
+Subject: [datatable-help] Cannot access cols of y when doing x[y, ...]
+In-Reply-To: <AANLkTinQooVbS5bRrV_Gi=M674oqHTwPKS5cnsf8iib8@mail.gmail.com>
+References: <AANLkTinQooVbS5bRrV_Gi=M674oqHTwPKS5cnsf8iib8@mail.gmail.com>
+Message-ID: <1295732880.2870.227.camel@netbook>
+
+Welcome to the list.
+You're right, the FAQ is wrong.
+FR#1095 is "Turn back on 'join inherited scope'".
+This was a known problem in NEWS at v1.4 and still is.
+When the grouping code was moved from R into C in v1.4 that feature
+wasn't something that made it into the port.
+
+Glad you appreciate the neater syntax and yes it should be faster (the
+more columns in x and y the faster the speed up could be, over a merge
+followed by a query).
+
+I'll try and take a look soon.
+
+Matthew
+
+
+On Sat, 2011-01-22 at 10:41 -0500, Prasad Chalasani wrote:
+> The Data-table FAQ 1.11 states:
+> 
+> 
+> "When you write x[y,foo*boo], data.table automatically inspects the j
+> expression to see which columns it uses. 
+> It will only subset, or group, those columns only. Memory is only
+> created for the columns the j uses. 
+> 
+> Let?s say foo is in x, and boo is in y (along with 20 other columns in
+> y). 
+> 
+> Isn?t x[y,foo*boo] quicker to program and quicker to run than a merge
+> step followed by another subset step ?"
+> 
+> 
+> Contrary to what it says above, I get an error when I try to access a
+> y-column in the "j" argument of x[y,j]. 
+> 
+> See the sequence of code below. 
+> 
+> 
+> > x <- data.table( foo = c(1,1,1,2,2,3), a = 1:6, key = 'foo')
+>            
+> 
+> > y <- data.table( foo = c(1,2), boo = 10:11, key = 'foo')          
+> 
+>      
+> 
+> # the below works as expected
+> 
+> > x[y]
+> 
+>      foo a
+> 
+> [1,]   1 1
+> 
+> [2,]   2 4
+> 
+> 
+> > with( merge(x,y), foo*boo)  
+> 
+> [1] 10 10 10 22 22
+> 
+> 
+> # I want to acheive the same result as the above using the 
+> 
+> # syntactically more compact (and faster?) code below:
+> 
+> 
+> > x[y, foo * boo ]                  
+> 
+> Error in eval(expr, envir, enclos) : object 'boo' not found
+> 
+> 
+> So is the FAQ just wrong, or am I misunderstanding something?
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From pchalasani at gmail.com  Sun Jan 23 01:57:28 2011
+From: pchalasani at gmail.com (Prasad Chalasani)
+Date: Sat, 22 Jan 2011 19:57:28 -0500
+Subject: [datatable-help] Cannot access cols of y when doing x[y, ...]
+In-Reply-To: <1295732880.2870.227.camel@netbook>
+References: <AANLkTinQooVbS5bRrV_Gi=M674oqHTwPKS5cnsf8iib8@mail.gmail.com>
+	<1295732880.2870.227.camel@netbook>
+Message-ID: <AANLkTinxMVkikVegpOmd2FNrr1Tdqq98XQ1d3cT7Qq0h@mail.gmail.com>
+
+Thank you for clarifying this! I was getting stuck on this. Yes the syntax
+and speedup are very nice indeed. I am dealing with 10 million row tables so
+it is very useful for me.
+
+Incidentally, I also asked this question on StackOverflow, and updated it
+based on your reply
+http://stackoverflow.com/questions/4764434/r-when-using-data-table-how-do-i-get-columns-of-y-when-i-do-xy
+
+
+
+On Sat, Jan 22, 2011 at 4:48 PM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+
+> Welcome to the list.
+> You're right, the FAQ is wrong.
+> FR#1095 is "Turn back on 'join inherited scope'".
+> This was a known problem in NEWS at v1.4 and still is.
+> When the grouping code was moved from R into C in v1.4 that feature
+> wasn't something that made it into the port.
+>
+> Glad you appreciate the neater syntax and yes it should be faster (the
+> more columns in x and y the faster the speed up could be, over a merge
+> followed by a query).
+>
+> I'll try and take a look soon.
+>
+> Matthew
+>
+>
+> On Sat, 2011-01-22 at 10:41 -0500, Prasad Chalasani wrote:
+> > The Data-table FAQ 1.11 states:
+> >
+> >
+> > "When you write x[y,foo*boo], data.table automatically inspects the j
+> > expression to see which columns it uses.
+> > It will only subset, or group, those columns only. Memory is only
+> > created for the columns the j uses.
+> >
+> > Let?s say foo is in x, and boo is in y (along with 20 other columns in
+> > y).
+> >
+> > Isn?t x[y,foo*boo] quicker to program and quicker to run than a merge
+> > step followed by another subset step ?"
+> >
+> >
+> > Contrary to what it says above, I get an error when I try to access a
+> > y-column in the "j" argument of x[y,j].
+> >
+> > See the sequence of code below.
+> >
+> >
+> > > x <- data.table( foo = c(1,1,1,2,2,3), a = 1:6, key = 'foo')
+> >
+> >
+> > > y <- data.table( foo = c(1,2), boo = 10:11, key = 'foo')
+> >
+> >
+> >
+> > # the below works as expected
+> >
+> > > x[y]
+> >
+> >      foo a
+> >
+> > [1,]   1 1
+> >
+> > [2,]   2 4
+> >
+> >
+> > > with( merge(x,y), foo*boo)
+> >
+> > [1] 10 10 10 22 22
+> >
+> >
+> > # I want to acheive the same result as the above using the
+> >
+> > # syntactically more compact (and faster?) code below:
+> >
+> >
+> > > x[y, foo * boo ]
+> >
+> > Error in eval(expr, envir, enclos) : object 'boo' not found
+> >
+> >
+> > So is the FAQ just wrong, or am I misunderstanding something?
+> >
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110122/a4ab65ce/attachment.htm>
+

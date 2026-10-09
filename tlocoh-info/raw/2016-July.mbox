@@ -1,0 +1,132 @@
+From E.J.Parker at 2015.ljmu.ac.uk  Thu Jul 21 10:20:50 2016
+From: E.J.Parker at 2015.ljmu.ac.uk (Parker, Edwin)
+Date: Thu, 21 Jul 2016 08:20:50 +0000
+Subject: [tlocoh-info] Error message when exporting locoh.lhs as shape file
+Message-ID: <C835AE13-F230-4FFB-A95F-4CEB9161E2D6@2015.ljmu.ac.uk>
+
+Hello,
+
+I am still fairly new to the T-LoCoH package but have been using it so far without any problems (and think it?s great!). However, I am recently getting the following error message when trying to export a locoh.lhs object as a shapefile:
+
+ *** caught segfault ***
+address 0x0, cause 'memory not mapped'
+
+Traceback:
+ 1: .Call("OGR_write", pre, PACKAGE = "rgdal")
+ 2: rgdal::writeOGR(hs[[hs.name]][["isos"]][[iidx]][["polys"]][hs[[hs.name]][["isos"]][[iidx]][["polys"]]@plotOrder,     ], dsn = dirname(fn.shp.unique.str), layer = basename(fn.shp.unique.str),     driver = "ESRI Shapefile")
+ 3: lhs.exp.shp(data.lhs, id = NULL, k = NULL, r = NULL, a = NULL,     s = NULL, hs.names = NULL, hpp = FALSE, hulls = T, iso = T,     iso.idx = NULL, iso.metric = NULL, ellipses = FALSE, dr = FALSE,     dr.idx = NULL, allpts = FALSE, nn = FALSE, dir = ".", file.base = "",     file.base.auto = TRUE, avl.file = NULL, status = TRUE, show.time = TRUE,     hm = "all", anv = NULL, hsp = NULL, metadata = TRUE)
+
+Possible actions:
+1: abort (with core dump, if enabled)
+2: normal R exit
+3: exit R without saving workspace
+4: exit R saving workspace
+Selection:
+
+I was wondering if anyone had any ideas what is going wrong as I have exported lhs objects as shapefiles before without any problems. Using R 3.3.1 and t-locoh 1.40.01. Also tried reinstalling R and t-locoh but still get the same message.
+
+Many thanks,
+Ed Parker
+
+________________________________
+Important Notice: the information in this email and any attachments is for the sole use of the intended recipient(s). If you are not an intended recipient, or a person responsible for delivering it to an intended recipient, you should delete it from your system immediately without disclosing its contents elsewhere and advise the sender by returning the email or by telephoning a number contained in the body of the email. No responsibility is accepted for loss or damage arising from viruses or changes made to this message after it was sent. The views contained in this email are those of the author and not necessarily those of Liverpool John Moores University.
+
+From lyons.andy at gmail.com  Thu Jul 28 15:51:56 2016
+From: lyons.andy at gmail.com (Andy Lyons)
+Date: Thu, 28 Jul 2016 06:51:56 -0700
+Subject: [tlocoh-info] Error message when exporting locoh.lhs as shape
+ file
+In-Reply-To: <C835AE13-F230-4FFB-A95F-4CEB9161E2D6@2015.ljmu.ac.uk>
+References: <C835AE13-F230-4FFB-A95F-4CEB9161E2D6@2015.ljmu.ac.uk>
+Message-ID: <df80fbd8-7b5a-44f9-f44a-7469ab619e49@gmail.com>
+
+Hi Edwin,
+
+That's a cryptic error message, but it sounds like the writeOGR() 
+function from rgdal (which is called by lhs.exp.shp()) is failing to 
+export one or more of the objects in your lochoh-hullset object (i.e., 
+either a hull or isopleth). I'm not familiar enough with rgdal to 
+interpret the message, but I've heard of other cases where there's 
+something funny about a polygon (e.g., very complex geometry, nodes on 
+top of each other, overlapping subpolygons, teeny tiny slivers, null 
+attribute values, etc.) that the gdal library (which is written in C++ I 
+believe) can not handle. Or it could be something the shapefile file 
+format can't handle.
+
+There are a couple of things you could try. You could use the hulls = 
+FALSE or iso = FALSE arguments in lhs.exp.shp() function, to determine 
+whether it is a hull or an isopleth that is causing the problem. Line 2 
+of the traceback suggests that it's struggling with one of the isopleths.
+
+The isopleths() function in tlocoh returns the isopleths in a 
+locoh-hullset as a list of SpatialPolygonDataFrame objects (which you 
+can also grab directly with an expression). The SpatialPolygonDataFrame 
+class is probably the most common data class in R for polygon layers, so 
+you could try to export them to disk using a different package. For 
+example the maptools package has a function called writeSpatialShape(), 
+the spsurvey package has a function called sp2shape(). You could also 
+export the SpatialPolygonDataFrame to a different format that your GIS 
+can read, such as kml. For a list of all the export drivers the rgdal 
+package supports, run ogrDrivers().
+
+If none of these work, you could track down what is causing the error 
+through a process of elimination (e.g., export the polygons in the 
+isopleths SPDF one-by-one).
+
+This is a very rare error so I don't suspect there is something 
+fundamentally wrong with the data structure or the way the isopleths are 
+created, but if you can isolate what it is about the polygon that is 
+causing the error and we can trap it that would be a good feature to 
+add. If you want to explore that more send me an email (no need to cc 
+the entire list).
+
+Hope this helps.
+
+Andy
+
+
+
+On 7/21/2016 1:20 AM, Parker, Edwin wrote:
+> Hello,
+>
+> I am still fairly new to the T-LoCoH package but have been using it so far without any problems (and think it?s great!). However, I am recently getting the following error message when trying to export a locoh.lhs object as a shapefile:
+>
+>   *** caught segfault ***
+> address 0x0, cause 'memory not mapped'
+>
+> Traceback:
+>   1: .Call("OGR_write", pre, PACKAGE = "rgdal")
+>   2: rgdal::writeOGR(hs[[hs.name]][["isos"]][[iidx]][["polys"]][hs[[hs.name]][["isos"]][[iidx]][["polys"]]@plotOrder,     ], dsn = dirname(fn.shp.unique.str), layer = basename(fn.shp.unique.str),     driver = "ESRI Shapefile")
+>   3: lhs.exp.shp(data.lhs, id = NULL, k = NULL, r = NULL, a = NULL,     s = NULL, hs.names = NULL, hpp = FALSE, hulls = T, iso = T,     iso.idx = NULL, iso.metric = NULL, ellipses = FALSE, dr = FALSE,     dr.idx = NULL, allpts = FALSE, nn = FALSE, dir = ".", file.base = "",     file.base.auto = TRUE, avl.file = NULL, status = TRUE, show.time = TRUE,     hm = "all", anv = NULL, hsp = NULL, metadata = TRUE)
+>
+> Possible actions:
+> 1: abort (with core dump, if enabled)
+> 2: normal R exit
+> 3: exit R without saving workspace
+> 4: exit R saving workspace
+> Selection:
+>
+> I was wondering if anyone had any ideas what is going wrong as I have exported lhs objects as shapefiles before without any problems. Using R 3.3.1 and t-locoh 1.40.01. Also tried reinstalling R and t-locoh but still get the same message.
+>
+> Many thanks,
+> Ed Parker
+>
+> ________________________________
+> Important Notice: the information in this email and any attachments is for the sole use of the intended recipient(s). If you are not an intended recipient, or a person responsible for delivering it to an intended recipient, you should delete it from your system immediately without disclosing its contents elsewhere and advise the sender by returning the email or by telephoning a number contained in the body of the email. No responsibility is accepted for loss or damage arising from viruses or changes made to this message after it was sent. The views contained in this email are those of the author and not necessarily those of Liverpool John Moores University.
+> _______________________________________________
+> Tlocoh-info mailing list
+> Tlocoh-info at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tlocoh-info
+
+-- 
+*T-LoCoH*: A hull-based method for home range construction and 
+spatiotemporal analysis of movement data.
+Lyons, A., Turner, W.C., and WM Getz. 2013. Home Range Plus: A 
+Space-Time Characterization of Movement Over Real Landscapes. BMC 
+Movement Ecology 1:2 <http://www.movementecologyjournal.com/content/1/1/2>.
+http://tlocoh.r-forge.r-project.org
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/tlocoh-info/attachments/20160728/051c4352/attachment.html>
+

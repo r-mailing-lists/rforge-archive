@@ -1,0 +1,1056 @@
+From deepayan.sarkar at gmail.com  Mon Sep 19 14:28:14 2011
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Mon, 19 Sep 2011 17:58:14 +0530
+Subject: [RQt-devel] possible bug in qtbase
+Message-ID: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+
+Hi,
+
+I'm working with qtbase after a long gap. In some code making use of
+QGraphicsView/Scene, I'm intermittently (but frequently) encountering
+what look like memory problems. I've simplified my code to a
+sort-of-reproducible minimal example, available at
+
+http://www.isid.ac.in/~deepayan/tmp/foo.R
+
+Running this (a couple of times) gives:
+
+deepayan at kanika:/tmp$ R --slave < foo.R
+NULL
+QGraphicsView instance
+1       QPen
+2       QPen
+3       QPen
+4       QPen
+5       QPen
+6       QPen
+7       QPen
+8       QPen
+9       QPen
+10      QPen
+11      QPen
+12      QPen
+13      QGraphicsEllipseItem
+Error in qinvoke(<environment>, "addRect", ...) :
+  Expected an instance of type 'QPen', not 'QGraphicsEllipseItem'
+Calls: <Anonymous> -> qinvoke -> .Call
+Execution halted
+
+deepayan at kanika:/tmp$ R --slave < foo.R
+NULL
+QGraphicsView instance
+1       QPen
+2       QPen
+3       QPen
+4       QPen
+5       QPen
+6       QPen
+7       QPen
+8       QPen
+Error in qinvokeStatic(cl, basename, ...) :
+  Wrong number or types of arguments passed to 'QColor::QColor'
+Calls: qpen ... qbrush -> qcolor -> <Anonymous> -> qinvokeStatic -> .Call
+Execution halted
+
+
+I get no error if I comment out the scene$addRect and scene$addEllipse
+calls.  If I move the pen <- qpen(...) call outside the loop, then the
+error still happens, but typically takes much longer; e.g.,
+
+...
+259     QPen
+260     QPen
+261     QPen
+Error in qinvoke(<environment>, "setScene", ...) :
+  Expected an instance of type 'QGraphicsScene', not 'QGraphicsEllipseItem'
+Calls: <Anonymous> -> qinvoke -> .Call
+Execution halted
+
+Can anyone reproduce?
+
+(I have added a few missing break statements in qtbase/src/module.cpp,
+but they don't seem to be relevant.)
+
+I am using Qt 4.7.2 on Debian.
+
+-Deepayan
+
+From lawrence.michael at gene.com  Tue Sep 20 17:25:58 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 20 Sep 2011 08:25:58 -0700
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+Message-ID: <CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+
+Hi Deepayan,
+
+Nice to hear you are back into the Qt stuff. I can indeed reproduce this.
+But not anymore, because I've fixed it.
+
+Thanks for the report,
+Michael
+
+On Mon, Sep 19, 2011 at 5:28 AM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> Hi,
+>
+> I'm working with qtbase after a long gap. In some code making use of
+> QGraphicsView/Scene, I'm intermittently (but frequently) encountering
+> what look like memory problems. I've simplified my code to a
+> sort-of-reproducible minimal example, available at
+>
+> http://www.isid.ac.in/~deepayan/tmp/foo.R
+>
+> Running this (a couple of times) gives:
+>
+> deepayan at kanika:/tmp$ R --slave < foo.R
+> NULL
+> QGraphicsView instance
+> 1       QPen
+> 2       QPen
+> 3       QPen
+> 4       QPen
+> 5       QPen
+> 6       QPen
+> 7       QPen
+> 8       QPen
+> 9       QPen
+> 10      QPen
+> 11      QPen
+> 12      QPen
+> 13      QGraphicsEllipseItem
+> Error in qinvoke(<environment>, "addRect", ...) :
+>  Expected an instance of type 'QPen', not 'QGraphicsEllipseItem'
+> Calls: <Anonymous> -> qinvoke -> .Call
+> Execution halted
+>
+> deepayan at kanika:/tmp$ R --slave < foo.R
+> NULL
+> QGraphicsView instance
+> 1       QPen
+> 2       QPen
+> 3       QPen
+> 4       QPen
+> 5       QPen
+> 6       QPen
+> 7       QPen
+> 8       QPen
+> Error in qinvokeStatic(cl, basename, ...) :
+>  Wrong number or types of arguments passed to 'QColor::QColor'
+> Calls: qpen ... qbrush -> qcolor -> <Anonymous> -> qinvokeStatic -> .Call
+> Execution halted
+>
+>
+> I get no error if I comment out the scene$addRect and scene$addEllipse
+> calls.  If I move the pen <- qpen(...) call outside the loop, then the
+> error still happens, but typically takes much longer; e.g.,
+>
+> ...
+> 259     QPen
+> 260     QPen
+> 261     QPen
+> Error in qinvoke(<environment>, "setScene", ...) :
+>  Expected an instance of type 'QGraphicsScene', not 'QGraphicsEllipseItem'
+> Calls: <Anonymous> -> qinvoke -> .Call
+> Execution halted
+>
+> Can anyone reproduce?
+>
+> (I have added a few missing break statements in qtbase/src/module.cpp,
+> but they don't seem to be relevant.)
+>
+> I am using Qt 4.7.2 on Debian.
+>
+> -Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110920/23d1769f/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Tue Sep 20 21:03:36 2011
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Wed, 21 Sep 2011 00:33:36 +0530
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+Message-ID: <CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+
+On Tue, Sep 20, 2011 at 8:55 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Hi Deepayan,
+>
+> Nice to hear you are back into the Qt stuff. I can indeed reproduce this.
+> But not anymore, because I've fixed it.
+
+Thanks, I can confirm the fix.
+
+I've decided to try out a different approach, managing the layout in R
+as much as possible, and target multiple backends. I'm initially
+experimenting with QGraphicsView/Scene, and now I'm getting much
+further with that thanks to your fix. At some point I'll start bugging
+you about qtpaint as well.
+
+I think there are still problems lurking around. Here is a protection
+bug: This gives an error because the gc() causes view$scene() to go
+away.
+
+----
+library(qtbase)
+
+view <- Qt$QGraphicsView()
+view$size <- qsize(600, 600)
+view$setScene(Qt$QGraphicsScene())
+## class(view$scene())
+gc()
+view$scene() # NULL
+view$scene()$clear()
+----
+
+If I uncomment the 'class(view$scene())' then things are OK.
+
+In a more realistic example involving QGraphicsScene (that I haven't
+been able to simplify yet), having a gc() keeps things sane, and not
+having it leads to errors similar to the ones before, e.g.,
+
+Error in qinvokeStatic(cl, basename, ...) :
+  Expected an instance of type 'QColor', not 'QGraphicsLineItem'
+Calls: print ... is -> qbrush -> <Anonymous> -> qinvokeStatic -> .Call
+
+-Deepayan
+
+From lawrence.michael at gene.com  Tue Sep 20 23:50:22 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 20 Sep 2011 14:50:22 -0700
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+Message-ID: <CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+
+On Tue, Sep 20, 2011 at 12:03 PM, Deepayan Sarkar <deepayan.sarkar at gmail.com
+> wrote:
+
+> On Tue, Sep 20, 2011 at 8:55 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > Hi Deepayan,
+> >
+> > Nice to hear you are back into the Qt stuff. I can indeed reproduce this.
+> > But not anymore, because I've fixed it.
+>
+> Thanks, I can confirm the fix.
+>
+> I've decided to try out a different approach, managing the layout in R
+> as much as possible, and target multiple backends. I'm initially
+> experimenting with QGraphicsView/Scene, and now I'm getting much
+> further with that thanks to your fix. At some point I'll start bugging
+> you about qtpaint as well.
+>
+>
+You might want to check out anypaint in the GGobi github. Gabriel Becker
+(DTL's student) has been doing a lot of work on generic (pure R, backend
+agnostic) implementations of things like layout. He's implementing anypaint
+against HTML5/JS in Firefox, via RFirefox. I need to make sure that he is
+committing his stuff back into github.
+
+
+
+> I think there are still problems lurking around. Here is a protection
+> bug: This gives an error because the gc() causes view$scene() to go
+> away.
+>
+> ----
+> library(qtbase)
+>
+> view <- Qt$QGraphicsView()
+> view$size <- qsize(600, 600)
+> view$setScene(Qt$QGraphicsScene())
+> ## class(view$scene())
+> gc()
+> view$scene() # NULL
+> view$scene()$clear()
+> ----
+>
+> If I uncomment the 'class(view$scene())' then things are OK.
+>
+>
+This is just Qt. Neither R nor QGraphicsView keep a reference to the scene.
+This is why qtpaint sets the parent of the scene to the view, if it does not
+already have a parent.
+
+
+> In a more realistic example involving QGraphicsScene (that I haven't
+> been able to simplify yet), having a gc() keeps things sane, and not
+> having it leads to errors similar to the ones before, e.g.,
+>
+> Error in qinvokeStatic(cl, basename, ...) :
+>   Expected an instance of type 'QColor', not 'QGraphicsLineItem'
+> Calls: print ... is -> qbrush -> <Anonymous> -> qinvokeStatic -> .Call
+>
+>
+Looking forward to that simplified example.
+
+
+> -Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110920/0f8d370d/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Wed Sep 21 04:40:05 2011
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Wed, 21 Sep 2011 08:10:05 +0530
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+	<CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+Message-ID: <CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+
+On Wed, Sep 21, 2011 at 3:20 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Tue, Sep 20, 2011 at 12:03 PM, Deepayan Sarkar
+> <deepayan.sarkar at gmail.com> wrote:
+>>
+>> On Tue, Sep 20, 2011 at 8:55 PM, Michael Lawrence
+>> <lawrence.michael at gene.com> wrote:
+>> > Hi Deepayan,
+>> >
+>> > Nice to hear you are back into the Qt stuff. I can indeed reproduce
+>> > this.
+>> > But not anymore, because I've fixed it.
+>>
+>> Thanks, I can confirm the fix.
+>>
+>> I've decided to try out a different approach, managing the layout in R
+>> as much as possible, and target multiple backends. I'm initially
+>> experimenting with QGraphicsView/Scene, and now I'm getting much
+>> further with that thanks to your fix. At some point I'll start bugging
+>> you about qtpaint as well.
+>>
+>
+> You might want to check out anypaint in the GGobi github. Gabriel Becker
+> (DTL's student) has been doing a lot of work on generic (pure R, backend
+> agnostic) implementations of things like layout. He's implementing anypaint
+> against HTML5/JS in Firefox, via RFirefox. I need to make sure that he is
+> committing his stuff back into github.
+
+Seems mostly notImplemented() calls right now.
+
+>> I think there are still problems lurking around. Here is a protection
+>> bug: This gives an error because the gc() causes view$scene() to go
+>> away.
+>>
+>> ----
+>> library(qtbase)
+>>
+>> view <- Qt$QGraphicsView()
+>> view$size <- qsize(600, 600)
+>> view$setScene(Qt$QGraphicsScene())
+>> ## class(view$scene())
+>> gc()
+>> view$scene() # NULL
+>> view$scene()$clear()
+>> ----
+>>
+>> If I uncomment the 'class(view$scene())' then things are OK.
+>>
+>
+> This is just Qt. Neither R nor QGraphicsView keep a reference to the scene.
+> This is why qtpaint sets the parent of the scene to the view, if it does not
+> already have a parent.
+
+So having an R reference like so
+
+scene <- Qt$QGraphicsScene()
+view$setScene(scene)
+
+should be safe?
+
+>> In a more realistic example involving QGraphicsScene (that I haven't
+>> been able to simplify yet), having a gc() keeps things sane, and not
+>> having it leads to errors similar to the ones before, e.g.,
+>>
+>> Error in qinvokeStatic(cl, basename, ...) :
+>> ?Expected an instance of type 'QColor', not 'QGraphicsLineItem'
+>> Calls: print ... is -> qbrush -> <Anonymous> -> qinvokeStatic -> .Call
+>>
+>
+> Looking forward to that simplified example.
+
+Here goes. Adding the gc() makes the whole thing work fine. The
+trivial qpen() call is required.
+
+#----
+library(qtbase)
+
+v <- Qt$QGraphicsView()
+v$size <- qsize(300, 300)
+scene <- Qt$QGraphicsScene()
+v$setScene(scene)
+v$show()
+
+doplot <- function(view, scene)
+{
+    ## gc()
+    scene$clear()
+    x <- runif(2, 50, 250)
+    scene$addEllipse(x[1], x[2], 10, 10, qpen())
+    Sys.sleep(0.01)
+}
+
+niter <- 0L
+while (TRUE)
+{
+    doplot(view = v, scene = scene)
+    niter <- niter + 1
+    cat(niter, fill = TRUE)
+}
+#----
+
+I'm usually getting an error within 10 iterations.
+
+-Deepayan
+
+From lawrence.michael at gene.com  Wed Sep 21 06:48:08 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 20 Sep 2011 21:48:08 -0700
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+	<CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+	<CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+Message-ID: <CAOQ5NydKKC=5ewH_P2qmGxPtvqVpk-r6wKXR+zOQfxgTVA0ajA@mail.gmail.com>
+
+On Tue, Sep 20, 2011 at 7:40 PM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> On Wed, Sep 21, 2011 at 3:20 AM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> >
+> >
+> > On Tue, Sep 20, 2011 at 12:03 PM, Deepayan Sarkar
+> > <deepayan.sarkar at gmail.com> wrote:
+> >>
+> >> On Tue, Sep 20, 2011 at 8:55 PM, Michael Lawrence
+> >> <lawrence.michael at gene.com> wrote:
+> >> > Hi Deepayan,
+> >> >
+> >> > Nice to hear you are back into the Qt stuff. I can indeed reproduce
+> >> > this.
+> >> > But not anymore, because I've fixed it.
+> >>
+> >> Thanks, I can confirm the fix.
+> >>
+> >> I've decided to try out a different approach, managing the layout in R
+> >> as much as possible, and target multiple backends. I'm initially
+> >> experimenting with QGraphicsView/Scene, and now I'm getting much
+> >> further with that thanks to your fix. At some point I'll start bugging
+> >> you about qtpaint as well.
+> >>
+> >
+> > You might want to check out anypaint in the GGobi github. Gabriel Becker
+> > (DTL's student) has been doing a lot of work on generic (pure R, backend
+> > agnostic) implementations of things like layout. He's implementing
+> anypaint
+> > against HTML5/JS in Firefox, via RFirefox. I need to make sure that he is
+> > committing his stuff back into github.
+>
+> Seems mostly notImplemented() calls right now.
+>
+>
+Right, it's just the abstraction. Gabe's firepaint package implements it for
+RFirefox. qtpaint will implement it for Qt.
+
+
+> >> I think there are still problems lurking around. Here is a protection
+> >> bug: This gives an error because the gc() causes view$scene() to go
+> >> away.
+> >>
+> >> ----
+> >> library(qtbase)
+> >>
+> >> view <- Qt$QGraphicsView()
+> >> view$size <- qsize(600, 600)
+> >> view$setScene(Qt$QGraphicsScene())
+> >> ## class(view$scene())
+> >> gc()
+> >> view$scene() # NULL
+> >> view$scene()$clear()
+> >> ----
+> >>
+> >> If I uncomment the 'class(view$scene())' then things are OK.
+> >>
+> >
+> > This is just Qt. Neither R nor QGraphicsView keep a reference to the
+> scene.
+> > This is why qtpaint sets the parent of the scene to the view, if it does
+> not
+> > already have a parent.
+>
+> So having an R reference like so
+>
+> scene <- Qt$QGraphicsScene()
+> view$setScene(scene)
+>
+> should be safe?
+>
+>
+Yes, but I would recommend setting the parent, so that you do not need to
+worry about the R reference. That's sensible as long as you have a single
+view.
+
+
+> >> In a more realistic example involving QGraphicsScene (that I haven't
+> >> been able to simplify yet), having a gc() keeps things sane, and not
+> >> having it leads to errors similar to the ones before, e.g.,
+> >>
+> >> Error in qinvokeStatic(cl, basename, ...) :
+> >>  Expected an instance of type 'QColor', not 'QGraphicsLineItem'
+> >> Calls: print ... is -> qbrush -> <Anonymous> -> qinvokeStatic -> .Call
+> >>
+> >
+> > Looking forward to that simplified example.
+>
+> Here goes. Adding the gc() makes the whole thing work fine. The
+> trivial qpen() call is required.
+>
+>
+Thanks a lot. Will look at this.
+
+
+> #----
+> library(qtbase)
+>
+> v <- Qt$QGraphicsView()
+> v$size <- qsize(300, 300)
+> scene <- Qt$QGraphicsScene()
+> v$setScene(scene)
+> v$show()
+>
+> doplot <- function(view, scene)
+> {
+>    ## gc()
+>    scene$clear()
+>    x <- runif(2, 50, 250)
+>    scene$addEllipse(x[1], x[2], 10, 10, qpen())
+>    Sys.sleep(0.01)
+> }
+>
+> niter <- 0L
+> while (TRUE)
+> {
+>    doplot(view = v, scene = scene)
+>    niter <- niter + 1
+>    cat(niter, fill = TRUE)
+> }
+> #----
+>
+> I'm usually getting an error within 10 iterations.
+>
+> -Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110920/c41cc7b3/attachment-0001.htm>
+
+From lawrence.michael at gene.com  Wed Sep 21 15:52:34 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 21 Sep 2011 06:52:34 -0700
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CAOQ5NydKKC=5ewH_P2qmGxPtvqVpk-r6wKXR+zOQfxgTVA0ajA@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+	<CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+	<CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+	<CAOQ5NydKKC=5ewH_P2qmGxPtvqVpk-r6wKXR+zOQfxgTVA0ajA@mail.gmail.com>
+Message-ID: <CAOQ5NyeMjLBKm0HmjqG8f4v9Dub530zM6Gy9MLP5wR618pk2+Q@mail.gmail.com>
+
+On Tue, Sep 20, 2011 at 9:48 PM, Michael Lawrence <michafla at gene.com> wrote:
+
+>
+>
+> On Tue, Sep 20, 2011 at 7:40 PM, Deepayan Sarkar <
+> deepayan.sarkar at gmail.com> wrote:
+>
+>> On Wed, Sep 21, 2011 at 3:20 AM, Michael Lawrence
+>> <lawrence.michael at gene.com> wrote:
+>> >
+>> >
+>> > On Tue, Sep 20, 2011 at 12:03 PM, Deepayan Sarkar
+>> > <deepayan.sarkar at gmail.com> wrote:
+>> >>
+>> >> On Tue, Sep 20, 2011 at 8:55 PM, Michael Lawrence
+>> >> <lawrence.michael at gene.com> wrote:
+>> >> > Hi Deepayan,
+>> >> >
+>> >> > Nice to hear you are back into the Qt stuff. I can indeed reproduce
+>> >> > this.
+>> >> > But not anymore, because I've fixed it.
+>> >>
+>> >> Thanks, I can confirm the fix.
+>> >>
+>> >> I've decided to try out a different approach, managing the layout in R
+>> >> as much as possible, and target multiple backends. I'm initially
+>> >> experimenting with QGraphicsView/Scene, and now I'm getting much
+>> >> further with that thanks to your fix. At some point I'll start bugging
+>> >> you about qtpaint as well.
+>> >>
+>> >
+>> > You might want to check out anypaint in the GGobi github. Gabriel Becker
+>> > (DTL's student) has been doing a lot of work on generic (pure R, backend
+>> > agnostic) implementations of things like layout. He's implementing
+>> anypaint
+>> > against HTML5/JS in Firefox, via RFirefox. I need to make sure that he
+>> is
+>> > committing his stuff back into github.
+>>
+>> Seems mostly notImplemented() calls right now.
+>>
+>>
+> Right, it's just the abstraction. Gabe's firepaint package implements it
+> for RFirefox. qtpaint will implement it for Qt.
+>
+>
+>>  >> I think there are still problems lurking around. Here is a protection
+>> >> bug: This gives an error because the gc() causes view$scene() to go
+>> >> away.
+>> >>
+>> >> ----
+>> >> library(qtbase)
+>> >>
+>> >> view <- Qt$QGraphicsView()
+>> >> view$size <- qsize(600, 600)
+>> >> view$setScene(Qt$QGraphicsScene())
+>> >> ## class(view$scene())
+>> >> gc()
+>> >> view$scene() # NULL
+>> >> view$scene()$clear()
+>> >> ----
+>> >>
+>> >> If I uncomment the 'class(view$scene())' then things are OK.
+>> >>
+>> >
+>> > This is just Qt. Neither R nor QGraphicsView keep a reference to the
+>> scene.
+>> > This is why qtpaint sets the parent of the scene to the view, if it does
+>> not
+>> > already have a parent.
+>>
+>> So having an R reference like so
+>>
+>> scene <- Qt$QGraphicsScene()
+>> view$setScene(scene)
+>>
+>> should be safe?
+>>
+>>
+> Yes, but I would recommend setting the parent, so that you do not need to
+> worry about the R reference. That's sensible as long as you have a single
+> view.
+>
+>
+>> >> In a more realistic example involving QGraphicsScene (that I haven't
+>> >> been able to simplify yet), having a gc() keeps things sane, and not
+>> >> having it leads to errors similar to the ones before, e.g.,
+>> >>
+>> >> Error in qinvokeStatic(cl, basename, ...) :
+>> >>  Expected an instance of type 'QColor', not 'QGraphicsLineItem'
+>> >> Calls: print ... is -> qbrush -> <Anonymous> -> qinvokeStatic -> .Call
+>> >>
+>> >
+>> > Looking forward to that simplified example.
+>>
+>> Here goes. Adding the gc() makes the whole thing work fine. The
+>> trivial qpen() call is required.
+>>
+>>
+> Thanks a lot. Will look at this.
+>
+>
+>> #----
+>> library(qtbase)
+>>
+>> v <- Qt$QGraphicsView()
+>> v$size <- qsize(300, 300)
+>> scene <- Qt$QGraphicsScene()
+>> v$setScene(scene)
+>> v$show()
+>>
+>> doplot <- function(view, scene)
+>> {
+>>    ## gc()
+>>    scene$clear()
+>>    x <- runif(2, 50, 250)
+>>    scene$addEllipse(x[1], x[2], 10, 10, qpen())
+>>    Sys.sleep(0.01)
+>> }
+>>
+>>
+The issue is that scene$clear() frees all objects, including the ellipse,
+but since Qt constructed the QGraphicsEllipseItem, we have no way of knowing
+that it has been freed, and so we cannot clear the pointer out of the hash.
+The fix yesterday made it so that if the R object was garbage collected, the
+pointer would be cleared in this situation. It may be that we can get away
+without adding such pointers to the hash at all, i.e., we would create a new
+wrapper object every time we see them. That will take a lot of thought
+though about the myriad of consequences.
+
+Please stand by.
+
+Michael
+
+
+
+> niter <- 0L
+>> while (TRUE)
+>> {
+>>    doplot(view = v, scene = scene)
+>>    niter <- niter + 1
+>>    cat(niter, fill = TRUE)
+>> }
+>> #----
+>>
+>> I'm usually getting an error within 10 iterations.
+>>
+>> -Deepayan
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110921/973e966c/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Wed Sep 21 18:07:24 2011
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Wed, 21 Sep 2011 21:37:24 +0530
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CAOQ5NyeMjLBKm0HmjqG8f4v9Dub530zM6Gy9MLP5wR618pk2+Q@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+	<CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+	<CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+	<CAOQ5NydKKC=5ewH_P2qmGxPtvqVpk-r6wKXR+zOQfxgTVA0ajA@mail.gmail.com>
+	<CAOQ5NyeMjLBKm0HmjqG8f4v9Dub530zM6Gy9MLP5wR618pk2+Q@mail.gmail.com>
+Message-ID: <CADfFDC6qJAUaJRQd97hwUdkF06Mqv9UP2pnXPzYzNg8agaY+EQ@mail.gmail.com>
+
+On Wed, Sep 21, 2011 at 7:22 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Tue, Sep 20, 2011 at 9:48 PM, Michael Lawrence <michafla at gene.com> wrote:
+>>
+>>
+>> On Tue, Sep 20, 2011 at 7:40 PM, Deepayan Sarkar
+
+[...]
+
+>>> Here goes. Adding the gc() makes the whole thing work fine. The
+>>> trivial qpen() call is required.
+>>>
+>>
+>> Thanks a lot. Will look at this.
+>>
+>>>
+>>> #----
+>>> library(qtbase)
+>>>
+>>> v <- Qt$QGraphicsView()
+>>> v$size <- qsize(300, 300)
+>>> scene <- Qt$QGraphicsScene()
+>>> v$setScene(scene)
+>>> v$show()
+>>>
+>>> doplot <- function(view, scene)
+>>> {
+>>> ? ?## gc()
+>>> ? ?scene$clear()
+>>> ? ?x <- runif(2, 50, 250)
+>>> ? ?scene$addEllipse(x[1], x[2], 10, 10, qpen())
+>>> ? ?Sys.sleep(0.01)
+>>> }
+>>>
+>
+> The issue is that scene$clear() frees all objects, including the ellipse,
+> but since Qt constructed the QGraphicsEllipseItem, we have no way of knowing
+> that it has been freed, and so we cannot clear the pointer out of the hash.
+> The fix yesterday made it so that if the R object was garbage collected, the
+> pointer would be cleared in this situation. It may be that we can get away
+> without adding such pointers to the hash at all, i.e., we would create a new
+> wrapper object every time we see them. That will take a lot of thought
+> though about the myriad of consequences.
+
+Makes sense. My first attempt had been replacing view$scene() by a new
+scene each time, and that had no problems.
+
+I will go back to that approach for now.
+
+-Deepayan
+
+>
+> Please stand by.
+>
+> Michael
+>
+>
+>>>
+>>> niter <- 0L
+>>> while (TRUE)
+>>> {
+>>> ? ?doplot(view = v, scene = scene)
+>>> ? ?niter <- niter + 1
+>>> ? ?cat(niter, fill = TRUE)
+>>> }
+>>> #----
+>>>
+>>> I'm usually getting an error within 10 iterations.
+>>>
+>>> -Deepayan
+>>
+>
+>
+
+From lawrence.michael at gene.com  Wed Sep 21 19:14:58 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 21 Sep 2011 10:14:58 -0700
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CADfFDC6qJAUaJRQd97hwUdkF06Mqv9UP2pnXPzYzNg8agaY+EQ@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+	<CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+	<CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+	<CAOQ5NydKKC=5ewH_P2qmGxPtvqVpk-r6wKXR+zOQfxgTVA0ajA@mail.gmail.com>
+	<CAOQ5NyeMjLBKm0HmjqG8f4v9Dub530zM6Gy9MLP5wR618pk2+Q@mail.gmail.com>
+	<CADfFDC6qJAUaJRQd97hwUdkF06Mqv9UP2pnXPzYzNg8agaY+EQ@mail.gmail.com>
+Message-ID: <CAOQ5Nyfidyf3dsfxFHERKCbAx0i3G7+GFVY0Y_CmC8r3FwcW0g@mail.gmail.com>
+
+Just pushed the fix. Let me know if this screws up something else.
+
+Thanks,
+Michael
+
+On Wed, Sep 21, 2011 at 9:07 AM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> On Wed, Sep 21, 2011 at 7:22 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> >
+> >
+> > On Tue, Sep 20, 2011 at 9:48 PM, Michael Lawrence <michafla at gene.com>
+> wrote:
+> >>
+> >>
+> >> On Tue, Sep 20, 2011 at 7:40 PM, Deepayan Sarkar
+>
+> [...]
+>
+> >>> Here goes. Adding the gc() makes the whole thing work fine. The
+> >>> trivial qpen() call is required.
+> >>>
+> >>
+> >> Thanks a lot. Will look at this.
+> >>
+> >>>
+> >>> #----
+> >>> library(qtbase)
+> >>>
+> >>> v <- Qt$QGraphicsView()
+> >>> v$size <- qsize(300, 300)
+> >>> scene <- Qt$QGraphicsScene()
+> >>> v$setScene(scene)
+> >>> v$show()
+> >>>
+> >>> doplot <- function(view, scene)
+> >>> {
+> >>>    ## gc()
+> >>>    scene$clear()
+> >>>    x <- runif(2, 50, 250)
+> >>>    scene$addEllipse(x[1], x[2], 10, 10, qpen())
+> >>>    Sys.sleep(0.01)
+> >>> }
+> >>>
+> >
+> > The issue is that scene$clear() frees all objects, including the ellipse,
+> > but since Qt constructed the QGraphicsEllipseItem, we have no way of
+> knowing
+> > that it has been freed, and so we cannot clear the pointer out of the
+> hash.
+> > The fix yesterday made it so that if the R object was garbage collected,
+> the
+> > pointer would be cleared in this situation. It may be that we can get
+> away
+> > without adding such pointers to the hash at all, i.e., we would create a
+> new
+> > wrapper object every time we see them. That will take a lot of thought
+> > though about the myriad of consequences.
+>
+> Makes sense. My first attempt had been replacing view$scene() by a new
+> scene each time, and that had no problems.
+>
+> I will go back to that approach for now.
+>
+> -Deepayan
+>
+> >
+> > Please stand by.
+> >
+> > Michael
+> >
+> >
+> >>>
+> >>> niter <- 0L
+> >>> while (TRUE)
+> >>> {
+> >>>    doplot(view = v, scene = scene)
+> >>>    niter <- niter + 1
+> >>>    cat(niter, fill = TRUE)
+> >>> }
+> >>> #----
+> >>>
+> >>> I'm usually getting an error within 10 iterations.
+> >>>
+> >>> -Deepayan
+> >>
+> >
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110921/762733ed/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Thu Sep 22 08:11:13 2011
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Thu, 22 Sep 2011 11:41:13 +0530
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CAOQ5Nyfidyf3dsfxFHERKCbAx0i3G7+GFVY0Y_CmC8r3FwcW0g@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+	<CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+	<CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+	<CAOQ5NydKKC=5ewH_P2qmGxPtvqVpk-r6wKXR+zOQfxgTVA0ajA@mail.gmail.com>
+	<CAOQ5NyeMjLBKm0HmjqG8f4v9Dub530zM6Gy9MLP5wR618pk2+Q@mail.gmail.com>
+	<CADfFDC6qJAUaJRQd97hwUdkF06Mqv9UP2pnXPzYzNg8agaY+EQ@mail.gmail.com>
+	<CAOQ5Nyfidyf3dsfxFHERKCbAx0i3G7+GFVY0Y_CmC8r3FwcW0g@mail.gmail.com>
+Message-ID: <CADfFDC54JFQuvd1878n8k792RdJegd1zQH_Bb0hZw1a9u9z1Yw@mail.gmail.com>
+
+On Wed, Sep 21, 2011 at 10:44 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Just pushed the fix. Let me know if this screws up something else.
+
+It does (looks like an infinite loop ending in a stack overflow, so
+hopefully easy to detect and fix):
+
+----
+library(qtbase)
+
+v <- Qt$QGraphicsView()
+v$size <- qsize(600, 600)
+scene <- Qt$QGraphicsScene(v)
+v$setScene(scene)
+
+v$scene()$addRect(50, 50, 550, 550)
+----
+
+Things are fine if I replace the last line with
+
+scene$addRect(50, 50, 550, 550)
+
+-Deepayan
+
+From lawrence.michael at gene.com  Thu Sep 22 18:54:19 2011
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 22 Sep 2011 09:54:19 -0700
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CADfFDC54JFQuvd1878n8k792RdJegd1zQH_Bb0hZw1a9u9z1Yw@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+	<CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+	<CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+	<CAOQ5NydKKC=5ewH_P2qmGxPtvqVpk-r6wKXR+zOQfxgTVA0ajA@mail.gmail.com>
+	<CAOQ5NyeMjLBKm0HmjqG8f4v9Dub530zM6Gy9MLP5wR618pk2+Q@mail.gmail.com>
+	<CADfFDC6qJAUaJRQd97hwUdkF06Mqv9UP2pnXPzYzNg8agaY+EQ@mail.gmail.com>
+	<CAOQ5Nyfidyf3dsfxFHERKCbAx0i3G7+GFVY0Y_CmC8r3FwcW0g@mail.gmail.com>
+	<CADfFDC54JFQuvd1878n8k792RdJegd1zQH_Bb0hZw1a9u9z1Yw@mail.gmail.com>
+Message-ID: <CAOQ5NydQn2GOBgetWN5sxUuA4TAqYrkHH63t+K7N8pi=4re19w@mail.gmail.com>
+
+Well it wasn't a simple fix (everything has far reaching consequences), but
+I think it's resolved.
+
+Michael
+
+On Wed, Sep 21, 2011 at 11:11 PM, Deepayan Sarkar <deepayan.sarkar at gmail.com
+> wrote:
+
+> On Wed, Sep 21, 2011 at 10:44 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > Just pushed the fix. Let me know if this screws up something else.
+>
+> It does (looks like an infinite loop ending in a stack overflow, so
+> hopefully easy to detect and fix):
+>
+> ----
+> library(qtbase)
+>
+> v <- Qt$QGraphicsView()
+> v$size <- qsize(600, 600)
+> scene <- Qt$QGraphicsScene(v)
+> v$setScene(scene)
+>
+> v$scene()$addRect(50, 50, 550, 550)
+> ----
+>
+> Things are fine if I replace the last line with
+>
+> scene$addRect(50, 50, 550, 550)
+>
+> -Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20110922/51118d1b/attachment.htm>
+
+From deepayan.sarkar at gmail.com  Sat Sep 24 17:38:54 2011
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Sat, 24 Sep 2011 21:08:54 +0530
+Subject: [RQt-devel] possible bug in qtbase
+In-Reply-To: <CAOQ5NydQn2GOBgetWN5sxUuA4TAqYrkHH63t+K7N8pi=4re19w@mail.gmail.com>
+References: <CADfFDC7F9LSOAVDkQWrrQ9fWRt-UM1pBtAwRnxKC+F811E6-NA@mail.gmail.com>
+	<CAOQ5NycUTBuQn6_dcKsLo+bH9JLt5P7CBe38BGN3Ux49Q1c96Q@mail.gmail.com>
+	<CADfFDC4A5k+tW88c+MxWk2ATp-uK8=y=md7OeDBV6np=Gfi67A@mail.gmail.com>
+	<CAOQ5Nyf5vBc6vB4Jw-81yNX4CyivmbBdJXRMHwJvFnvkHURF+w@mail.gmail.com>
+	<CADfFDC7No6nDLz_MoKhTLnr_YD5b=bwKTujXMDkrk73y8R2_Aw@mail.gmail.com>
+	<CAOQ5NydKKC=5ewH_P2qmGxPtvqVpk-r6wKXR+zOQfxgTVA0ajA@mail.gmail.com>
+	<CAOQ5NyeMjLBKm0HmjqG8f4v9Dub530zM6Gy9MLP5wR618pk2+Q@mail.gmail.com>
+	<CADfFDC6qJAUaJRQd97hwUdkF06Mqv9UP2pnXPzYzNg8agaY+EQ@mail.gmail.com>
+	<CAOQ5Nyfidyf3dsfxFHERKCbAx0i3G7+GFVY0Y_CmC8r3FwcW0g@mail.gmail.com>
+	<CADfFDC54JFQuvd1878n8k792RdJegd1zQH_Bb0hZw1a9u9z1Yw@mail.gmail.com>
+	<CAOQ5NydQn2GOBgetWN5sxUuA4TAqYrkHH63t+K7N8pi=4re19w@mail.gmail.com>
+Message-ID: <CADfFDC4YsK2SpNAXRXRkr2_GWGf=6D2KwUNG3FBFva-4QaxusQ@mail.gmail.com>
+
+On Thu, Sep 22, 2011 at 10:24 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Well it wasn't a simple fix (everything has far reaching consequences), but
+> I think it's resolved.
+
+Looks good. I'll let you know if anything else comes up.
+
+-Deepayan
+

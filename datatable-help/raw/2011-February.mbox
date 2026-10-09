@@ -1,0 +1,1963 @@
+From mdowle at mdowle.plus.com  Tue Feb  1 23:12:47 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 01 Feb 2011 22:12:47 +0000
+Subject: [datatable-help] Cannot access cols of y when doing x[y, ...]
+In-Reply-To: <AANLkTinxMVkikVegpOmd2FNrr1Tdqq98XQ1d3cT7Qq0h@mail.gmail.com>
+References: <AANLkTinQooVbS5bRrV_Gi=M674oqHTwPKS5cnsf8iib8@mail.gmail.com>
+	<1295732880.2870.227.camel@netbook>
+	<AANLkTinxMVkikVegpOmd2FNrr1Tdqq98XQ1d3cT7Qq0h@mail.gmail.com>
+Message-ID: <1296598367.1909.54.camel@netbook>
+
+Hi Prasad and all,
+
+Join inherited scope is now back on, in v1.5.3 on R-Forge.
+FAQ 1.11 has been simplified; see latest pdf on homepage.
+
+Please check the NEWS link for v1.5.3 as there are
+several other changes too e.g. X[Y] now includes Y's
+non-join columns for consistency with JIS. FAQ 1.12
+now strongly encourages X[Y,j] rather than X[Y].
+
+v1.5.3 contains several changes that may require changes
+to existing code. Please check and let us know if these
+will cause any issues.
+
+http://datatable.r-forge.r-project.org/
+
+Matthew
+
+
+On Sat, 2011-01-22 at 19:57 -0500, Prasad Chalasani wrote:
+> Thank you for clarifying this! I was getting stuck on this. Yes the
+> syntax and speedup are very nice indeed. I am dealing with 10 million
+> row tables so it is very useful for me.
+> 
+> 
+> Incidentally, I also asked this question on StackOverflow, and updated
+> it based on your reply
+> http://stackoverflow.com/questions/4764434/r-when-using-data-table-how-do-i-get-columns-of-y-when-i-do-xy
+> 
+> 
+> 
+> 
+> On Sat, Jan 22, 2011 at 4:48 PM, Matthew Dowle
+> <mdowle at mdowle.plus.com> wrote:
+>         Welcome to the list.
+>         You're right, the FAQ is wrong.
+>         FR#1095 is "Turn back on 'join inherited scope'".
+>         This was a known problem in NEWS at v1.4 and still is.
+>         When the grouping code was moved from R into C in v1.4 that
+>         feature
+>         wasn't something that made it into the port.
+>         
+>         Glad you appreciate the neater syntax and yes it should be
+>         faster (the
+>         more columns in x and y the faster the speed up could be, over
+>         a merge
+>         followed by a query).
+>         
+>         I'll try and take a look soon.
+>         
+>         Matthew
+>         
+>         
+>         
+>         On Sat, 2011-01-22 at 10:41 -0500, Prasad Chalasani wrote:
+>         > The Data-table FAQ 1.11 states:
+>         >
+>         >
+>         > "When you write x[y,foo*boo], data.table automatically
+>         inspects the j
+>         > expression to see which columns it uses.
+>         > It will only subset, or group, those columns only. Memory is
+>         only
+>         > created for the columns the j uses.
+>         >
+>         > Let?s say foo is in x, and boo is in y (along with 20 other
+>         columns in
+>         > y).
+>         >
+>         > Isn?t x[y,foo*boo] quicker to program and quicker to run
+>         than a merge
+>         > step followed by another subset step ?"
+>         >
+>         >
+>         > Contrary to what it says above, I get an error when I try to
+>         access a
+>         > y-column in the "j" argument of x[y,j].
+>         >
+>         > See the sequence of code below.
+>         >
+>         >
+>         > > x <- data.table( foo = c(1,1,1,2,2,3), a = 1:6, key =
+>         'foo')
+>         >
+>         >
+>         > > y <- data.table( foo = c(1,2), boo = 10:11, key = 'foo')
+>         >
+>         >
+>         >
+>         > # the below works as expected
+>         >
+>         > > x[y]
+>         >
+>         >      foo a
+>         >
+>         > [1,]   1 1
+>         >
+>         > [2,]   2 4
+>         >
+>         >
+>         > > with( merge(x,y), foo*boo)
+>         >
+>         > [1] 10 10 10 22 22
+>         >
+>         >
+>         > # I want to acheive the same result as the above using the
+>         >
+>         > # syntactically more compact (and faster?) code below:
+>         >
+>         >
+>         > > x[y, foo * boo ]
+>         >
+>         > Error in eval(expr, envir, enclos) : object 'boo' not found
+>         >
+>         >
+>         > So is the FAQ just wrong, or am I misunderstanding
+>         something?
+>         >
+>         >
+>         
+>         > _______________________________________________
+>         > datatable-help mailing list
+>         > datatable-help at lists.r-forge.r-project.org
+>         >
+>         https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>         
+>         
+> 
+> 
+
+
+
+From mdowle at mdowle.plus.com  Wed Feb  2 22:28:03 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 02 Feb 2011 21:28:03 +0000
+Subject: [datatable-help] Joins in data.table
+In-Reply-To: <1279448312.6858.48.camel@Adam>
+References: <432780.35597.qm@web30805.mail.mud.yahoo.com>
+	<1279448312.6858.48.camel@Adam>
+Message-ID: <1296682083.3304.43.camel@netbook>
+
+Hi Harish,
+
+You may remember this thread from a while back.
+
+Now that join inherited scope is back on and X[Y]
+includes Y's non-join columns, I revisited your example.
+
+It now works as you originally thought it should :
+
+> x <- data.table( a=c("a","b","c"), b=1:3, key="a" )
+> y <- data.table( a=c("b","d","e"), d=c(8,9,10) )
+> x
+     a b
+[1,] a 1
+[2,] b 2
+[3,] c 3
+> y
+     a  d
+[1,] b  8
+[2,] d  9
+[3,] e 10
+> x[y]
+     a  b  d
+[1,] b  2  8
+[2,] d NA  9   # used to be a full row of NA
+[3,] e NA 10   # i's non join column (d) is included now
+> 
+
+We'll now need to add a prefix to the x variables so the
+value joined to can be accessed. In this case 'x.a' could
+be used in j and would contain the NA's matched to. This
+is useful for key only tables which have no non-key columns
+to indicate the no match, and also rolling joins where it's
+useful to calculate the staleness of data being rolled forward.
+
+Since those example are more unusual, this seems the 'right'
+way round now in terms of syntax; closer to what most people
+naturally expect.
+
+Feedback much appreciated.
+
+Matthew
+
+
+On Sun, 2010-07-18 at 11:18 +0100, Matthew Dowle wrote: 
+> On question #1 there are quite a few reasons. I'll mention each one in
+> brief, just let us know if more detail is required.
+> 
+> i) x may be a key only table, perhaps just one column. You need the NA
+> returned in the key column when nomatch=NA otherwise you wouldn't know
+> there wasn't a match because there are no non-key columns to hold the NA
+> value in that case.
+> 
+> ii) You do know what the NA correspond to: the y you passed in. If you
+> need the correspondence then you can cbind(y,x[y]).  Thats works when
+> mult="first" which the default. When mult="all" you don't know how many
+> rows of the result each row of y matched to, so either merge(), or we
+> have discussed a new inci argument.
+> 
+> iii) However, why join to create and hold some bigger intermediate
+> table, only then to calculate some aggregate.  I try to do both in one
+> step:  x[y,<calc>]. This is quite a big feature of the syntax that
+> allows to do more in less code.
+> 
+> iv) using roll=TRUE, it is normal for the keys not to match when there
+> is a prevailing join on the last column. You need the value the y joined
+> _to_ in x, so you can do a diff if needed. You may need to join to the
+> prevailing row in x as long as it wasn't more than 20 days ago, for
+> example. NA in the key tells you there was no prevailing row at all.
+> 
+> Yes join inherited scope [i.e. accessing y's columns within the j] is
+> high on the to do list.  I'm thinking those will likely be accessed with
+> an "i." prefix because we often use the same column name such as "date"
+> or "id" in several tables e.g. in use-case iv above j might include a
+> column 'stale=(date-i.date)>20'.
+> 
+> v) I was going to say consistency with n-dim-array[n-col-matrix] in
+> base, where the x[y] syntax in data.table is generalised from. However,
+> when I checked just know it gives "subscript out of bounds" rather than
+> NA, but I mention it anyway as an aside.
+> 
+> HTH?
+> Matthew
+> 
+> 
+> On Fri, 2010-07-16 at 10:56 -0700, Harish wrote:
+> > Thanks Tom.  That answers my question #2.
+> > 
+> > It looks rather obvious once I see the solution.  :)
+> > 
+> > 
+> > Harish
+> > 
+> > 
+> > --- On Fri, 7/16/10, Short, Tom <TShort at epri.com> wrote:
+> > 
+> > > From: Short, Tom <TShort at epri.com>
+> > > Subject: RE: [datatable-help] Joins in data.table
+> > > To: "Harish" <harishv_99 at yahoo.com>
+> > > Cc: datatable-help at lists.r-forge.r-project.org
+> > > Date: Friday, July 16, 2010, 4:37 AM
+> > > Harish, I'm not sure on the answer to
+> > > your first question.
+> > > 
+> > > I'm not sure what VLOOKUP does, but based on your
+> > > description, is this
+> > > what you want?
+> > > 
+> > > > x <- data.table( a=c("a","b","c"), b=1:3, key="a"
+> > > )
+> > > > y <- data.table( a=c("b","d","e"), d=c(8,9,10),
+> > > key="a" ) # key added
+> > > > 
+> > > > x$d <- y[x, d]     # or 
+> > > y[x]$d
+> > > > x
+> > >      a b  d
+> > > [1,] a 1 NA
+> > > [2,] b 2  8
+> > > [3,] c 3 NA
+> > > 
+> > > 
+> > > - Tom
+> > > 
+> > > 
+> > >  
+> > > 
+> > > > -----Original Message-----
+> > > > From: datatable-help-bounces at lists.r-forge.r-project.org
+> > > 
+> > > > [mailto:datatable-help-bounces at lists.r-forge.r-project.org]
+> > > 
+> > > > On Behalf Of Harish
+> > > > Sent: Friday, July 16, 2010 03:04
+> > > > To: datatable-help at lists.r-forge.r-project.org
+> > > > Subject: [datatable-help] Joins in data.table
+> > > > 
+> > > > Question 1 -- Why get a full row of NAs with
+> > > x[y]?  Bug?
+> > > > Question 2 -- What is an easy way to do the equivalent
+> > > of 
+> > > > VLOOKUP in Excel?
+> > > > 
+> > > > ====================================
+> > > > 
+> > > > Question 1 -- Why get a full row of NAs with
+> > > x[y]?  Bug?
+> > > > 
+> > > > I was experimenting with x[y] syntax and I don't
+> > > understand 
+> > > > the use case for getting NA with nomatch=NA.
+> > > > 
+> > > > x <- data.table( a=c("a","b","c"), b=1:3, key="a" )
+> > > y <- 
+> > > > data.table( a=c("b","d","e"), d=c(8,9,10) )
+> > > > 
+> > > > x[y] returns:
+> > > > 
+> > > >         a  b
+> > > > [1,]    b  2
+> > > > [2,] <NA> NA
+> > > > [3,] <NA> NA
+> > > > 
+> > > > 
+> > > > What is the point of getting an entire row of
+> > > NA?  I don't 
+> > > > even know what the NA row corresponds to in data.table
+> > > y.  If 
+> > > > I got the values in column "a", then it would make
+> > > more sense.
+> > > > 
+> > > > I would expect:
+> > > > 
+> > > >      a  b
+> > > > [1,] b  2
+> > > > [2,] d NA
+> > > > [3,] e NA
+> > > > 
+> > > > Am I misunderstanding this join?
+> > > > 
+> > > > (I do realize that nomatch=0 will prevent the NA
+> > > rows.)
+> > > > 
+> > > > Also, is there still a plan to allowing access to y's
+> > > columns 
+> > > > within the "j" expression as indicated in FAQ 1.10?
+> > > >    x[y, d]
+> > > > 
+> > > > (I did ask this before and I believe Matthew said that
+> > > it is 
+> > > > in the works.  I just want to make sure I didn't
+> > > misunderstand.)
+> > > > 
+> > > > Otherwise, the whole x[y] join is only a subset. 
+> > > (I do 
+> > > > understand that I can use merge() to do a full
+> > > merge.)
+> > > > 
+> > > > ====================================
+> > > > 
+> > > > Question 2 -- What is an easy way to do the equivalent
+> > > of 
+> > > > VLOOKUP in Excel?
+> > > > 
+> > > > Now, suppose both my data.tables (x and y) had a lot
+> > > of 
+> > > > columns in it.  I want to add a new column "d" to
+> > > x.  The 
+> > > > value "d" will be from the data.table y such that x$a
+> > > == y$a.
+> > > > 
+> > > > What is the easiest way for me to do it?  Do I
+> > > have to 
+> > > > merge() both the data.tables and remove the unwanted
+> > > columns 
+> > > > of y from the result?
+> > > > 
+> > > > If the feature in the FAQ 1.10 were implemented, could
+> > > I could do
+> > > >    x[y, list(.SD,d)]
+> > > > or something to that effect?
+> > > > 
+> > > > 
+> > > > Regards,
+> > > > Harish
+> > > > 
+> > > > 
+> > > > 
+> > > >       
+> > > > _______________________________________________
+> > > > datatable-help mailing list
+> > > > datatable-help at lists.r-forge.r-project.org
+> > > > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/d
+> > > atatable-help
+> > > > 
+> > > 
+> > 
+> > 
+> >       
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+
+From mdowle at mdowle.plus.com  Mon Feb  7 13:16:09 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 7 Feb 2011 12:16:09 -0000
+Subject: [datatable-help] using character vector as input argument to
+ setkey (data.tablepakcage)
+Message-ID: <6c480c9f84db14f44be6096cecad30ba.squirrel@webmail.plus.net>
+
+
+Hi Sean,
+
+Try :
+   key(test.dt) = c("a","b")
+
+Btw, the posting guide asks you to contact the maintainer of the package
+before r-help. Otherwise r-help would fill up with posts about 2000+
+packages (I guess is the reason). In this case maintainer("data.table")
+returns "datatable-help at lists.r-forge.r-project.org" (cc'd) where you will
+be very welcome.
+
+Matthew
+
+
+
+From dbetebenner at nciea.org  Tue Feb  8 19:19:53 2011
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Tue, 8 Feb 2011 12:19:53 -0600
+Subject: [datatable-help] Question on inconsistent behavior
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694A96D10BEE@AUSP01VMBX05.collaborationhost.net>
+
+All,
+
+In using data.table within a package I develop, I'm trying to avoid those pesky warnings about variables not having a binding. Because data.table scopes within the existing frame and code.tools isn't smart enough to detect
+that, I'm getting a few of those pesky errors.
+
+This brought me to the following inconsistent behavior (at least it appears that way to me):
+
+tmp.dt <- data.table(ID=1:10, SCORE=rnorm(10))
+
+tmp.dt[,SCORE]
+
+and
+
+tmp.dt[,"SCORE", with=FALSE]
+
+The first returns a numeric vector whereas the second produces a data.table/data.frame with a single column. The second avoids those pesky warnings about unbound variables but I'd prefer to get the result provided by the
+first.
+
+Any suggestions/comments on the consistency of these results and/or the binding of variables when using data.table inside a package?
+
+Best regards,
+
+Damian
+
+Damian Betebenner
+Center for Assessment
+PO Box 351
+Dover, NH   03821-0351
+
+Phone (office): (603) 516-7900
+Phone (cell): (857) 234-2474
+Fax: (603) 516-7910
+
+dbetebenner at nciea.org<mailto:dbetebenner at nciea.org>
+www.nciea.org<http://www.nciea.org/>
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110208/38cbe6b2/attachment.htm>
+
+From mailinglist.honeypot at gmail.com  Tue Feb  8 19:26:07 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 8 Feb 2011 13:26:07 -0500
+Subject: [datatable-help] Question on inconsistent behavior
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694A96D10BEE@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694A96D10BEE@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <AANLkTi=_VkpBszL0dAsYk-Tv_3ZXG4bv08MN63JXtvbX@mail.gmail.com>
+
+Hi,
+
+On Tue, Feb 8, 2011 at 1:19 PM, Damian Betebenner <dbetebenner at nciea.org> wrote:
+> All,
+>
+> In using data.table within a package I develop, I?m trying to avoid those
+> pesky warnings about variables not having a binding. Because data.table
+> scopes within the existing frame and code.tools isn?t smart enough to detect
+>
+> that, I?m getting a few of those pesky errors.
+>
+>
+>
+> This brought me to the following inconsistent behavior (at least it appears
+> that way to me):
+>
+>
+>
+> tmp.dt <- data.table(ID=1:10, SCORE=rnorm(10))
+>
+>
+>
+> tmp.dt[,SCORE]
+>
+>
+>
+> and
+>
+>
+>
+> tmp.dt[,?SCORE?, with=FALSE]
+>
+>
+>
+> The first returns a numeric vector whereas the second produces a
+> data.table/data.frame with a single column. The second avoids those pesky
+> warnings about unbound variables but I?d prefer to get the result provided
+> by the
+
+How about:
+
+R> tmp.dt$SCORE
+R> tmp.dt[['SCORE']]
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Tue Feb  8 19:53:00 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 08 Feb 2011 18:53:00 +0000
+Subject: [datatable-help] Question on inconsistent behavior
+In-Reply-To: <AANLkTi=_VkpBszL0dAsYk-Tv_3ZXG4bv08MN63JXtvbX@mail.gmail.com>
+References: <8AD9137B75B37049AA711A4B64CEDB694A96D10BEE@AUSP01VMBX05.collaborationhost.net>
+	<AANLkTi=_VkpBszL0dAsYk-Tv_3ZXG4bv08MN63JXtvbX@mail.gmail.com>
+Message-ID: <1297191180.3304.229.camel@netbook>
+
+test.data.table() has the same issue.
+
+There was a thread on r-devel recently when somebody asked a very
+similar question about another package, unrelated to data.table. Core
+was basically saying NOTES were fine. They got very specific that they
+are *not* warnings but NOTES! :-) They don't prevent the package being
+accepted on CRAN.
+
+However, I'm like you and prefer to have "OK" all the way down the
+CRAN results page. That way users really do know it's fine (quickly). So
+in test.data.table I just put a line of variables near the top to keep R
+CMD check quiet.  It's only as bad as declaring variables in something
+like C anyway.  Actually it's quite nice...I've found and fixed a few
+problems that way.  See top of test.data.table.
+
+The difference between DT[,SCORE] and DT[,list(SCORE)] is covered by FAQ
+1.3.  At the top of your function just put in a SCORE=NULL.
+
+On Tue, 2011-02-08 at 13:26 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> On Tue, Feb 8, 2011 at 1:19 PM, Damian Betebenner <dbetebenner at nciea.org> wrote:
+> > All,
+> >
+> > In using data.table within a package I develop, I?m trying to avoid those
+> > pesky warnings about variables not having a binding. Because data.table
+> > scopes within the existing frame and code.tools isn?t smart enough to detect
+> >
+> > that, I?m getting a few of those pesky errors.
+> >
+> >
+> >
+> > This brought me to the following inconsistent behavior (at least it appears
+> > that way to me):
+> >
+> >
+> >
+> > tmp.dt <- data.table(ID=1:10, SCORE=rnorm(10))
+> >
+> >
+> >
+> > tmp.dt[,SCORE]
+> >
+> >
+> >
+> > and
+> >
+> >
+> >
+> > tmp.dt[,?SCORE?, with=FALSE]
+> >
+> >
+> >
+> > The first returns a numeric vector whereas the second produces a
+> > data.table/data.frame with a single column. The second avoids those pesky
+> > warnings about unbound variables but I?d prefer to get the result provided
+> > by the
+> 
+> How about:
+> 
+> R> tmp.dt$SCORE
+> R> tmp.dt[['SCORE']]
+> 
+> -steve
+> 
+
+
+
+From dbetebenner at nciea.org  Tue Feb  8 19:54:23 2011
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Tue, 8 Feb 2011 12:54:23 -0600
+Subject: [datatable-help] Question on inconsistent behavior
+In-Reply-To: <1297191180.3304.229.camel@netbook>
+References: <8AD9137B75B37049AA711A4B64CEDB694A96D10BEE@AUSP01VMBX05.collaborationhost.net>
+	<AANLkTi=_VkpBszL0dAsYk-Tv_3ZXG4bv08MN63JXtvbX@mail.gmail.com>
+	<1297191180.3304.229.camel@netbook>
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694A96D10C31@AUSP01VMBX05.collaborationhost.net>
+
+Excellent.
+
+Thank you both!
+
+
+
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowlenoreply at virginmedia.com] On Behalf Of Matthew Dowle
+Sent: Tuesday, February 08, 2011 1:53 PM
+To: Steve Lianoglou; Damian Betebenner
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] Question on inconsistent behavior
+
+test.data.table() has the same issue.
+
+There was a thread on r-devel recently when somebody asked a very
+similar question about another package, unrelated to data.table. Core
+was basically saying NOTES were fine. They got very specific that they
+are *not* warnings but NOTES! :-) They don't prevent the package being
+accepted on CRAN.
+
+However, I'm like you and prefer to have "OK" all the way down the
+CRAN results page. That way users really do know it's fine (quickly). So
+in test.data.table I just put a line of variables near the top to keep R
+CMD check quiet.  It's only as bad as declaring variables in something
+like C anyway.  Actually it's quite nice...I've found and fixed a few
+problems that way.  See top of test.data.table.
+
+The difference between DT[,SCORE] and DT[,list(SCORE)] is covered by FAQ
+1.3.  At the top of your function just put in a SCORE=NULL.
+
+On Tue, 2011-02-08 at 13:26 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> On Tue, Feb 8, 2011 at 1:19 PM, Damian Betebenner <dbetebenner at nciea.org> wrote:
+> > All,
+> >
+> > In using data.table within a package I develop, I?m trying to avoid those
+> > pesky warnings about variables not having a binding. Because data.table
+> > scopes within the existing frame and code.tools isn?t smart enough to detect
+> >
+> > that, I?m getting a few of those pesky errors.
+> >
+> >
+> >
+> > This brought me to the following inconsistent behavior (at least it appears
+> > that way to me):
+> >
+> >
+> >
+> > tmp.dt <- data.table(ID=1:10, SCORE=rnorm(10))
+> >
+> >
+> >
+> > tmp.dt[,SCORE]
+> >
+> >
+> >
+> > and
+> >
+> >
+> >
+> > tmp.dt[,?SCORE?, with=FALSE]
+> >
+> >
+> >
+> > The first returns a numeric vector whereas the second produces a
+> > data.table/data.frame with a single column. The second avoids those pesky
+> > warnings about unbound variables but I?d prefer to get the result provided
+> > by the
+> 
+> How about:
+> 
+> R> tmp.dt$SCORE
+> R> tmp.dt[['SCORE']]
+> 
+> -steve
+> 
+
+
+
+From mdowle at mdowle.plus.com  Wed Feb  9 00:10:14 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 08 Feb 2011 23:10:14 +0000
+Subject: [datatable-help] lapply on .SD example,
+	and dropping names in functions
+Message-ID: <1297206614.3304.246.camel@netbook>
+
+
+Just replied to this thread on r-help. Perhaps quite a few people might
+be unaware of syntax like this in data.table ...
+
+http://r.789695.n4.nabble.com/Convert-the-output-of-by-to-a-data-frame-tp3268428p3278326.html
+
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Wed Feb  9 01:15:26 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 09 Feb 2011 00:15:26 +0000
+Subject: [datatable-help] data.table wiki
+Message-ID: <1297210526.3304.253.camel@netbook>
+
+data.table now has a wiki :
+
+http://rwiki.sciviews.org/doku.php?id=packages:cran:data.table
+
+Please feel free to edit away. I don't know what it should look like,
+what the structure should be, or anything really. Over to you!
+
+Matthew
+
+
+
+
+From mdowle at mdowle.plus.com  Mon Feb  7 13:16:09 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 7 Feb 2011 12:16:09 -0000
+Subject: [datatable-help] :Re: [R] using character vector as input argument
+	to setkey (data.tablepakcage)
+Message-ID: <6c480c9f84db14f44be6096cecad30ba.squirrel@webmail.plus.net>
+
+
+Hi Sean,
+
+Try :
+   key(test.dt) = c("a","b")
+
+Btw, the posting guide asks you to contact the maintainer of the package
+before r-help. Otherwise r-help would fill up with posts about 2000+
+packages (I guess is the reason). In this case maintainer("data.table")
+returns "datatable-help at lists.r-forge.r-project.org" (cc'd) where you will
+be very welcome.
+
+Matthew
+
+______________________________________________
+R-help at r-project.org mailing list
+https://stat.ethz.ch/mailman/listinfo/r-help
+PLEASE do read the posting guide http://www.R-project.org/posting-guide.html
+and provide commented, minimal, self-contained, reproducible code.
+
+----------------------------------------------------------------------------
+NOTICE: Please note that this eMail, and the contents thereof, 
+is subject to the standard Sasol eMail legal notice which may be found at: 
+http://www.sasol.com/legalnotices                                                                                                          
+
+If you cannot access the legal notice through the URL attached and you wish 
+to receive a copy thereof please send an eMail to 
+legalnotice at sasol.com
+----------------------------------------------------------------------------
+
+From mdowle at mdowle.plus.com  Fri Feb 11 02:00:20 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Fri, 11 Feb 2011 01:00:20 +0000
+Subject: [datatable-help] v1.5.3 has just been pushed to CRAN
+Message-ID: <1297386020.1817.8.camel@netbook>
+
+
+NEW FEATURES
+
+   o    .SD no longer includes 'by' columns, FR#978. This resolves
+        the long standing annoyance of duplicated 'by' columns
+        when the j expression returns a subset of rows from .SD. 
+        For example, the following query no longer contains
+        a redundant 'colA.1' duplicate.
+            DT[,.SD[2],by=colA] #  2nd row of each group
+        Any existing code that uses .SD may require simple
+        changes to remove workarounds.
+
+   o    'by' may now be a character vector of column names.
+        This allows syntax such as DT[,sum(x),by=key(DT)].
+
+   o    X[Y] now includes Y's non-join columns, as most users
+        naturally expect, FR#746. Please do use j in one step
+        (i.e. X[Y,j]) since that merges just the columns j uses and
+        is much more efficient than X[Y][,j] or merge(X,Y)[,j].
+
+   o    The 'Join Inherited Scope' feature is back on, FR#1095. This
+        is consistent with X[Y] including Y's non-join columns, enabling
+        natural progression from X[Y] to X[Y,j]. j sees columns in X
+        first then Y. 
+        If the same column name exists in both X and Y, the data in
+        Y can be accessed via a prefix "i." (not yet implemented).
+
+   o    Ad hoc by now coerces double to integer (provided they are
+        all.equal) and character to factor, FR#1051, as setkey
+        already does.
+
+USER-VISIBLE CHANGES
+
+   o    The default for mult is now "all", as planned and
+        prior notice given in FAQ 2.2.
+
+   o    ?[.data.table has been merged into ?data.table and updated,
+        simplified, corrected and formatted.
+
+DEPRECATED & DEFUNCT
+
+   o    The DT() alias is now fully deprecated, as warned
+        in NEWS for v1.4, and FAQs 2.6 and 2.7.
+
+
+
+From mel at mbacou.com  Fri Feb 11 03:43:17 2011
+From: mel at mbacou.com (Bacou, Melanie)
+Date: Thu, 10 Feb 2011 21:43:17 -0500
+Subject: [datatable-help] v1.5.3 has just been pushed to CRAN
+In-Reply-To: <1297386020.1817.8.camel@netbook>
+References: <1297386020.1817.8.camel@netbook>
+Message-ID: <004c01cbc995$71b50570$551f1050$@com>
+
+Matt,
+
+This is fantastic! Eight more reasons to rely on data.table for my daily
+research tasks. Thanks so much for your efforts.
+
+--Mel.
+
+
+-----Original Message-----
+From: datatable-help-bounces at r-forge.wu-wien.ac.at
+[mailto:datatable-help-bounces at r-forge.wu-wien.ac.at] On Behalf Of Matthew
+Dowle
+Sent: Thursday, February 10, 2011 8:00 PM
+To: datatable-help at lists.r-forge.r-project.org
+Subject: [datatable-help] v1.5.3 has just been pushed to CRAN
+
+
+NEW FEATURES
+
+   o    .SD no longer includes 'by' columns, FR#978. This resolves
+        the long standing annoyance of duplicated 'by' columns
+        when the j expression returns a subset of rows from .SD. 
+        For example, the following query no longer contains
+        a redundant 'colA.1' duplicate.
+            DT[,.SD[2],by=colA] #  2nd row of each group
+        Any existing code that uses .SD may require simple
+        changes to remove workarounds.
+
+   o    'by' may now be a character vector of column names.
+        This allows syntax such as DT[,sum(x),by=key(DT)].
+
+   o    X[Y] now includes Y's non-join columns, as most users
+        naturally expect, FR#746. Please do use j in one step
+        (i.e. X[Y,j]) since that merges just the columns j uses and
+        is much more efficient than X[Y][,j] or merge(X,Y)[,j].
+
+   o    The 'Join Inherited Scope' feature is back on, FR#1095. This
+        is consistent with X[Y] including Y's non-join columns, enabling
+        natural progression from X[Y] to X[Y,j]. j sees columns in X
+        first then Y. 
+        If the same column name exists in both X and Y, the data in
+        Y can be accessed via a prefix "i." (not yet implemented).
+
+   o    Ad hoc by now coerces double to integer (provided they are
+        all.equal) and character to factor, FR#1051, as setkey
+        already does.
+
+USER-VISIBLE CHANGES
+
+   o    The default for mult is now "all", as planned and
+        prior notice given in FAQ 2.2.
+
+   o    ?[.data.table has been merged into ?data.table and updated,
+        simplified, corrected and formatted.
+
+DEPRECATED & DEFUNCT
+
+   o    The DT() alias is now fully deprecated, as warned
+        in NEWS for v1.4, and FAQs 2.6 and 2.7.
+
+
+_______________________________________________
+datatable-help mailing list
+datatable-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+From pj16 at cornell.edu  Tue Feb 22 04:04:27 2011
+From: pj16 at cornell.edu (Peter Jackson)
+Date: Mon, 21 Feb 2011 19:04:27 -0800 (PST)
+Subject: [datatable-help] How to use datatable in S4 class?
+Message-ID: <1298343867289-3318478.post@n4.nabble.com>
+
+
+The following command
+setClass("ClusterGroup",representation=representation(dtDemand="data.table"))
+results in 
+Warning message:
+undefined slot classes in definition of "ClusterGroup": dtDemand(class
+"data.table") 
+
+I assume this means the class does not recognize data.table. Is there way to
+use data.table's in slots?
+Thanks, Peter
+-- 
+View this message in context: http://r.789695.n4.nabble.com/How-to-use-datatable-in-S4-class-tp3318478p3318478.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mailinglist.honeypot at gmail.com  Tue Feb 22 15:55:22 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 22 Feb 2011 09:55:22 -0500
+Subject: [datatable-help] How to use datatable in S4 class?
+In-Reply-To: <1298343867289-3318478.post@n4.nabble.com>
+References: <1298343867289-3318478.post@n4.nabble.com>
+Message-ID: <AANLkTin7g2Wq60zZi+iwcidWR1BS_YLJdoJXoOx3+drq@mail.gmail.com>
+
+(Forgot to CC datatable-help, sorry):
+
+setOldClass(c('data.frame'))
+setOldClass(c('data.table', 'data.frame'))
+Hi,
+
+On Mon, Feb 21, 2011 at 10:04 PM, Peter Jackson <pj16 at cornell.edu> wrote:
+>
+> The following command
+> setClass("ClusterGroup",representation=representation(dtDemand="data.table"))
+> results in
+> Warning message:
+> undefined slot classes in definition of "ClusterGroup": dtDemand(class
+> "data.table")
+>
+> I assume this means the class does not recognize data.table. Is there way to
+> use data.table's in slots?
+
+Yes,
+
+I've actually been sitting on a patch for this for a long time due to
+the difficulty of adding a unit test for this in the current framework
+... long story, but I'll repost with an update on that in a separate
+thread later.
+
+It's simple to do what you want know, you'll need to have R run the
+following lines before defining your class that contains data.table in
+a slot:
+
+setOldClass(c('data.frame'))
+setOldClass(c('data.table', 'data.frame'))
+
+Define your class after that, and it should work.
+
+--
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+ | Memorial Sloan-Kettering Cancer Center
+ | Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Tue Feb 22 20:06:14 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Tue, 22 Feb 2011 14:06:14 -0500
+Subject: [datatable-help] Adding the S4-ization patch
+Message-ID: <AANLkTinKc_-Py1hZWzWgvMOdSYgp7Lk1Wj77qeuiPvhZ@mail.gmail.com>
+
+Hi,
+
+Prompted by the earlier post today from Peter, I'd like to submit my
+(simple) S4 patch back into the svn trunk.
+
+This has been on pause for me since we ran into the problem of
+shoehorning the s4 tests into the current testing methodology, which
+lead me to suggest using testthat for testing ... which I started to
+do.
+
+We then spoke about whether or not push all of the tests into
+testthat, or just do the s4 for now, and tests in future would use
+testthat, and the current ones would stay where they are.
+
+Personally, I'm in favor of (gradually) moving all of the current
+tests into testthat -- I've actually submitted  patch to Hadley for
+testthat that makes it easier to use the less verbose expect_*
+shortform functions with labels so they are more informative. For
+example, instead of:
+
+expect_that(1, equals(2), info="Testing numeric equality")
+
+one would do:
+
+expect_equal(1, 2, info="testing numeric equality")
+
+[The current version of testthat doesn't allow to add info/label args
+to these short forms -- this is what I submitted a patch for).
+
+So, does this plan seem OK to the devs?
+
+(1) Add my S4 patch to datatable-trunk asap with unit tests using the
+current version of test_that.
+
+(2) Once my patch gets into test_that, then I'd volunteer to
+(gradually) migrate older tests into this framework (and out of the
+data.table manual page).
+
+If we don't want to move the older tests into the test_that framework,
+then we can just drop (2).
+
+Thoughts?
+
+Doing this sooner rather than later would be helpful for me so that I
+can more easily track latest svn and all of the goodness that has been
+added post 1.5.2, but I'm trying not to be selfish ;-)
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Wed Feb 23 01:32:10 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 23 Feb 2011 00:32:10 +0000
+Subject: [datatable-help] Adding the S4-ization patch
+In-Reply-To: <AANLkTinKc_-Py1hZWzWgvMOdSYgp7Lk1Wj77qeuiPvhZ@mail.gmail.com>
+References: <AANLkTinKc_-Py1hZWzWgvMOdSYgp7Lk1Wj77qeuiPvhZ@mail.gmail.com>
+Message-ID: <1298421130.2050.114.camel@netbook>
+
+Steve,
+
+We definitely need to include your S4 work asap.
+
+My thoughts on the testing are as follows (very likely due to my lack of
+knowledge) :
+
+1) is test_that the best choice -  what about Runit and SVunit? Which is
+the most acceptable/recommended by r-core? What do other packages use? I
+simply don't know - I've been meaning to investigate. Is there any
+document that weighs up the pros and cons of each? On what basis should
+we choose? R itself doesn't use any of these packages - how do they
+manage?
+
+2) If the call to test.data.table() was moved out of .Rd and into tests
+directory, would the S4 tests then work? If yes, then the choice of
+testing framework may be distinct from the incompatibility problem.
+
+3) The tests in the v1.5.3 ?data.table manual page were revised
+recently. They are for users to look at; to learn data.table quickly. At
+least that's what I aimed for. They should be a subset of formal tests
+definitely, but did you really mean to move them out of .Rd ?
+
+4) I've used specific numbers to various tests in various places at
+various times: FAQ, FR list, public posts and private emails. If we drop
+the test numbers how will we (I) identify them? There are specific
+numbers I know in my mind which often come up when I change anything -
+test 147 for example. I made a change recently so that test numbers can
+be float, and also independent of the counter of tests passed/failed.
+
+Matthew
+
+
+On Tue, 2011-02-22 at 14:06 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> Prompted by the earlier post today from Peter, I'd like to submit my
+> (simple) S4 patch back into the svn trunk.
+> 
+> This has been on pause for me since we ran into the problem of
+> shoehorning the s4 tests into the current testing methodology, which
+> lead me to suggest using testthat for testing ... which I started to
+> do.
+> 
+> We then spoke about whether or not push all of the tests into
+> testthat, or just do the s4 for now, and tests in future would use
+> testthat, and the current ones would stay where they are.
+> 
+> Personally, I'm in favor of (gradually) moving all of the current
+> tests into testthat -- I've actually submitted  patch to Hadley for
+> testthat that makes it easier to use the less verbose expect_*
+> shortform functions with labels so they are more informative. For
+> example, instead of:
+> 
+> expect_that(1, equals(2), info="Testing numeric equality")
+> 
+> one would do:
+> 
+> expect_equal(1, 2, info="testing numeric equality")
+> 
+> [The current version of testthat doesn't allow to add info/label args
+> to these short forms -- this is what I submitted a patch for).
+> 
+> So, does this plan seem OK to the devs?
+> 
+> (1) Add my S4 patch to datatable-trunk asap with unit tests using the
+> current version of test_that.
+> 
+> (2) Once my patch gets into test_that, then I'd volunteer to
+> (gradually) migrate older tests into this framework (and out of the
+> data.table manual page).
+> 
+> If we don't want to move the older tests into the test_that framework,
+> then we can just drop (2).
+> 
+> Thoughts?
+> 
+> Doing this sooner rather than later would be helpful for me so that I
+> can more easily track latest svn and all of the goodness that has been
+> added post 1.5.2, but I'm trying not to be selfish ;-)
+> 
+> -steve
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Wed Feb 23 06:13:08 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 23 Feb 2011 00:13:08 -0500
+Subject: [datatable-help] Adding the S4-ization patch
+In-Reply-To: <1298421130.2050.114.camel@netbook>
+References: <AANLkTinKc_-Py1hZWzWgvMOdSYgp7Lk1Wj77qeuiPvhZ@mail.gmail.com>
+	<1298421130.2050.114.camel@netbook>
+Message-ID: <AANLkTinv1g4-5VC-DtibXDaqiVZHhK3sJ19EHysD8+9X@mail.gmail.com>
+
+Hi Matthew:
+
+On Tue, Feb 22, 2011 at 7:32 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> Steve,
+>
+> We definitely need to include your S4 work asap.
+>
+> My thoughts on the testing are as follows (very likely due to my lack of
+> knowledge) :
+>
+> 1) is test_that the best choice - ?what about Runit and SVunit? Which is
+> the most acceptable/recommended by r-core? What do other packages use? I
+> simply don't know - I've been meaning to investigate. Is there any
+> document that weighs up the pros and cons of each? On what basis should
+> we choose? R itself doesn't use any of these packages - how do they
+> manage?
+
+I suggested test_that because (i) someone (maybe you?) said that a
+previous patch was added for RUnit support, but it wasn't clear how to
+run tests, so that patch was dropped. test_that allows easy ways to
+run tests via R CMD check, but also you can easily test directories
+etc. interactively from the R prompt; and (ii) it seems more
+intuitive/user friendly to me and is still quite comprehensive with
+respect to the types of tests you can check against, eg. normal tests
+for equality/identity/inheritance, but also checks for calls that
+should throw errors, warnings, or messages.
+
+If anyone strongly favors another testing framework, that's fine too.
+
+> 2) If the call to test.data.table() was moved out of .Rd and into tests
+> directory, would the S4 tests then work? If yes, then the choice of
+> testing framework may be distinct from the incompatibility problem.
+
+Perhaps.
+
+There was some locked environment issue that was messing things up.
+
+> 3) The tests in the v1.5.3 ?data.table manual page were revised
+> recently. They are for users to look at; to learn data.table quickly. At
+> least that's what I aimed for. They should be a subset of formal tests
+> definitely, but did you really mean to move them out of .Rd ?
+
+I see. Maybe not(?). I think keeping a subset of the usage scenarios
+in the Examples section is definitely useful, but last I checked, all
+of the tests were in there (sorry if that's not the case -- I'll
+double check when I get back to school tomorrow).
+
+I certainly wouldn't propose removing all scenarios/tests from the
+example section, though.
+
+> 4) I've used specific numbers to various tests in various places at
+> various times: FAQ, FR list, public posts and private emails. If we drop
+> the test numbers how will we (I) identify them? There are specific
+> numbers I know in my mind which often come up when I change anything -
+> test 147 for example. I made a change recently so that test numbers can
+> be float, and also independent of the counter of tests passed/failed.
+
+For what it's worth, the numbers/id's could be added to the tests
+using the info/label arguments in test_that's expect_* functions.
+
+-steve
+
+>
+> Matthew
+>
+>
+> On Tue, 2011-02-22 at 14:06 -0500, Steve Lianoglou wrote:
+>> Hi,
+>>
+>> Prompted by the earlier post today from Peter, I'd like to submit my
+>> (simple) S4 patch back into the svn trunk.
+>>
+>> This has been on pause for me since we ran into the problem of
+>> shoehorning the s4 tests into the current testing methodology, which
+>> lead me to suggest using testthat for testing ... which I started to
+>> do.
+>>
+>> We then spoke about whether or not push all of the tests into
+>> testthat, or just do the s4 for now, and tests in future would use
+>> testthat, and the current ones would stay where they are.
+>>
+>> Personally, I'm in favor of (gradually) moving all of the current
+>> tests into testthat -- I've actually submitted ?patch to Hadley for
+>> testthat that makes it easier to use the less verbose expect_*
+>> shortform functions with labels so they are more informative. For
+>> example, instead of:
+>>
+>> expect_that(1, equals(2), info="Testing numeric equality")
+>>
+>> one would do:
+>>
+>> expect_equal(1, 2, info="testing numeric equality")
+>>
+>> [The current version of testthat doesn't allow to add info/label args
+>> to these short forms -- this is what I submitted a patch for).
+>>
+>> So, does this plan seem OK to the devs?
+>>
+>> (1) Add my S4 patch to datatable-trunk asap with unit tests using the
+>> current version of test_that.
+>>
+>> (2) Once my patch gets into test_that, then I'd volunteer to
+>> (gradually) migrate older tests into this framework (and out of the
+>> data.table manual page).
+>>
+>> If we don't want to move the older tests into the test_that framework,
+>> then we can just drop (2).
+>>
+>> Thoughts?
+>>
+>> Doing this sooner rather than later would be helpful for me so that I
+>> can more easily track latest svn and all of the goodness that has been
+>> added post 1.5.2, but I'm trying not to be selfish ;-)
+>>
+>> -steve
+>>
+>
+>
+>
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Thu Feb 24 04:05:27 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Wed, 23 Feb 2011 22:05:27 -0500
+Subject: [datatable-help] Bug when by=key(DT)
+Message-ID: <AANLkTi=DfytxBPmv3Ttm5tWJyR_Acv2wYidipZn4rX1V@mail.gmail.com>
+
+Hi,
+
+I'm running data.table 1.5.4 (but this also fails w/ data.table in SVN).
+
+One of the bullet points in the news for version 1.5.3 was:
+
+  o    'by' may now be a character vector of column names.
+       This allows syntax such as DT[,sum(x),by=key(DT)].
+
+But when the result of the subgroup iteration/summary returns less
+rows than the original subgroup, it fails.
+
+For example:
+
+R> library(data.table)
+R> dt <- data.table(name=c('a', 'a', 'a', 'b', 'b', 'c', 'c', 'c'),
+start=sample(1:50, 8))
+R> dt$end <- dt$start + sample(1:50, 8)
+R> key(dt) <- 'name'
+
+This is OK:
+
+R> dt[, list(start=max(start), end=max(end)), by='name']
+     name start end
+[1,]    a    47  69
+[2,]    b    35  48
+[3,]    c    26  52
+
+This isn't:
+
+R> dt[, list(start=max(start), end=max(end)), by=key(dt)]
+Error in `[[<-.data.frame`(`*tmp*`, jj, value = 1:3) :
+  replacement has 3 rows, data has 8
+
+
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mailinglist.honeypot at gmail.com  Thu Feb 24 22:33:36 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Thu, 24 Feb 2011 16:33:36 -0500
+Subject: [datatable-help] Have a patch for mere.data.table to take
+	`suffixes` param like merge.data.frame
+Message-ID: <AANLkTik81ARYrtt0Z+2b9ikcFWcsdmZQMHt9fUz9MUkh@mail.gmail.com>
+
+Hi again,
+
+I have a small patch I can commit (if you like) for having
+merge.data.table act more like merge.data.frame by adding suffixes
+when merging two data.tables more like you would expect when one
+merges two data.frames.
+
+The default would be suffixes=c(".x", ".y"), like merge.data.frame,
+but this is (obviously) up to the user.
+
+Is that acceptable? I figured that 'data.table way' discourages
+`merge` in favor dt1[dt2, ...] type stuff, so I thought the caller who
+uses `merge` would expect it to work more like a data.frame merge,
+which is why I thought this would be useful..
+
+Also -- I'm in a bit of holding pattern until the other issues are
+resolved (primarily how to properly test -- even if just temporarily),
+otherwise I'd be happy to commit it back into the repo.
+
+Thanks,
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From TShort at epri.com  Thu Feb 24 22:37:24 2011
+From: TShort at epri.com (Short, Tom)
+Date: Thu, 24 Feb 2011 16:37:24 -0500
+Subject: [datatable-help] Have a patch for mere.data.table to
+	take`suffixes` param like merge.data.frame
+In-Reply-To: <AANLkTik81ARYrtt0Z+2b9ikcFWcsdmZQMHt9fUz9MUkh@mail.gmail.com>
+References: <AANLkTik81ARYrtt0Z+2b9ikcFWcsdmZQMHt9fUz9MUkh@mail.gmail.com>
+Message-ID: <A88D30CC-52BB-402D-8543-D851B10A3090@epri.com>
+
+Please do, Steve. 
+
+Tom
+
+
+
+On Feb 24, 2011, at 16:34, "Steve Lianoglou" <mailinglist.honeypot at gmail.com> wrote:
+
+> Hi again,
+> 
+> I have a small patch I can commit (if you like) for having
+> merge.data.table act more like merge.data.frame by adding suffixes
+> when merging two data.tables more like you would expect when one
+> merges two data.frames.
+> 
+> The default would be suffixes=c(".x", ".y"), like merge.data.frame,
+> but this is (obviously) up to the user.
+> 
+> Is that acceptable? I figured that 'data.table way' discourages
+> `merge` in favor dt1[dt2, ...] type stuff, so I thought the caller who
+> uses `merge` would expect it to work more like a data.frame merge,
+> which is why I thought this would be useful..
+> 
+> Also -- I'm in a bit of holding pattern until the other issues are
+> resolved (primarily how to properly test -- even if just temporarily),
+> otherwise I'd be happy to commit it back into the repo.
+> 
+> Thanks,
+> -steve
+> 
+> -- 
+> Steve Lianoglou
+> Graduate Student: Computational Systems Biology
+>  | Memorial Sloan-Kettering Cancer Center
+>  | Weill Medical College of Cornell University
+> Contact Info: http://cbio.mskcc.org/~lianos/contact
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From mdowle at mdowle.plus.com  Fri Feb 25 00:53:32 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 24 Feb 2011 23:53:32 +0000
+Subject: [datatable-help] Bug when by=key(DT)
+In-Reply-To: <AANLkTi=DfytxBPmv3Ttm5tWJyR_Acv2wYidipZn4rX1V@mail.gmail.com>
+References: <AANLkTi=DfytxBPmv3Ttm5tWJyR_Acv2wYidipZn4rX1V@mail.gmail.com>
+Message-ID: <1298591612.2544.71.camel@netbook>
+
+Thanks Steve. That was a strange one. Bug #1298 raised, fixed and test
+added.
+
+o    by=key(DT) now works when the number of rows is not
+     divisible by the number of groups (#1298, an odd bug).
+
+Matthew
+
+On Wed, 2011-02-23 at 22:05 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> I'm running data.table 1.5.4 (but this also fails w/ data.table in SVN).
+> 
+> One of the bullet points in the news for version 1.5.3 was:
+> 
+>   o    'by' may now be a character vector of column names.
+>        This allows syntax such as DT[,sum(x),by=key(DT)].
+> 
+> But when the result of the subgroup iteration/summary returns less
+> rows than the original subgroup, it fails.
+> 
+> For example:
+> 
+> R> library(data.table)
+> R> dt <- data.table(name=c('a', 'a', 'a', 'b', 'b', 'c', 'c', 'c'),
+> start=sample(1:50, 8))
+> R> dt$end <- dt$start + sample(1:50, 8)
+> R> key(dt) <- 'name'
+> 
+> This is OK:
+> 
+> R> dt[, list(start=max(start), end=max(end)), by='name']
+>      name start end
+> [1,]    a    47  69
+> [2,]    b    35  48
+> [3,]    c    26  52
+> 
+> This isn't:
+> 
+> R> dt[, list(start=max(start), end=max(end)), by=key(dt)]
+> Error in `[[<-.data.frame`(`*tmp*`, jj, value = 1:3) :
+>   replacement has 3 rows, data has 8
+> 
+> 
+> 
+
+
+
+From mailinglist.honeypot at gmail.com  Fri Feb 25 22:48:19 2011
+From: mailinglist.honeypot at gmail.com (Steve Lianoglou)
+Date: Fri, 25 Feb 2011 16:48:19 -0500
+Subject: [datatable-help] Making merge.data.table more like merge.data.frame,
+	part II
+Message-ID: <AANLkTin2FG+x+PuQvZeoVJ2bV5RgD=UhzgY14y4i-39h@mail.gmail.com>
+
+Hi,
+
+In an effort to accomplish the goal stated in the subject, I was
+working on some code to support an explicit `by` parameter in the
+merge.data.table function.
+
+I just wanted to make sure we were all on the same page (accomplishing
+goal in subject line) before I start committing back into repo.
+
+Yay/nay?
+
+-steve
+
+-- 
+Steve Lianoglou
+Graduate Student: Computational Systems Biology
+?| Memorial Sloan-Kettering Cancer Center
+?| Weill Medical College of Cornell University
+Contact Info: http://cbio.mskcc.org/~lianos/contact
+
+From mdowle at mdowle.plus.com  Sat Feb 26 01:03:36 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 26 Feb 2011 00:03:36 +0000
+Subject: [datatable-help] Adding the S4-ization patch
+In-Reply-To: <AANLkTinv1g4-5VC-DtibXDaqiVZHhK3sJ19EHysD8+9X@mail.gmail.com>
+References: <AANLkTinKc_-Py1hZWzWgvMOdSYgp7Lk1Wj77qeuiPvhZ@mail.gmail.com>
+	<1298421130.2050.114.camel@netbook>
+	<AANLkTinv1g4-5VC-DtibXDaqiVZHhK3sJ19EHysD8+9X@mail.gmail.com>
+Message-ID: <1298678616.31429.24.camel@netbook>
+
+To update this thread, the locked environment issue with S4 has been
+resolved by moving tests from test.data.table() into pkg/tests/tests.R.
+test.data.table() still exists and is callable by users, and the tests
+are easily viewable by users.
+
+This resolves S4-ization and is in v1.5.4 on R-Forge. Thanks to Steve.
+
+We may yet move to test_that in future.
+
+Matthew
+
+On Wed, 2011-02-23 at 00:13 -0500, Steve Lianoglou wrote: 
+> Hi Matthew:
+> 
+> On Tue, Feb 22, 2011 at 7:32 PM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+> > Steve,
+> >
+> > We definitely need to include your S4 work asap.
+> >
+> > My thoughts on the testing are as follows (very likely due to my lack of
+> > knowledge) :
+> >
+> > 1) is test_that the best choice -  what about Runit and SVunit? Which is
+> > the most acceptable/recommended by r-core? What do other packages use? I
+> > simply don't know - I've been meaning to investigate. Is there any
+> > document that weighs up the pros and cons of each? On what basis should
+> > we choose? R itself doesn't use any of these packages - how do they
+> > manage?
+> 
+> I suggested test_that because (i) someone (maybe you?) said that a
+> previous patch was added for RUnit support, but it wasn't clear how to
+> run tests, so that patch was dropped. test_that allows easy ways to
+> run tests via R CMD check, but also you can easily test directories
+> etc. interactively from the R prompt; and (ii) it seems more
+> intuitive/user friendly to me and is still quite comprehensive with
+> respect to the types of tests you can check against, eg. normal tests
+> for equality/identity/inheritance, but also checks for calls that
+> should throw errors, warnings, or messages.
+> 
+> If anyone strongly favors another testing framework, that's fine too.
+> 
+> > 2) If the call to test.data.table() was moved out of .Rd and into tests
+> > directory, would the S4 tests then work? If yes, then the choice of
+> > testing framework may be distinct from the incompatibility problem.
+> 
+> Perhaps.
+> 
+> There was some locked environment issue that was messing things up.
+> 
+> > 3) The tests in the v1.5.3 ?data.table manual page were revised
+> > recently. They are for users to look at; to learn data.table quickly. At
+> > least that's what I aimed for. They should be a subset of formal tests
+> > definitely, but did you really mean to move them out of .Rd ?
+> 
+> I see. Maybe not(?). I think keeping a subset of the usage scenarios
+> in the Examples section is definitely useful, but last I checked, all
+> of the tests were in there (sorry if that's not the case -- I'll
+> double check when I get back to school tomorrow).
+> 
+> I certainly wouldn't propose removing all scenarios/tests from the
+> example section, though.
+> 
+> > 4) I've used specific numbers to various tests in various places at
+> > various times: FAQ, FR list, public posts and private emails. If we drop
+> > the test numbers how will we (I) identify them? There are specific
+> > numbers I know in my mind which often come up when I change anything -
+> > test 147 for example. I made a change recently so that test numbers can
+> > be float, and also independent of the counter of tests passed/failed.
+> 
+> For what it's worth, the numbers/id's could be added to the tests
+> using the info/label arguments in test_that's expect_* functions.
+> 
+> -steve
+> 
+> >
+> > Matthew
+> >
+> >
+> > On Tue, 2011-02-22 at 14:06 -0500, Steve Lianoglou wrote:
+> >> Hi,
+> >>
+> >> Prompted by the earlier post today from Peter, I'd like to submit my
+> >> (simple) S4 patch back into the svn trunk.
+> >>
+> >> This has been on pause for me since we ran into the problem of
+> >> shoehorning the s4 tests into the current testing methodology, which
+> >> lead me to suggest using testthat for testing ... which I started to
+> >> do.
+> >>
+> >> We then spoke about whether or not push all of the tests into
+> >> testthat, or just do the s4 for now, and tests in future would use
+> >> testthat, and the current ones would stay where they are.
+> >>
+> >> Personally, I'm in favor of (gradually) moving all of the current
+> >> tests into testthat -- I've actually submitted  patch to Hadley for
+> >> testthat that makes it easier to use the less verbose expect_*
+> >> shortform functions with labels so they are more informative. For
+> >> example, instead of:
+> >>
+> >> expect_that(1, equals(2), info="Testing numeric equality")
+> >>
+> >> one would do:
+> >>
+> >> expect_equal(1, 2, info="testing numeric equality")
+> >>
+> >> [The current version of testthat doesn't allow to add info/label args
+> >> to these short forms -- this is what I submitted a patch for).
+> >>
+> >> So, does this plan seem OK to the devs?
+> >>
+> >> (1) Add my S4 patch to datatable-trunk asap with unit tests using the
+> >> current version of test_that.
+> >>
+> >> (2) Once my patch gets into test_that, then I'd volunteer to
+> >> (gradually) migrate older tests into this framework (and out of the
+> >> data.table manual page).
+> >>
+> >> If we don't want to move the older tests into the test_that framework,
+> >> then we can just drop (2).
+> >>
+> >> Thoughts?
+> >>
+> >> Doing this sooner rather than later would be helpful for me so that I
+> >> can more easily track latest svn and all of the goodness that has been
+> >> added post 1.5.2, but I'm trying not to be selfish ;-)
+> >>
+> >> -steve
+> >>
+> >
+> >
+> >
+> 
+> 
+> 
+
+
+
+
+From mdowle at mdowle.plus.com  Sat Feb 26 01:35:45 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sat, 26 Feb 2011 00:35:45 +0000
+Subject: [datatable-help] Making merge.data.table more like
+ merge.data.frame, part II
+In-Reply-To: <AANLkTin2FG+x+PuQvZeoVJ2bV5RgD=UhzgY14y4i-39h@mail.gmail.com>
+References: <AANLkTin2FG+x+PuQvZeoVJ2bV5RgD=UhzgY14y4i-39h@mail.gmail.com>
+Message-ID: <1298680545.31429.69.camel@netbook>
+
+Hi,
+I'll defer to Tom on this one. He's usually right about things like
+this. It sounds good to me, I think.
+Please add as an FR for tracking purposes. When we move NEWS to NEWS.Rd
+all the bug and FR numbers will become clickable links. Those numbers
+might also link to svn revs, not sure.
+Matthew
+
+On Fri, 2011-02-25 at 16:48 -0500, Steve Lianoglou wrote:
+> Hi,
+> 
+> In an effort to accomplish the goal stated in the subject, I was
+> working on some code to support an explicit `by` parameter in the
+> merge.data.table function.
+> 
+> I just wanted to make sure we were all on the same page (accomplishing
+> goal in subject line) before I start committing back into repo.
+> 
+> Yay/nay?
+> 
+> -steve
+> 
+
+
+
+From dbetebenner at nciea.org  Sat Feb 26 23:55:44 2011
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Sat, 26 Feb 2011 16:55:44 -0600
+Subject: [datatable-help] data.table by versus apply
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694A971911B2@AUSP01VMBX05.collaborationhost.net>
+
+All,
+
+I'm curious from a speed perspective what the analog of apply is in data.table as I have a problem where, for each row,  I want to take either the min or the max of several columns depending upon the value of a third column:
+
+For example:
+
+test.dt <- data.table(ID=1:10, SCORE_1=rnorm(10), SCORE_2=rnorm(10), SCORE_3=rnorm(10), MAX_OR_MIN=c(rep("Max", 5), rep("Min", 5)))
+
+For each row I'd like to get the max of SCORE_1, SCORE_2, and SCORE_3 if the MAX_OR_MIN value is MAX and the min of SCORE_1, SCORE_2, and SCORE_3 if the MAX_OR_MIN value is MIN.
+
+It isn't too difficult to come up with a "bulky" and slow solution, but I'm wondering if I'm missing a way in which data.table would make such an effort elegant and quick.
+
+Any help greatly appreciated.
+
+Damian Betebenner
+Center for Assessment
+PO Box 351
+Dover, NH   03821-0351
+
+Phone (office): (603) 516-7900
+Phone (cell): (857) 234-2474
+Fax: (603) 516-7910
+
+dbetebenner at nciea.org<mailto:dbetebenner at nciea.org>
+www.nciea.org<http://www.nciea.org/>
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110226/877a6d5b/attachment.htm>
+
+From mdowle at mdowle.plus.com  Sun Feb 27 18:14:06 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Sun, 27 Feb 2011 17:14:06 +0000
+Subject: [datatable-help] data.table by versus apply
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694A971911B2@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694A971911B2@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <1298826846.1803.43.camel@netbook>
+
+Hi,
+
+How about this :
+
+fns=c(max,min)
+test.dt <- data.table(ID=1:10, SCORE_1=rnorm(10), SCORE_2=rnorm(10),
+SCORE_3=rnorm(10), fn=c(rep(1, 5), rep(2, 5)))
+
+test.dt[,fns[[fn]](SCORE_1,SCORE_2,SCORE_3),by=ID]  # bug #1301 raised
+
+test.dt[,{fn;fns[[fn]](SCORE_1,SCORE_2,SCORE_3)},by=ID]  # workaround
+      ID         V1
+ [1,]  1 -1.6788065
+ [2,]  2 -1.4021021
+ [3,]  3 -1.0469943
+ [4,]  4 -1.2663419
+ [5,]  5 -0.2765518
+ [6,]  6  0.3511581
+ [7,]  7  1.1809315
+ [8,]  8  0.3570631
+ [9,]  9  0.9680948
+[10,] 10  1.3025652
+
+The bug is because the variable 'fn' isn't being detected as used by j
+(incorrectly) so it isn't being subset. Maybe because it appears inside
+the [[]]. Using fn explicity in the workaround gets around that. Raised
+bug #1301 to fix that.
+
+Also, data.table could be enhanced to allow a column to contain a list
+of functions directly, rather than a lookup. Should be ok provided it
+was pointers to functions rather than the functions themselves repeated
+over and over. Might be quite useful. FR#1302 raised to do that. You can
+probably create data.frame and data.table with a list column containing
+functions already, but whether operations on those columns work I doubt.
+Might not be very difficult to do though.
+
+Thanks for helping to discover a new bug and new fr !
+
+Matthew
+
+
+On Sat, 2011-02-26 at 16:55 -0600, Damian Betebenner wrote:
+> All,
+>
+> I?m curious from a speed perspective what the analog of apply is in
+> data.table as I have a problem where, for each row,  I want to take
+> either the min or the max of several columns depending upon the value
+> of a third column:
+> 
+> For example:
+> 
+> test.dt <- data.table(ID=1:10, SCORE_1=rnorm(10), SCORE_2=rnorm(10),
+> SCORE_3=rnorm(10), MAX_OR_MIN=c(rep("Max", 5), rep("Min", 5)))
+> 
+> For each row I?d like to get the max of SCORE_1, SCORE_2, and SCORE_3
+> if the MAX_OR_MIN value is MAX and the min of SCORE_1, SCORE_2, and
+> SCORE_3 if the MAX_OR_MIN value is MIN. 
+> 
+> It isn?t too difficult to come up with a ?bulky? and slow solution,
+> but I?m wondering if I?m missing a way in which data.table would make
+> such an effort elegant and quick.
+>
+> Any help greatly appreciated.  
+> 
+> Damian Betebenner
+> 
+> Center for Assessment
+> 
+> PO Box 351
+> 
+> Dover, NH   03821-0351
+> 
+>  
+> 
+> Phone (office): (603) 516-7900
+> 
+> Phone (cell): (857) 234-2474
+> 
+> Fax: (603) 516-7910
+> 
+>  
+> 
+> dbetebenner at nciea.org
+> 
+> www.nciea.org
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From dbetebenner at nciea.org  Mon Feb 28 01:09:35 2011
+From: dbetebenner at nciea.org (Damian Betebenner)
+Date: Sun, 27 Feb 2011 18:09:35 -0600
+Subject: [datatable-help] Puzzling issue
+Message-ID: <8AD9137B75B37049AA711A4B64CEDB694A97191263@AUSP01VMBX05.collaborationhost.net>
+
+All,
+
+Running some simple data.table code that previously ran and now getting errors that I don't understand and a found a work around that is puzzling:
+
+Doesn't run:
+
+tmp <- tmp.dt[, sum(!is.na(SGP)), by=list(STATE, CONTENT_AREA)]
+Error in `[.data.table`(tmp.dt, , sum(!is.na(SGP)), by = list(STATE, CONTENT_AREA)) :
+  'names' attribute [215514] must be the same length as the vector [215227]
+
+Does run:
+
+tmp <- tmp.dt[, sum(!is.na(as.numeric(SGP))), by=list(STATE, CONTENT_AREA)]
+
+class(tmp.dt$SGP)
+[1] "integer"
+
+
+Hmmm. Not sure what's going on.
+
+Damian
+
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20110227/8537b52d/attachment.htm>
+
+From mdowle at mdowle.plus.com  Mon Feb 28 09:20:09 2011
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 28 Feb 2011 08:20:09 +0000
+Subject: [datatable-help] Puzzling issue
+In-Reply-To: <8AD9137B75B37049AA711A4B64CEDB694A97191263@AUSP01VMBX05.collaborationhost.net>
+References: <8AD9137B75B37049AA711A4B64CEDB694A97191263@AUSP01VMBX05.collaborationhost.net>
+Message-ID: <1298881209.3442.18.camel@netbook>
+
+Doesn't ring any bells. Will need a small reproducible example, or save
+the object somewhere online so we can see it please.
+
+Does sapply(test.dt,names) return any data, and if so seems like some
+invalid data got in there depending on how it was created.
+
+
+On Sun, 2011-02-27 at 18:09 -0600, Damian Betebenner wrote:
+> All,
+> 
+>  
+> 
+> Running some simple data.table code that previously ran and now
+> getting errors that I don?t understand and a found a work around that
+> is puzzling:
+> 
+>  
+> 
+> Doesn?t run:
+> 
+>  
+> 
+> tmp <- tmp.dt[, sum(!is.na(SGP)), by=list(STATE, CONTENT_AREA)]
+> 
+> Error in `[.data.table`(tmp.dt, , sum(!is.na(SGP)), by = list(STATE,
+> CONTENT_AREA)) : 
+> 
+>   'names' attribute [215514] must be the same length as the vector
+> [215227]
+> 
+>  
+> 
+> Does run:
+> 
+>  
+> 
+> tmp <- tmp.dt[, sum(!is.na(as.numeric(SGP))), by=list(STATE,
+> CONTENT_AREA)]
+> 
+>  
+> 
+> class(tmp.dt$SGP)
+> 
+> [1] "integer"
+> 
+>  
+> 
+>  
+> 
+> Hmmm. Not sure what?s going on.
+> 
+>  
+> 
+> Damian
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+>  
+> 
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From bogus@does.not.exist.com  Mon Feb 21 17:26:18 2011
+From: bogus@does.not.exist.com ()
+Date: Mon, 21 Feb 2011 16:26:18 -0000
+Subject: No subject
+Message-ID: <mailman.3.1300501538.1423.datatable-help@lists.r-forge.r-project.org>
+
+will go a long way to improve my code efficiency.
+My experience with the forums which have been immensely useful  are
+that I am able to get the output I need (more often than not).
+I am looking forward to learn and graduate to do things .... The 'R'ight Way.
+
+On Sat, Mar 19, 2011 at 3:52 AM, Matthew Dowle <mdowle at mdowle.plus.com> wrote:
+>
+> The data.table wiki now has 3 do's and don'ts ! :
+>
+> http://rwiki.sciviews.org/doku.php?id=packages:cran:data.table
+>
+> Would be interested to know if these things are revelations, or old
+> news, to people who watch this list?
+>
+> Thanks,
+> Matthew
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+

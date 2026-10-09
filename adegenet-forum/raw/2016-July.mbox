@@ -1,0 +1,179 @@
+From roman.lustrik at biolitika.si  Sat Jul  2 08:11:23 2016
+From: roman.lustrik at biolitika.si (Roman =?utf-8?Q?Lu=C5=A1trik?=)
+Date: Sat, 2 Jul 2016 08:11:23 +0200 (CEST)
+Subject: [adegenet-forum] Different results from PCA derived from DAPC
+In-Reply-To: <1579341323.5177104.1461252261226.JavaMail.yahoo@mail.yahoo.com>
+References: <1579341323.5177104.1461252261226.JavaMail.yahoo.ref@mail.yahoo.com>
+ <1579341323.5177104.1461252261226.JavaMail.yahoo@mail.yahoo.com>
+Message-ID: <1079106828.682915.1467439883405.JavaMail.zimbra@biolitika.si>
+
+Hi, 
+
+can you provide a reproducible example? 
+DAPC works with dudi.pca function and implementation may differ from prcomp() or princomp(). If you are not satisfied with dudi.pca for some reason, you can supply your own object from other functions. As far as I can see from the code, you will need to have a list of elements (this is not documented, mind you): eig, li, c1, cent, norm. You can dissect the dudi.pca object and see what's what. 
+
+Cheers, 
+Roman 
+
+---- 
+In god we trust, all others bring data. 
+
+
+From: "kin onn" <kin_onn at yahoo.com> 
+To: adegenet-forum at lists.r-forge.r-project.org 
+Sent: Thursday, April 21, 2016 5:24:21 PM 
+Subject: [adegenet-forum] Different results from PCA derived from DAPC 
+
+Dear adegenet users, 
+
+Results from a regular PCA (using the function prcomp() )is very different from the results of the PCA that DAPC performs. I was wondering if anybody knows why? Thank you in advance! 
+
+
+Best regards, 
+Chan 
+Biodiversity Institute and Department of Ecology and Evolutionary Biology 
+University of Kansas 
+Dyche Hall, 1345 Jayhawk Blvd 
+Lawrence, KS 66045-7593 
+
+_______________________________________________ 
+adegenet-forum mailing list 
+adegenet-forum at lists.r-forge.r-project.org 
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/adegenet-forum 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20160702/3b1e06fa/attachment.html>
+
+From thibautjombart at gmail.com  Mon Jul  4 15:34:01 2016
+From: thibautjombart at gmail.com (Thibaut Jombart)
+Date: Mon, 4 Jul 2016 14:34:01 +0100
+Subject: [adegenet-forum] Order of SNPs biasing DAPC results?
+In-Reply-To: <9ADA9A2CB1EF44ADAD9EE5855C826081@MaikePC>
+References: <9ADA9A2CB1EF44ADAD9EE5855C826081@MaikePC>
+Message-ID: <CANPRA+qHx-biXgU9Cbdn7N9hF5sFyfbQYAHdo_0SF8ZjjNJfWg@mail.gmail.com>
+
+Dear Maike,
+
+no, the ordering of alleles should not change anything. See for instance
+using sim2pop:
+
+> library(adegenet)
+
+> data(sim2pop)
+   /// adegenet 2.0.1 is loaded ////////////
+
+   > overview: '?adegenet'
+   > tutorials/doc/questions: 'adegenetWeb()'
+   > bug reports/feature requests: adegenetIssues()
+
+
+> dapc1 <- dapc(tab(sim2pop), grp=pop(sim2pop), n.pca=10, n.da=1)
+
+> dapc2 <- dapc(tab(sim2pop)[,sample(1:ncol(tab(sim2pop)))],
+grp=pop(sim2pop), n.pca=10, n.da=1)
+
+> dapc1$eig
+[1] 484.1916
+
+> dapc2$eig
+[1] 484.1916
+
+> dapc1$li
+
+> sum(dapc1$ind.coord-dapc2$ind.coord)
+[1] -1.110223e-16  # this is a zero
+
+Best
+Thibaut
+
+
+--
+Dr Thibaut Jombart
+Lecturer, Department of Infectious Disease Epidemiology
+Imperial College London
+https://sites.google.com/site/thibautjombart/
+https://github.com/thibautjombart
+Twitter: @TeebzR <https://twitter.com/TeebzR>
+
+On 27 June 2016 at 13:40, <herrmann-m at uni-landau.de> wrote:
+
+> Hi!
+>
+> I was performing pairwise DAPCs on a data set containing > 62.000 SNPs in
+> 4 populations.
+>
+> Because of a problem with my PLINK input, my SNPs were initially in a
+> ?wrong? order. When I noticed the error, I repeated the DAPC analysis with
+> a correctly ordered input file, primarily to get correct SNP-IDs for the
+> allele loadings. Thereby I noticed differences between the two analyses:
+> Individual coordinates (dapc$ind.scores) and DAPC eigenvalues (dapc$eig)
+> differed and allele loadings (dapc$var.contr) were also slightly different.
+> The output of find.clusters was not different between the input files.
+>
+> My code:
+> > data1 <- read.PLINK("file.raw", map.file = NULL, quiet = FALSE,
+> chunkSize = 1000, parallel = FALSE)
+> > clust1 <- find.clusters(data1, stat="BIC", choose.n.clust=TRUE,
+> max.n.clust=10, n.iter=1e5, n.start=10,  pca.select="percVar",
+> perc.pca=100, glPca=NULL, parallel=FALSE)
+> > dapc1 <- dapc(data1, pop = clust1$grp, pca.select = "percVar", perc.pca
+> = 100, parallel=FALSE)
+> > loadings1 <- dapc1$var.contr
+> > ld1 <- loadings1[order(loadings1[,1], decreasing = TRUE),]
+> > write.table(ld1, file = "PW1_loadings_rc.txt")
+>
+> DAPC Output 1 (unsorted SNPs):
+> $eig (eigenvalues): 8.495e+32  vector    length content
+> $ind.scores
+>     LD1
+> Cluster1    -8.413869e+15    #(same value for all 6 individuals in this
+> cluster)
+> Cluster2    8.413869e+15    #(same value for all 6 individuals in this
+> cluster)
+> $var.contr (in decreasing order)
+> [line 72]    "60732" 0.000171552889525985
+> [line 72]    "2993" 0.000154678359525634
+> [line 72]    "976" 0.000152483049214648
+>
+> DAPC Output 2 (correctly sorted SNPs):
+> $eig (eigenvalues): 4.459e+33  vector    length content
+> $ind.scores
+>     LD1
+> Cluster1    -1.927727e+16    #(same value for all 6 individuals in this
+> cluster)
+> Cluster2    1.927727e+16    #(same value for all 6 individuals in this
+> cluster)
+> $var.contr (in decreasing order)
+> [line 72]    "60819" 0.000171552889525985
+> [line 73]    "42995" 0.000154678359525636
+> [line 74]    "697" 0.000152483049214647
+> (-> of course the SNP-IDs don?t match, but the values in each line of the
+> output should correspond )
+>
+> I used exactly the same code and the only difference between the analyses
+> was the sorting of SNPs. I realize that the difference in allele loadings
+> (my main interest) is marginal but I was surprised to find differences in
+> the first place. Is that normal? Shouldn?t these results be independent
+> from the sorting of SNPs? Could it be because of rounding errors?
+>
+>
+> Thank you for your time!
+> Cheers,
+> Maike
+>
+>
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> adegenet-forum mailing list
+> adegenet-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/adegenet-forum
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/adegenet-forum/attachments/20160704/ac21ce73/attachment.html>
+

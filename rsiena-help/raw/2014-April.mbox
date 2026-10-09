@@ -1,0 +1,276 @@
+From philip.leifeld at uni-konstanz.de  Tue Apr  8 15:56:06 2014
+From: philip.leifeld at uni-konstanz.de (Philip Leifeld)
+Date: Tue, 08 Apr 2014 15:56:06 +0200
+Subject: [Rsiena-help] Error in x$FRAN(zsmall,
+ xsmall) : Unlikely to terminate this epoch: more than 1000000 steps
+Message-ID: <5343FFF6.4000304@uni-konstanz.de>
+
+Hi,
+
+I am relatively new to RSiena, so hello to everybody on this list. I am 
+currently replicating a two-mode RSiena analysis that was published a 
+while ago by somebody else. I have the data and I have the code and I 
+can reasonably well replicate two of the three models reported, but I 
+keep getting an error message during the estimation of the third model. 
+The probability that this error message shows up seems to vary across 
+RSiena versions. I thought maybe you could let me know your thoughts on 
+what may be causing the problem or how to avoid it. Here is what I get 
+after about five minutes:
+
+Phase 2 Subphase 1 Iteration 3 Progress: 14%
+Error in x$FRAN(zsmall, xsmall) :
+   Unlikely to terminate this epoch:  more than 1000000 steps
+Calls: siena07 ... proc2subphase -> doIterations -> <Anonymous> -> .Call
+
+I found an old thread in the archive of this mailing list where somebody 
+had the same problem. In that case, the advice was to try unconditional 
+estimation. Here is the message:
+
+http://lists.r-forge.r-project.org/pipermail/rsiena-help/2012-March/000237.html
+
+In my case, there is also only one dependent network, so I tried 
+sienaModelCreate(cond = FALSE), but it did not change anything. The 
+other potential reason reported in the thread was that the composition 
+change was possibly too substantial. However, in the data I am dealing 
+with, the vast majority of both node types persists between consecutive 
+time steps, and apparently the estimation worked in the original 
+analysis, otherwise the authors couldn't have reported their results.
+
+Interestingly, the problem varies across RSiena versions. First, I was 
+using r267 (the most recent build on R-Forge) and r232 (the current 
+stable release on CRAN) on my desktop computer, and the problem showed 
+up every single time and usually around the tenth iteration. Then I 
+started to use r169, which is the version the original authors were 
+using in their original analysis (as reported in the paper), and the 
+problem disappeared, except for every 10th estimation or so on average 
+(still during the tenth iteration). Then I thought, OK, fine, this is 
+not optimal, but I can live with the problem as long as it shows up only 
+every 10th run. So I installed r169 also on the HPC cluster I have 
+access to, and there it seems to produce the error message every single 
+time during the third iteration (as in the example message printed above).
+
+I really have no clue (a) what is causing the problem and (b) why its 
+probability of occurrence seems to vary across versions and computers.
+
+In one of the earlier e-mails cited above, Tom Snijders stated that the 
+problem is most likely due to "fitting a model which is too complicated 
+for your data" and that one should go one step back and build a simpler 
+model, and then add other model terms step by step. While I agree that 
+this is a good strategy for model-building, this is not really 
+satisfactory for a replication because the very goal is to test whether 
+the same model with the same data leads approximately to the same 
+coefficients and standard errors. I was also wondering whether this 
+error message is basically a sign of degeneracy, similar to estimating a 
+degenerate model in statnet, but with an error message rather than 
+hard-to-detect convergence issues.
+
+I would be happy to receive feedback about what exactly is going on or 
+how to avoid the problem. Thanks very much in advance!
+
+Philip
+
+--
+Postdoctoral Fellow
+University of Konstanz, Germany, and
+Eawag, ETH domain, Switzerland
+
+From Tom.Snijders at nuffield.ox.ac.uk  Tue Apr  8 23:30:25 2014
+From: Tom.Snijders at nuffield.ox.ac.uk (Tom Snijders)
+Date: Tue, 8 Apr 2014 21:30:25 +0000
+Subject: [Rsiena-help] Error in x$FRAN(zsmall,
+ xsmall) : Unlikely to terminate this epoch: more than 1000000 steps
+In-Reply-To: <5343FFF6.4000304@uni-konstanz.de>
+References: <5343FFF6.4000304@uni-konstanz.de>
+Message-ID: <38F6D40F55648441B2070D889450ADCB08B19724@NUFF-ROCKALL.nuff.ox.ac.uk>
+
+Dear Philip,
+
+I am surprised that the problem still occurs when setting cond=FALSE, and I do not understand that.
+
+The reason for this error message in conditional estimation is that the algorithm of Section 4.2 in Snijders (Sociological Methodology, 2001) is used, and the stopping criterion given by (23) in that paper is never reached, because the distance defined in (22) reaches an asymptotic value (around which it fluctuates stochastically) that is lower than the observed value c_m. This is also why it may happen sometimes but not always: by chance the fluctuations may be such that the distance is reached in a limited amount of time, and from there the parameter change is such that the parameter comes in a region where the stopping rule behaves more acceptably. Also for a number of clusters greater than 1 there will be some difference.
+
+This depends on the model and the starting value. The fact that it depends on the version of RSiena or RSienaTest is probably because for two-mode networks we have changed the starting value. 
+
+Another solution is to use a different (better) starting value.
+
+Still, the fact that cond=FALSE does not improve things is strange. Perhaps there is some difference between one-mode and two-mode networks that I do not realize. If indeed cond=FALSE also gives the error, then you could send me (directly, not through this list) the data & code to let me check things.
+
+Best regards,
+Tom
+
+
+
+================================================================
+Tom A.B. Snijders
+Professor of Statistics in the Social Sciences
+Department of Politics and Department of Statistics
+Nuffield College
+University of Oxford
+tel. +44-01865-278599
+
+
+-----Original Message-----
+From: rsiena-help-bounces at lists.r-forge.r-project.org [mailto:rsiena-help-bounces at lists.r-forge.r-project.org] On Behalf Of Philip Leifeld
+Sent: 08 April 2014 14:56
+To: rsiena-help at lists.r-forge.r-project.org
+Subject: [Rsiena-help] Error in x$FRAN(zsmall, xsmall) : Unlikely to terminate this epoch: more than 1000000 steps
+
+Hi,
+
+I am relatively new to RSiena, so hello to everybody on this list. I am currently replicating a two-mode RSiena analysis that was published a while ago by somebody else. I have the data and I have the code and I can reasonably well replicate two of the three models reported, but I keep getting an error message during the estimation of the third model. 
+The probability that this error message shows up seems to vary across RSiena versions. I thought maybe you could let me know your thoughts on what may be causing the problem or how to avoid it. Here is what I get after about five minutes:
+
+Phase 2 Subphase 1 Iteration 3 Progress: 14% Error in x$FRAN(zsmall, xsmall) :
+   Unlikely to terminate this epoch:  more than 1000000 steps
+Calls: siena07 ... proc2subphase -> doIterations -> <Anonymous> -> .Call
+
+I found an old thread in the archive of this mailing list where somebody had the same problem. In that case, the advice was to try unconditional estimation. Here is the message:
+
+http://lists.r-forge.r-project.org/pipermail/rsiena-help/2012-March/000237.html
+
+In my case, there is also only one dependent network, so I tried sienaModelCreate(cond = FALSE), but it did not change anything. The other potential reason reported in the thread was that the composition change was possibly too substantial. However, in the data I am dealing with, the vast majority of both node types persists between consecutive time steps, and apparently the estimation worked in the original analysis, otherwise the authors couldn't have reported their results.
+
+Interestingly, the problem varies across RSiena versions. First, I was using r267 (the most recent build on R-Forge) and r232 (the current stable release on CRAN) on my desktop computer, and the problem showed up every single time and usually around the tenth iteration. Then I started to use r169, which is the version the original authors were using in their original analysis (as reported in the paper), and the problem disappeared, except for every 10th estimation or so on average (still during the tenth iteration). Then I thought, OK, fine, this is not optimal, but I can live with the problem as long as it shows up only every 10th run. So I installed r169 also on the HPC cluster I have access to, and there it seems to produce the error message every single time during the third iteration (as in the example message printed above).
+
+I really have no clue (a) what is causing the problem and (b) why its probability of occurrence seems to vary across versions and computers.
+
+In one of the earlier e-mails cited above, Tom Snijders stated that the problem is most likely due to "fitting a model which is too complicated for your data" and that one should go one step back and build a simpler model, and then add other model terms step by step. While I agree that this is a good strategy for model-building, this is not really satisfactory for a replication because the very goal is to test whether the same model with the same data leads approximately to the same coefficients and standard errors. I was also wondering whether this error message is basically a sign of degeneracy, similar to estimating a degenerate model in statnet, but with an error message rather than hard-to-detect convergence issues.
+
+I would be happy to receive feedback about what exactly is going on or how to avoid the problem. Thanks very much in advance!
+
+Philip
+
+--
+Postdoctoral Fellow
+University of Konstanz, Germany, and
+Eawag, ETH domain, Switzerland
+_______________________________________________
+Rsiena-help mailing list
+Rsiena-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rsiena-help
+
+From philip.leifeld at uni-konstanz.de  Sat Apr 26 20:19:48 2014
+From: philip.leifeld at uni-konstanz.de (Philip Leifeld)
+Date: Sat, 26 Apr 2014 20:19:48 +0200
+Subject: [Rsiena-help] Error in x$FRAN(zsmall,
+ xsmall) : Unlikely to terminate this epoch: more than 1000000 steps
+In-Reply-To: <38F6D40F55648441B2070D889450ADCB08B69798@NUFF-ROCKALL.nuff.ox.ac.uk>
+References: <5344744A.2080400@uni-konstanz.de> <535055A2.80500@uni-konstanz.de>
+ <38F6D40F55648441B2070D889450ADCB08B69798@NUFF-ROCKALL.nuff.ox.ac.uk>
+Message-ID: <535BF8C4.2030402@uni-konstanz.de>
+
+Hi Tom (and others),
+
+Thanks again for your help regarding my estimation issue a couple of 
+days ago. Your suggestion to set a low "firstg" value finally enabled me 
+to complete the estimation and replicate the original study (using build 
+r271). I first tried a value of 0.02 (as suggested), which made things 
+better but wasn't enough in the end. So I tried firstg = 0.002, which 
+worked very well (even in a hundred replications on an HPC cluster). 
+Thank you very much for the hint!
+
+Best,
+Philip
+
+Am 23.04.2014 15:11, schrieb Tom Snijders:
+> Dear Philip,
+>
+> Indeed I could reproduce the error and saw that it can arise also with non-conditional simulation. I checked in the code and saw that indeed this may happen (so I was wrong when writing you it couldn't).
+>
+> The reason is that the rate parameters attain a region that is impossible. This here is connected perhaps with the composition change, pretty sure with the use of the outdegree effect on rate, and perhaps the fact that there are three periods with the possibility of unmodeled heterogeneity between them.
+> If the purpose is modelling this data set, my suggestion would be to model the periods separately.
+> Another suggestion would be to replace the outRate effect by the outRateLog effect.
+>
+> But I believe your purpose was first to reproduce the results.
+> Then the options I see are: using good starting values (like those produced in the earlier analysis) - but I already said that before; and/or setting the parameter firstg in sienaModelCreate (now preferentially called sienaAlgorithmCreate) to a lower value than the default 0.2. My advice would be to set it at 0.02 and expect the necessity to do a second estimation using the prevAns parameter in siena07. But 0.02 is just a wild guess. If the problem still occurs for firstg=0.02, just use a smaller value (but less than 0.001 probably makes no sense).
+> The interpretation of firstg is mentioned in two places in the manual. Basically, it determines the step sizes in the stochastic approximation algorithm. Especially for the outRate parameter in this model the steps might be too large.
+> If you are interested in the technical background, this is the parameter called a_N in the sentence
+> " The initial value of a_N in Phase 2 is 0.2."
+> in page 393 of my 2001 paper in Sociological Methodology where this model was first explained.
+>
+> Please let me know if this works. My apologies for the long delay. It is good that you reminded me. I have been too busy the past month and, frankly, I had forgotten about your question.
+>
+> By the way: the R command set.seed does not affect the results of RSiena in a systematic way. For this purpose you need to use parameter seed in sienaModelCreate/sienaAlgorithmCreate.
+>
+> Best wishes,
+> Tom
+>
+> ================================================================
+> Tom A.B. Snijders
+> Professor of Statistics in the Social Sciences
+> Department of Politics and Department of Statistics
+> Nuffield College
+> University of Oxford
+> tel. +44-01865-278599
+>
+>
+>
+> Am 08.04.2014 23:30, schrieb Tom Snijders:
+>> Dear Philip,
+>>
+>> I am surprised that the problem still occurs when setting cond=FALSE, and I do not understand that.
+>>
+>> The reason for this error message in conditional estimation is that the algorithm of Section 4.2 in Snijders (Sociological Methodology, 2001) is used, and the stopping criterion given by (23) in that paper is never reached, because the distance defined in (22) reaches an asymptotic value (around which it fluctuates stochastically) that is lower than the observed value c_m. This is also why it may happen sometimes but not always: by chance the fluctuations may be such that the distance is reached in a limited amount of time, and from there the parameter change is such that the parameter comes in a region where the stopping rule behaves more acceptably. Also for a number of clusters greater than 1 there will be some difference.
+>>
+>> This depends on the model and the starting value. The fact that it depends on the version of RSiena or RSienaTest is probably because for two-mode networks we have changed the starting value.
+>>
+>> Another solution is to use a different (better) starting value.
+>>
+>> Still, the fact that cond=FALSE does not improve things is strange. Perhaps there is some difference between one-mode and two-mode networks that I do not realize. If indeed cond=FALSE also gives the error, then you could send me (directly, not through this list) the data & code to let me check things.
+>>
+>> Best regards,
+>> Tom
+>>
+>>
+>>
+>> ================================================================
+>> Tom A.B. Snijders
+>> Professor of Statistics in the Social Sciences Department of Politics
+>> and Department of Statistics Nuffield College University of Oxford
+>> tel. +44-01865-278599
+>>
+>>
+>> -----Original Message-----
+>> From: rsiena-help-bounces at lists.r-forge.r-project.org [mailto:rsiena-help-bounces at lists.r-forge.r-project.org] On Behalf Of Philip Leifeld
+>> Sent: 08 April 2014 14:56
+>> To: rsiena-help at lists.r-forge.r-project.org
+>> Subject: [Rsiena-help] Error in x$FRAN(zsmall, xsmall) : Unlikely to terminate this epoch: more than 1000000 steps
+>>
+>> Hi,
+>>
+>> I am relatively new to RSiena, so hello to everybody on this list. I am currently replicating a two-mode RSiena analysis that was published a while ago by somebody else. I have the data and I have the code and I can reasonably well replicate two of the three models reported, but I keep getting an error message during the estimation of the third model.
+>> The probability that this error message shows up seems to vary across RSiena versions. I thought maybe you could let me know your thoughts on what may be causing the problem or how to avoid it. Here is what I get after about five minutes:
+>>
+>> Phase 2 Subphase 1 Iteration 3 Progress: 14% Error in x$FRAN(zsmall, xsmall) :
+>>      Unlikely to terminate this epoch:  more than 1000000 steps
+>> Calls: siena07 ... proc2subphase -> doIterations -> <Anonymous> -> .Call
+>>
+>> I found an old thread in the archive of this mailing list where somebody had the same problem. In that case, the advice was to try unconditional estimation. Here is the message:
+>>
+>> http://lists.r-forge.r-project.org/pipermail/rsiena-help/2012-March/000237.html
+>>
+>> In my case, there is also only one dependent network, so I tried sienaModelCreate(cond = FALSE), but it did not change anything. The other potential reason reported in the thread was that the composition change was possibly too substantial. However, in the data I am dealing with, the vast majority of both node types persists between consecutive time steps, and apparently the estimation worked in the original analysis, otherwise the authors couldn't have reported their results.
+>>
+>> Interestingly, the problem varies across RSiena versions. First, I was using r267 (the most recent build on R-Forge) and r232 (the current stable release on CRAN) on my desktop computer, and the problem showed up every single time and usually around the tenth iteration. Then I started to use r169, which is the version the original authors were using in their original analysis (as reported in the paper), and the problem disappeared, except for every 10th estimation or so on average (still during the tenth iteration). Then I thought, OK, fine, this is not optimal, but I can live with the problem as long as it shows up only every 10th run. So I installed r169 also on the HPC cluster I have access to, and there it seems to produce the error message every single time during the third iteration (as in the example message printed above).
+>>
+>> I really have no clue (a) what is causing the problem and (b) why its probability of occurrence seems to vary across versions and computers.
+>>
+>> In one of the earlier e-mails cited above, Tom Snijders stated that the problem is most likely due to "fitting a model which is too complicated for your data" and that one should go one step back and build a simpler model, and then add other model terms step by step. While I agree that this is a good strategy for model-building, this is not really satisfactory for a replication because the very goal is to test whether the same model with the same data leads approximately to the same coefficients and standard errors. I was also wondering whether this error message is basically a sign of degeneracy, similar to estimating a degenerate model in statnet, but with an error message rather than hard-to-detect convergence issues.
+>>
+>> I would be happy to receive feedback about what exactly is going on or how to avoid the problem. Thanks very much in advance!
+>>
+>> Philip
+>>
+>> --
+>> Postdoctoral Fellow
+>> University of Konstanz, Germany, and
+>> Eawag, ETH domain, Switzerland
+>> _______________________________________________
+>> Rsiena-help mailing list
+>> Rsiena-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rsiena-help
+>>
+>
+>
+>
+

@@ -1,0 +1,91 @@
+From srinivas.kowta at adelphigroup.com  Tue Oct  4 18:45:49 2016
+From: srinivas.kowta at adelphigroup.com (Srinivas Kowta)
+Date: Tue, 4 Oct 2016 16:45:49 +0000
+Subject: [R-marketing-bugs] possible bug in R Code (Chap 13, page 369)
+Message-ID: <0EAA9D4F04DAE440A991D78AC1F16811B05CF2@S2376M32.CDSmail.pvt>
+
+
+I was testing some R code in Chapter 13 on Choice Based Conjoint. I was going through the step by step introduction you have that creates the cbc.df data file from scratch. Here is the code (in italics) I have so far when the following error cropped up: Error in nrow(profiles) : object 'profiles' not found (please see the highlighted code at the end of the code section in the email below). What is causing the error?
+
+Thanks for your help.
+
+Sri
+
+
+attrib <- list(seat = c("6", "7", "8"),
+cargo = c("2ft", "3ft"),
+eng = c("gas", "hyb", "elec"),
+price = c("30", "35", "40"))
+
+coef.names <- NULL
+for (a in seq_along(attrib)) {
+coef.names <- c(coef.names,
+paste(names(attrib)[a], attrib[[a]][-1], sep=""))
+}
+
+coef.names
+
+mu <- c(-1, -1, 0.5, -1, -2, -1, -2)
+names(mu) <- coef.names
+mu
+
+Sigma <- diag(c(0.3, 1, 0.1, 0.3, 1, 0.2, 0.3))
+dimnames(Sigma) <- list(coef.names, coef.names)
+Sigma["enghyb", "engelec"] <- Sigma["engelec", "enghyb"] <- 0.3
+
+set.seed(33040)
+resp.id <- 1:200 # respondent ids
+carpool <- sample(c("yes", "no"), size=length(resp.id), replace=TRUE, prob=c(0.3, 0.7))
+
+library(MASS)
+coefs <- mvrnorm(length(resp.id), mu=mu, Sigma=Sigma)
+colnames(coefs) <- coef.names
+
+coefs[carpool=="yes", "seat8"] <- coefs[carpool=="yes", "seat8"] + 2
+coefs[carpool=="yes", "seat7"] <- coefs[carpool=="yes", "seat7"] + 1.5
+
+head(cbind(carpool, coefs))
+
+nques <- 15
+nalt <- 3
+
+profiles <- expand.grid(attrib)
+nrow(profiles)
+head(profiles)
+
+profiles.coded <- model.matrix(~ seat + cargo + eng + price, data=profiles)[ , -1]
+head(profiles.coded)
+
+cbc.df <- data.frame(NULL)
+for (i in seq_along(resp.id)) {
+profiles.i <- sample(1:nrow(profiles), size=nques*nalt)
+utility <- profiles.coded[profiles.i, ] %*% coefs[i, ]
+wide.util <- matrix(data=utility, ncol=nalt, byrow=TRUE)
+probs <- exp(wide.util) / rowSums(exp(wide.util))
+choice <- apply(probs, 1, function(x) sample(1:nalt, size=1, prob=x))
+choice <- rep(choice, each=nalt)==rep(1:nalt, nques)
+conjoint.i <- data.frame(resp.id=rep(i, nques),
+ques = rep(1:nques, each=nalt),
+alt = rep(1:nalt, nques),
+carpool = rep(carpool[i], nques),
+profiles[profiles.i, ],
+choice = as.numeric(choice))
+cbc.df <- rbind(cbc.df, conjoint.i)
+# Tidy up, keeping only cbc.df and attrib
+rm(a, i, resp.id, carpool, mu, Sigma, coefs, coef.names,
+conjoint.i, profiles, profiles.i, profiles.coded, utility,
+wide.util, probs, choice, nalt, nques)
+}
+
+
+
+
+________________________________
+
+Please help the environment. Only print this email if absolutely necessary.
+
+DISCLAIMER: The information in this message is confidential and may be legally privileged. It is intended solely for the addressee. Access to this message by anyone else is unauthorised. If you are not the intended recipient, any disclosure, copying, or distribution of the message, or any action or omission taken by you in reliance on it, is prohibited and may be unlawful. Please immediately contact the sender if you have received this message in error.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/r-marketing-bugs/attachments/20161004/9ec9c3b3/attachment.html>
+

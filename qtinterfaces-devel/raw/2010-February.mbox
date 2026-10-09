@@ -1,0 +1,319 @@
+From deepayan.sarkar at gmail.com  Sat Feb 27 06:35:09 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Fri, 26 Feb 2010 21:35:09 -0800
+Subject: [RQt-devel] regressions
+Message-ID: <eb555e661002262135h3e972f4cqdf066545629e23be@mail.gmail.com>
+
+This used to work before:
+
+> qfile <- Qt$QFile("/tmp/foo.R")
+> stream <- Qt$QTextStream(qfile)
+Error in qinvokeStatic(cl, name, ...) :
+  Unable to disambiguate method QTextStream::QTextStream
+
+but no longer. A workaround is
+
+> stream <- Qt$QTextStream()
+> stream$setDevice(qfile)
+
+Similarly,
+
+> Qt$QPen(Qt$QColor())
+Error in qinvokeStatic(cl, name, ...) :
+  Unable to disambiguate method QPen::QPen
+
+Any idea what might be going on?
+
+
+Even worse, segfaults with
+
+> stream$string()
+
+ *** caught segfault ***
+address 0x8, cause 'memory not mapped'
+
+Traceback:
+ 1: .Call(qt_qinvoke, x, method, FALSE, list(...))
+ 2: qinvoke(<environment>, "string", ...)
+ 3: stream$string()
+
+
+and with
+
+> foo <- "foobar"
+> stream <- Qt$QTextStream(foo)
+
+ *** caught segfault ***
+address 0x8, cause 'memory not mapped'
+
+Traceback:
+ 1: .Call(qt_qinvokeStatic, x, method, list(...))
+ 2: qinvokeStatic(cl, name, ...)
+ 3: Qt$QTextStream(foo)
+
+(But I guess this usage doesn't make sense for us.)
+
+-Deepayan
+
+From lawrence.michael at gene.com  Sat Feb 27 06:42:52 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 26 Feb 2010 21:42:52 -0800
+Subject: [RQt-devel] regressions
+In-Reply-To: <eb555e661002262135h3e972f4cqdf066545629e23be@mail.gmail.com>
+References: <eb555e661002262135h3e972f4cqdf066545629e23be@mail.gmail.com>
+Message-ID: <acbd1aed1002262142g460352d0ne00b3bb21103d73f@mail.gmail.com>
+
+I'll have to look into this. All of the type conversions were rewritten.
+It's likely that many things are broken.
+
+Thanks,
+Michael
+
+On Fri, Feb 26, 2010 at 9:35 PM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> This used to work before:
+>
+> > qfile <- Qt$QFile("/tmp/foo.R")
+> > stream <- Qt$QTextStream(qfile)
+> Error in qinvokeStatic(cl, name, ...) :
+>  Unable to disambiguate method QTextStream::QTextStream
+>
+> but no longer. A workaround is
+>
+> > stream <- Qt$QTextStream()
+> > stream$setDevice(qfile)
+>
+> Similarly,
+>
+> > Qt$QPen(Qt$QColor())
+> Error in qinvokeStatic(cl, name, ...) :
+>  Unable to disambiguate method QPen::QPen
+>
+> Any idea what might be going on?
+>
+>
+> Even worse, segfaults with
+>
+> > stream$string()
+>
+>  *** caught segfault ***
+> address 0x8, cause 'memory not mapped'
+>
+> Traceback:
+>  1: .Call(qt_qinvoke, x, method, FALSE, list(...))
+>  2: qinvoke(<environment>, "string", ...)
+>  3: stream$string()
+>
+>
+> and with
+>
+> > foo <- "foobar"
+> > stream <- Qt$QTextStream(foo)
+>
+>  *** caught segfault ***
+> address 0x8, cause 'memory not mapped'
+>
+> Traceback:
+>  1: .Call(qt_qinvokeStatic, x, method, list(...))
+>  2: qinvokeStatic(cl, name, ...)
+>  3: Qt$QTextStream(foo)
+>
+> (But I guess this usage doesn't make sense for us.)
+>
+> -Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100226/f48ed196/attachment.htm 
+
+From deepayan.sarkar at gmail.com  Sat Feb 27 07:08:37 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Fri, 26 Feb 2010 22:08:37 -0800
+Subject: [RQt-devel] regressions
+In-Reply-To: <acbd1aed1002262142g460352d0ne00b3bb21103d73f@mail.gmail.com>
+References: <eb555e661002262135h3e972f4cqdf066545629e23be@mail.gmail.com>
+	<acbd1aed1002262142g460352d0ne00b3bb21103d73f@mail.gmail.com>
+Message-ID: <eb555e661002262208s494b4f98v88e14155e7660971@mail.gmail.com>
+
+On Fri, Feb 26, 2010 at 9:42 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> I'll have to look into this. All of the type conversions were rewritten.
+> It's likely that many things are broken.
+
+Here's a different one with enums--some are there, some are not:
+
+> Qt$QTextCursor$NoMove
+NoMove
+     0
+attr(,"class")
+[1] "QtEnum"
+> Qt$QTextCursor$Start
+NULL
+> Qt$QTextCursor$Up
+NULL
+
+When you figure out the fixes, could you also briefly describe what
+you did so I can help out in the future? Right now, I have no idea
+where to start looking :-)
+
+-Deepayan
+
+From lawrence.michael at gene.com  Sun Feb 28 17:32:26 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sun, 28 Feb 2010 08:32:26 -0800
+Subject: [RQt-devel] regressions
+In-Reply-To: <eb555e661002262208s494b4f98v88e14155e7660971@mail.gmail.com>
+References: <eb555e661002262135h3e972f4cqdf066545629e23be@mail.gmail.com>
+	<acbd1aed1002262142g460352d0ne00b3bb21103d73f@mail.gmail.com>
+	<eb555e661002262208s494b4f98v88e14155e7660971@mail.gmail.com>
+Message-ID: <acbd1aed1002280832g20d6e5b2v2efafbda3274b078@mail.gmail.com>
+
+On Fri, Feb 26, 2010 at 10:08 PM, Deepayan Sarkar <deepayan.sarkar at gmail.com
+> wrote:
+
+> On Fri, Feb 26, 2010 at 9:42 PM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > I'll have to look into this. All of the type conversions were rewritten.
+> > It's likely that many things are broken.
+>
+> Here's a different one with enums--some are there, some are not:
+>
+> > Qt$QTextCursor$NoMove
+> NoMove
+>     0
+> attr(,"class")
+> [1] "QtEnum"
+> > Qt$QTextCursor$Start
+> NULL
+> > Qt$QTextCursor$Up
+> NULL
+>
+> When you figure out the fixes, could you also briefly describe what
+> you did so I can help out in the future? Right now, I have no idea
+> where to start looking :-)
+>
+>
+
+Sure. I'm going to start working on these now. We obviously need
+documentation at the user and developer level. Sorry that I have sort of run
+away with this project. I'll get you back on board ASAP.
+
+I just got qtbase "working" on the Mac. The Mac-specific routines caused
+lots of headaches, due to all the different subplatforms (carbon vs cocoa,
+32 bit vs 64 bit etc). I ended up blacklisting some of the obsolete stuff.
+
+
+> -Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100228/1d3d0ba2/attachment.htm 
+
+From lawrence.michael at gene.com  Sun Feb 28 20:17:52 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sun, 28 Feb 2010 11:17:52 -0800
+Subject: [RQt-devel] regressions
+In-Reply-To: <eb555e661002262135h3e972f4cqdf066545629e23be@mail.gmail.com>
+References: <eb555e661002262135h3e972f4cqdf066545629e23be@mail.gmail.com>
+Message-ID: <acbd1aed1002281117tcb1d1e0ub494b65d194a3647@mail.gmail.com>
+
+On Fri, Feb 26, 2010 at 9:35 PM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> This used to work before:
+>
+> > qfile <- Qt$QFile("/tmp/foo.R")
+> > stream <- Qt$QTextStream(qfile)
+> Error in qinvokeStatic(cl, name, ...) :
+>  Unable to disambiguate method QTextStream::QTextStream
+>
+> but no longer. A workaround is
+>
+> > stream <- Qt$QTextStream()
+> > stream$setDevice(qfile)
+>
+> Similarly,
+>
+> > Qt$QPen(Qt$QColor())
+> Error in qinvokeStatic(cl, name, ...) :
+>  Unable to disambiguate method QPen::QPen
+>
+> Any idea what might be going on?
+>
+>
+> Even worse, segfaults with
+>
+> > stream$string()
+>
+>  *** caught segfault ***
+> address 0x8, cause 'memory not mapped'
+>
+> Traceback:
+>  1: .Call(qt_qinvoke, x, method, FALSE, list(...))
+>  2: qinvoke(<environment>, "string", ...)
+>  3: stream$string()
+>
+>
+> and with
+>
+> > foo <- "foobar"
+> > stream <- Qt$QTextStream(foo)
+>
+>  *** caught segfault ***
+> address 0x8, cause 'memory not mapped'
+>
+> Traceback:
+>  1: .Call(qt_qinvokeStatic, x, method, list(...))
+>  2: qinvokeStatic(cl, name, ...)
+>  3: Qt$QTextStream(foo)
+>
+> (But I guess this usage doesn't make sense for us.)
+>
+>
+I've fixed most of these issues. stream$string() returns NULL, as I think it
+should here. Calling setString() or using the constructor above is going to
+be a problem. It wants a QString pointer, so it that it can make changes,
+which means we need to allocate a new QString on the heap. Normally, when we
+see a pointer like that, we (usually correctly) assume that it is a
+return-by-reference parameter. Allocating on the heap would be a special
+case, and a difficult one at that, since we would need to free the memory
+upon destruction of QTextStream.
+
+And you're right that it does not make a lot of sense to write into a
+persistent string like that. Better to use QBuffer as the QIODevice.
+
+Thus, I need to tweak the argument scoring code so that the const
+QByteArray& constructor is chosen when given a character vector (creating a
+read-only stream).
+
+You can check the svn logs to see what I changed. There were 2 main problems
+here. The first was that the argument scoring of classes was broken. We need
+to score arguments in methods that are overloaded, in certain cases. There
+is an attempt to mimic the behavior of the compiler. This is all done via
+the scoreArg function template. The second problem was that I had forgotten
+to handle the 'QString*' type. Smoke is configured so that QString is
+treated as a "void pointer" type, instead of a class, because most language
+bindings want to convert QString to a native string type. The other voidps
+are things like primitive pointers and template types (e.g. QList). All of
+these voidp's need to be handled special-cased via the typeHandlers hash.
+
+Michael
+
+
+-Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100228/79942fe4/attachment.htm 
+

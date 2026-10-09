@@ -1,0 +1,1458 @@
+{
+  "list": "datatable-help",
+  "description": "",
+  "month": "2014-07",
+  "messages": [
+    {
+      "id": "msg-84547044d978",
+      "message_id": "<etPan.53b1f2e5.5d888a08.e9e5@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-06-30T23:29:40Z",
+      "subject": "[datatable-help] Speeding up column references with roll",
+      "subject_clean": "[datatable-help] Speeding up column references with roll",
+      "in_reply_to": "<CACLVabUmtthr8iCAWT2o5aMH53yid_STuqSvQCXJJ=v3SVJYQg@mail.gmail.com>",
+      "references": [
+        "<CACLVabX13hU4SzPqx4tbMdLU_C00vhqWaOCm9Vn1ODuRPu7Zxg@mail.gmail.com>",
+        "<etPan.53b197a1.5b25ace2.e9e5@Arunkumars-MacBook-Pro.local>",
+        "<CACLVabWdaHSy=Tpi=fgKJCbkCV3tgktNadEP1Db0yW92nL6oSg@mail.gmail.com>",
+        "<etPan.53b1d7ec.2c6e4afd.e9e5@Arunkumars-MacBook-Pro.local>",
+        "<CACLVabUmtthr8iCAWT2o5aMH53yid_STuqSvQCXJJ=v3SVJYQg@mail.gmail.com>",
+        "<CACLVabUmtthr8iCAWT2o5aMH53yid_STuqSvQCXJJ=v3SVJYQg@mail.gmail.com>"
+      ],
+      "body_plain": "Thanks, that helped. To illustrate on your big data (from the first post), your question is:\n\nrequire(data.table) ## 1.9.3\nset.seed(12312391)\ndata <- data.table(\n          group = sample(1e3,1e7,replace=T),\n          time = ceiling(runif(1e7, 0, 1e5)),\n          hit = rbinom(1e7, 1, p = 0.1),\n  key=c(\"group\",\"time\"))\n\nsystem.time(ans1 <- d[(hit)][d,list(hittime=time),roll=-20,by=.EACHI]) ## 5.4 sec\nsystem.time(ans2 <- d[(hit)][d,time,roll=-20,by=.EACHI])  ## 3.4 sec\n\nsetnames(ans2, 3L, \"hittime\")\nsetkey(ans1, NULL)\nsetkey(ans2, NULL)\nidentical(ans1, ans2) # [1] TRUE\nWhy this difference? And that?s a great question!\n\nNote that this is not particularly due to you not setting name (because [.data.table is clever enough to remove names before to call dogroups). Just to be sure, we?ll do a check:\n\nsystem.time(ans3 <- d[(hit)][d,list(time),roll=-20,by=.EACHI]) ## 5.7 sec\nsetnames(ans3, 3L, \"hittime\")\nsetkey(ans3, NULL)\nidentical(ans1, ans3) # [1] TRUE\nThe difference comes from the j-expression?s difference in list(.) in both the slow cases.. For each group, in C-level, the j-expression is evaluated.. and in the slow cases it?s eval(list(time)) and in the fast case, it?s eval(time) and my guess is that this difference in the call is what makes that difference..\n\nIt?d be easy to test this by writing a simple C-script and evaluating both expressions, but I don?t have the time to do that right now. However, here?s an alternate ?easy-route? to verify.\n\nrequire(data.table) ## 1.9.3\nDT <- data.table(x=rep(1:1e7, 2L), y=1L)\nsystem.time(ans1 <- DT[, .N, by=x])            ## 3.5 sec\nsystem.time(ans2 <- DT[, list(N = .N), by=x])  ## 5.8 sec\nBasically, when j-expression is just 1 entry, we could gain some speedup by removing the list() that?s being wrapped around..\n\nIt?d be great if you could cite this thread from the data.table mailing list and file an issue here: https://github.com/Rdatatable/data.table/issues?direction=desc&labels=&milestone=&page=1&sort=updated&state=open\n\n\nArun\n\nFrom:?Stavros Macrakis (??????? ????????) macrakis at alum.mit.edu\nReply:?Stavros Macrakis (??????? ????????) macrakis at alum.mit.edu\nDate:?July 1, 2014 at 12:51:36 AM\nTo:?Arunkumar Srinivasan aragorn168b at gmail.com\nCc:?datatable-help at r-forge.wu-wien.ac.at datatable-help at r-forge.wu-wien.ac.at\nSubject:? Re: [datatable-help] Speeding up column references with roll  \n\nThanks for your reply, but your code doesn't do the same thing as mine. Here's a very small example of what I'm trying to do.\n\n# Test data\n\n> dd <- data.table(groups=rep(1:2,each=4),time=1:8,hit=1:8%%3==0,key=c(\"groups\",\"time\"))\n> dd\n? ?groups time ? hit\n1: ? ? ?1 ? ?1 FALSE\n2: ? ? ?1 ? ?2 FALSE\n3: ? ? ?1 ? ?3 ?TRUE\n4: ? ? ?1 ? ?4 FALSE\n5: ? ? ?2 ? ?5 FALSE\n6: ? ? ?2 ? ?6 ?TRUE\n7: ? ? ?2 ? ?7 FALSE\n8: ? ? ?2 ? ?8 FALSE\n\n# Desired output includes the time and the corresponding roll time\n\n> (res1 <- dd[(hit)][dd,list(rolltime=time),roll=2,by=.EACHI][!is.na(rolltime)])\n? ?groups time rolltime\n1: ? ? ?1 ? ?3 ? ? ? 3\n2: ? ? ?1 ? ?4 ? ? ? 3\n3: ? ? ?2 ? ?6 ? ? ? 6\n4: ? ? ?2 ? ?7 ? ? ? 6\n5: ? ? ?2 ? ?8 ? ? ? 6\n\n# Undesired output (without .EACHI)\n\n> (res2 <- dd[hit==1][dd,list(rolltime=time),roll=2][!is.na(rolltime)])\n? ?rolltime\n1: ? ? ? 1\n2: ? ? ? 2\n3: ? ? ? 3\n4: ? ? ? 4\n5: ? ? ? 5\n6: ? ? ? 6\n7: ? ? ? 7\n8: ? ? ? 8\n\n# Undesired output (with allow.cartesian)\n\n> res3 <- dd[hit==1][dd,list(rolltime=time),roll=2,allow.cartesian=TRUE][!is.na(rolltime)])\n> identical(res2,res3)\n[1] TRUE\n\nRe rolltime vs. time, consider the following?\n\n> dd[(hit)][dd,time,roll=2,by=.EACHI]\n? ?groups time time\n1: ? ? ?1 ? ?1 ? NA\n2: ? ? ?1 ? ?2 ? NA\n3: ? ? ?1 ? ?3 ? ?3\n4: ? ? ?1 ? ?4 ? ?3\n5: ? ? ?2 ? ?5 ? NA\n6: ? ? ?2 ? ?6 ? ?6\n7: ? ? ?2 ? ?7 ? ?6\n8: ? ? ?2 ? ?8 ? ?6\n\nThere are two different output columns named 'time'. One is the time from the right relation of the join, the other is the time from the left relation of the join. There is nothing like the i.time convention for distinguishing the time that comes from one of the tables from the (rolled) time that comes from the other.\n\n? ? ? ? ? ?-s\n\n\n\nOn Mon, Jun 30, 2014 at 5:34 PM, Arunkumar Srinivasan <aragorn168b at gmail.com> wrote:\nYour example doesn?t work without allow.cartesian=TRUE.\n\nYou shouldn?t be using by=.EACHI here. This by was what was implicit in the earlier versions which made it slow. Please re-read the README.\n\nHere?s the function I tested on 1.9.3:\n\ncalc1 <- function(d) {\n    d[ hit==1][ d,list(hittime=time),roll=-20, allow.cartesian=TRUE][ !is.na(hittime)]\n}\n\ncalc2 <- function(d) {\n  temp <- d[ hit==1][ d,list(time),roll=-20, allow.cartesian=TRUE]\n  setnames(temp,1,\"hittime\")\n  temp[!is.na(hittime)]\n}\n\n# Generate sample data\nset.seed(12312391)\ndata <- data.table(\n          group = sample(1e3,1e7,replace=T),\n          time = ceiling(runif(1e7, 0, 1e5)),\n          hit = rbinom(1e7, 1, p = 0.1),\n  key=c(\"group\",\"time\"))\n\nsystem.time(ans1 <- calc1(data))\n#   user  system elapsed   \n#  2.083   0.189   2.344   \nsystem.time(ans2 <- calc2(data))\n#   user  system elapsed   \n#  2.012   0.241   2.426   \nidentical(ans1, ans2) # [1] TRUE\n\nYou write:\nI also don't see any way to refer to the different time vs. hittime without renaming the second time column.\n\nI don?t quite follow what this means, but IIUC I think this is what you?re referring to: https://github.com/Rdatatable/data.table/issues/471\n\nYou write:\nYou mention some FR's, but they're hard to find without the specific numbers.\n\nI was mentioning the first two points under NEW FEATURES within Changes in v1.9.3. The one that starts with by=.EACHI runs j for each group in x that each row of i joins to. and the one that starts with Accordingly, X[Y, j] now does what X[Y][, j] did.\n\nMaybe we should start numbering the fixes for easy reference. Will note it down.\n\nYou write: Where can I find the 1.9.3 reference manual?\n\nThis version is a development version. Necesary changes will be reflected in their corresponding ?... entry. And when we find some time, the introduction and FAQs will be updated. But that?s not yet.\n\nIf you don?t wish to keep up-to-date by looking at the NEWS, you?ll have to wait until the next stable release on CRAN.\n\nYou write: On my system (MacOSX), build_vignettes=TRUE gives an error in texi2dvi -- would that have generated the refman? If so, how do I fix that?\n\nI?m guessing it?s a PDF latex error. If so, you?ll have to install what the error message says is missing on your system. Sorry, can?t help you much there.\n\n\nArun\n\nFrom:?Stavros Macrakis (??????? ????????) macrakis at alum.mit.edu\nReply:?Stavros Macrakis (??????? ????????) macrakis at alum.mit.edu\nDate:?June 30, 2014 at 10:40:24 PM\nTo:?Arunkumar Srinivasan aragorn168b at gmail.com\nCc:?datatable-help at r-forge.wu-wien.ac.at datatable-help at r-forge.wu-wien.ac.at\nSubject:? Re: [datatable-help] Speeding up column references with roll\n\nOK, I'm retesting in 1.9.3, adding by=.EACHI. I don't see any significant difference in the timings -- setnames is still 25% faster than list(hittime=time). What exactly was fixed?\n\nI also don't see any way to refer to the different time vs. hittime without renaming the second time column.\n\nYou mention some FR's, but they're hard to find without the specific numbers.\n\nWhere can I find the 1.9.3 reference manual? I think it would be easier to understand for me than the incremental changes in the New Features listings. On my system (MacOSX), build_vignettes=TRUE gives an error in texi2dvi -- would that have generated the refman? If so, how do I fix that?\n\nThanks,\n\n? ? ? ? ? ? ? ?-s\n\n\nOn Mon, Jun 30, 2014 at 1:00 PM, Arunkumar Srinivasan <aragorn168b at gmail.com> wrote:\nOnce again, has been fixed in 1.9.3. Now join requires `by=.EACHI` (explicit) to perform a by-without-by.\nhttps://github.com/Rdatatable/data.table/blob/master/README.md\nHave a look at the first FR (by = .EACHI runs ...) that's been fixed in 1.9.3 - there's some changes in the way join results in due to these changes (which've been discussed since and for quite sometime) to bring more consistency to the DT[i, j, by] syntax. Also have a look at the second FR and the links it points to for the discussions.\n\nIn general, it's better to test with the devel version (and have a look at README) for any bugs you may encounter.\n\nArun\n\nFrom:?Stavros Macrakis (??????? ????????) macrakis at alum.mit.edu\nReply:?Stavros Macrakis (??????? ????????) macrakis at alum.mit.edu\nDate:?June 30, 2014 at 5:38:10 PM\nTo:?datatable-help at r-forge.wu-wien.ac.at datatable-help at r-forge.wu-wien.ac.at\nSubject:? [datatable-help] Speeding up column references with roll\n\nIn the following example, it is about 15-25% faster to use setnames rather than j=list(name=var). Is there some better approach to referencing the other joined column when using roll?\n\n# Use j=list(name=var)\ncalc1 <- function(d) {\n? d[ hit==1\n? ?][ d,list(hittime=time),roll=-20\n? ?][ !is.na(hittime)\n? ?]\n}\n\n# Use setnames\ncalc2 <- function(d) {\n? temp <- d[ hit==1\n? ? ? ? ? ?][ d,time,roll=-20\n? ? ? ? ? ?]\n? setnames(temp,3,\"hittime\")\n? temp[!is.na(hittime)]\n}\n\n# Generate sample data\nset.seed(12312391)\ndata <- data.table(\n? ? ? ? ? group = sample(1e3,1e7,replace=T),\n? ? ? ? ? time = ceiling(runif(1e7, 0, 1e5)),\n? ? ? ? ? hit = rbinom(1e7, 1, p = 0.1),\n??key=c(\"group\",\"time\"))\n\n# Timing\n\nsystem.time(replicate(10,{gc();calc1(data)})) => 69 sec system.time(replicate(10,{gc();calc2(data)})) => 52 sec\n_______________________________________________\ndatatable-help mailing list\ndatatable-help at lists.r-forge.r-project.org\nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140701/76fdf20b/attachment-0001.html>",
+      "body_snippet": "Thanks, that helped. To illustrate on your big data (from the first post), your question is:\n\nrequire(data.table) ## 1.9.3\nset.seed(12312391)\ndata <- data.table(\n          group = sample(1e3,1e7,repla",
+      "thread_id": "thread-84547044d978",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-0b7670a6607e",
+      "message_id": "<etPan.53b23fb8.5ec6afd4.e9e5@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-01T04:57:28Z",
+      "subject": "[datatable-help] Speeding up column references with roll",
+      "subject_clean": "[datatable-help] Speeding up column references with roll",
+      "in_reply_to": "<CAP01uR=qrgupcUUBaOGiATjkB=HHuLAfu_UMAw+JAXc8EpY5eg@mail.gmail.com>",
+      "references": [
+        "<CACLVabX13hU4SzPqx4tbMdLU_C00vhqWaOCm9Vn1ODuRPu7Zxg@mail.gmail.com>",
+        "<etPan.53b197a1.5b25ace2.e9e5@Arunkumars-MacBook-Pro.local>",
+        "<CAP01uR=qrgupcUUBaOGiATjkB=HHuLAfu_UMAw+JAXc8EpY5eg@mail.gmail.com>"
+      ],
+      "body_plain": "The README would be easier to understand if DT was not undefined in?\nthe README. As it stands none of the examples are runnable.?\nWill try to get this more reproducible where possible, ASAP.\n\n\nArun\n\nFrom:?Gabor Grothendieck ggrothendieck at gmail.com\nReply:?Gabor Grothendieck ggrothendieck at gmail.com\nDate:?June 30, 2014 at 8:21:38 PM\nTo:?Arunkumar Srinivasan aragorn168b at gmail.com\nCc:?Stavros Macrakis (??????? ????????) macrakis at alum.mit.edu, datatable-help at r-forge.wu-wien.ac.at datatable-help at r-forge.wu-wien.ac.at\nSubject:? Re: [datatable-help] Speeding up column references with roll  \n\nOn Mon, Jun 30, 2014 at 1:00 PM, Arunkumar Srinivasan  \n<aragorn168b at gmail.com> wrote:  \n> Once again, has been fixed in 1.9.3. Now join requires `by=.EACHI`  \n> (explicit) to perform a by-without-by.  \n> https://github.com/Rdatatable/data.table/blob/master/README.md  \n\nThe README would be easier to understand if DT was not undefined in  \nthe README. As it stands none of the examples are runnable.  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140701/7800817f/attachment.html>",
+      "body_snippet": "The README would be easier to understand if DT was not undefined in?\nthe README. As it stands none of the examples are runnable.?\nWill try to get this more reproducible where possible, ASAP.\n\n\nArun\n\nF",
+      "thread_id": "thread-0b7670a6607e",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-056586f58921",
+      "message_id": "<etPan.53b24030.75e0858a.e9e5@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-01T04:59:28Z",
+      "subject": "[datatable-help] Speeding up column references with roll",
+      "subject_clean": "[datatable-help] Speeding up column references with roll",
+      "in_reply_to": "<CAP01uRnRa0d1dzF8E4gX-4EfJQw7uCS0vU=uv5Z1ps7-iChVdA@mail.gmail.com>",
+      "references": [
+        "<CACLVabX13hU4SzPqx4tbMdLU_C00vhqWaOCm9Vn1ODuRPu7Zxg@mail.gmail.com>",
+        "<etPan.53b197a1.5b25ace2.e9e5@Arunkumars-MacBook-Pro.local>",
+        "<CAP01uR=qrgupcUUBaOGiATjkB=HHuLAfu_UMAw+JAXc8EpY5eg@mail.gmail.com>",
+        "<CAP01uRnRa0d1dzF8E4gX-4EfJQw7uCS0vU=uv5Z1ps7-iChVdA@mail.gmail.com>"
+      ],
+      "body_plain": "Nice! I don't see why not. It's a nice use of .EACHI. Perhaps you'd like to file it as a FR? It'd be easy to keep track then, for later, when Matt'll also have a look..\n\nArun\n\nFrom:?Gabor Grothendieck ggrothendieck at gmail.com\nReply:?Gabor Grothendieck ggrothendieck at gmail.com\nDate:?June 30, 2014 at 8:41:51 PM\nTo:?Arunkumar Srinivasan aragorn168b at gmail.com\nCc:?Stavros Macrakis (??????? ????????) macrakis at alum.mit.edu, datatable-help datatable-help at r-forge.wu-wien.ac.at\nSubject:? Re: [datatable-help] Speeding up column references with roll  \n\nOne other comment. I wonder if .EACHI could mean by each row if there  \nwere no join specified so this:  \n\nlibrary(data.table)  \nDT <- data.table(  \nv1 = factor(c(\"a\", \"a\", \"a\", \"b\", \"b\", \"b\")),  \nv2 = c(1, 1, 6, 3, 4, 5),  \nv3 = c(\"a\", \"b\", \"c\", \"a\", \"b\", \"c\"),  \nstringsAsFactors=FALSE  \n)  \nDT[, c(.SD, split(v2, v1)), by = 1:nrow(DT)][, -1, with = FALSE]  \n\ncould be written:  \n\nDT[, c(.SD, split(v2, v1)), by = .EACHI]  \n\nor maybe even:  \n\nDT[, split(v2, v1), by = c(names(DT), .EACHI)]  \n\n\nOn Mon, Jun 30, 2014 at 2:21 PM, Gabor Grothendieck  \n<ggrothendieck at gmail.com> wrote:  \n> On Mon, Jun 30, 2014 at 1:00 PM, Arunkumar Srinivasan  \n> <aragorn168b at gmail.com> wrote:  \n>> Once again, has been fixed in 1.9.3. Now join requires `by=.EACHI`  \n>> (explicit) to perform a by-without-by.  \n>> https://github.com/Rdatatable/data.table/blob/master/README.md  \n>  \n> The README would be easier to understand if DT was not undefined in  \n> the README. As it stands none of the examples are runnable.  \n\n\n\n--  \nStatistics & Software Consulting  \nGKX Group, GKX Associates Inc.  \ntel: 1-877-GKX-GROUP  \nemail: ggrothendieck at gmail.com  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140701/f373bed1/attachment.html>",
+      "body_snippet": "Nice! I don't see why not. It's a nice use of .EACHI. Perhaps you'd like to file it as a FR? It'd be easy to keep track then, for later, when Matt'll also have a look..\n\nArun\n\nFrom:?Gabor Grothendieck",
+      "thread_id": "thread-056586f58921",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-85f9dbe66aaf",
+      "message_id": "<CAO2XSvdq8LThq9zTHUPU-vdJfWaJmzf3BWyKs1b-aMqqgkQz=w@mail.gmail.com>",
+      "from_name": "Juan Manuel Truppia",
+      "from_email_hash": "d12336cd73a2a2a9fd899ff3b3a7b9b76c9c7272d0a5ca22eeba342bb5651b09",
+      "date": "2014-07-04T19:36:09Z",
+      "subject": "[datatable-help] internal FALSE/TRUE value has been modified",
+      "subject_clean": "[datatable-help] internal FALSE/TRUE value has been modified",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi, I've read the previous thread on this issue (May 1).\nI'm on R 3.1 and data.table 1.9.2 and I'm getting this issue.\nIs this expected on this environment? The only way to avoid it is to\nupgrade to 1.9.3 in github? What are the consequences of ignoring the\nwarning?\n\nRegards",
+      "body_snippet": "Hi, I've read the previous thread on this issue (May 1).\nI'm on R 3.1 and data.table 1.9.2 and I'm getting this issue.\nIs this expected on this environment? The only way to avoid it is to\nupgrade to 1",
+      "thread_id": "thread-85f9dbe66aaf",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-8a43ba87a5b8",
+      "message_id": "<0a5ade948fa7e218077707c58e93d20d@imap.plus.net>",
+      "from_name": "Matthew Dowle",
+      "from_email_hash": "da70e29f21357922d3ff71dee2915877599edde846f651e4da8287df362c75d3",
+      "date": "2014-07-04T19:53:56Z",
+      "subject": "[datatable-help] internal FALSE/TRUE value has been modified",
+      "subject_clean": "[datatable-help] internal FALSE/TRUE value has been modified",
+      "in_reply_to": "<CAO2XSvdq8LThq9zTHUPU-vdJfWaJmzf3BWyKs1b-aMqqgkQz=w@mail.gmail.com>",
+      "references": [
+        "<CAO2XSvdq8LThq9zTHUPU-vdJfWaJmzf3BWyKs1b-aMqqgkQz=w@mail.gmail.com>"
+      ],
+      "body_plain": "Yup - upgrade to v1.9.3\n\nConsequences of ignoring the warning may be severe and R itself has now \nchanged from warning to error.\n\n From README.md :\n\nThe warning \"internal TRUE value has been modified\" with recently \nreleased R 3.1 when grouping a table containing a logical column and \nwhere all groups are just 1 row is now fixed and tests added. Thanks to \nJames Sams for the reproducible example. The warning is issued by R and \nwe have asked if it can be upgraded to error (UPDATE: change now made \nfor R 3.1.1 thanks to Luke Tierney).\n\nMatt\n\n\nOn 04.07.2014 12:36, Juan Manuel Truppia wrote:\n> Hi, I've read the previous thread on this issue (May 1).\n> I'm on R 3.1 and data.table 1.9.2 and I'm getting this issue.\n> Is this expected on this environment? The only way to avoid it is to\n> upgrade to 1.9.3 in github? What are the consequences of ignoring the\n> warning?\n>\n> Regards\n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> \n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help",
+      "body_snippet": "Yup - upgrade to v1.9.3\n\nConsequences of ignoring the warning may be severe and R itself has now \nchanged from warning to error.\n\n From README.md :\n\nThe warning \"internal TRUE value has been modified\"",
+      "thread_id": "thread-85f9dbe66aaf",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-30aba9b4e444",
+      "message_id": "<1404645587192-4693579.post@n4.nabble.com>",
+      "from_name": "fabio.marroni",
+      "from_email_hash": "0bf32d873981a2378a74e10aaf5c77dcc85c36ad3249d10ab27811cc2319263c",
+      "date": "2014-07-06T11:19:47Z",
+      "subject": "[datatable-help] Strange Error: bump from type 0 to type 1",
+      "subject_clean": "[datatable-help] Strange Error: bump from type 0 to type 1",
+      "in_reply_to": "<1404162339174-4693302.post@n4.nabble.com>",
+      "references": [
+        "<1404162339174-4693302.post@n4.nabble.com>"
+      ],
+      "body_plain": "Try this: \ndata <- fread('Data\\\\processedData02.csv',colClasses=\"character\") \n\nOf course, you might not want to set everything as character. You can change\nto other Classes, but you need to specify it. The error is probably due to\nwrong class attribution. You might also read this useful post:\nhttp://r.789695.n4.nabble.com/Weird-error-in-package-with-older-data-table-version-td4686704.html \n\n\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/Strange-Error-bump-from-type-0-to-type-1-tp4693302p4693579.html\nSent from the datatable-help mailing list archive at Nabble.com.",
+      "body_snippet": "Try this: \ndata <- fread('Data\\\\processedData02.csv',colClasses=\"character\") \n\nOf course, you might not want to set everything as character. You can change\nto other Classes, but you need to specify it",
+      "thread_id": "thread-30aba9b4e444",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-a86f1cf31506",
+      "message_id": "<CAO2XSvefijj+tbTjbzm4NNPNC=mGv5Z8f+pKRpVEpv3t+6ujdA@mail.gmail.com>",
+      "from_name": "Juan Manuel Truppia",
+      "from_email_hash": "d12336cd73a2a2a9fd899ff3b3a7b9b76c9c7272d0a5ca22eeba342bb5651b09",
+      "date": "2014-07-08T16:57:19Z",
+      "subject": "[datatable-help] Join inherited scope with by",
+      "subject_clean": "[datatable-help] Join inherited scope with by",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi, I'm on 1.9.3, and maybe I'm wrong, but I don't recall the\nfollowing to be expected previously.\n\nI build 2 data.tables, dta and dtb\n\n> dta\n   idx vala fdx\n1:   1    2   a\n2:   2    4   a\n3:   3    6   b\n\n> dtb\n   idx valb\n1:   1    3\n2:   4    6\n\n> dput(x = dta)\nstructure(list(idx = c(1, 2, 3), vala = c(2, 4, 6), fdx = c(\"a\",\n\"a\", \"b\")), .Names = c(\"idx\", \"vala\", \"fdx\"), row.names = c(NA,\n-3L), class = c(\"data.table\", \"data.frame\"), .internal.selfref =\n<pointer: 0x0000000000110788>, sorted = \"idx\")\n\n> dput(x = dtb)\nstructure(list(idx = c(1, 4), valb = c(3, 6)), .Names = c(\"idx\",\n\"valb\"), row.names = c(NA, -2L), class = c(\"data.table\", \"data.frame\"\n), .internal.selfref = <pointer: 0x0000000000110788>, sorted = \"idx\")\n\nThe key is idx in both cases.\n\nThe following works, of course\n\n> dta[dtb, sum(valb)]\n[1] 9\n\nHowever this doesn't\n\n> dta[dtb, sum(valb), by = fdx]\nError in `[.data.table`(dta, dtb, sum(valb), by = fdx) :\n  object 'valb' not found\n\nBut this does\n\n> dta[dtb][, sum(valb), by = fdx]\n   fdx V1\n1:   a  3\n2:  NA  6\n\nIf we se the intermediate step\n\n> dta[dtb]\n   idx vala fdx valb\n1:   1    2   a    3\n2:   4   NA  NA    6\n\nI would have expected dta[dtb, sum(valb), by = fdx] == dta[dtb][,\nsum(valb), by = fdx]\n\nWhere have I gone wrong??\n\nRegards",
+      "body_snippet": "Hi, I'm on 1.9.3, and maybe I'm wrong, but I don't recall the\nfollowing to be expected previously.\n\nI build 2 data.tables, dta and dtb\n\n> dta\n   idx vala fdx\n1:   1    2   a\n2:   2    4   a\n3:   3    ",
+      "thread_id": "thread-a86f1cf31506",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-66af16bac4ba",
+      "message_id": "<53BC48D1.80509@mdowle.plus.com>",
+      "from_name": "Matt Dowle",
+      "from_email_hash": "da70e29f21357922d3ff71dee2915877599edde846f651e4da8287df362c75d3",
+      "date": "2014-07-08T19:38:57Z",
+      "subject": "[datatable-help] useR2014",
+      "subject_clean": "[datatable-help] useR2014",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "To catch those who maybe don't follow twitter or blogs, slides from the \ndata.table talk and tutorial are now online :\n\nhttp://user2014.stat.ucla.edu/files/talk_Matt.pdf\nhttp://user2014.stat.ucla.edu/files/tutorial_Matt.pdf\n\nI've never been to useR! before so didn't know what to expect. It \ncertainly exceeded all my expectations. I was most amazed by the quality \nof the posters - you could hardly call them posters, more works of art.\n\nI really wasn't sure how to pitch the talk (benchmarks, syntax, \nfeatures?) but after seeing John Chambers keynote in the morning, that \nwas an ahah moment: the history.\n\nDelighted that data.table made it into the top 10 list of packages that \nXavier Conort uses at DataRobot to enter Kaggle competitions. His room \nwas packed out. When the standing room was gone they started sitting in \nthe aisle.\n\nI'm particularly keen to try out testCoverage from Mango Solutions, \npresented by Andy Nicholls. We have 1,500 tests in data.table, but which \nlines of source code aren't touched by any of them? It's due on CRAN soon.\n\nA selection of tweets, some with photos :\n\nhttps://twitter.com/matlabulous/status/484591147298217984\nhttps://twitter.com/_inundata/status/484120526021881858\nhttps://twitter.com/timtriche/status/484120355254980608\nhttps://twitter.com/R_projekt/status/484118957964546048\nhttps://twitter.com/timtriche/status/484117983359275008\nhttps://twitter.com/revodavid/status/483650587263643649\nhttps://twitter.com/revodavid/status/483647927575777280\nhttps://twitter.com/UglyResearch/status/481137085974589441\n\nand if you look very closely, I'm in the very right of this photo :\nhttps://twitter.com/eddelbuettel/status/485150745080000512\n\nNext up:\n\n* Numerous bug fixes\n\n* Presenting at R in Insurance, London on Monday 14th July\nhttp://bit.ly/1vXtLyK\n\n* 4hr tutorial and talk at EARL, London in September, with Arun :\nhttp://www.earl-conference.com/Agenda.html\n(spaces are limited)\n\nMatt",
+      "body_snippet": "To catch those who maybe don't follow twitter or blogs, slides from the \ndata.table talk and tutorial are now online :\n\nhttp://user2014.stat.ucla.edu/files/talk_Matt.pdf\nhttp://user2014.stat.ucla.edu/",
+      "thread_id": "thread-66af16bac4ba",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-e05a7fd99408",
+      "message_id": "<53BCA642.4060800@gmail.com>",
+      "from_name": "Michael Smith",
+      "from_email_hash": "a7e1151e628d8816b7bab185f82d3d0b8e635db81353cc0fe989960cea37147b",
+      "date": "2014-07-09T02:17:38Z",
+      "subject": "[datatable-help] useR2014",
+      "subject_clean": "[datatable-help] useR2014",
+      "in_reply_to": "<53BC48D1.80509@mdowle.plus.com>",
+      "references": [
+        "<53BC48D1.80509@mdowle.plus.com>"
+      ],
+      "body_plain": "Awesome slides; wish I had been there at the conference. Are you going\nto upload the slides to http://datatable.r-forge.r-project.org as well?\n\nThanks!\nM\n\nOn 07/09/2014 03:38 AM, Matt Dowle wrote:\n> \n> To catch those who maybe don't follow twitter or blogs, slides from the\n> data.table talk and tutorial are now online :\n> \n> http://user2014.stat.ucla.edu/files/talk_Matt.pdf\n> http://user2014.stat.ucla.edu/files/tutorial_Matt.pdf\n> \n> I've never been to useR! before so didn't know what to expect. It\n> certainly exceeded all my expectations. I was most amazed by the quality\n> of the posters - you could hardly call them posters, more works of art.\n> \n> I really wasn't sure how to pitch the talk (benchmarks, syntax,\n> features?) but after seeing John Chambers keynote in the morning, that\n> was an ahah moment: the history.\n> \n> Delighted that data.table made it into the top 10 list of packages that\n> Xavier Conort uses at DataRobot to enter Kaggle competitions. His room\n> was packed out. When the standing room was gone they started sitting in\n> the aisle.\n> \n> I'm particularly keen to try out testCoverage from Mango Solutions,\n> presented by Andy Nicholls. We have 1,500 tests in data.table, but which\n> lines of source code aren't touched by any of them? It's due on CRAN soon.\n> \n> A selection of tweets, some with photos :\n> \n> https://twitter.com/matlabulous/status/484591147298217984\n> https://twitter.com/_inundata/status/484120526021881858\n> https://twitter.com/timtriche/status/484120355254980608\n> https://twitter.com/R_projekt/status/484118957964546048\n> https://twitter.com/timtriche/status/484117983359275008\n> https://twitter.com/revodavid/status/483650587263643649\n> https://twitter.com/revodavid/status/483647927575777280\n> https://twitter.com/UglyResearch/status/481137085974589441\n> \n> and if you look very closely, I'm in the very right of this photo :\n> https://twitter.com/eddelbuettel/status/485150745080000512\n> \n> Next up:\n> \n> * Numerous bug fixes\n> \n> * Presenting at R in Insurance, London on Monday 14th July\n> http://bit.ly/1vXtLyK\n> \n> * 4hr tutorial and talk at EARL, London in September, with Arun :\n> http://www.earl-conference.com/Agenda.html\n> (spaces are limited)\n> \n> Matt\n> \n> \n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help",
+      "body_snippet": "Awesome slides; wish I had been there at the conference. Are you going\nto upload the slides to http://datatable.r-forge.r-project.org as well?\n\nThanks!\nM\n\nOn 07/09/2014 03:38 AM, Matt Dowle wrote:\n> \n",
+      "thread_id": "thread-66af16bac4ba",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-a62f49803661",
+      "message_id": "<39832BDC-9D49-48B3-B07C-2C06A75CEF63@gmail.com>",
+      "from_name": "Steve Bellan",
+      "from_email_hash": "18d5d5a9a142c229265c06627d05bb896938c03b1b9ac1716cb7838bc756bf57",
+      "date": "2014-07-09T15:30:02Z",
+      "subject": "[datatable-help] data.table vs matrix speed",
+      "subject_clean": "[datatable-help] data.table vs matrix speed",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "I'm trying to optimize the speed of a script that iteratively updates state variables for several thousands of individuals through time though only some individuals are active at each point in time. I had been doing this with matrices but was wondering how it compared with data.table since the latter seems to be more readable. I'm finding that my data.table implementation is about 2-3 times faster, which seems surprising since I thought matrices should be faster. It makes me wonder if there are ways to speed up either implementation. Any help is much appreciated! Here's an example of the code:\n\n\nn <- 10^5\nk <- 9\nserostates <- matrix(0,n,k)\nserostates <- as.data.table(serostates)\nsetnames(serostates, 1:k, c('s..', 'mb.a1', 'mb.a2', 'mb.', 'f.ba1', 'f.ba2', 'f.b', 'hb1b2', 'hb2b1'))\nserostates[, `:=`(s.. = 1)]\nserostates\nserostatesMat <- as.matrix(serostates)\n\npre.coupleDT <- function(serostates, sexually.active) {\n    serostates[sexually.active , `:=`(\n        s..   = s.. * (1-p.m.bef) * (1-p.f.bef),\n        mb.a1 = s.. * p.m.bef * (1-p.f.bef),\n        mb.a2 = mb.a1 * (1 - p.f.bef),\n        mb.   = mb.a2 * (1 - p.f.bef) + mb. * (1 - p.f.bef),\n        f.ba1 = s.. * p.f.bef * (1-p.m.bef),\n        f.ba2 = f.ba1 * (1 - p.m.bef),\n        f.b   = f.ba2 * (1 - p.m.bef) + f.b * (1 - p.m.bef),\n        hb1b2 = hb1b2 + .5  *  s.. * p.m.bef * p.f.bef + (mb.a1 + mb.a2 + mb.)  *  p.f.bef,\n        hb2b1 = hb2b1 + .5  *  s.. * p.m.bef * p.f.bef + (f.ba1 + f.ba2 + f.b)  *  p.m.bef)\n           ]\n    return(serostates)\n}\n\n\npre.coupleMat <- function(serostates, sexually.active) {\n    temp <- serostates[sexually.active,]\n    temp[,'s..']   = temp[,'s..'] * (1-p.m.bef) * (1-p.f.bef)\n    temp[,'mb.a1'] = temp[,'s..'] * p.m.bef * (1-p.f.bef)\n    temp[,'mb.a2'] = temp[,'mb.a1'] * (1 - p.f.bef)\n    temp[,'mb.'] = temp[,'mb.a2'] * (1 - p.f.bef) + temp[,'mb.'] * (1 - p.f.bef)\n    temp[,'f.ba1'] = temp[,'s..'] * p.f.bef * (1-p.m.bef)\n    temp[,'f.ba2'] = temp[,'f.ba1'] * (1 - p.m.bef)\n    temp[,'f.b'] = temp[,'f.ba2'] * (1 - p.m.bef) + temp[,'f.b'] * (1 - p.m.bef)\n    temp[,'hb1b2'] = temp[,'hb1b2'] + .5  *  temp[,'s..'] * p.m.bef * p.f.bef + (temp[,'mb.a1'] + temp[,'mb.a2'] + temp[,'mb.'])  *  p.f.bef\n    temp[,'hb2b1'] = temp[,'hb2b1'] + .5  *  temp[,'s..'] * p.m.bef * p.f.bef + (temp[,'f.ba1'] + temp[,'f.ba2'] + temp[,'f.b'])  *  p.m.bef\nserostates[sexually.active,] <- temp\nreturn(serostates)\n}\n\nsexually.active <- rbinom(n, 1,.5)==1\np.m.bef <- .5\np.f.bef <- .8\n\nsystem.time(\n    for(ii in 1:100) {\n        serostates <- pre.couple(serostates, sexually.active)\n    }\n    ) ## about 2.25 seconds\n\n\nsystem.time(\n    for(ii in 1:100) {\n        serostatesMat <- pre.coupleMat(serostatesMat, sexually.active)\n    }\n    ) ## about 6 seconds",
+      "body_snippet": "I'm trying to optimize the speed of a script that iteratively updates state variables for several thousands of individuals through time though only some individuals are active at each point in time. I",
+      "thread_id": "thread-a62f49803661",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-0089f936309e",
+      "message_id": "<53BD7354.2020208@mdowle.plus.com>",
+      "from_name": "Matt Dowle",
+      "from_email_hash": "da70e29f21357922d3ff71dee2915877599edde846f651e4da8287df362c75d3",
+      "date": "2014-07-09T16:52:36Z",
+      "subject": "[datatable-help] data.table vs matrix speed",
+      "subject_clean": "[datatable-help] data.table vs matrix speed",
+      "in_reply_to": "<39832BDC-9D49-48B3-B07C-2C06A75CEF63@gmail.com>",
+      "references": [
+        "<39832BDC-9D49-48B3-B07C-2C06A75CEF63@gmail.com>"
+      ],
+      "body_plain": "Nice example.  Yes this is the way to use it and I agree more \nreadable.   But I fear it isn't actually working as you expected. Each \ncomponent of `:=` doesn't see previous results, yet (not yet \nimplemented).  Easier to see that in a simple example :\n\n > DT = data.table(a=1:3,b=1:6)\n > DT\n    a b\n1: 1 1\n2: 2 2\n3: 3 3\n4: 1 4\n5: 2 5\n6: 3 6\n > DT[,`:=`(b=1L, d=sum(b)), by=a]\n > DT\n    a b d\n1: 1 1 5   # all the RHS got evaluated first, before starting to assign \nthe results.\n2: 2 1 7\n3: 3 1 9\n4: 1 1 5\n5: 2 1 7\n6: 3 1 9\n >\n\nTo get the result you want, you currently have to add an extra `<-`.  \nLike this :\n\n > DT = data.table(a=1:3,b=1:6)   # start fresh\n > DT\n    a b\n1: 1 1\n2: 2 2\n3: 3 3\n4: 1 4\n5: 2 5\n6: 3 6\n > DT[,`:=`(b=b<-1L, d=sum(b)), by=a]   # extra b<-\n > DT\n    a b d\n1: 1 1 1\n2: 2 1 1\n3: 3 1 1\n4: 1 1 1\n5: 2 1 1\n6: 3 1 1\n >\n\nClearly in your example, since you're using earlier columns in later \nones, that becomes onerous and bug prone due to typos, but shouldn't \nslow it down :\n\npre.coupleDT <- function(serostates, sexually.active) {\n     serostates[sexually.active , `:=`(\n         s..   = s..   <- s.. * (1-p.m.bef) * (1-p.f.bef),\n         mb.a1 = mb.a1 <- s.. * p.m.bef * (1-p.f.bef),\n         mb.a2 = mb.a2 <- mb.a1 * (1 - p.f.bef),\n         mb.   = mb.   <- mb.a2 * (1 - p.f.bef) + mb. * (1 - p.f.bef),\n         f.ba1 = f.bal <- s.. * p.f.bef * (1-p.m.bef),\n         f.ba2 = f.ba2 <- f.ba1 * (1 - p.m.bef),\n         f.b   = f.b   <- f.ba2 * (1 - p.m.bef) + f.b * (1 - p.m.bef),\n         hb1b2 = hb1b2 <- hb1b2 + .5  *  s.. * p.m.bef * p.f.bef + (mb.a1 + mb.a2 + mb.)  *  p.f.bef,\n         hb2b1 =          hb2b1 + .5  *  s.. * p.m.bef * p.f.bef + (f.ba1 + f.ba2 + f.b)  *  p.m.bef)\n            ]\n     return(serostates)\n}\n\n\nIt's on the list to change it to the way you expected,  and we all want \nthat.  It involves a change quite deep down in the C code so isn't done \nyet,  although there's nothing particularly hard about it.\n\nIn terms of why data.table is faster here, consider the repeated :\n\n     temp[,'s..']\n\nThe `[` there is a function call; is.function(`[`)==TRUE. And each time \nthe 's..' string appears, it looks up which column number corresponds to \nthat name. There are 28 calls in your matrix version. It isn't so much \nmatrix vs data.table, more the access method. In the data.table version, \nonce you're inside scope, it's just symbol lookup (the 28 calls to `[` \nare gone, as are the 28 lookups of 'colname').\n\nThere may be some copies going on as well; e.g. \nserostates[sexually.active,] <- temp.   Run both through Rprof() and it \nmight reveal more.\n\nI can't think of a better way to use data.table. But note that the \nbenchmark is pretty meaningless. It's being looped 100 times presumably \nbecause one run is so quick. This is quite a bug bear when we see this \ndone online. The only way to scale up, is to increase the data size, \nperhaps by 100 times in this example. Then a single run takes a \nmeasurable amount of time (say 10 seconds or more) and the industry rule \nof thumb is to report the minimum of three consecutive runs. The \ninferences are usually very different than when you repeat a tiny test \nmany times. The data has to be much much bigger than L2/L3 cache \n(typically 8MB but varies widely), e.g. 1GB or more.  This matrix is \njust 6MB and likely fits entirely in cache, depending on how big your \ncache is (see output of lscpu on unix/mac, or system info on Windows).  \nUnless of course the nature of the task is to iterate,  in which case \nthe overhead of the `[` call can become significant, and is why we added \nset() as a loopable `:=`.\n\nHTH\nMatt\n\n\nOn 09/07/14 16:30, Steve Bellan wrote:\n> I'm trying to optimize the speed of a script that iteratively updates state variables for several thousands of individuals through time though only some individuals are active at each point in time. I had been doing this with matrices but was wondering how it compared with data.table since the latter seems to be more readable. I'm finding that my data.table implementation is about 2-3 times faster, which seems surprising since I thought matrices should be faster. It makes me wonder if there are ways to speed up either implementation. Any help is much appreciated! Here's an example of the code:\n>\n>\n> n <- 10^5\n> k <- 9\n> serostates <- matrix(0,n,k)\n> serostates <- as.data.table(serostates)\n> setnames(serostates, 1:k, c('s..', 'mb.a1', 'mb.a2', 'mb.', 'f.ba1', 'f.ba2', 'f.b', 'hb1b2', 'hb2b1'))\n> serostates[, `:=`(s.. = 1)]\n> serostates\n> serostatesMat <- as.matrix(serostates)\n>\n> pre.coupleDT <- function(serostates, sexually.active) {\n>      serostates[sexually.active , `:=`(\n>          s..   = s.. * (1-p.m.bef) * (1-p.f.bef),\n>          mb.a1 = s.. * p.m.bef * (1-p.f.bef),\n>          mb.a2 = mb.a1 * (1 - p.f.bef),\n>          mb.   = mb.a2 * (1 - p.f.bef) + mb. * (1 - p.f.bef),\n>          f.ba1 = s.. * p.f.bef * (1-p.m.bef),\n>          f.ba2 = f.ba1 * (1 - p.m.bef),\n>          f.b   = f.ba2 * (1 - p.m.bef) + f.b * (1 - p.m.bef),\n>          hb1b2 = hb1b2 + .5  *  s.. * p.m.bef * p.f.bef + (mb.a1 + mb.a2 + mb.)  *  p.f.bef,\n>          hb2b1 = hb2b1 + .5  *  s.. * p.m.bef * p.f.bef + (f.ba1 + f.ba2 + f.b)  *  p.m.bef)\n>             ]\n>      return(serostates)\n> }\n>\n>\n> pre.coupleMat <- function(serostates, sexually.active) {\n>      temp <- serostates[sexually.active,]\n>      temp[,'s..']   = temp[,'s..'] * (1-p.m.bef) * (1-p.f.bef)\n>      temp[,'mb.a1'] = temp[,'s..'] * p.m.bef * (1-p.f.bef)\n>      temp[,'mb.a2'] = temp[,'mb.a1'] * (1 - p.f.bef)\n>      temp[,'mb.'] = temp[,'mb.a2'] * (1 - p.f.bef) + temp[,'mb.'] * (1 - p.f.bef)\n>      temp[,'f.ba1'] = temp[,'s..'] * p.f.bef * (1-p.m.bef)\n>      temp[,'f.ba2'] = temp[,'f.ba1'] * (1 - p.m.bef)\n>      temp[,'f.b'] = temp[,'f.ba2'] * (1 - p.m.bef) + temp[,'f.b'] * (1 - p.m.bef)\n>      temp[,'hb1b2'] = temp[,'hb1b2'] + .5  *  temp[,'s..'] * p.m.bef * p.f.bef + (temp[,'mb.a1'] + temp[,'mb.a2'] + temp[,'mb.'])  *  p.f.bef\n>      temp[,'hb2b1'] = temp[,'hb2b1'] + .5  *  temp[,'s..'] * p.m.bef * p.f.bef + (temp[,'f.ba1'] + temp[,'f.ba2'] + temp[,'f.b'])  *  p.m.bef\n> serostates[sexually.active,] <- temp\n> return(serostates)\n> }\n>\n> sexually.active <- rbinom(n, 1,.5)==1\n> p.m.bef <- .5\n> p.f.bef <- .8\n>\n> system.time(\n>      for(ii in 1:100) {\n>          serostates <- pre.couple(serostates, sexually.active)\n>      }\n>      ) ## about 2.25 seconds\n>\n>\n> system.time(\n>      for(ii in 1:100) {\n>          serostatesMat <- pre.coupleMat(serostatesMat, sexually.active)\n>      }\n>      ) ## about 6 seconds\n>\n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>",
+      "body_snippet": "Nice example.  Yes this is the way to use it and I agree more \nreadable.   But I fear it isn't actually working as you expected. Each \ncomponent of `:=` doesn't see previous results, yet (not yet \nimp",
+      "thread_id": "thread-a62f49803661",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-71606627514e",
+      "message_id": "<53BD750F.90300@mdowle.plus.com>",
+      "from_name": "Matt Dowle",
+      "from_email_hash": "da70e29f21357922d3ff71dee2915877599edde846f651e4da8287df362c75d3",
+      "date": "2014-07-09T16:59:59Z",
+      "subject": "[datatable-help] data.table vs matrix speed",
+      "subject_clean": "[datatable-help] data.table vs matrix speed",
+      "in_reply_to": "<53BD7354.2020208@mdowle.plus.com>",
+      "references": [
+        "<39832BDC-9D49-48B3-B07C-2C06A75CEF63@gmail.com>",
+        "<53BD7354.2020208@mdowle.plus.com>"
+      ],
+      "body_plain": "Oops, that highlighted that adding <- isn't quite the same when \nrecycling comes into it.  In your case, each RHS returns a vector as \nlong as the input, so adding <- should be ok.  But in my example, the \nfirst RHS was a single 1L which was assigned to the symbol b (before \nrecycling) that sum(b) then saw and returned 1 not 2.\n\nOk, iterative RHS more pressing that I thought then.  Thanks for \nhighlighting.\n\nMatt\n\nOn 09/07/14 17:52, Matt Dowle wrote:\n>\n> Nice example.  Yes this is the way to use it and I agree more \n> readable.   But I fear it isn't actually working as you expected. Each \n> component of `:=` doesn't see previous results, yet (not yet \n> implemented).  Easier to see that in a simple example :\n>\n> > DT = data.table(a=1:3,b=1:6)\n> > DT\n>    a b\n> 1: 1 1\n> 2: 2 2\n> 3: 3 3\n> 4: 1 4\n> 5: 2 5\n> 6: 3 6\n> > DT[,`:=`(b=1L, d=sum(b)), by=a]\n> > DT\n>    a b d\n> 1: 1 1 5   # all the RHS got evaluated first, before starting to \n> assign the results.\n> 2: 2 1 7\n> 3: 3 1 9\n> 4: 1 1 5\n> 5: 2 1 7\n> 6: 3 1 9\n> >\n>\n> To get the result you want, you currently have to add an extra `<-`.  \n> Like this :\n>\n> > DT = data.table(a=1:3,b=1:6)   # start fresh\n> > DT\n>    a b\n> 1: 1 1\n> 2: 2 2\n> 3: 3 3\n> 4: 1 4\n> 5: 2 5\n> 6: 3 6\n> > DT[,`:=`(b=b<-1L, d=sum(b)), by=a]   # extra b<-\n> > DT\n>    a b d\n> 1: 1 1 1\n> 2: 2 1 1\n> 3: 3 1 1\n> 4: 1 1 1\n> 5: 2 1 1\n> 6: 3 1 1\n> >\n>\n> Clearly in your example, since you're using earlier columns in later \n> ones, that becomes onerous and bug prone due to typos, but shouldn't \n> slow it down :\n>\n> pre.coupleDT <- function(serostates, sexually.active) {\n>     serostates[sexually.active , `:=`(\n>         s..   = s..   <- s.. * (1-p.m.bef) * (1-p.f.bef),\n>         mb.a1 = mb.a1 <- s.. * p.m.bef * (1-p.f.bef),\n>         mb.a2 = mb.a2 <- mb.a1 * (1 - p.f.bef),\n>         mb.   = mb.   <- mb.a2 * (1 - p.f.bef) + mb. * (1 - p.f.bef),\n>         f.ba1 = f.bal <- s.. * p.f.bef * (1-p.m.bef),\n>         f.ba2 = f.ba2 <- f.ba1 * (1 - p.m.bef),\n>         f.b   = f.b   <- f.ba2 * (1 - p.m.bef) + f.b * (1 - p.m.bef),\n>         hb1b2 = hb1b2 <- hb1b2 + .5  *  s.. * p.m.bef * p.f.bef + \n> (mb.a1 + mb.a2 + mb.)  *  p.f.bef,\n>         hb2b1 =          hb2b1 + .5  *  s.. * p.m.bef * p.f.bef + \n> (f.ba1 + f.ba2 + f.b)  *  p.m.bef)\n>            ]\n>     return(serostates)\n> }\n>\n>\n> It's on the list to change it to the way you expected,  and we all \n> want that.  It involves a change quite deep down in the C code so \n> isn't done yet,  although there's nothing particularly hard about it.\n>\n> In terms of why data.table is faster here, consider the repeated :\n>\n>     temp[,'s..']\n>\n> The `[` there is a function call; is.function(`[`)==TRUE. And each \n> time the 's..' string appears, it looks up which column number \n> corresponds to that name. There are 28 calls in your matrix version. \n> It isn't so much matrix vs data.table, more the access method. In the \n> data.table version, once you're inside scope, it's just symbol lookup \n> (the 28 calls to `[` are gone, as are the 28 lookups of 'colname').\n>\n> There may be some copies going on as well; e.g. \n> serostates[sexually.active,] <- temp.   Run both through Rprof() and \n> it might reveal more.\n>\n> I can't think of a better way to use data.table. But note that the \n> benchmark is pretty meaningless. It's being looped 100 times \n> presumably because one run is so quick. This is quite a bug bear when \n> we see this done online. The only way to scale up, is to increase the \n> data size, perhaps by 100 times in this example. Then a single run \n> takes a measurable amount of time (say 10 seconds or more) and the \n> industry rule of thumb is to report the minimum of three consecutive \n> runs. The inferences are usually very different than when you repeat a \n> tiny test many times. The data has to be much much bigger than L2/L3 \n> cache (typically 8MB but varies widely), e.g. 1GB or more.  This \n> matrix is just 6MB and likely fits entirely in cache, depending on how \n> big your cache is (see output of lscpu on unix/mac, or system info on \n> Windows).  Unless of course the nature of the task is to iterate,  in \n> which case the overhead of the `[` call can become significant, and is \n> why we added set() as a loopable `:=`.\n>\n> HTH\n> Matt\n>\n>\n> On 09/07/14 16:30, Steve Bellan wrote:\n>> I'm trying to optimize the speed of a script that iteratively updates \n>> state variables for several thousands of individuals through time \n>> though only some individuals are active at each point in time. I had \n>> been doing this with matrices but was wondering how it compared with \n>> data.table since the latter seems to be more readable. I'm finding \n>> that my data.table implementation is about 2-3 times faster, which \n>> seems surprising since I thought matrices should be faster. It makes \n>> me wonder if there are ways to speed up either implementation. Any \n>> help is much appreciated! Here's an example of the code:\n>>\n>>\n>> n <- 10^5\n>> k <- 9\n>> serostates <- matrix(0,n,k)\n>> serostates <- as.data.table(serostates)\n>> setnames(serostates, 1:k, c('s..', 'mb.a1', 'mb.a2', 'mb.', 'f.ba1', \n>> 'f.ba2', 'f.b', 'hb1b2', 'hb2b1'))\n>> serostates[, `:=`(s.. = 1)]\n>> serostates\n>> serostatesMat <- as.matrix(serostates)\n>>\n>> pre.coupleDT <- function(serostates, sexually.active) {\n>>      serostates[sexually.active , `:=`(\n>>          s..   = s.. * (1-p.m.bef) * (1-p.f.bef),\n>>          mb.a1 = s.. * p.m.bef * (1-p.f.bef),\n>>          mb.a2 = mb.a1 * (1 - p.f.bef),\n>>          mb.   = mb.a2 * (1 - p.f.bef) + mb. * (1 - p.f.bef),\n>>          f.ba1 = s.. * p.f.bef * (1-p.m.bef),\n>>          f.ba2 = f.ba1 * (1 - p.m.bef),\n>>          f.b   = f.ba2 * (1 - p.m.bef) + f.b * (1 - p.m.bef),\n>>          hb1b2 = hb1b2 + .5  *  s.. * p.m.bef * p.f.bef + (mb.a1 + \n>> mb.a2 + mb.)  *  p.f.bef,\n>>          hb2b1 = hb2b1 + .5  *  s.. * p.m.bef * p.f.bef + (f.ba1 + \n>> f.ba2 + f.b)  *  p.m.bef)\n>>             ]\n>>      return(serostates)\n>> }\n>>\n>>\n>> pre.coupleMat <- function(serostates, sexually.active) {\n>>      temp <- serostates[sexually.active,]\n>>      temp[,'s..']   = temp[,'s..'] * (1-p.m.bef) * (1-p.f.bef)\n>>      temp[,'mb.a1'] = temp[,'s..'] * p.m.bef * (1-p.f.bef)\n>>      temp[,'mb.a2'] = temp[,'mb.a1'] * (1 - p.f.bef)\n>>      temp[,'mb.'] = temp[,'mb.a2'] * (1 - p.f.bef) + temp[,'mb.'] * \n>> (1 - p.f.bef)\n>>      temp[,'f.ba1'] = temp[,'s..'] * p.f.bef * (1-p.m.bef)\n>>      temp[,'f.ba2'] = temp[,'f.ba1'] * (1 - p.m.bef)\n>>      temp[,'f.b'] = temp[,'f.ba2'] * (1 - p.m.bef) + temp[,'f.b'] * \n>> (1 - p.m.bef)\n>>      temp[,'hb1b2'] = temp[,'hb1b2'] + .5  *  temp[,'s..'] * p.m.bef \n>> * p.f.bef + (temp[,'mb.a1'] + temp[,'mb.a2'] + temp[,'mb.'])  *  p.f.bef\n>>      temp[,'hb2b1'] = temp[,'hb2b1'] + .5  *  temp[,'s..'] * p.m.bef \n>> * p.f.bef + (temp[,'f.ba1'] + temp[,'f.ba2'] + temp[,'f.b'])  *  p.m.bef\n>> serostates[sexually.active,] <- temp\n>> return(serostates)\n>> }\n>>\n>> sexually.active <- rbinom(n, 1,.5)==1\n>> p.m.bef <- .5\n>> p.f.bef <- .8\n>>\n>> system.time(\n>>      for(ii in 1:100) {\n>>          serostates <- pre.couple(serostates, sexually.active)\n>>      }\n>>      ) ## about 2.25 seconds\n>>\n>>\n>> system.time(\n>>      for(ii in 1:100) {\n>>          serostatesMat <- pre.coupleMat(serostatesMat, sexually.active)\n>>      }\n>>      ) ## about 6 seconds\n>>\n>> _______________________________________________\n>> datatable-help mailing list\n>> datatable-help at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help \n>>\n>>\n>",
+      "body_snippet": "Oops, that highlighted that adding <- isn't quite the same when \nrecycling comes into it.  In your case, each RHS returns a vector as \nlong as the input, so adding <- should be ok.  But in my example,",
+      "thread_id": "thread-a62f49803661",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-6454dc265751",
+      "message_id": "<53BDB62C.3020407@mdowle.plus.com>",
+      "from_name": "Matt Dowle",
+      "from_email_hash": "da70e29f21357922d3ff71dee2915877599edde846f651e4da8287df362c75d3",
+      "date": "2014-07-09T21:37:48Z",
+      "subject": "[datatable-help] useR2014",
+      "subject_clean": "[datatable-help] useR2014",
+      "in_reply_to": "<53BCA642.4060800@gmail.com>",
+      "references": [
+        "<53BC48D1.80509@mdowle.plus.com>",
+        "<53BCA642.4060800@gmail.com>"
+      ],
+      "body_plain": "M,\n\nOh, yes, now uploaded.  Thanks.\n\nYou may need to Ctrl+F5 to refresh the homepage.\n\nMatt\n\nOn 09/07/14 03:17, Michael Smith wrote:\n> Awesome slides; wish I had been there at the conference. Are you going\n> to upload the slides to http://datatable.r-forge.r-project.org as well?\n>\n> Thanks!\n> M\n>\n> On 07/09/2014 03:38 AM, Matt Dowle wrote:\n>> To catch those who maybe don't follow twitter or blogs, slides from the\n>> data.table talk and tutorial are now online :\n>>\n>> http://user2014.stat.ucla.edu/files/talk_Matt.pdf\n>> http://user2014.stat.ucla.edu/files/tutorial_Matt.pdf\n>>\n>> I've never been to useR! before so didn't know what to expect. It\n>> certainly exceeded all my expectations. I was most amazed by the quality\n>> of the posters - you could hardly call them posters, more works of art.\n>>\n>> I really wasn't sure how to pitch the talk (benchmarks, syntax,\n>> features?) but after seeing John Chambers keynote in the morning, that\n>> was an ahah moment: the history.\n>>\n>> Delighted that data.table made it into the top 10 list of packages that\n>> Xavier Conort uses at DataRobot to enter Kaggle competitions. His room\n>> was packed out. When the standing room was gone they started sitting in\n>> the aisle.\n>>\n>> I'm particularly keen to try out testCoverage from Mango Solutions,\n>> presented by Andy Nicholls. We have 1,500 tests in data.table, but which\n>> lines of source code aren't touched by any of them? It's due on CRAN soon.\n>>\n>> A selection of tweets, some with photos :\n>>\n>> https://twitter.com/matlabulous/status/484591147298217984\n>> https://twitter.com/_inundata/status/484120526021881858\n>> https://twitter.com/timtriche/status/484120355254980608\n>> https://twitter.com/R_projekt/status/484118957964546048\n>> https://twitter.com/timtriche/status/484117983359275008\n>> https://twitter.com/revodavid/status/483650587263643649\n>> https://twitter.com/revodavid/status/483647927575777280\n>> https://twitter.com/UglyResearch/status/481137085974589441\n>>\n>> and if you look very closely, I'm in the very right of this photo :\n>> https://twitter.com/eddelbuettel/status/485150745080000512\n>>\n>> Next up:\n>>\n>> * Numerous bug fixes\n>>\n>> * Presenting at R in Insurance, London on Monday 14th July\n>> http://bit.ly/1vXtLyK\n>>\n>> * 4hr tutorial and talk at EARL, London in September, with Arun :\n>> http://www.earl-conference.com/Agenda.html\n>> (spaces are limited)\n>>\n>> Matt\n>>\n>>\n>> _______________________________________________\n>> datatable-help mailing list\n>> datatable-help at lists.r-forge.r-project.org\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help",
+      "body_snippet": "M,\n\nOh, yes, now uploaded.  Thanks.\n\nYou may need to Ctrl+F5 to refresh the homepage.\n\nMatt\n\nOn 09/07/14 03:17, Michael Smith wrote:\n> Awesome slides; wish I had been there at the conference. Are you ",
+      "thread_id": "thread-66af16bac4ba",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-b5db4e0db9f6",
+      "message_id": "<CACAnkwCb+6CThKPWPJDCdhPe5jhK5owy2xZwtr=GRuiKpEZXqA@mail.gmail.com>",
+      "from_name": "Farrel Buchinsky",
+      "from_email_hash": "3afc1e62e6c0cd7708dc76fbbfdd9860aa8e095e351a01ab10897d7ff9a57703",
+      "date": "2014-07-13T22:45:14Z",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "subject_clean": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "I was about to post my question on Stackoverflow when I cam across the\nquestion I wanted to ask but alas it is not answered. I am sure you know\nhow to do this in data.table. I almost think I know but not quite. Can you\nplease help\n\nMoving sum over date range\nhttp://stackoverflow.com/q/21838935/168139?sem=2\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140713/19441975/attachment.html>",
+      "body_snippet": "I was about to post my question on Stackoverflow when I cam across the\nquestion I wanted to ask but alas it is not answered. I am sure you know\nhow to do this in data.table. I almost think I know but ",
+      "thread_id": "thread-b5db4e0db9f6",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-bf12c4cefa28",
+      "message_id": "<CACAnkwCe0gy1=XgHZb7KsBd=Tb1Tt9KtTLtPzE5gY_HKzuE98w@mail.gmail.com>",
+      "from_name": "Farrel Buchinsky",
+      "from_email_hash": "3afc1e62e6c0cd7708dc76fbbfdd9860aa8e095e351a01ab10897d7ff9a57703",
+      "date": "2014-07-13T22:52:21Z",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "subject_clean": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "I was about to post my question on Stackoverflow when I came across the\nquestion I wanted to ask but alas it is not answered. I am sure you know\nhow to do this in data.table. I almost think I know but not quite. Can you\nplease help\n\nMoving sum over date range\nhttp://stackoverflow.com/q/21838935/168139?sem=2\n\n\nFarrel Buchinsky\nGoogle Voice Tel: (412) 567-7870\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140713/74863f08/attachment.html>",
+      "body_snippet": "I was about to post my question on Stackoverflow when I came across the\nquestion I wanted to ask but alas it is not answered. I am sure you know\nhow to do this in data.table. I almost think I know but",
+      "thread_id": "thread-bf12c4cefa28",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-6bb46984e3c0",
+      "message_id": "<1405380421694-4694007.post@n4.nabble.com>",
+      "from_name": "Mike.Gahan",
+      "from_email_hash": "922148cb6b2c219c44f649f8ace971ab69c90fda6da5b4944654933f8cc8ffbc",
+      "date": "2014-07-14T23:27:01Z",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "subject_clean": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "in_reply_to": "<CACAnkwCe0gy1=XgHZb7KsBd=Tb1Tt9KtTLtPzE5gY_HKzuE98w@mail.gmail.com>",
+      "references": [
+        "<CACAnkwCe0gy1=XgHZb7KsBd=Tb1Tt9KtTLtPzE5gY_HKzuE98w@mail.gmail.com>"
+      ],
+      "body_plain": "Here is an example of how I would approach this problem.  I am certainly open\nto more elegant solutions.\n\n\nrequire(data.table)\n\n#Build some sample data\ndata <- data.table(Date=1:20,Value=rpois(20,10))\n\n#Build reference table.  This is where we keep the list of Dates and Values\nthat will be referenced for \n#each individual data\nRef <- data[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]\n\n#Use lapply to get last seven days of value by id\ndata[,Roll.Val := lapply(Date, function(x) {\n                  d <- as.numeric(Ref$Compare_Date[[1]] - x)\n                  sum((d <= 0 & d >= -7)*Ref$Compare_Value[[1]])})]\n\nhead(data,10)\n\n    Date Value Roll.Val\n 1:    1    14       14\n 2:    2     7       21\n 3:    3     9       30\n 4:    4     5       35\n 5:    5    10       45\n 6:    6    10       55\n 7:    7    15       70\n 8:    8    14       84\n 9:    9     8       78\n10:   10    12       83\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/I-have-been-agnozing-over-how-to-do-a-running-cummulative-sum-over-a-particular-date-range-tp4693953p4694007.html\nSent from the datatable-help mailing list archive at Nabble.com.",
+      "body_snippet": "Here is an example of how I would approach this problem.  I am certainly open\nto more elegant solutions.\n\n\nrequire(data.table)\n\n#Build some sample data\ndata <- data.table(Date=1:20,Value=rpois(20,10))",
+      "thread_id": "thread-bf12c4cefa28",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-e8a03c478373",
+      "message_id": "<CAAxdm-6CB=8ar7RcnWY0ApJTfjLEnOY3uhvLTLzk6ucaPEpUpQ@mail.gmail.com>",
+      "from_name": "jim holtman",
+      "from_email_hash": "46f979d1a5bf6fa8b5559d3a049add9a0eb45fffc6a219e7401d97ba07ef9a0f",
+      "date": "2014-07-15T01:26:04Z",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "subject_clean": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "in_reply_to": "<1405380421694-4694007.post@n4.nabble.com>",
+      "references": [
+        "<CACAnkwCe0gy1=XgHZb7KsBd=Tb1Tt9KtTLtPzE5gY_HKzuE98w@mail.gmail.com>",
+        "<1405380421694-4694007.post@n4.nabble.com>"
+      ],
+      "body_plain": "try this using 'filter':\n\n> x <- read.table(text = \"    Date Value Roll.Val\n+  1:    1    14       14\n+  2:    2     7       21\n+  3:    3     9       30\n+  4:    4     5       35\n+  5:    5    10       45\n+  6:    6    10       55\n+  7:    7    15       70\n+  8:    8    14       84\n+  9:    9     8       78\n+ 10:   10    12       83\", as.is = TRUE, header = TRUE)\n>\n> n <- 8  # items to include in running total\n>\n> # create vector to sum with leading zeros\n> vec <- c(rep(0, n - 1), x$Value)\n>\n> # compute sum with 'filter', drop first 7 and store back\n> x$mySum <- filter(vec, rep(1, n), sides = 1)[-seq(1, n - 1)]\n>\n>\n> x\n    Date Value Roll.Val mySum\n1:     1    14       14    14\n2:     2     7       21    21\n3:     3     9       30    30\n4:     4     5       35    35\n5:     5    10       45    45\n6:     6    10       55    55\n7:     7    15       70    70\n8:     8    14       84    84\n9:     9     8       78    78\n10:   10    12       83    83\n>\n\nJim Holtman\nData Munger Guru\n\nWhat is the problem that you are trying to solve?\nTell me what you want to do, not how you want to do it.\n\n\nOn Mon, Jul 14, 2014 at 7:27 PM, Mike.Gahan <michael.gahan at gmail.com> wrote:\n> Here is an example of how I would approach this problem.  I am certainly open\n> to more elegant solutions.\n>\n>\n> require(data.table)\n>\n> #Build some sample data\n> data <- data.table(Date=1:20,Value=rpois(20,10))\n>\n> #Build reference table.  This is where we keep the list of Dates and Values\n> that will be referenced for\n> #each individual data\n> Ref <- data[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]\n>\n> #Use lapply to get last seven days of value by id\n> data[,Roll.Val := lapply(Date, function(x) {\n>                   d <- as.numeric(Ref$Compare_Date[[1]] - x)\n>                   sum((d <= 0 & d >= -7)*Ref$Compare_Value[[1]])})]\n>\n> head(data,10)\n>\n>     Date Value Roll.Val\n>  1:    1    14       14\n>  2:    2     7       21\n>  3:    3     9       30\n>  4:    4     5       35\n>  5:    5    10       45\n>  6:    6    10       55\n>  7:    7    15       70\n>  8:    8    14       84\n>  9:    9     8       78\n> 10:   10    12       83\n>\n>\n>\n> --\n> View this message in context: http://r.789695.n4.nabble.com/I-have-been-agnozing-over-how-to-do-a-running-cummulative-sum-over-a-particular-date-range-tp4693953p4694007.html\n> Sent from the datatable-help mailing list archive at Nabble.com.\n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help",
+      "body_snippet": "try this using 'filter':\n\n> x <- read.table(text = \"    Date Value Roll.Val\n+  1:    1    14       14\n+  2:    2     7       21\n+  3:    3     9       30\n+  4:    4     5       35\n+  5:    5    10    ",
+      "thread_id": "thread-bf12c4cefa28",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-925cec844dfd",
+      "message_id": "<1405392562025-4694009.post@n4.nabble.com>",
+      "from_name": "Mike.Gahan",
+      "from_email_hash": "922148cb6b2c219c44f649f8ace971ab69c90fda6da5b4944654933f8cc8ffbc",
+      "date": "2014-07-15T02:49:22Z",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "subject_clean": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "in_reply_to": "<CAAxdm-6CB=8ar7RcnWY0ApJTfjLEnOY3uhvLTLzk6ucaPEpUpQ@mail.gmail.com>",
+      "references": [
+        "<CACAnkwCe0gy1=XgHZb7KsBd=Tb1Tt9KtTLtPzE5gY_HKzuE98w@mail.gmail.com>",
+        "<1405380421694-4694007.post@n4.nabble.com>",
+        "<CAAxdm-6CB=8ar7RcnWY0ApJTfjLEnOY3uhvLTLzk6ucaPEpUpQ@mail.gmail.com>"
+      ],
+      "body_plain": "But what if the dates are irregularly spaced?\n\n#Build some sample data \nset.seed(12345)\ndata <- data.table(Date=seq(1,60,by=3),Value=rpois(20,10)) \n\n#Build reference table.  This is where we keep the list of Dates and Values\nthat will be referenced for \n#each individual data \nRef <- data[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))] \n\n#Use lapply to get last seven days of value by id \ndata[,Roll.Val := lapply(Date, function(x) { \n                  d <- as.numeric(Ref$Compare_Date[[1]] - x) \n                  sum((d <= 0 & d >= -7)*Ref$Compare_Value[[1]])})] \n\nhead(data,10) \n\n    Date Value Roll.Val\n 1:    1    12       12\n 2:    4     9       21\n 3:    7    10       31\n 4:   10    10       29\n 5:   13    14       34\n 6:   16    13       37\n 7:   19     7       34\n 8:   22    12       32\n 9:   25    12       31\n10:   28    16       40\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/I-have-been-agnozing-over-how-to-do-a-running-cummulative-sum-over-a-particular-date-range-tp4693953p4694009.html\nSent from the datatable-help mailing list archive at Nabble.com.",
+      "body_snippet": "But what if the dates are irregularly spaced?\n\n#Build some sample data \nset.seed(12345)\ndata <- data.table(Date=seq(1,60,by=3),Value=rpois(20,10)) \n\n#Build reference table.  This is where we keep the ",
+      "thread_id": "thread-bf12c4cefa28",
+      "thread_depth": 3,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-cd60672a0206",
+      "message_id": "<CACAnkwCGy4GS3g966-XFrc1EfUYLKgXksOukMUwg9vo=ZsUu1Q@mail.gmail.com>",
+      "from_name": "Farrel Buchinsky",
+      "from_email_hash": "3afc1e62e6c0cd7708dc76fbbfdd9860aa8e095e351a01ab10897d7ff9a57703",
+      "date": "2014-07-15T03:06:50Z",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "subject_clean": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "in_reply_to": "<1405392562025-4694009.post@n4.nabble.com>",
+      "references": [
+        "<CACAnkwCe0gy1=XgHZb7KsBd=Tb1Tt9KtTLtPzE5gY_HKzuE98w@mail.gmail.com>",
+        "<1405380421694-4694007.post@n4.nabble.com>",
+        "<CAAxdm-6CB=8ar7RcnWY0ApJTfjLEnOY3uhvLTLzk6ucaPEpUpQ@mail.gmail.com>",
+        "<1405392562025-4694009.post@n4.nabble.com>"
+      ],
+      "body_plain": "I do not understand why you have to make a list Ref <-\ndata[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]  when\nthe data is already sitting in a data.table. Is it simply because lapply\nworks on a list and not a data.table?\n\nFarrel Buchinsky\nGoogle Voice Tel: (412) 567-7870\n\n\nOn Mon, Jul 14, 2014 at 10:49 PM, Mike.Gahan <michael.gahan at gmail.com>\nwrote:\n\n> But what if the dates are irregularly spaced?\n>\n> #Build some sample data\n> set.seed(12345)\n> data <- data.table(Date=seq(1,60,by=3),Value=rpois(20,10))\n>\n> #Build reference table.  This is where we keep the list of Dates and Values\n> that will be referenced for\n> #each individual data\n> Ref <- data[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]\n>\n> #Use lapply to get last seven days of value by id\n> data[,Roll.Val := lapply(Date, function(x) {\n>                   d <- as.numeric(Ref$Compare_Date[[1]] - x)\n>                   sum((d <= 0 & d >= -7)*Ref$Compare_Value[[1]])})]\n>\n> head(data,10)\n>\n>     Date Value Roll.Val\n>  1:    1    12       12\n>  2:    4     9       21\n>  3:    7    10       31\n>  4:   10    10       29\n>  5:   13    14       34\n>  6:   16    13       37\n>  7:   19     7       34\n>  8:   22    12       32\n>  9:   25    12       31\n> 10:   28    16       40\n>\n>\n>\n> --\n> View this message in context:\n> http://r.789695.n4.nabble.com/I-have-been-agnozing-over-how-to-do-a-running-cummulative-sum-over-a-particular-date-range-tp4693953p4694009.html\n> Sent from the datatable-help mailing list archive at Nabble.com.\n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140714/082abae9/attachment.html>",
+      "body_snippet": "I do not understand why you have to make a list Ref <-\ndata[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]  when\nthe data is already sitting in a data.table. Is it simply because lapp",
+      "thread_id": "thread-bf12c4cefa28",
+      "thread_depth": 4,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-9f55cf5b002f",
+      "message_id": "<CACAnkwDoQxj0Wk1pM74tjLVfdEV6M8PSoVKkwFgvTxp0QL1LLQ@mail.gmail.com>",
+      "from_name": "Farrel Buchinsky",
+      "from_email_hash": "3afc1e62e6c0cd7708dc76fbbfdd9860aa8e095e351a01ab10897d7ff9a57703",
+      "date": "2014-07-15T03:10:51Z",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "subject_clean": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "in_reply_to": "<CACAnkwCGy4GS3g966-XFrc1EfUYLKgXksOukMUwg9vo=ZsUu1Q@mail.gmail.com>",
+      "references": [
+        "<CACAnkwCe0gy1=XgHZb7KsBd=Tb1Tt9KtTLtPzE5gY_HKzuE98w@mail.gmail.com>",
+        "<1405380421694-4694007.post@n4.nabble.com>",
+        "<CAAxdm-6CB=8ar7RcnWY0ApJTfjLEnOY3uhvLTLzk6ucaPEpUpQ@mail.gmail.com>",
+        "<1405392562025-4694009.post@n4.nabble.com>",
+        "<CACAnkwCGy4GS3g966-XFrc1EfUYLKgXksOukMUwg9vo=ZsUu1Q@mail.gmail.com>"
+      ],
+      "body_plain": "Is there perhaps a more data.tabely way of doing it?.\n\nFarrel Buchinsky\nGoogle Voice Tel: (412) 567-7870\n\n\nOn Mon, Jul 14, 2014 at 11:06 PM, Farrel Buchinsky <fjbuch at gmail.com> wrote:\n\n> I do not understand why you have to make a list Ref <-\n> data[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]  when\n> the data is already sitting in a data.table. Is it simply because lapply\n> works on a list and not a data.table?\n>\n> Farrel Buchinsky\n> Google Voice Tel: (412) 567-7870\n>\n>\n> On Mon, Jul 14, 2014 at 10:49 PM, Mike.Gahan <michael.gahan at gmail.com>\n> wrote:\n>\n>> But what if the dates are irregularly spaced?\n>>\n>> #Build some sample data\n>> set.seed(12345)\n>> data <- data.table(Date=seq(1,60,by=3),Value=rpois(20,10))\n>>\n>> #Build reference table.  This is where we keep the list of Dates and\n>> Values\n>> that will be referenced for\n>> #each individual data\n>> Ref <-\n>> data[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]\n>>\n>> #Use lapply to get last seven days of value by id\n>> data[,Roll.Val := lapply(Date, function(x) {\n>>                   d <- as.numeric(Ref$Compare_Date[[1]] - x)\n>>                   sum((d <= 0 & d >= -7)*Ref$Compare_Value[[1]])})]\n>>\n>> head(data,10)\n>>\n>>     Date Value Roll.Val\n>>  1:    1    12       12\n>>  2:    4     9       21\n>>  3:    7    10       31\n>>  4:   10    10       29\n>>  5:   13    14       34\n>>  6:   16    13       37\n>>  7:   19     7       34\n>>  8:   22    12       32\n>>  9:   25    12       31\n>> 10:   28    16       40\n>>\n>>\n>>\n>> --\n>> View this message in context:\n>> http://r.789695.n4.nabble.com/I-have-been-agnozing-over-how-to-do-a-running-cummulative-sum-over-a-particular-date-range-tp4693953p4694009.html\n>> Sent from the datatable-help mailing list archive at Nabble.com.\n>> _______________________________________________\n>> datatable-help mailing list\n>> datatable-help at lists.r-forge.r-project.org\n>>\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>>\n>\n>\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140714/9a08b4a4/attachment.html>",
+      "body_snippet": "Is there perhaps a more data.tabely way of doing it?.\n\nFarrel Buchinsky\nGoogle Voice Tel: (412) 567-7870\n\n\nOn Mon, Jul 14, 2014 at 11:06 PM, Farrel Buchinsky <fjbuch at gmail.com> wrote:\n\n> I do not u",
+      "thread_id": "thread-bf12c4cefa28",
+      "thread_depth": 5,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-f9f8c7770aee",
+      "message_id": "<CAKtx0d7rJUpnriQ8wEYD4jkCMfQD0uPYnGfHqheqAUBbZiHstQ@mail.gmail.com>",
+      "from_name": "Mike Gahan",
+      "from_email_hash": "922148cb6b2c219c44f649f8ace971ab69c90fda6da5b4944654933f8cc8ffbc",
+      "date": "2014-07-15T03:37:41Z",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "subject_clean": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "in_reply_to": "<CACAnkwCGy4GS3g966-XFrc1EfUYLKgXksOukMUwg9vo=ZsUu1Q@mail.gmail.com>",
+      "references": [
+        "<CACAnkwCe0gy1=XgHZb7KsBd=Tb1Tt9KtTLtPzE5gY_HKzuE98w@mail.gmail.com>",
+        "<1405380421694-4694007.post@n4.nabble.com>",
+        "<CAAxdm-6CB=8ar7RcnWY0ApJTfjLEnOY3uhvLTLzk6ucaPEpUpQ@mail.gmail.com>",
+        "<1405392562025-4694009.post@n4.nabble.com>",
+        "<CACAnkwCGy4GS3g966-XFrc1EfUYLKgXksOukMUwg9vo=ZsUu1Q@mail.gmail.com>"
+      ],
+      "body_plain": "This \"reference\" could be done in the actual data.table, but I wanted to\navoid it due to size concerns.  In the event that we want to do rolling\ncalls by groups, we could have a lot of redundant data inside the\ndata.table. This redundant data could possibly bloat the data to be VERY\nVERY large if we are not careful.  A separate table helps to alleviate this\nproblem.  This is especially true in this case (where we implicitly only\nhave 1 group).\n\nOn Monday, July 14, 2014, Farrel Buchinsky <fjbuch at gmail.com> wrote:\n\n> I do not understand why you have to make a list Ref <-\n> data[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]  when\n> the data is already sitting in a data.table. Is it simply because lapply\n> works on a list and not a data.table?\n>\n> Farrel Buchinsky\n> Google Voice Tel: (412) 567-7870\n>\n>\n> On Mon, Jul 14, 2014 at 10:49 PM, Mike.Gahan <michael.gahan at gmail.com\n> <javascript:_e(%7B%7D,'cvml','michael.gahan at gmail.com');>> wrote:\n>\n>> But what if the dates are irregularly spaced?\n>>\n>> #Build some sample data\n>> set.seed(12345)\n>> data <- data.table(Date=seq(1,60,by=3),Value=rpois(20,10))\n>>\n>> #Build reference table.  This is where we keep the list of Dates and\n>> Values\n>> that will be referenced for\n>> #each individual data\n>> Ref <-\n>> data[,list(Compare_Value=list(I(Value)),Compare_Date=list(I(Date)))]\n>>\n>> #Use lapply to get last seven days of value by id\n>> data[,Roll.Val := lapply(Date, function(x) {\n>>                   d <- as.numeric(Ref$Compare_Date[[1]] - x)\n>>                   sum((d <= 0 & d >= -7)*Ref$Compare_Value[[1]])})]\n>>\n>> head(data,10)\n>>\n>>     Date Value Roll.Val\n>>  1:    1    12       12\n>>  2:    4     9       21\n>>  3:    7    10       31\n>>  4:   10    10       29\n>>  5:   13    14       34\n>>  6:   16    13       37\n>>  7:   19     7       34\n>>  8:   22    12       32\n>>  9:   25    12       31\n>> 10:   28    16       40\n>>\n>>\n>>\n>> --\n>> View this message in context:\n>> http://r.789695.n4.nabble.com/I-have-been-agnozing-over-how-to-do-a-running-cummulative-sum-over-a-particular-date-range-tp4693953p4694009.html\n>> Sent from the datatable-help mailing list archive at Nabble.com.\n>> _______________________________________________\n>> datatable-help mailing list\n>> datatable-help at lists.r-forge.r-project.org\n>> <javascript:_e(%7B%7D,'cvml','datatable-help at lists.r-forge.r-project.org');>\n>>\n>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>>\n>\n>\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140714/15678789/attachment-0001.html>",
+      "body_snippet": "This \"reference\" could be done in the actual data.table, but I wanted to\navoid it due to size concerns.  In the event that we want to do rolling\ncalls by groups, we could have a lot of redundant data ",
+      "thread_id": "thread-bf12c4cefa28",
+      "thread_depth": 5,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-a6b50d592ee2",
+      "message_id": "<1405723233048-4694221.post@n4.nabble.com>",
+      "from_name": "bgoldstein",
+      "from_email_hash": "f0291614f59aaed75e346c8a16339d40cf5b7aea94f3a17fcc14d59ca7b79cdf",
+      "date": "2014-07-18T22:40:33Z",
+      "subject": "[datatable-help] Subsetting By Row Function",
+      "subject_clean": "[datatable-help] Subsetting By Row Function",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "I am having trouble defining (and therefore searching) for this problem. I\nhave data like this:\n\nGroup Value Date\n1         xxx   June\n1         yyy   July\n2         zzzz   May\n2         qqqq  August\netc.\n\n\nI want to subset the 'Value' of each 'Group' by the latest 'Date'. So my\noutput should be:\n\nGroup Value Date\n1         yyy   July\n2         qqqq  August\netc.\n\nThe doBy package has a firstobs() function that works but is quite slow.\n\nWhat would be a data.table way to do this?\n\nThank you,\n\nBen\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/Subsetting-By-Row-Function-tp4694221.html\nSent from the datatable-help mailing list archive at Nabble.com.",
+      "body_snippet": "I am having trouble defining (and therefore searching) for this problem. I\nhave data like this:\n\nGroup Value Date\n1         xxx   June\n1         yyy   July\n2         zzzz   May\n2         qqqq  August\n",
+      "thread_id": "thread-a6b50d592ee2",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-fb959bb4eb47",
+      "message_id": "<etPan.53c9a791.70c6a529.28e6@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-18T23:02:41Z",
+      "subject": "[datatable-help] Subsetting By Row Function",
+      "subject_clean": "[datatable-help] Subsetting By Row Function",
+      "in_reply_to": "<CAAf756MzFy8iR0KdoJnFw74ud4C0jaTKtMQwgFWOx2MvqLw=TA@mail.gmail.com>",
+      "references": [
+        "<1405723233048-4694221.post@n4.nabble.com>",
+        "<CAAf756MzFy8iR0KdoJnFw74ud4C0jaTKtMQwgFWOx2MvqLw=TA@mail.gmail.com>"
+      ],
+      "body_plain": "Hi Ben,\n\nIf the ?Date? column (which seems to be just month names) is already in order - meaning you just want to pick the last item for each group, then this is fairly straightforward:\n\nI assume Date is of type ?character?.\n\nMethod 1:\n\nDT[, .SD[.N], by=Group]\n#    Group Value   Date\n# 1:     1   yyy   July\n# 2:     2  qqqq August\nMethod 2:\n\nIn this case, .SD is not optimised for speed yet. So, if this is slow, then you can overcome it by using .I in place of .SD as follows:\n\nDT[DT[, .I[.N], by=Group]$V1]\n#    Group Value   Date\n# 1:     1   yyy   July\n# 2:     2  qqqq August\nInstead of subsetting entire data per group (.SD), we get the row number (.I) in DT for each group (in column V1) and then just subset those rows.\n\nIf the Date column is not necessarily sorted for each group, then we create an extra column:\n\nMethod 3:\n\nDT[, idx := chmatch(Date, month.name)]\nsetkey(DT, Group, idx) # sort by group, idx\nDT[DT[, .I[.N], by=Group]$V1]\n#    Group Value   Date idx\n# 1:     1   yyy   July   7\n# 2:     2  qqqq August   8\nOr if you use v1.9.3, you can use setorder instead of setkey which allows for ordering in ascending and descending order:\n\nMethod 4:\n\nDT[, idx := chmatch(Date, month.name)]\nsetorder(DT, Group, -idx) # sort by group, and descending order on idx\nNow we?ll need to pick the first element instead of the .Nth (last) element per group.\n\nDT[DT[, .I[1L], by=Group]$V1]\n#    Group Value   Date idx\n# 1:     1   yyy   July   7\n# 2:     2  qqqq August   8\nAnd alternatively, if you don?t wish to add the extra column, you can use order(.) as follows:\n\nMethod 5:\n\nDT[order(Group, -chmatch(Date, month.name))][, .SD[1L], by=Group]\nIf you want to use .I here, you?ll have to save the first part onto a variable, which essentially means you?ll use up twice the memory of your data set.. So, I?d prefer this least. But just to show all possible ways I could think of.\n\nHTH\n\n\nArun\n\nFrom:?Arunkumar Srinivasan aragorn168b at gmail.com\nReply:?Arunkumar Srinivasan aragorn168b at gmail.com\nDate:?July 19, 2014 at 12:51:04 AM\nTo:?bgoldstein ben.goldstein at gmail.com\nCc:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org\nSubject:? Re: [datatable-help] Subsetting By Row Function  \n\nHi Ben,\n\nIf the \"Date\" column (which seems to be just month names) is already in order - meaning you just want to pick the last item for each group, then this is fairly straightforward:\n\nI assume `Date` is of type \"character\".\n\nMethod 1:\nDT[, .SD[.N], by=Group]\n# ? ?Group Value ? Date\n# 1: ? ? 1 ? yyy ? July\n# 2: ? ? 2 ?qqqq August\n\nMethod 2:\nIn this case, `.SD` is not optimised for speed yet. So, if this is slow, then you can overcome it by using `.I` in place of `.SD` as follows:\n\nDT[DT[, .I[.N], by=Group]$V1]\n# ? ?Group Value ? Date\n# 1: ? ? 1 ? yyy ? July\n# 2: ? ? 2 ?qqqq August\n\nInstead of subsetting entire data per group (.SD), we get the row number (.I) in DT for each group (in column V1) and then just subset those rows.\n\n---\n\nIf?\n\n\nOn Sat, Jul 19, 2014 at 12:40 AM, bgoldstein <ben.goldstein at gmail.com> wrote:\nI am having trouble defining (and therefore searching) for this problem. I\nhave data like this:\n\nGroup Value Date\n1 ? ? ? ? xxx ? June\n1 ? ? ? ? yyy ? July\n2 ? ? ? ? zzzz ? May\n2 ? ? ? ? qqqq ?August\netc.\n\n\nI want to subset the 'Value' of each 'Group' by the latest 'Date'. So my\noutput should be:\n\nGroup Value Date\n1 ? ? ? ? yyy ? July\n2 ? ? ? ? qqqq ?August\netc.\n\nThe doBy package has a firstobs() function that works but is quite slow.\n\nWhat would be a data.table way to do this?\n\nThank you,\n\nBen\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/Subsetting-By-Row-Function-tp4694221.html\nSent from the datatable-help mailing list archive at Nabble.com.\n_______________________________________________\ndatatable-help mailing list\ndatatable-help at lists.r-forge.r-project.org\nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140719/a2f10516/attachment.html>",
+      "body_snippet": "Hi Ben,\n\nIf the ?Date? column (which seems to be just month names) is already in order - meaning you just want to pick the last item for each group, then this is fairly straightforward:\n\nI assume Date",
+      "thread_id": "thread-fb959bb4eb47",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-fb4329ec8f01",
+      "message_id": "<1405725127355-4694227.post@n4.nabble.com>",
+      "from_name": "bgoldstein",
+      "from_email_hash": "f0291614f59aaed75e346c8a16339d40cf5b7aea94f3a17fcc14d59ca7b79cdf",
+      "date": "2014-07-18T23:12:07Z",
+      "subject": "[datatable-help] Subsetting By Row Function",
+      "subject_clean": "[datatable-help] Subsetting By Row Function",
+      "in_reply_to": "<etPan.53c9a791.70c6a529.28e6@Arunkumars-MacBook-Pro.local>",
+      "references": [
+        "<1405723233048-4694221.post@n4.nabble.com>",
+        "<etPan.53c9a791.70c6a529.28e6@Arunkumars-MacBook-Pro.local>"
+      ],
+      "body_plain": "Arun,\n\nThis worked perfectly - Thank you. The dates are actually full Chron dates\nso it was easy to sort first by date. I ended up using your Method 2 for\nspeed.\n\nI was wondering - if you don't mind - you could briefly explain some of the\nsyntax. I have seen .I and .SD but am not familiar quite with what they\nmean. I'm assuming .N is last? Is there a syntax for the first (.n?) or the\n5th (.5?)\n\nIs '.I' saying find the index that meets this criterion? And .SD find the\ngroup that meet the criterion?\n\nThank you,\n\nBen\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/Subsetting-By-Row-Function-tp4694221p4694227.html\nSent from the datatable-help mailing list archive at Nabble.com.",
+      "body_snippet": "Arun,\n\nThis worked perfectly - Thank you. The dates are actually full Chron dates\nso it was easy to sort first by date. I ended up using your Method 2 for\nspeed.\n\nI was wondering - if you don't mind -",
+      "thread_id": "thread-fb959bb4eb47",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-55963784ec4f",
+      "message_id": "<etPan.53c9abc6.374a3fe6.28e6@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-18T23:20:38Z",
+      "subject": "[datatable-help] Subsetting By Row Function",
+      "subject_clean": "[datatable-help] Subsetting By Row Function",
+      "in_reply_to": "<1405725127355-4694227.post@n4.nabble.com>",
+      "references": [
+        "<1405723233048-4694221.post@n4.nabble.com>",
+        "<etPan.53c9a791.70c6a529.28e6@Arunkumars-MacBook-Pro.local>",
+        "<1405725127355-4694227.post@n4.nabble.com>"
+      ],
+      "body_plain": "I was wondering - if you don't mind - you could briefly explain some of the?\nsyntax. I have seen .I and .SD but am not familiar quite with what they?\nmean. I'm assuming .N is last? Is there a syntax for the first (.n?) or the?\n5th (.5?)?\nAll special variables are explained in `?data.table`. It'd be much easier for you in the future if you go through it and try it out yourself with some dummy examples. They can be very powerful tools!\n\nBriefly: .N contains the number of observations for each group - integer vector of length 1. If you want to refer to the first value, then you can just use 1 = .I[1], .I[5] for 5th value.. and if 5 > .N, .I[5] will return NA (like base R does when we access beyond a vector's allocated length).\n\n.I contains the row number of the original data.table for each group. Ex: `DT <- data.table(x=c(1,2,1,1,2,1,2), y=10:16); DT[, print(.I), by=x]` gives the position of all the 1's in `DT` corresponding to x=1 first followed by all 2's in DT corresponding to x=2.\n\nHTH\n\nArun\n\nFrom:?bgoldstein ben.goldstein at gmail.com\nReply:?bgoldstein ben.goldstein at gmail.com\nDate:?July 19, 2014 at 1:12:17 AM\nTo:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org\nSubject:? Re: [datatable-help] Subsetting By Row Function  \n\nArun,  \n\nThis worked perfectly - Thank you. The dates are actually full Chron dates  \nso it was easy to sort first by date. I ended up using your Method 2 for  \nspeed.  \n\nI was wondering - if you don't mind - you could briefly explain some of the  \nsyntax. I have seen .I and .SD but am not familiar quite with what they  \nmean. I'm assuming .N is last? Is there a syntax for the first (.n?) or the  \n5th (.5?)  \n\nIs '.I' saying find the index that meets this criterion? And .SD find the  \ngroup that meet the criterion?  \n\nThank you,  \n\nBen  \n\n\n\n--  \nView this message in context: http://r.789695.n4.nabble.com/Subsetting-By-Row-Function-tp4694221p4694227.html  \nSent from the datatable-help mailing list archive at Nabble.com.  \n_______________________________________________  \ndatatable-help mailing list  \ndatatable-help at lists.r-forge.r-project.org  \nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140719/b88ab0ce/attachment-0001.html>",
+      "body_snippet": "I was wondering - if you don't mind - you could briefly explain some of the?\nsyntax. I have seen .I and .SD but am not familiar quite with what they?\nmean. I'm assuming .N is last? Is there a syntax f",
+      "thread_id": "thread-fb959bb4eb47",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-2c5278645c17",
+      "message_id": "<etPan.53c9ae6c.275ac794.28e6@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-18T23:31:56Z",
+      "subject": "[datatable-help] Subsetting By Row Function",
+      "subject_clean": "[datatable-help] Subsetting By Row Function",
+      "in_reply_to": "<etPan.53c9abc6.374a3fe6.28e6@Arunkumars-MacBook-Pro.local>",
+      "references": [
+        "<1405723233048-4694221.post@n4.nabble.com>",
+        "<etPan.53c9a791.70c6a529.28e6@Arunkumars-MacBook-Pro.local>",
+        "<1405725127355-4694227.post@n4.nabble.com>",
+        "<etPan.53c9abc6.374a3fe6.28e6@Arunkumars-MacBook-Pro.local>"
+      ],
+      "body_plain": "Looking at ?data.table, there?s another way which doesn?t require sorting on ?Group, Date?:\n\nDT[DT[, .I[which.max(idx)], by=Group]$V1]\n#    Group Value   Date idx\n# 1:     1   yyy   July   7\n# 2:     2  qqqq August   8\nHTH\n\n\nArun\n\nFrom:?Arunkumar Srinivasan aragorn168b at gmail.com\nReply:?Arunkumar Srinivasan aragorn168b at gmail.com\nDate:?July 19, 2014 at 1:20:40 AM\nTo:?bgoldstein ben.goldstein at gmail.com, datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org\nSubject:? Re: [datatable-help] Subsetting By Row Function  \n\nI was wondering - if you don't mind - you could briefly explain some of the?\nsyntax. I have seen .I and .SD but am not familiar quite with what they?\nmean. I'm assuming .N is last? Is there a syntax for the first (.n?) or the?\n5th (.5?)?\nAll special variables are explained in `?data.table`. It'd be much easier for you in the future if you go through it and try it out yourself with some dummy examples. They can be very powerful tools!\n\nBriefly: .N contains the number of observations for each group - integer vector of length 1. If you want to refer to the first value, then you can just use 1 = .I[1], .I[5] for 5th value.. and if 5 > .N, .I[5] will return NA (like base R does when we access beyond a vector's allocated length).\n\n.I contains the row number of the original data.table for each group. Ex: `DT <- data.table(x=c(1,2,1,1,2,1,2), y=10:16); DT[, print(.I), by=x]` gives the position of all the 1's in `DT` corresponding to x=1 first followed by all 2's in DT corresponding to x=2.\n\nHTH\n\nArun\n\nFrom:?bgoldstein ben.goldstein at gmail.com\nReply:?bgoldstein ben.goldstein at gmail.com\nDate:?July 19, 2014 at 1:12:17 AM\nTo:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org\nSubject:? Re: [datatable-help] Subsetting By Row Function\n\nArun,\n\nThis worked perfectly - Thank you. The dates are actually full Chron dates\nso it was easy to sort first by date. I ended up using your Method 2 for\nspeed.\n\nI was wondering - if you don't mind - you could briefly explain some of the\nsyntax. I have seen .I and .SD but am not familiar quite with what they\nmean. I'm assuming .N is last? Is there a syntax for the first (.n?) or the\n5th (.5?)\n\nIs '.I' saying find the index that meets this criterion? And .SD find the\ngroup that meet the criterion?\n\nThank you,\n\nBen\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/Subsetting-By-Row-Function-tp4694221p4694227.html\nSent from the datatable-help mailing list archive at Nabble.com.\n_______________________________________________\ndatatable-help mailing list\ndatatable-help at lists.r-forge.r-project.org\nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140719/e44a03d3/attachment.html>",
+      "body_snippet": "Looking at ?data.table, there?s another way which doesn?t require sorting on ?Group, Date?:\n\nDT[DT[, .I[which.max(idx)], by=Group]$V1]\n#    Group Value   Date idx\n# 1:     1   yyy   July   7\n# 2:     ",
+      "thread_id": "thread-fb959bb4eb47",
+      "thread_depth": 3,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-e840740ea58e",
+      "message_id": "<53CBAEE3.5030509@gmail.com>",
+      "from_name": "PARIS Nicolas",
+      "from_email_hash": "1fb036cc3ef02ef4e6785abb4242fc6430a1907d215b2cf37bb3d891d380f277",
+      "date": "2014-07-20T11:58:27Z",
+      "subject": "[datatable-help] Subsetting By Row Function",
+      "subject_clean": "[datatable-help] Subsetting By Row Function",
+      "in_reply_to": "<1405723233048-4694221.post@n4.nabble.com>",
+      "references": [
+        "<1405723233048-4694221.post@n4.nabble.com>"
+      ],
+      "body_plain": "Hello Ben,\n\nWhat about ordering on group+date descending, then removing duplicated\non group ?\n\nsometing like :\nDT[!duplicated(Group),][order(Group,asDate(Date,format=\"yourFormat\"),decreasing=T)]\n\n\nLe 19/07/2014 00:40, bgoldstein a ?crit :\n> I am having trouble defining (and therefore searching) for this problem. I\n> have data like this:\n> \n> Group Value Date\n> 1         xxx   June\n> 1         yyy   July\n> 2         zzzz   May\n> 2         qqqq  August\n> etc.\n> \n> \n> I want to subset the 'Value' of each 'Group' by the latest 'Date'. So my\n> output should be:\n> \n> Group Value Date\n> 1         yyy   July\n> 2         qqqq  August\n> etc.\n> \n> The doBy package has a firstobs() function that works but is quite slow.\n> \n> What would be a data.table way to do this?\n> \n> Thank you,\n> \n> Ben\n> \n> \n> \n> --\n> View this message in context: http://r.789695.n4.nabble.com/Subsetting-By-Row-Function-tp4694221.html\n> Sent from the datatable-help mailing list archive at Nabble.com.\n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>",
+      "body_snippet": "Hello Ben,\n\nWhat about ordering on group+date descending, then removing duplicated\non group ?\n\nsometing like :\nDT[!duplicated(Group),][order(Group,asDate(Date,format=\"yourFormat\"),decreasing=T)]\n\n\nLe ",
+      "thread_id": "thread-a6b50d592ee2",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-8dbc8ef8b407",
+      "message_id": "<BAY181-W556C55322BBB366B90F501BAF00@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-21T11:01:04Z",
+      "subject": "[datatable-help] Construct a new data table from another",
+      "subject_clean": "[datatable-help] Construct a new data table from another",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi everyone,\n \nFor instance, let's suppose I have the an initial data frame DF, and I want to\nrename and reorder some of its columns, so that the desired result is\nexpressed by DF2:\n \n \nset.seed(100)\nDF = data.frame(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))\nDF2 <- data.frame(a=DF[,1],d=DF[,4],B=DF[,2])\n\nIf I do the equivalent operations under data table format, I'm on?y able to obtain\nthe same result with the following code:\n \n \nset.seed(100)\nDT = data.table(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))\nDT2 <- data.table(a=DT[,1,with=FALSE],d=DT[,4,with=FALSE],B=DT[,2,with=FALSE])\n \n \nPlease, is it possible to get the same result with a more simply code?\nThanks!\n \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140721/e31aa0a0/attachment.html>",
+      "body_snippet": "Hi everyone,\n \nFor instance, let's suppose I have the an initial data frame DF, and I want to\nrename and reorder some of its columns, so that the desired result is\nexpressed by DF2:\n \n \nset.seed(100)\n",
+      "thread_id": "thread-8dbc8ef8b407",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-67245bbecc18",
+      "message_id": "<CAAuY0RW+0ZWbSJ9=KLqRwXi4yBh78T44w0fpcMnQsfSoTifM4Q@mail.gmail.com>",
+      "from_name": "Chris Neff",
+      "from_email_hash": "cd7f0a4a4bae5babbb8da5cefe4465dce0481d4f11e2d902373a576560b01490",
+      "date": "2014-07-21T11:10:16Z",
+      "subject": "[datatable-help] Construct a new data table from another",
+      "subject_clean": "[datatable-help] Construct a new data table from another",
+      "in_reply_to": null,
+      "references": [
+        "<BAY181-W556C55322BBB366B90F501BAF00@phx.gbl>"
+      ],
+      "body_plain": "DT = data.table(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))\nDT2=DT[,c(1,4,2),with=FALSE]\n# If you really want the name changes\nsetnames(DT2, c('a','d','B'))\n\nOn Mon Jul 21 2014 at 7:01:26 AM, Frank S. <f_j_rod at hotmail.com> wrote:\n\n> Hi everyone,\n>\n> For instance, let's suppose I have the an initial data frame DF, and I\n> want to\n> rename and reorder some of its columns, so that the desired result is\n> expressed by DF2:\n>\n>\n> set.seed(100)\n> DF = data.frame(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))\n> DF2 <- data.frame(a=DF[,1],d=DF[,4],B=DF[,2])\n>\n> If I do the equivalent operations under data table format, I'm on?y able\n> to obtain\n> the same result with the following code:\n>\n>\n> set.seed(100)\n> DT = data.table(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))\n> DT2 <-\n> data.table(a=DT[,1,with=FALSE],d=DT[,4,with=FALSE],B=DT[,2,with=FALSE])\n>\n>\n> Please, is it possible to get the same result with a more simply code?\n> Thanks!\n>  _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/\n> listinfo/datatable-help\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140721/a7630454/attachment.html>",
+      "body_snippet": "DT = data.table(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))\nDT2=DT[,c(1,4,2),with=FALSE]\n# If you really want the name changes\nsetnames(DT2, c('a','d','B'))\n\nOn Mon Jul 21 2014 at 7:01:26 AM, Fran",
+      "thread_id": "thread-8dbc8ef8b407",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-02c713212b11",
+      "message_id": "<BAY181-W64F1E5AC6B84C23F40952DBAF00@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-21T14:48:29Z",
+      "subject": "[datatable-help] Construct a new data table from another",
+      "subject_clean": "[datatable-help] Construct a new data table from another",
+      "in_reply_to": "<CAAuY0RW+0ZWbSJ9=KLqRwXi4yBh78T44w0fpcMnQsfSoTifM4Q@mail.gmail.com>",
+      "references": [
+        "<BAY181-W556C55322BBB366B90F501BAF00@phx.gbl>",
+        "<CAAuY0RW+0ZWbSJ9=KLqRwXi4yBh78T44w0fpcMnQsfSoTifM4Q@mail.gmail.com>"
+      ],
+      "body_plain": "Thanks Chris, But, is there any option in order to avoid writing \"with=FALSE\" every timein the next situation?:  \n# USING DATA FRAME set.seed(100)DF = data.frame(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))DF2 <- data.frame(a=DF[,1],d=DF[,4],B=DF[,2])If I do the equivalent operations under data table format, I'm on?y able to obtain\nthe same result with the following code: # USING DATA TABLEset.seed(100)DT = data.table(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))DT2 <- data.table(DT[,1,with=FALSE], DT[,4,with=FALSE], DT[,2,with=FALSE])setnames(DT2, c('a','d','B')) Thank you! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140721/fd90c389/attachment.html>",
+      "body_snippet": "Thanks Chris, But, is there any option in order to avoid writing \"with=FALSE\" every timein the next situation?:  \n# USING DATA FRAME set.seed(100)DF = data.frame(A=letters[1:5],B=rnorm(5),C=rexp(5),D=",
+      "thread_id": "thread-8dbc8ef8b407",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-b5c2e9d78458",
+      "message_id": "<etPan.53cd2b9a.257130a3.172@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-21T15:02:50Z",
+      "subject": "[datatable-help] Construct a new data table from another",
+      "subject_clean": "[datatable-help] Construct a new data table from another",
+      "in_reply_to": "<BAY181-W64F1E5AC6B84C23F40952DBAF00@phx.gbl>",
+      "references": [
+        "<BAY181-W556C55322BBB366B90F501BAF00@phx.gbl>",
+        "<CAAuY0RW+0ZWbSJ9=KLqRwXi4yBh78T44w0fpcMnQsfSoTifM4Q@mail.gmail.com>",
+        "<BAY181-W64F1E5AC6B84C23F40952DBAF00@phx.gbl>"
+      ],
+      "body_plain": "Hi Frank,\n\nThe data.frame way of referring to column names or numbers requires with=FALSE. This is because the default data.table-like operations are more common where with=TRUE. Also, data.tables are designed with really huge data sets in mind and avoiding as many copies as possible. So, unless there?s a strong reason, the data.table philosophy would be to avoid copies (ex: DT[, 1, with=FALSE] will create a copy).\n\nThat being said, another alternative is to subset the data.table way (where with=TRUE by default):\n\nDT2 = DT[, list(A,D,B)] # list(1,4,2) won't work. Read FAQ 1.1-1.5\nsetnames(DT2, c(\"a\", \"d\", \"B\"))\nIt?s also generally considered a bad practice to subset columns by using column numbers - prone to errors.\n\nHope this helps.\n\n\nArun\n\nFrom:?Frank S. f_j_rod at hotmail.com\nReply:?Frank S. f_j_rod at hotmail.com\nDate:?July 21, 2014 at 4:48:54 PM\nTo:?Chris Neff caneff at gmail.com, datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org\nSubject:? Re: [datatable-help] Construct a new data table from another  \n\nThanks Chris,\n\n?\n\nBut, is there any option in order to avoid writing \"with=FALSE\" every time\n\nin the next situation?:\n\n?\n\n?\n\n# USING DATA FRAME?\nset.seed(100)\nDF = data.frame(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))\nDF2 <- data.frame(a=DF[,1],d=DF[,4],B=DF[,2])\n\nIf I do the equivalent operations under data table format, I'm on?y able to obtain\nthe same result with the following code:\n?\n# USING DATA TABLE\nset.seed(100)\nDT = data.table(A=letters[1:5],B=rnorm(5),C=rexp(5),D=runif(5))\nDT2 <- data.table(DT[,1,with=FALSE], DT[,4,with=FALSE], DT[,2,with=FALSE])\n\nsetnames(DT2, c('a','d','B'))\n\n?\n\nThank you!\n\n_______________________________________________  \ndatatable-help mailing list  \ndatatable-help at lists.r-forge.r-project.org  \nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140721/2772dd42/attachment.html>",
+      "body_snippet": "Hi Frank,\n\nThe data.frame way of referring to column names or numbers requires with=FALSE. This is because the default data.table-like operations are more common where with=TRUE. Also, data.tables are",
+      "thread_id": "thread-8dbc8ef8b407",
+      "thread_depth": 3,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-9afeb696f194",
+      "message_id": "<BAY181-W33A864CF1304FDA7DFFFEABAF00@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-21T16:06:50Z",
+      "subject": "[datatable-help] Construct a new data table from another",
+      "subject_clean": "[datatable-help] Construct a new data table from another",
+      "in_reply_to": "<etPan.53cd2b9a.257130a3.172@Arunkumars-MacBook-Pro.local>",
+      "references": [
+        "<BAY181-W556C55322BBB366B90F501BAF00@phx.gbl>",
+        "<CAAuY0RW+0ZWbSJ9=KLqRwXi4yBh78T44w0fpcMnQsfSoTifM4Q@mail.gmail.com>",
+        "<BAY181-W64F1E5AC6B84C23F40952DBAF00@phx.gbl>",
+        "<etPan.53cd2b9a.257130a3.172@Arunkumars-MacBook-Pro.local>"
+      ],
+      "body_plain": "Arunkumar, thank you very much! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140721/f3932ec2/attachment.html>",
+      "body_snippet": "Arunkumar, thank you very much! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/201",
+      "thread_id": "thread-8dbc8ef8b407",
+      "thread_depth": 4,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-f51dea5e3c48",
+      "message_id": "<CAMd_AgV=2f0qxiCR7J1ZMHW5BR9gLnns1KN7OHUJOQqaKMJUhQ@mail.gmail.com>",
+      "from_name": "Amelia Hardjasa",
+      "from_email_hash": "5b335b267363a6e66e29e770310de1459094eb6da623ce2bb6e05d6507937312",
+      "date": "2014-07-21T19:24:08Z",
+      "subject": "[datatable-help] Setting the key of a table produced by merging reorders original table if key column was used as by column",
+      "subject_clean": "[datatable-help] Setting the key of a table produced by merging reorders original table if key column was used as by column",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "In data.table version 1.9.2: When merging two data tables with\nmerge.data.table, if the \"by\" column is the same as the key column of\nat least one table, setting the key of the new table will reorder the\noriginal table without changing the key, leading to this warning:\n\nWarning message:\nIn setkeyv(x, cols, verbose = verbose) :\n  Already keyed by this key but had invalid row order, key rebuilt. If\nyou didn't go under the hood please let datatable-help know so the\nroot cause can be fixed.\n\nPresumably this is because when the key and by are the same, a copy is\nnot made/rekeyed (?merge.data.table: \"Note that if the specified\ncolumns in by is not the key (or head of the key) of x or y, then a\ncopy is first rekeyed prior to performing the merge\"). The silent\nreordering doesn't seem like desired behaviour, however.\n\nMinimal example is below. The second case uses a different column for\nthe merge by and no problem is seen.\n\n\nlibrary(data.table)\n\ndt.1 <- data.table(Y = c(rep(\"a\", 2), rep(\"b\", 2)), X = c(1:2), key = \"X\")\ndt.2 <- data.table(X = c(2:1), Z = c(\"123\", \"456\"))\ndt.3 <- merge(dt.1, dt.2, by = \"X\", all.x = TRUE)\nstr(dt.1) #keyed by X, ordered by X\nsetkey(dt.3, Y)\nstr(dt.1) #keyed by X, but now ordered by Y\nsetkey(dt.1, X) #warning\n\ndt.1 <- data.table(Y = c(rep(\"b\", 2), rep(\"a\", 2)), X = c(2:1), key = \"Y\")\ndt.2 <- data.table(X = c(2:1), Z = c(\"123\", \"456\"))\ndt.3 <- merge(dt.1, dt.2, by = \"X\", all.x = TRUE)\nstr(dt.1) #keyed by Y, ordered by Y\nsetkey(dt.3, X)\nstr(dt.1) #remains keyed by Y, ordered by Y\n\n\nThanks for any help,\nAmelia\n\n-- \nThe contents of this email, are confidential and may be privileged. If you \nare not the intended recipient please notify the sender immediately and \nremove it from your system. Please note that we have taken reasonable \nprecautions against viruses and accept no liability for loss or damage \ncaused by any virus present in this email or its attachments or caused by \nthis email being intercepted, lost or corrupted as a result of \ntransmission. Thank you.",
+      "body_snippet": "In data.table version 1.9.2: When merging two data tables with\nmerge.data.table, if the \"by\" column is the same as the key column of\nat least one table, setting the key of the new table will reorder t",
+      "thread_id": "thread-f51dea5e3c48",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-797afd5cac77",
+      "message_id": "<1405973850560-4694323.post@n4.nabble.com>",
+      "from_name": "ahardjasa",
+      "from_email_hash": "5b335b267363a6e66e29e770310de1459094eb6da623ce2bb6e05d6507937312",
+      "date": "2014-07-21T20:17:30Z",
+      "subject": "[datatable-help] seq with data.table",
+      "subject_clean": "[datatable-help] seq with data.table",
+      "in_reply_to": "<1405393913575-4694013.post@n4.nabble.com>",
+      "references": [
+        "<1405393913575-4694013.post@n4.nabble.com>"
+      ],
+      "body_plain": "marcos.takahashi wrote\n> Hi all.\n> \n> I am working with a data.table with customer order data, and I have to\n> order all orders sequentially by customer, returning the number of that\n> order for that customer (eg: order O_10 is the 2nd order of customer A).\n> I can do it using some loop statement, but is there a way of doing it on\n> another way (maybe using seq)?\n> \n> Here's an example of the data:\n> \n> DT = data.table(customer=c(\"A\", \"A\", \"B\", \"B\",\"B\",\"C\"),\n> order=c(701,325,10,306,289,90))\n> \n> Expected result:\n> customer order number\n> A  325  1\n> A  701  2\n> B  100  1\n> B  289  2\n> B  306  3\n> C  900  1\n\nYou can use order(...) to get the indices in order (ascending by default),\nand by to get the indices per each customer.\n\nDT[, number := order(order), by = customer]\nsetkey(DT, customer, number)\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/seq-with-data-table-tp4694013p4694323.html\nSent from the datatable-help mailing list archive at Nabble.com.",
+      "body_snippet": "marcos.takahashi wrote\n> Hi all.\n> \n> I am working with a data.table with customer order data, and I have to\n> order all orders sequentially by customer, returning the number of that\n> order for that ",
+      "thread_id": "thread-797afd5cac77",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-561ea4feccb2",
+      "message_id": "<BAY181-W94FF22404EA75056537DD1BAF10@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-22T14:49:33Z",
+      "subject": "[datatable-help] Subsetting a data table and add a new column in one step",
+      "subject_clean": "[datatable-help] Subsetting a data table and add a new column in one step",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hello everyone.  I?ve the following data table:\n\n \n\nDT <- data.table(id=1:5,\n\n                born=as.Date(c(\"1939-10-28\",\"1943-02-26\",\"1946-03-09\",\"1947-05-19\",\"1932-04-03\")),\n\n                start=as.Date(c(\"2012-01-01\",\"1980-07-15\",\"1998-10-28\",\"2011-10-28\",\"2010-10-28\")),\n\n                end=as.Date(c(\"2012-05-01\",\"2014-02-01\",\"2012-10-20\",\"2013-10-15\",\"2012-08-25\")))\n\n>DT\n\n   id      \nborn      start        end\n\n1:  1 1939-10-28 2012-01-01 2012-05-01\n\n2:  2 1943-02-26 1980-07-15 2014-02-01\n\n3:  3 1946-03-09 1998-10-28 2012-10-20\n\n4:  4 1947-05-19 2011-10-28 2013-10-15\n\n5:  5 1932-04-03 2010-10-28 2012-08-25\n\nI\nwould like to be able to keep only those subjects whose ?start? date  is previous to ?2010-01-01? date, and then\ncalculatethe age they were at 2010-01-01 in a newDT:\n\n    id      \nborn      start        end    \nage\n\n2:  2 1943-02-26 1980-07-15 2014-02-01    66.8\n\n3:  3 1946-03-09 1998-10-28 2012-10-20    63.8\n\n \n\nI\nhave:\n\n \n\nnewDT <- DT[, if(start <= as.Date(\"2010-01-01\"))\n{\n\nlist(c(id, born,\nstart, end, age=unclass(round(difftime(Apertura, born)/365.25,1))))\n\n} , by=c('id','born','start','end')]\n\n But it appears an error message!  Can anyone please help me with this? Thank you!  \n\n \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140722/9441ad47/attachment.html>",
+      "body_snippet": "Hello everyone.  I?ve the following data table:\n\n \n\nDT <- data.table(id=1:5,\n\n                born=as.Date(c(\"1939-10-28\",\"1943-02-26\",\"1946-03-09\",\"1947-05-19\",\"1932-04-03\")),\n\n                start=",
+      "thread_id": "thread-561ea4feccb2",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-4303ab903212",
+      "message_id": "<53CFAE8A.7040803@gmail.com>",
+      "from_name": "Michael Smith",
+      "from_email_hash": "a7e1151e628d8816b7bab185f82d3d0b8e635db81353cc0fe989960cea37147b",
+      "date": "2014-07-23T12:46:02Z",
+      "subject": "[datatable-help] Subsetting a data table and add a new column in one step",
+      "subject_clean": "[datatable-help] Subsetting a data table and add a new column in one step",
+      "in_reply_to": "<BAY181-W94FF22404EA75056537DD1BAF10@phx.gbl>",
+      "references": [
+        "<BAY181-W94FF22404EA75056537DD1BAF10@phx.gbl>"
+      ],
+      "body_plain": "This gives the output in your example:\n\nDT <- DT[start <= \"2010-01-01\"]\nDT[, age := round((as.Date(\"2010-01-01\") - DT$born) / 365.25, 1)][]\n\nAlternatively you could also do it like this (but it might be less\nefficient on a larger dataset since it first does the calculation and\nthen the subsetting; however, the date calculation in this example\nshould scale well in any case):\n\nDT[, age := round((as.Date(\"2010-01-01\") - DT$born) / 365.25, 1)][\n  start <= \"2010-01-01\"]\n\n\n\nOn 07/22/2014 10:49 PM, Frank S. wrote:\n> Hello everyone.  I?ve the following data table:\n> \n>  \n> \n> DT <- data.table(id=1:5,\n> \n>                \n> born=as.Date(c(\"1939-10-28\",\"1943-02-26\",\"1946-03-09\",\"1947-05-19\",\"1932-04-03\")),\n> \n>                \n> start=as.Date(c(\"2012-01-01\",\"1980-07-15\",\"1998-10-28\",\"2011-10-28\",\"2010-10-28\")),\n> \n>                \n> end=as.Date(c(\"2012-05-01\",\"2014-02-01\",\"2012-10-20\",\"2013-10-15\",\"2012-08-25\")))\n> \n>>DT\n> \n>    id       born      start        end\n> \n> 1:  1 1939-10-28 2012-01-01 2012-05-01\n> \n> 2:  2 1943-02-26 1980-07-15 2014-02-01\n> \n> 3:  3 1946-03-09 1998-10-28 2012-10-20\n> \n> 4:  4 1947-05-19 2011-10-28 2013-10-15\n> \n> 5:  5 1932-04-03 2010-10-28 2012-08-25\n> \n> I would like to be able to keep only those subjects whose ?start? date\n>  is previous to ?2010-01-01? date, and then calculate\n> \n> the age they were at 2010-01-01 in a newDT:\n> \n>  \n> \n>    id       born      start        end    age\n> \n> 2:  2 1943-02-26 1980-07-15 2014-02-01    66.8\n> \n> 3:  3 1946-03-09 1998-10-28 2012-10-20    63.8\n> \n>  \n> \n> I have:\n> \n>  \n> \n> newDT <- DT[, if(start <= as.Date(\"2010-01-01\")) {\n> \n> list(c(id, born, start, end, age=unclass(round(difftime(Apertura,\n> born)/365.25,1))))\n> \n> } ,\n> \n> by=c('id','born','start','end')]\n> \n>  \n> \n> But it appears an error message!  Can anyone please help me with this?\n> Thank you!\n> \n>  \n> \n>  \n> \n> \n> \n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>",
+      "body_snippet": "This gives the output in your example:\n\nDT <- DT[start <= \"2010-01-01\"]\nDT[, age := round((as.Date(\"2010-01-01\") - DT$born) / 365.25, 1)][]\n\nAlternatively you could also do it like this (but it might ",
+      "thread_id": "thread-561ea4feccb2",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-fdcc4b9a83ed",
+      "message_id": "<BAY181-W826F3A399D9E31BA15AAB5BAFF0@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-24T10:53:06Z",
+      "subject": "[datatable-help] Subsetting a data table and add a new column in one step",
+      "subject_clean": "[datatable-help] Subsetting a data table and add a new column in one step",
+      "in_reply_to": "<53CFAE8A.7040803@gmail.com>",
+      "references": [
+        "<BAY181-W94FF22404EA75056537DD1BAF10@phx.gbl>",
+        "<53CFAE8A.7040803@gmail.com>"
+      ],
+      "body_plain": "Michael, thank you very much for your detailed reply. Regards, Frank \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140724/c78813a2/attachment.html>",
+      "body_snippet": "Michael, thank you very much for your detailed reply. Regards, Frank \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pip",
+      "thread_id": "thread-561ea4feccb2",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-ed148ad69210",
+      "message_id": "<1406224074875-4694494.post@n4.nabble.com>",
+      "from_name": "jpbowman01",
+      "from_email_hash": "0d83653c7eebe37431fd8994ae24769bd009a37d9cd501334e511dbc26ecf0c8",
+      "date": "2014-07-24T17:47:54Z",
+      "subject": "[datatable-help] Cannot convert from data.frame to data.table inside RStudio",
+      "subject_clean": "[datatable-help] Cannot convert from data.frame to data.table inside RStudio",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "I'm running R 3.0.2 on CentOS, using data.table 1.9.2.  \n\nWhen I execute the following code inside command-line R immediately after\nstartup (no other packages loaded):\n\n> library(data.table)\ndata.table 1.9.2  For help type: help(\"data.table\")\n> foo <- data.frame(a=1:3, b=4:6)\n> foo\n  a b\n1 1 4\n2 2 5\n3 3 6\n> bar <- data.table(foo)\n\nall is well  When I execute the same code inside RStudio running on the same\nmachine, also immediately after startup, I get:\n\n> bar <- data.table(foo)\nError in chmatch(\"data.frame\", tt) : \n  Internal error: savetl_init checks failed (0 100 0x35c79d0 0x41657b0).\nPlease report to datatable-help.\n\nA lot of existing code suddenly broke from the point of view of being able\nto execute it inside RStudio as a result of this, although it still runs as\nproduction scripts.  Any help would be appreciated...\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/Cannot-convert-from-data-frame-to-data-table-inside-RStudio-tp4694494.html\nSent from the datatable-help mailing list archive at Nabble.com.",
+      "body_snippet": "I'm running R 3.0.2 on CentOS, using data.table 1.9.2.  \n\nWhen I execute the following code inside command-line R immediately after\nstartup (no other packages loaded):\n\n> library(data.table)\ndata.tabl",
+      "thread_id": "thread-ed148ad69210",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-a39e781707d2",
+      "message_id": "<1406231656643-4694497.post@n4.nabble.com>",
+      "from_name": "jpbowman01",
+      "from_email_hash": "0d83653c7eebe37431fd8994ae24769bd009a37d9cd501334e511dbc26ecf0c8",
+      "date": "2014-07-24T19:54:16Z",
+      "subject": "[datatable-help] Cannot convert from data.frame to data.table inside RStudio",
+      "subject_clean": "[datatable-help] Cannot convert from data.frame to data.table inside RStudio",
+      "in_reply_to": "<1406224074875-4694494.post@n4.nabble.com>",
+      "references": [
+        "<1406224074875-4694494.post@n4.nabble.com>"
+      ],
+      "body_plain": "Just to keep the solution to this problem available...\n\nIt turns out that if you have an integer in a data table = 2^31-1 and you\nsetkey on that variable, fail happens that sticks around after the failure\nand has some bizarre effects that don't look like they have anything to do\nwith your index attempt or even the data table which you were trying to\nindex, e.g., the error messages in the OP.   Earlier in the day I had done\nsuch a setkey; even with the data table deleted and working on toy problems,\nas in the OP, these errors will occur.\n\nI can clean out all the variables etc., but the failure persists in the\ncode, as some code appears to be overwritten when the attempt to index\noccurs.  In RStudio the solution (other than the obvious \"delete the\nobservation with the value that causes the problem\") is to restart R.  \n\nMore generally, the solution would be for the setkey function to check for\nvalues of 2^31-1 (or larger one assumes) on integer keys and fail\ngracefully.\n\n\n\n--\nView this message in context: http://r.789695.n4.nabble.com/Cannot-convert-from-data-frame-to-data-table-inside-RStudio-tp4694494p4694497.html\nSent from the datatable-help mailing list archive at Nabble.com.",
+      "body_snippet": "Just to keep the solution to this problem available...\n\nIt turns out that if you have an integer in a data table = 2^31-1 and you\nsetkey on that variable, fail happens that sticks around after the fai",
+      "thread_id": "thread-ed148ad69210",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-987b4b7668c5",
+      "message_id": "<CAF42hW6eEnkwHSN3knqptQMJFGOjqbHGdiHad3o2G82+WTSL2Q@mail.gmail.com>",
+      "from_name": "Francois Pepin",
+      "from_email_hash": "feb54ce910d0b21631b7611a937af27e280d38bd16f1e854a2b67285a9e956d4",
+      "date": "2014-07-25T01:27:12Z",
+      "subject": "[datatable-help] Fwd: problems with modifying colnames",
+      "subject_clean": "[datatable-help] Fwd: problems with modifying colnames",
+      "in_reply_to": "<CAF42hW7oF1GOpMX5OYSm+K9OqvR-g=vNOGT3iQ=ppPbWpsYUHw@mail.gmail.com>",
+      "references": [
+        "<CAF42hW6kiyfX=ayzYJUWoSOJEjKpBVMyW7BM43TJ_S2CNE3WNg@mail.gmail.com>",
+        "<CAF42hW7oF1GOpMX5OYSm+K9OqvR-g=vNOGT3iQ=ppPbWpsYUHw@mail.gmail.com>"
+      ],
+      "body_plain": "Hi everyone,\n\nI?m hitting a weird bug which I think might be data.table?s fault.\n\nx<-data.table(a=1,b=2)\nxn<-colnames(x)\nxn\n#[1] \"a\" \"b\"\nx[,c:=3]\nxn\n[1] \"a\" \"b\" \"c\"\n\n\nI would expect xn to stay the same value even if we change the columns in x.\n\nThere?s an easy workaround with copy(xn), but it?s weird and\nsurprising enough that I wanted to let others know about it.\n\nCould someone check to see if this is reproducible? I?ll be happy to\nfile the bug report if it?s a genuine bug.\n\nThanks,\n\nFrancois\n\nR version 3.1.0 (2014-04-10)\nPlatform: x86_64-unknown-linux-gnu (64-bit)\n\nlocale:\n[1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C\n[3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8\n[5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8\n[7] LC_PAPER=en_US.UTF-8       LC_NAME=C\n[9] LC_ADDRESS=C               LC_TELEPHONE=C\n[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C\n\nattached base packages:\n[1] stats     graphics  grDevices utils     datasets  methods   base\n\nother attached packages:\n[1] data.table_1.9.3\n\nloaded via a namespace (and not attached):\n[1] plyr_1.8.1    Rcpp_0.11.2   reshape2_1.4  stringr_0.6.2",
+      "body_snippet": "Hi everyone,\n\nI?m hitting a weird bug which I think might be data.table?s fault.\n\nx<-data.table(a=1,b=2)\nxn<-colnames(x)\nxn\n#[1] \"a\" \"b\"\nx[,c:=3]\nxn\n[1] \"a\" \"b\" \"c\"\n\n\nI would expect xn to stay the sam",
+      "thread_id": "thread-987b4b7668c5",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-c2dbceb560d3",
+      "message_id": "<6FB5193A6CDCDF499486A833B7AFBDCDCD8F2ACE@ex-mbx-pro-05>",
+      "from_name": "Michael Nelson",
+      "from_email_hash": "7ee6a0ae5f8c722354f0d92dd5a0b2d518e551bcefff0f6f6d8a52c0af96bf88",
+      "date": "2014-07-25T02:41:19Z",
+      "subject": "[datatable-help] Fwd: problems with modifying colnames",
+      "subject_clean": "[datatable-help] Fwd: problems with modifying colnames",
+      "in_reply_to": "<CAF42hW6eEnkwHSN3knqptQMJFGOjqbHGdiHad3o2G82+WTSL2Q@mail.gmail.com>",
+      "references": [
+        "<CAF42hW6kiyfX=ayzYJUWoSOJEjKpBVMyW7BM43TJ_S2CNE3WNg@mail.gmail.com>",
+        "<CAF42hW7oF1GOpMX5OYSm+K9OqvR-g=vNOGT3iQ=ppPbWpsYUHw@mail.gmail.com>",
+        "<CAF42hW6eEnkwHSN3knqptQMJFGOjqbHGdiHad3o2G82+WTSL2Q@mail.gmail.com>"
+      ],
+      "body_plain": "This is a known issue\n\nhttps://github.com/Rdatatable/data.table/issues/512\n\n\n________________________________________\nFrom: datatable-help-bounces at lists.r-forge.r-project.org [datatable-help-bounces at lists.r-forge.r-project.org] on behalf of Francois Pepin [fpepin at gmail.com]\nSent: Friday, 25 July 2014 11:27 AM\nTo: datatable-help at lists.r-forge.r-project.org\nSubject: [datatable-help] Fwd: problems with modifying colnames\n\nHi everyone,\n\nI?m hitting a weird bug which I think might be data.table?s fault.\n\nx<-data.table(a=1,b=2)\nxn<-colnames(x)\nxn\n#[1] \"a\" \"b\"\nx[,c:=3]\nxn\n[1] \"a\" \"b\" \"c\"\n\n\nI would expect xn to stay the same value even if we change the columns in x.\n\nThere?s an easy workaround with copy(xn), but it?s weird and\nsurprising enough that I wanted to let others know about it.\n\nCould someone check to see if this is reproducible? I?ll be happy to\nfile the bug report if it?s a genuine bug.\n\nThanks,\n\nFrancois\n\nR version 3.1.0 (2014-04-10)\nPlatform: x86_64-unknown-linux-gnu (64-bit)\n\nlocale:\n[1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C\n[3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8\n[5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8\n[7] LC_PAPER=en_US.UTF-8       LC_NAME=C\n[9] LC_ADDRESS=C               LC_TELEPHONE=C\n[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C\n\nattached base packages:\n[1] stats     graphics  grDevices utils     datasets  methods   base\n\nother attached packages:\n[1] data.table_1.9.3\n\nloaded via a namespace (and not attached):\n[1] plyr_1.8.1    Rcpp_0.11.2   reshape2_1.4  stringr_0.6.2\n_______________________________________________\ndatatable-help mailing list\ndatatable-help at lists.r-forge.r-project.org\nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help",
+      "body_snippet": "This is a known issue\n\nhttps://github.com/Rdatatable/data.table/issues/512\n\n\n________________________________________\nFrom: datatable-help-bounces at lists.r-forge.r-project.org [datatable-help-bounce",
+      "thread_id": "thread-987b4b7668c5",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-7d9925303526",
+      "message_id": "<BAY168-W53FA248F06353915DE86D1BAFC0@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-25T12:29:59Z",
+      "subject": "[datatable-help] New column with conditions for first and last observation by id group",
+      "subject_clean": "[datatable-help] New column with conditions for first and last observation by id group",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi all, I'm very novice in data.table management, and I have the following doubt about this data: > DT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))> DT   obs id time1:   1  1    32:   2  1    43:   3  1    74:   4  4    55:   5  4    86:   6  4   107:   7  4   15 In general, I know that I can select respectively the first and the last observation within \"id\" group with:   First observation: DT[!duplicated(id)] Last observation: DT[!duplicated(id, fromLast=T)]  But, how can I add a new column, called \"value\", which contains all zeros except:1) The first observation within each \"id\" group, which is equal to 22) The last observation within each \"id\" group, which is equal to 1 ?    obs id time value1:   1  1    3     22:   2  1    4     03:   3  1    7     14:   4  4    5     25:   5  4    8     06:   6  4   10     07:   7  4   15     1 I've tried with conditionslas, ifelse, etc, but I get an error message. Please, can you help me? Thanks in advance!!            \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140725/cca9c657/attachment.html>",
+      "body_snippet": "Hi all, I'm very novice in data.table management, and I have the following doubt about this data: > DT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))> DT   obs id time1:   1  1  ",
+      "thread_id": "thread-7d9925303526",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-e28bf70d694b",
+      "message_id": "<CAMjp+0dz0R-3qOdoxGR01XTR0rpPk33yO1t=G1QQQm98V2WmmQ@mail.gmail.com>",
+      "from_name": "Matthew DeAngelis",
+      "from_email_hash": "4d9c900215ffc0016dba7d4e7416a9346fa96c1f91198785c131322b2aa5063c",
+      "date": "2014-07-25T13:25:05Z",
+      "subject": "[datatable-help] New column with conditions for first and last observation by id group",
+      "subject_clean": "[datatable-help] New column with conditions for first and last observation by id group",
+      "in_reply_to": "<BAY168-W53FA248F06353915DE86D1BAFC0@phx.gbl>",
+      "references": [
+        "<BAY168-W53FA248F06353915DE86D1BAFC0@phx.gbl>"
+      ],
+      "body_plain": "Hi Frank,\n\nNot sure about a one-liner, but this seems to do what you want:\n\n> DT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))\n> DT[,value:=0]\n> DT[!duplicated(id),value:=2]\n> DT[!duplicated(id,fromLast=T),value:=1]\n> DT\n\n   obs id time value\n1:   1  1    3     2\n2:   2  1    4     0\n3:   3  1    7     1\n4:   4  4    5     2\n5:   5  4    8     0\n6:   6  4   10    0\n7:   7  4   15    1\n\nSeems too straightforward, though, so maybe I am missing something about\nyour problem. Please elaborate if so.\n\n\nRegards,\nMatt\n\n\nOn Fri, Jul 25, 2014 at 8:29 AM, Frank S. <f_j_rod at hotmail.com> wrote:\n\n> Hi all, I'm very novice in data.table management, and I have the\n> following doubt about this data:\n>\n>\n>\n> > DT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))\n> > DT\n>    obs id time\n> 1:   1  1    3\n> 2:   2  1    4\n> 3:   3  1    7\n> 4:   4  4    5\n> 5:   5  4    8\n> 6:   6  4   10\n> 7:   7  4   15\n>\n>\n>\n> In general, I know that I can select respectively the first and the last\n> observation within \"id\" group with:\n>\n>\n>\n> First observation: *DT[!duplicated(id)] *\n>\n> Last observation:* DT[!duplicated(id, fromLast=T)] *\n>\n>\n>\n> But, how can I add a new column, called \"value\", which contains all zeros\n> except:\n>\n> 1) The first observation within each \"id\" group, which is equal to 2\n>\n> 2) The last observation within each \"id\" group, which is equal to 1 ?\n>\n>\n>\n>    obs id time value\n> 1:   1  1    3     2\n> 2:   2  1    4     0\n> 3:   3  1    7     1\n> 4:   4  4    5     2\n> 5:   5  4    8     0\n> 6:   6  4   10     0\n> 7:   7  4   15     1\n>\n>\n>\n> I've tried with conditionslas, ifelse, etc, but I get an error message.\n> Please, can you help me?\n>\n>\n>\n> Thanks in advance!!\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n>\n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140725/2a7e4247/attachment.html>",
+      "body_snippet": "Hi Frank,\n\nNot sure about a one-liner, but this seems to do what you want:\n\n> DT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))\n> DT[,value:=0]\n> DT[!duplicated(id),value:=2]\n> D",
+      "thread_id": "thread-7d9925303526",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-94fa09d198ea",
+      "message_id": "<53D25ABA.5000109@gmail.com>",
+      "from_name": "Michael Smith",
+      "from_email_hash": "a7e1151e628d8816b7bab185f82d3d0b8e635db81353cc0fe989960cea37147b",
+      "date": "2014-07-25T13:25:14Z",
+      "subject": "[datatable-help] New column with conditions for first and last observation by id group",
+      "subject_clean": "[datatable-help] New column with conditions for first and last observation by id group",
+      "in_reply_to": "<BAY168-W53FA248F06353915DE86D1BAFC0@phx.gbl>",
+      "references": [
+        "<BAY168-W53FA248F06353915DE86D1BAFC0@phx.gbl>"
+      ],
+      "body_plain": "This seems to work:\n\nDT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))\nDT[, value := 0]\nDT[!duplicated(id), value := 2]\nDT[!duplicated(id, fromLast = T), value := 1]\n\n\n\nOn 07/25/2014 08:29 PM, Frank S. wrote:\n> Hi all, I'm very novice in data.table management, and I have the\n> following doubt about this data:\n> \n>  \n> \n>> DT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))\n>> DT\n>    obs id time\n> 1:   1  1    3\n> 2:   2  1    4\n> 3:   3  1    7\n> 4:   4  4    5\n> 5:   5  4    8\n> 6:   6  4   10\n> 7:   7  4   15\n> \n>  \n> \n> In general, I know that I can select respectively the first and the last\n> observation within \"id\" group with:  \n> \n>  \n> \n> First observation: /DT[!duplicated(id)] /\n> \n> Last observation:/DT[!duplicated(id, fromLast=T)] /\n> \n>  \n> \n> But, how can I add a new column, called \"value\", which contains all\n> zeros except:\n> \n> 1) The first observation within each \"id\" group, which is equal to 2\n> \n> 2) The last observation within each \"id\" group, which is equal to 1 ?\n> \n>  \n> \n>    obs id time value\n> 1:   1  1    3     2\n> 2:   2  1    4     0\n> 3:   3  1    7     1\n> 4:   4  4    5     2\n> 5:   5  4    8     0\n> 6:   6  4   10     0\n> 7:   7  4   15     1\n> \n>  \n> \n> I've tried with conditionslas, ifelse, etc, but I get an error message.\n> Please, can you help me?\n> \n>  \n> \n> Thanks in advance!!\n> \n>  \n> \n>  \n> \n>  \n> \n>  \n> \n>  \n> \n>  \n> \n>  \n> \n>  \n> \n>  \n> \n>  \n> \n>  \n> \n> \n> \n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>",
+      "body_snippet": "This seems to work:\n\nDT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))\nDT[, value := 0]\nDT[!duplicated(id), value := 2]\nDT[!duplicated(id, fromLast = T), value := 1]\n\n\n\nOn 07/25/",
+      "thread_id": "thread-7d9925303526",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-a27f89425f49",
+      "message_id": "<BAY168-W46510B00F8308BC160E5EBBAFC0@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-25T15:24:36Z",
+      "subject": "[datatable-help] New column with conditions for first and last observation by id group",
+      "subject_clean": "[datatable-help] New column with conditions for first and last observation by id group",
+      "in_reply_to": "<53D25ABA.5000109@gmail.com>",
+      "references": [
+        "<BAY168-W53FA248F06353915DE86D1BAFC0@phx.gbl>",
+        "<53D25ABA.5000109@gmail.com>"
+      ],
+      "body_plain": "Thank you Michael !! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140725/ab8f6080/attachment.html>",
+      "body_snippet": "Thank you Michael !! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140725/ab8f6",
+      "thread_id": "thread-7d9925303526",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-15251733df4c",
+      "message_id": "<53D2F308.9050305@gmail.com>",
+      "from_name": "Michael Smith",
+      "from_email_hash": "a7e1151e628d8816b7bab185f82d3d0b8e635db81353cc0fe989960cea37147b",
+      "date": "2014-07-26T00:15:04Z",
+      "subject": "[datatable-help] New column with conditions for first and last observation by id group",
+      "subject_clean": "[datatable-help] New column with conditions for first and last observation by id group",
+      "in_reply_to": "<BAY168-W46510B00F8308BC160E5EBBAFC0@phx.gbl>",
+      "references": [
+        "<BAY168-W53FA248F06353915DE86D1BAFC0@phx.gbl>",
+        "<53D25ABA.5000109@gmail.com>",
+        "<BAY168-W46510B00F8308BC160E5EBBAFC0@phx.gbl>"
+      ],
+      "body_plain": "Actually, Matthew DeAngelis beat me by a few seconds, so props to him.\n\nBut here's another solution that makes use of a keyed table, which might\nbe a bit faster if your data is large (although the previous solution\nshould also be fine for larger data).\n\nDT <- data.table(obs=1:7, id=c(1,1,1,4,4,4,4), time=c(3,4,7,5,8,10,15))\nDT[, value := 0]\nsetkey(DT, id)\nDT[DT[, .I[1], by = key(DT)]$V1, value := 2]\nDT[DT[, .I[.N], by = key(DT)]$V1, value := 1]\nDT\n\n\n\nOn 07/25/2014 11:24 PM, Frank S. wrote:\n> Thank you Michael !!\n>",
+      "body_snippet": "Actually, Matthew DeAngelis beat me by a few seconds, so props to him.\n\nBut here's another solution that makes use of a keyed table, which might\nbe a bit faster if your data is large (although the pre",
+      "thread_id": "thread-7d9925303526",
+      "thread_depth": 3,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-42db9a64c08a",
+      "message_id": "<etPan.53d41b5f.238e1f29.152@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-26T21:19:27Z",
+      "subject": "[datatable-help] Cannot convert from data.frame to data.table inside RStudio",
+      "subject_clean": "[datatable-help] Cannot convert from data.frame to data.table inside RStudio",
+      "in_reply_to": "<1406231656643-4694497.post@n4.nabble.com>",
+      "references": [
+        "<1406224074875-4694494.post@n4.nabble.com>",
+        "<1406231656643-4694497.post@n4.nabble.com>"
+      ],
+      "body_plain": "Hi John,\n\nSorry, but I am not able to reproduce the issue on my mac. You say you're using CentOS. Is it possible for you test it on other systems and see if they're reproducible? Also, is the example you provided in the first post also giving the error, or is it restricted to 2^31-1 as you mention in your second post? If so, could you provide another minimal reproducible example?\n\nLastly, could you also try installing the latest version of data.table from the github page and see if the issue is fixed?\n\nBest,\nArun\n\nFrom:?jpbowman01 john at therandomco.com\nReply:?jpbowman01 john at therandomco.com\nDate:?July 24, 2014 at 9:54:33 PM\nTo:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org\nSubject:? Re: [datatable-help] Cannot convert from data.frame to data.table inside RStudio  \n\nJust to keep the solution to this problem available...  \n\nIt turns out that if you have an integer in a data table = 2^31-1 and you  \nsetkey on that variable, fail happens that sticks around after the failure  \nand has some bizarre effects that don't look like they have anything to do  \nwith your index attempt or even the data table which you were trying to  \nindex, e.g., the error messages in the OP. Earlier in the day I had done  \nsuch a setkey; even with the data table deleted and working on toy problems,  \nas in the OP, these errors will occur.  \n\nI can clean out all the variables etc., but the failure persists in the  \ncode, as some code appears to be overwritten when the attempt to index  \noccurs. In RStudio the solution (other than the obvious \"delete the  \nobservation with the value that causes the problem\") is to restart R.  \n\nMore generally, the solution would be for the setkey function to check for  \nvalues of 2^31-1 (or larger one assumes) on integer keys and fail  \ngracefully.  \n\n\n\n--  \nView this message in context: http://r.789695.n4.nabble.com/Cannot-convert-from-data-frame-to-data-table-inside-RStudio-tp4694494p4694497.html  \nSent from the datatable-help mailing list archive at Nabble.com.  \n_______________________________________________  \ndatatable-help mailing list  \ndatatable-help at lists.r-forge.r-project.org  \nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140726/d0bbb19c/attachment.html>",
+      "body_snippet": "Hi John,\n\nSorry, but I am not able to reproduce the issue on my mac. You say you're using CentOS. Is it possible for you test it on other systems and see if they're reproducible? Also, is the example ",
+      "thread_id": "thread-ed148ad69210",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-e51200858d8f",
+      "message_id": "<BAY168-W34A17BD61D394D7F39CFA8BAFB0@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-28T08:57:14Z",
+      "subject": "[datatable-help] New column with conditions for first and last observation by id group",
+      "subject_clean": "[datatable-help] New column with conditions for first and last observation by id group",
+      "in_reply_to": "<53D2F308.9050305@gmail.com>",
+      "references": [
+        "<BAY168-W53FA248F06353915DE86D1BAFC0@phx.gbl>",
+        "<53D25ABA.5000109@gmail.com>",
+        "<BAY168-W46510B00F8308BC160E5EBBAFC0@phx.gbl>",
+        "<53D2F308.9050305@gmail.com>"
+      ],
+      "body_plain": "Thanks Mathew and Michael for your accurate answers! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140728/7369127a/attachment.html>",
+      "body_snippet": "Thanks Mathew and Michael for your accurate answers! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable",
+      "thread_id": "thread-7d9925303526",
+      "thread_depth": 4,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-fba7e6579d68",
+      "message_id": "<BAY168-W101FDC5C0C95C953F9CB2CBBAFB0@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-28T12:24:14Z",
+      "subject": "[datatable-help] fread statement for a long data table",
+      "subject_clean": "[datatable-help] fread statement for a long data table",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi all, I've a data base in txt file, which contains approximately  1.5 million observations and 18 variables. The aspect of two of the observationsis the following: 345~X~99~30/10/1950~89000~784~ERVY LE CHATEL, RUE~9~AUXERRE~08500~410005~VISITE MEDICALE~20/03/1998~20~UROLOGIE~9~VISITES~5~ 67895~J~102~28/05/1967~89000~359~CHATILLON SUR SEIENE, RUE~10~AUXERRE~08340~560025~ASSURANCE-CR?DIT~15/09/1997~25~UROLOGIE~1~VISITES~5~ So, as you can see, the columns are separated by \"~\" symbol, but there is also other symbols: \",\", \"-\", written accents, ...  inside some descriptive variables. I execute: data <- fread('data.txt',autostart=60) The R gives an error message in one row Error en fread(\"data.txt\", autostart = 60) :   Expected sep (',') but '' ends field 1 on line 1 when detecting types: Please, anyone can help me? \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140728/2b6ca0a6/attachment.html>",
+      "body_snippet": "Hi all, I've a data base in txt file, which contains approximately  1.5 million observations and 18 variables. The aspect of two of the observationsis the following: 345~X~99~30/10/1950~89000~784~ERVY",
+      "thread_id": "thread-fba7e6579d68",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-74f0dbd3aaaf",
+      "message_id": "<53D64534.8000405@gmail.com>",
+      "from_name": "Michael Smith",
+      "from_email_hash": "a7e1151e628d8816b7bab185f82d3d0b8e635db81353cc0fe989960cea37147b",
+      "date": "2014-07-28T12:42:28Z",
+      "subject": "[datatable-help] fread statement for a long data table",
+      "subject_clean": "[datatable-help] fread statement for a long data table",
+      "in_reply_to": "<BAY168-W101FDC5C0C95C953F9CB2CBBAFB0@phx.gbl>",
+      "references": [
+        "<BAY168-W101FDC5C0C95C953F9CB2CBBAFB0@phx.gbl>"
+      ],
+      "body_plain": "Does it help if you set `sep=\"~\"`, i.e.\n\nfread(\"data.txt\", sep = \"~\")\n\n\n\nOn 07/28/2014 08:24 PM, Frank S. wrote:\n> Hi all,\n> \n>  \n> \n> I've a data base in txt file, which contains approximately **1.5 million\n> observations and 18 variables. The aspect of two of the observations\n> \n> is the following:\n> \n>  \n> \n> 345~X~99~30/10/1950~89000~784~ERVY LE CHATEL,\n> RUE~9~AUXERRE~08500~410005~VISITE\n> MEDICALE~20/03/1998~20~UROLOGIE~9~VISITES~5~\n> \n>  \n> \n> 67895~J~102~28/05/1967~89000~359~CHATILLON SUR SEIENE,\n> RUE~10~AUXERRE~08340~560025~ASSURANCE-CR?DIT~15/09/1997~25~UROLOGIE~1~VISITES~5~\n> \n>  \n> \n> So, as you can see, the columns are separated by \"~\" symbol, but there\n> is also other symbols: \",\", \"-\", written accents, ...  inside some\n> descriptive variables. I execute:\n> \n>  \n> \n> data <- fread('data.txt',autostart=60)\n> \n>  \n> \n> The R gives an error message in one row\n> \n>  \n> \n> Error en fread(\"data.txt\", autostart = 60) :\n>   Expected sep (',') but '' ends field 1 on line 1 when detecting types:\n> \n>  \n> \n> Please, anyone can help me?\n> \n> \n> \n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>",
+      "body_snippet": "Does it help if you set `sep=\"~\"`, i.e.\n\nfread(\"data.txt\", sep = \"~\")\n\n\n\nOn 07/28/2014 08:24 PM, Frank S. wrote:\n> Hi all,\n> \n>  \n> \n> I've a data base in txt file, which contains approximately **1.5 ",
+      "thread_id": "thread-fba7e6579d68",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-06494dffb75c",
+      "message_id": "<53D64DE6.4010905@gmail.com>",
+      "from_name": "Michael Smith",
+      "from_email_hash": "a7e1151e628d8816b7bab185f82d3d0b8e635db81353cc0fe989960cea37147b",
+      "date": "2014-07-28T13:19:34Z",
+      "subject": "[datatable-help] 1.9.4 Release Date",
+      "subject_clean": "[datatable-help] 1.9.4 Release Date",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Just curious: Approximately when will version 1.9.4 be released?\n\nM",
+      "body_snippet": "Just curious: Approximately when will version 1.9.4 be released?\n\nM",
+      "thread_id": "thread-06494dffb75c",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-63e2f59714c0",
+      "message_id": "<BAY168-W1377AF5308FE9E65FBE227FBAFB0@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-28T16:25:19Z",
+      "subject": "[datatable-help] FW:  fread statement for a long data table",
+      "subject_clean": "[datatable-help] FW:  fread statement for a long data table",
+      "in_reply_to": "<BAY168-W111349197A3F9B21902898EBAFB0@phx.gbl>",
+      "references": [
+        "<BAY168-W101FDC5C0C95C953F9CB2CBBAFB0@phx.gbl>",
+        "<53D64534.8000405@gmail.com>",
+        "<BAY168-W111349197A3F9B21902898EBAFB0@phx.gbl>"
+      ],
+      "body_plain": "Hi Michael, As you suggest, I execute: > data <- fread('data.txt',sep='~') But it still appears an (incomplete) error message:Error en fread(\"data.txt\", sep = \"~\") : Expected sep ('~') but 'I do not know the reason.  \t\t \t   \t\t   \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140728/35a65abb/attachment.html>",
+      "body_snippet": "Hi Michael, As you suggest, I execute: > data <- fread('data.txt',sep='~') But it still appears an (incomplete) error message:Error en fread(\"data.txt\", sep = \"~\") : Expected sep ('~') but 'I do not k",
+      "thread_id": "thread-63e2f59714c0",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-db0cf80c22a8",
+      "message_id": "<etPan.53d679ba.12200854.152@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-28T16:26:34Z",
+      "subject": "[datatable-help] FW: fread statement for a long data table",
+      "subject_clean": "[datatable-help] FW: fread statement for a long data table",
+      "in_reply_to": "<BAY168-W1377AF5308FE9E65FBE227FBAFB0@phx.gbl>",
+      "references": [
+        "<BAY168-W101FDC5C0C95C953F9CB2CBBAFB0@phx.gbl>",
+        "<53D64534.8000405@gmail.com>",
+        "<BAY168-W111349197A3F9B21902898EBAFB0@phx.gbl>",
+        "<BAY168-W1377AF5308FE9E65FBE227FBAFB0@phx.gbl>"
+      ],
+      "body_plain": "Could you try it with the github version of data.table? It seems to load fine by specifying separator on 1.9.3.\nArun\n\nFrom:?Frank S. f_j_rod at hotmail.com\nReply:?Frank S. f_j_rod at hotmail.com\nDate:?July 28, 2014 at 6:25:32 PM\nTo:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org, my.r.help at gmail.com my.r.help at gmail.com\nSubject:? [datatable-help] FW: fread statement for a long data table  \n\nHi Michael,\n\n?\n\nAs you suggest, I execute:\n\n?\n\n>?data <- fread('data.txt',sep='~')\n\n?\n\nBut it still appears an (incomplete) error message:\n\n\nError en fread(\"data.txt\", sep = \"~\") : Expected sep ('~') but '\n\nI do not know the reason.\n\n_______________________________________________  \ndatatable-help mailing list  \ndatatable-help at lists.r-forge.r-project.org  \nhttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140728/77d59f15/attachment.html>",
+      "body_snippet": "Could you try it with the github version of data.table? It seems to load fine by specifying separator on 1.9.3.\nArun\n\nFrom:?Frank S. f_j_rod at hotmail.com\nReply:?Frank S. f_j_rod at hotmail.com\nDate:",
+      "thread_id": "thread-63e2f59714c0",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-16b948b868c2",
+      "message_id": "<BAY168-W105BA9A1181BF582DB32289BAFB0@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-28T17:06:42Z",
+      "subject": "[datatable-help] FW:   fread statement for a long data table",
+      "subject_clean": "[datatable-help] FW:   fread statement for a long data table",
+      "in_reply_to": "<BAY168-W105301CA499535F8D3DD98CBAFB0@phx.gbl>",
+      "references": [
+        "<BAY168-W101FDC5C0C95C953F9CB2CBBAFB0@phx.gbl>",
+        "<53D64534.8000405@gmail.com>",
+        "<BAY168-W111349197A3F9B21902898EBAFB0@phx.gbl>",
+        "<BAY168-W1377AF5308FE9E65FBE227FBAFB0@phx.gbl>",
+        "<etPan.53d679ba.12200854.152@Arunkumars-MacBook-Pro.local>",
+        "<BAY168-W105301CA499535F8D3DD98CBAFB0@phx.gbl>"
+      ],
+      "body_plain": "From: f_j_rod at hotmail.comTo: aragorn168b at gmail.comSubject: RE: [datatable-help] FW: fread statement for a long data tableDate: Mon, 28 Jul 2014 19:06:09 +0200\n\n\nHi Arunkumar, I can not install version 1.9.3 of data table package. I download data-table-master.zip from web: https://github.com/Rdatatable/data.table/ And the I execute the following lines: require(devtools)install_github(\"data.table\", \"Rdatatable\") But it appears an error message: Installing github repo data.table/master from RdatatableDownloading master.zip from https://github.com/Rdatatable/data.table/archive/master.zipInstalling package from c:\\TEMP\\Rtmpq40Zag/master.zipInstalling data.table\"C:/PROGRA~1/R/R-31~1.1/bin/x64/R\" --vanilla CMD build \"c:\\TEMP\\Rtmpq40Zag\\devtools13984b0b7a1b\\data.table-master\" --no-manual --no-resave-data * checking for file 'c:\\TEMP\\Rtmpq40Zag\\devtools13984b0b7a1b\\data.table-master/DESCRIPTION' ... OK* preparing 'data.table':* checking DESCRIPTION meta-information ... OK* cleaning src* installing the package to build vignettesWarning: running command '\"C:/PROGRA~1/R/R-31~1.1/bin/x64/Rcmd.exe\" INSTALL -l \"c:\\TEMP\\RtmpIPAerX\\Rinst10886f22ec\" --no-multiarch \"c:/TEMP/RtmpIPAerX/Rbuild108834cd355/data.table\"' had status 1      -----------------------------------* installing *source* package 'data.table' ...** libsWarning: running command 'make -f \"Makevars\" -f \"C:/PROGRA~1/R/R-31~1.1/etc/x64/Makeconf\" -f \"C:/PROGRA~1/R/R-31~1.1/share/make/winshlib.mk\" SHLIB=\"data.table.dll\" WIN=64 TCLBIN=64 OBJECTS=\"assign.o bmerge.o chmatch.o dogroups.o fastmean.o fastradixdouble.o fastradixint.o fcast.o fmelt.o forder.o fread.o gsumm.o init.o rbindlist.o reorder.o uniqlist.o vecseq.o wrappers.o\"' had status 127ERROR: compilation failed for package 'data.table'* removing 'c:/TEMP/RtmpIPAerX/Rinst10886f22ec/data.table'      -----------------------------------ERROR: package installation failedError: Command failed (1) \t\t \t   \t\t   \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140728/cf065973/attachment-0001.html>",
+      "body_snippet": "From: f_j_rod at hotmail.comTo: aragorn168b at gmail.comSubject: RE: [datatable-help] FW: fread statement for a long data tableDate: Mon, 28 Jul 2014 19:06:09 +0200\n\n\nHi Arunkumar, I can not install v",
+      "thread_id": "thread-16b948b868c2",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-5684f8f71af1",
+      "message_id": "<etPan.53d6944f.216231b.152@Arunkumars-MacBook-Pro.local>",
+      "from_name": "Arunkumar Srinivasan",
+      "from_email_hash": "161b08698bb7d5e3dc39a19a70101f6fbe0911bac35adf8f416025c38e8b4dc0",
+      "date": "2014-07-28T18:19:59Z",
+      "subject": "[datatable-help] FW:  fread statement for a long data table",
+      "subject_clean": "[datatable-help] FW:  fread statement for a long data table",
+      "in_reply_to": "<BAY168-W105BA9A1181BF582DB32289BAFB0@phx.gbl>",
+      "references": [
+        "<BAY168-W101FDC5C0C95C953F9CB2CBBAFB0@phx.gbl>",
+        "<53D64534.8000405@gmail.com>",
+        "<BAY168-W111349197A3F9B21902898EBAFB0@phx.gbl>",
+        "<BAY168-W1377AF5308FE9E65FBE227FBAFB0@phx.gbl>",
+        "<etPan.53d679ba.12200854.152@Arunkumars-MacBook-Pro.local>",
+        "<BAY168-W105301CA499535F8D3DD98CBAFB0@phx.gbl>",
+        "<BAY168-W105BA9A1181BF582DB32289BAFB0@phx.gbl>"
+      ],
+      "body_plain": "Looking at this post:?https://github.com/Rdatatable/data.table/issues/740\nIt seems to me that updating to the newest Rtools might be worth a try. Also try installing with `build_vignettes=FALSE` argument to the `install_github` function?\nHopefully either of these resolves it for you.\n\nArun\n\nFrom:?Frank S. f_j_rod at hotmail.com\nReply:?Frank S. f_j_rod at hotmail.com\nDate:?July 28, 2014 at 7:06:59 PM\nTo:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org, aragorn168b at gmail.com aragorn168b at gmail.com\nSubject:? FW: [datatable-help] fread statement for a long data table  \n\n\n?\n\nFrom: f_j_rod at hotmail.com\nTo: aragorn168b at gmail.com\nSubject: RE: [datatable-help] FW: fread statement for a long data table\nDate: Mon, 28 Jul 2014 19:06:09 +0200\n\nHi Arunkumar,\n\n?\n\nI can not install version 1.9.3 of data table package. I download data-table-master.zip from web:\n\n?\n\nhttps://github.com/Rdatatable/data.table/\n?\n\nAnd the I execute the following lines:\n\n?\n\nrequire(devtools)\ninstall_github(\"data.table\", \"Rdatatable\")\n\n?\n\nBut it appears an error message:\n\n?\n\nInstalling github repo data.table/master from Rdatatable\nDownloading master.zip from https://github.com/Rdatatable/data.table/archive/master.zip\nInstalling package from c:\\TEMP\\Rtmpq40Zag/master.zip\nInstalling data.table\n\"C:/PROGRA~1/R/R-31~1.1/bin/x64/R\" --vanilla CMD build \"c:\\TEMP\\Rtmpq40Zag\\devtools13984b0b7a1b\\data.table-master\" --no-manual --no-resave-data\n\n* checking for file 'c:\\TEMP\\Rtmpq40Zag\\devtools13984b0b7a1b\\data.table-master/DESCRIPTION' ... OK\n* preparing 'data.table':\n* checking DESCRIPTION meta-information ... OK\n* cleaning src\n* installing the package to build vignettes\nWarning: running command '\"C:/PROGRA~1/R/R-31~1.1/bin/x64/Rcmd.exe\" INSTALL -l \"c:\\TEMP\\RtmpIPAerX\\Rinst10886f22ec\" --no-multiarch \"c:/TEMP/RtmpIPAerX/Rbuild108834cd355/data.table\"' had status 1\n????? -----------------------------------\n* installing *source* package 'data.table' ...\n** libs\nWarning: running command 'make -f \"Makevars\" -f \"C:/PROGRA~1/R/R-31~1.1/etc/x64/Makeconf\" -f \"C:/PROGRA~1/R/R-31~1.1/share/make/winshlib.mk\" SHLIB=\"data.table.dll\" WIN=64 TCLBIN=64 OBJECTS=\"assign.o bmerge.o chmatch.o dogroups.o fastmean.o fastradixdouble.o fastradixint.o fcast.o fmelt.o forder.o fread.o gsumm.o init.o rbindlist.o reorder.o uniqlist.o vecseq.o wrappers.o\"' had status 127\nERROR: compilation failed for package 'data.table'\n* removing 'c:/TEMP/RtmpIPAerX/Rinst10886f22ec/data.table'\n????? -----------------------------------\nERROR: package installation failed\nError: Command failed (1)\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140728/043d49e5/attachment.html>",
+      "body_snippet": "Looking at this post:?https://github.com/Rdatatable/data.table/issues/740\nIt seems to me that updating to the newest Rtools might be worth a try. Also try installing with `build_vignettes=FALSE` argum",
+      "thread_id": "thread-16b948b868c2",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-7edcf2e5eba3",
+      "message_id": "<CAP=9f+oGJsQjdnSE0vbemQR4tm-2QQPnsownFiaytcJpe2FySg@mail.gmail.com>",
+      "from_name": "carrieromichele",
+      "from_email_hash": "cfdd8b32871ad0c6a3c128d1dde60397ec84feca74dbba1bc98e0210c0482ea2",
+      "date": "2014-07-29T00:07:37Z",
+      "subject": "[datatable-help] 1.9.4 Release Date",
+      "subject_clean": "[datatable-help] 1.9.4 Release Date",
+      "in_reply_to": "<53D64DE6.4010905@gmail.com>",
+      "references": [
+        "<53D64DE6.4010905@gmail.com>"
+      ],
+      "body_plain": "Check this link for what needs to be fixed/implemented before 1.9.4\n\nhttps://github.com/Rdatatable/data.table/milestones/v1.9.4\n\nMichele\n\n\n\n\nOn 28 July 2014 14:19, Michael Smith <my.r.help at gmail.com> wrote:\n\n> Just curious: Approximately when will version 1.9.4 be released?\n>\n> M\n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help\n>\n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140729/23ce388a/attachment.html>",
+      "body_snippet": "Check this link for what needs to be fixed/implemented before 1.9.4\n\nhttps://github.com/Rdatatable/data.table/milestones/v1.9.4\n\nMichele\n\n\n\n\nOn 28 July 2014 14:19, Michael Smith <my.r.help at gmail.co",
+      "thread_id": "thread-06494dffb75c",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-ab06fd8a30b4",
+      "message_id": "<BAY168-W654E9B9D44A30FFAD137A9BAF80@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-29T16:15:48Z",
+      "subject": "[datatable-help] fread statement for a long data table",
+      "subject_clean": "[datatable-help] fread statement for a long data table",
+      "in_reply_to": "<etPan.53d6944f.216231b.152@Arunkumars-MacBook-Pro.local>",
+      "references": [
+        "<BAY168-W101FDC5C0C95C953F9CB2CBBAFB0@phx.gbl>",
+        "<53D64534.8000405@gmail.com>",
+        "<BAY168-W111349197A3F9B21902898EBAFB0@phx.gbl>",
+        "<BAY168-W1377AF5308FE9E65FBE227FBAFB0@phx.gbl>",
+        "<etPan.53d679ba.12200854.152@Arunkumars-MacBook-Pro.local>",
+        "<BAY168-W105301CA499535F8D3DD98CBAFB0@phx.gbl>",
+        "<BAY168-W105BA9A1181BF582DB32289BAFB0@phx.gbl>",
+        "<etPan.53d6944f.216231b.152@Arunkumars-MacBook-Pro.local>"
+      ],
+      "body_plain": "Thanks Arun! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140729/25778d22/attachment.html>",
+      "body_snippet": "Thanks Arun! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140729/25778d22/atta",
+      "thread_id": "thread-16b948b868c2",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-de6d7befb92f",
+      "message_id": "<BAY168-W24AE729BEB01FE1EE8F31BBAF80@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-29T16:28:09Z",
+      "subject": "[datatable-help] Replace a character in one data table column",
+      "subject_clean": "[datatable-help] Replace a character in one data table column",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Hi everyone, I would want to replace only the \"missing\" characters in date column by \"2002-06-30\" character (I will make the change  to date format in future): DT <- data.table(id=c(1,1,4,4,4),                 date=as.character(c(\"1997-04-26\",\"missing\",\"1998-08-25\",\"missing\",\"1998-11-07\")))DT    id       date1:  1 1997-04-262:  1         NA3:  4 1998-08-254:  4         NA5:  4 1998-11-07  DT[,list(id, date=if(variable==NA) {\"2002-06-30\"} else date)] But I get an error message. Is it posible to do it under data table format? Many thanks to all the data.table help  members!! \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140729/9acc80c1/attachment.html>",
+      "body_snippet": "Hi everyone, I would want to replace only the \"missing\" characters in date column by \"2002-06-30\" character (I will make the change  to date format in future): DT <- data.table(id=c(1,1,4,4,4),       ",
+      "thread_id": "thread-de6d7befb92f",
+      "thread_depth": 0,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-1d447310499c",
+      "message_id": "<CAAxdm-6RwdXN2x3kB3O5zop=qWc9AqqsK9XiY=fz-HK+D_2Qsw@mail.gmail.com>",
+      "from_name": "jim holtman",
+      "from_email_hash": "46f979d1a5bf6fa8b5559d3a049add9a0eb45fffc6a219e7401d97ba07ef9a0f",
+      "date": "2014-07-29T17:08:20Z",
+      "subject": "[datatable-help] Replace a character in one data table column",
+      "subject_clean": "[datatable-help] Replace a character in one data table column",
+      "in_reply_to": "<BAY168-W24AE729BEB01FE1EE8F31BBAF80@phx.gbl>",
+      "references": [
+        "<BAY168-W24AE729BEB01FE1EE8F31BBAF80@phx.gbl>"
+      ],
+      "body_plain": "Is this what you want:\n\n> require(data.table)\n> DT <- data.table(id=c(1,1,4,4,4),\n+\n+\ndate=as.character(c(\"1997-04-26\",\"missing\",\"1998-08-25\",\"missing\",\"1998-11-07\")))\n> DT\n   id       date\n1:  1 1997-04-26\n2:  1    missing\n3:  4 1998-08-25\n4:  4    missing\n5:  4 1998-11-07\n> DT[date == \"missing\", date := '2002-06-30']\n> DT\n   id       date\n1:  1 1997-04-26\n2:  1 2002-06-30\n3:  4 1998-08-25\n4:  4 2002-06-30\n5:  4 1998-11-07\n>\n\nJim Holtman\nData Munger Guru\n\nWhat is the problem that you are trying to solve?\nTell me what you want to do, not how you want to do it.\n\n\nOn Tue, Jul 29, 2014 at 12:28 PM, Frank S. <f_j_rod at hotmail.com> wrote:\n> Hi everyone,\n>\n>\n>\n> I would want to replace only the \"missing\" characters in date column by\n> \"2002-06-30\" character (I will make the change  to date format in future):\n>\n>\n>\n> DT <- data.table(id=c(1,1,4,4,4),\n>\n>\n> date=as.character(c(\"1997-04-26\",\"missing\",\"1998-08-25\",\"missing\",\"1998-11-07\")))\n> DT\n>\n>\n>\n>    id       date\n> 1:  1 1997-04-26\n> 2:  1         NA\n> 3:  4 1998-08-25\n> 4:  4         NA\n> 5:  4 1998-11-07\n>\n>\n>\n>\n>\n> DT[,list(id, date=if(variable==NA) {\"2002-06-30\"} else date)]\n>\n>\n>\n> But I get an error message.\n>\n>\n>\n> Is it posible to do it under data table format?\n>\n>\n>\n> Many thanks to all the data.table help  members!!\n>\n>\n> _______________________________________________\n> datatable-help mailing list\n> datatable-help at lists.r-forge.r-project.org\n> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help",
+      "body_snippet": "Is this what you want:\n\n> require(data.table)\n> DT <- data.table(id=c(1,1,4,4,4),\n+\n+\ndate=as.character(c(\"1997-04-26\",\"missing\",\"1998-08-25\",\"missing\",\"1998-11-07\")))\n> DT\n   id       date\n1:  1 1997",
+      "thread_id": "thread-de6d7befb92f",
+      "thread_depth": 1,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-7aba7811536c",
+      "message_id": "<BAY168-W25EFD659D24163136A4BC1BAF90@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-30T11:37:28Z",
+      "subject": "[datatable-help] Replace a character in one data table column",
+      "subject_clean": "[datatable-help] Replace a character in one data table column",
+      "in_reply_to": "<CAAxdm-6RwdXN2x3kB3O5zop=qWc9AqqsK9XiY=fz-HK+D_2Qsw@mail.gmail.com>",
+      "references": [
+        "<BAY168-W24AE729BEB01FE1EE8F31BBAF80@phx.gbl>",
+        "<CAAxdm-6RwdXN2x3kB3O5zop=qWc9AqqsK9XiY=fz-HK+D_2Qsw@mail.gmail.com>"
+      ],
+      "body_plain": "Thanks for your reply Jim,\n\nI've realized that in my data R recognizes the value \"missing\" as authentic NA. So, in conclusion, I really have:\n\n> DT\n\n   id       date\n1:  1 1997-04-26\n2:  1         NA\n3:  4 1998-08-25\n4:  4         NA\n5:  4 1998-11-07\n\nAnd if I do:\n\n > sum(is.na(DT$date))\n\nThe result is 2. So I've applied your suggestion and there are not changes in date variable. Can you help me?\n \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140730/ca1aad9f/attachment.html>",
+      "body_snippet": "Thanks for your reply Jim,\n\nI've realized that in my data R recognizes the value \"missing\" as authentic NA. So, in conclusion, I really have:\n\n> DT\n\n   id       date\n1:  1 1997-04-26\n2:  1         NA\n",
+      "thread_id": "thread-de6d7befb92f",
+      "thread_depth": 2,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-8dac28ab9562",
+      "message_id": "<CAAxdm-7KixuhgLPiSK4=atO3k_S7aYnav2Nv3OsWM9PauK=kvw@mail.gmail.com>",
+      "from_name": "jim holtman",
+      "from_email_hash": "46f979d1a5bf6fa8b5559d3a049add9a0eb45fffc6a219e7401d97ba07ef9a0f",
+      "date": "2014-07-31T13:52:05Z",
+      "subject": "[datatable-help] Replace a character in one data table column",
+      "subject_clean": "[datatable-help] Replace a character in one data table column",
+      "in_reply_to": "<BAY168-W25EFD659D24163136A4BC1BAF90@phx.gbl>",
+      "references": [
+        "<BAY168-W24AE729BEB01FE1EE8F31BBAF80@phx.gbl>",
+        "<CAAxdm-6RwdXN2x3kB3O5zop=qWc9AqqsK9XiY=fz-HK+D_2Qsw@mail.gmail.com>",
+        "<BAY168-W25EFD659D24163136A4BC1BAF90@phx.gbl>"
+      ],
+      "body_plain": "I assume that you could use the following statement to replace the\nNA's with a specified date:\n\n DT[is.na(date), date := '2002-06-30']\n\nor\n\nDT[is.na(date), date := as.Date('2002-06-30')]  # if 'date' has the \"Date\" class\n\nJim Holtman\nData Munger Guru\n\nWhat is the problem that you are trying to solve?\nTell me what you want to do, not how you want to do it.\n\n\nOn Wed, Jul 30, 2014 at 7:37 AM, Frank S. <f_j_rod at hotmail.com> wrote:\n> Thanks for your reply Jim,\n>\n> I've realized that in my data R recognizes the value \"missing\" as authentic\n> NA. So, in conclusion, I really have:\n>\n>> DT\n>\n>    id       date\n> 1:  1 1997-04-26\n> 2:  1         NA\n> 3:  4 1998-08-25\n> 4:  4         NA\n> 5:  4 1998-11-07\n>\n> And if I do:\n>\n>  > sum(is.na(DT$date))\n>\n> The result is 2. So I've applied your suggestion and there are not changes\n> in date variable. Can you help me?",
+      "body_snippet": "I assume that you could use the following statement to replace the\nNA's with a specified date:\n\n DT[is.na(date), date := '2002-06-30']\n\nor\n\nDT[is.na(date), date := as.Date('2002-06-30')]  # if 'date' ",
+      "thread_id": "thread-de6d7befb92f",
+      "thread_depth": 3,
+      "month": "2014-07"
+    },
+    {
+      "id": "msg-4f39fdcdad5e",
+      "message_id": "<BAY168-W65FFEC01FA37D05E9056E5BAE60@phx.gbl>",
+      "from_name": "Frank S.",
+      "from_email_hash": "972ecec9f885184e366066f801118b9846df7d85694df46ee25104b988360994",
+      "date": "2014-07-31T16:35:37Z",
+      "subject": "[datatable-help] Replace a character in one data table column",
+      "subject_clean": "[datatable-help] Replace a character in one data table column",
+      "in_reply_to": "<CAAxdm-7KixuhgLPiSK4=atO3k_S7aYnav2Nv3OsWM9PauK=kvw@mail.gmail.com>",
+      "references": [
+        "<BAY168-W24AE729BEB01FE1EE8F31BBAF80@phx.gbl>",
+        "<CAAxdm-6RwdXN2x3kB3O5zop=qWc9AqqsK9XiY=fz-HK+D_2Qsw@mail.gmail.com>",
+        "<BAY168-W25EFD659D24163136A4BC1BAF90@phx.gbl>",
+        "<CAAxdm-7KixuhgLPiSK4=atO3k_S7aYnav2Nv3OsWM9PauK=kvw@mail.gmail.com>"
+      ],
+      "body_plain": "Thnaks Jim,  That's it:   is.na(date) Regards \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140731/73d69c71/attachment.html>",
+      "body_snippet": "Thnaks Jim,  That's it:   is.na(date) Regards \t\t \t   \t\t  \n-------------- next part --------------\nAn HTML attachment was scrubbed...\nURL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/a",
+      "thread_id": "thread-de6d7befb92f",
+      "thread_depth": 4,
+      "month": "2014-07"
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-84547044d978",
+      "subject": "[datatable-help] Speeding up column references with roll",
+      "message_count": 1,
+      "participants": [
+        "Arunkumar Srinivasan"
+      ],
+      "started": "2014-06-30T23:29:40Z",
+      "last_reply": "2014-06-30T23:29:40Z",
+      "root_message_id": "msg-84547044d978"
+    },
+    {
+      "id": "thread-0b7670a6607e",
+      "subject": "[datatable-help] Speeding up column references with roll",
+      "message_count": 1,
+      "participants": [
+        "Arunkumar Srinivasan"
+      ],
+      "started": "2014-07-01T04:57:28Z",
+      "last_reply": "2014-07-01T04:57:28Z",
+      "root_message_id": "msg-0b7670a6607e"
+    },
+    {
+      "id": "thread-056586f58921",
+      "subject": "[datatable-help] Speeding up column references with roll",
+      "message_count": 1,
+      "participants": [
+        "Arunkumar Srinivasan"
+      ],
+      "started": "2014-07-01T04:59:28Z",
+      "last_reply": "2014-07-01T04:59:28Z",
+      "root_message_id": "msg-056586f58921"
+    },
+    {
+      "id": "thread-85f9dbe66aaf",
+      "subject": "[datatable-help] internal FALSE/TRUE value has been modified",
+      "message_count": 2,
+      "participants": [
+        "Juan Manuel Truppia",
+        "Matthew Dowle"
+      ],
+      "started": "2014-07-04T19:36:09Z",
+      "last_reply": "2014-07-04T19:53:56Z",
+      "root_message_id": "msg-85f9dbe66aaf"
+    },
+    {
+      "id": "thread-30aba9b4e444",
+      "subject": "[datatable-help] Strange Error: bump from type 0 to type 1",
+      "message_count": 1,
+      "participants": [
+        "fabio.marroni"
+      ],
+      "started": "2014-07-06T11:19:47Z",
+      "last_reply": "2014-07-06T11:19:47Z",
+      "root_message_id": "msg-30aba9b4e444"
+    },
+    {
+      "id": "thread-a86f1cf31506",
+      "subject": "[datatable-help] Join inherited scope with by",
+      "message_count": 1,
+      "participants": [
+        "Juan Manuel Truppia"
+      ],
+      "started": "2014-07-08T16:57:19Z",
+      "last_reply": "2014-07-08T16:57:19Z",
+      "root_message_id": "msg-a86f1cf31506"
+    },
+    {
+      "id": "thread-66af16bac4ba",
+      "subject": "[datatable-help] useR2014",
+      "message_count": 3,
+      "participants": [
+        "Matt Dowle",
+        "Michael Smith"
+      ],
+      "started": "2014-07-08T19:38:57Z",
+      "last_reply": "2014-07-09T21:37:48Z",
+      "root_message_id": "msg-66af16bac4ba"
+    },
+    {
+      "id": "thread-a62f49803661",
+      "subject": "[datatable-help] data.table vs matrix speed",
+      "message_count": 3,
+      "participants": [
+        "Matt Dowle",
+        "Steve Bellan"
+      ],
+      "started": "2014-07-09T15:30:02Z",
+      "last_reply": "2014-07-09T16:59:59Z",
+      "root_message_id": "msg-a62f49803661"
+    },
+    {
+      "id": "thread-b5db4e0db9f6",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "message_count": 1,
+      "participants": [
+        "Farrel Buchinsky"
+      ],
+      "started": "2014-07-13T22:45:14Z",
+      "last_reply": "2014-07-13T22:45:14Z",
+      "root_message_id": "msg-b5db4e0db9f6"
+    },
+    {
+      "id": "thread-bf12c4cefa28",
+      "subject": "[datatable-help] I have been agnozing over how to do a running cummulative sum over a particular date range",
+      "message_count": 7,
+      "participants": [
+        "Farrel Buchinsky",
+        "Mike Gahan",
+        "Mike.Gahan",
+        "jim holtman"
+      ],
+      "started": "2014-07-13T22:52:21Z",
+      "last_reply": "2014-07-15T03:37:41Z",
+      "root_message_id": "msg-bf12c4cefa28"
+    },
+    {
+      "id": "thread-a6b50d592ee2",
+      "subject": "[datatable-help] Subsetting By Row Function",
+      "message_count": 2,
+      "participants": [
+        "PARIS Nicolas",
+        "bgoldstein"
+      ],
+      "started": "2014-07-18T22:40:33Z",
+      "last_reply": "2014-07-20T11:58:27Z",
+      "root_message_id": "msg-a6b50d592ee2"
+    },
+    {
+      "id": "thread-fb959bb4eb47",
+      "subject": "[datatable-help] Subsetting By Row Function",
+      "message_count": 4,
+      "participants": [
+        "Arunkumar Srinivasan",
+        "bgoldstein"
+      ],
+      "started": "2014-07-18T23:02:41Z",
+      "last_reply": "2014-07-18T23:31:56Z",
+      "root_message_id": "msg-fb959bb4eb47"
+    },
+    {
+      "id": "thread-8dbc8ef8b407",
+      "subject": "[datatable-help] Construct a new data table from another",
+      "message_count": 5,
+      "participants": [
+        "Arunkumar Srinivasan",
+        "Chris Neff",
+        "Frank S."
+      ],
+      "started": "2014-07-21T11:01:04Z",
+      "last_reply": "2014-07-21T16:06:50Z",
+      "root_message_id": "msg-8dbc8ef8b407"
+    },
+    {
+      "id": "thread-f51dea5e3c48",
+      "subject": "[datatable-help] Setting the key of a table produced by merging reorders original table if key column was used as by column",
+      "message_count": 1,
+      "participants": [
+        "Amelia Hardjasa"
+      ],
+      "started": "2014-07-21T19:24:08Z",
+      "last_reply": "2014-07-21T19:24:08Z",
+      "root_message_id": "msg-f51dea5e3c48"
+    },
+    {
+      "id": "thread-797afd5cac77",
+      "subject": "[datatable-help] seq with data.table",
+      "message_count": 1,
+      "participants": [
+        "ahardjasa"
+      ],
+      "started": "2014-07-21T20:17:30Z",
+      "last_reply": "2014-07-21T20:17:30Z",
+      "root_message_id": "msg-797afd5cac77"
+    },
+    {
+      "id": "thread-561ea4feccb2",
+      "subject": "[datatable-help] Subsetting a data table and add a new column in one step",
+      "message_count": 3,
+      "participants": [
+        "Frank S.",
+        "Michael Smith"
+      ],
+      "started": "2014-07-22T14:49:33Z",
+      "last_reply": "2014-07-24T10:53:06Z",
+      "root_message_id": "msg-561ea4feccb2"
+    },
+    {
+      "id": "thread-ed148ad69210",
+      "subject": "[datatable-help] Cannot convert from data.frame to data.table inside RStudio",
+      "message_count": 3,
+      "participants": [
+        "Arunkumar Srinivasan",
+        "jpbowman01"
+      ],
+      "started": "2014-07-24T17:47:54Z",
+      "last_reply": "2014-07-26T21:19:27Z",
+      "root_message_id": "msg-ed148ad69210"
+    },
+    {
+      "id": "thread-987b4b7668c5",
+      "subject": "[datatable-help] Fwd: problems with modifying colnames",
+      "message_count": 2,
+      "participants": [
+        "Francois Pepin",
+        "Michael Nelson"
+      ],
+      "started": "2014-07-25T01:27:12Z",
+      "last_reply": "2014-07-25T02:41:19Z",
+      "root_message_id": "msg-987b4b7668c5"
+    },
+    {
+      "id": "thread-7d9925303526",
+      "subject": "[datatable-help] New column with conditions for first and last observation by id group",
+      "message_count": 6,
+      "participants": [
+        "Frank S.",
+        "Matthew DeAngelis",
+        "Michael Smith"
+      ],
+      "started": "2014-07-25T12:29:59Z",
+      "last_reply": "2014-07-28T08:57:14Z",
+      "root_message_id": "msg-7d9925303526"
+    },
+    {
+      "id": "thread-fba7e6579d68",
+      "subject": "[datatable-help] fread statement for a long data table",
+      "message_count": 2,
+      "participants": [
+        "Frank S.",
+        "Michael Smith"
+      ],
+      "started": "2014-07-28T12:24:14Z",
+      "last_reply": "2014-07-28T12:42:28Z",
+      "root_message_id": "msg-fba7e6579d68"
+    },
+    {
+      "id": "thread-06494dffb75c",
+      "subject": "[datatable-help] 1.9.4 Release Date",
+      "message_count": 2,
+      "participants": [
+        "Michael Smith",
+        "carrieromichele"
+      ],
+      "started": "2014-07-28T13:19:34Z",
+      "last_reply": "2014-07-29T00:07:37Z",
+      "root_message_id": "msg-06494dffb75c"
+    },
+    {
+      "id": "thread-63e2f59714c0",
+      "subject": "[datatable-help] FW:  fread statement for a long data table",
+      "message_count": 2,
+      "participants": [
+        "Arunkumar Srinivasan",
+        "Frank S."
+      ],
+      "started": "2014-07-28T16:25:19Z",
+      "last_reply": "2014-07-28T16:26:34Z",
+      "root_message_id": "msg-63e2f59714c0"
+    },
+    {
+      "id": "thread-16b948b868c2",
+      "subject": "[datatable-help] FW:   fread statement for a long data table",
+      "message_count": 3,
+      "participants": [
+        "Arunkumar Srinivasan",
+        "Frank S."
+      ],
+      "started": "2014-07-28T17:06:42Z",
+      "last_reply": "2014-07-29T16:15:48Z",
+      "root_message_id": "msg-16b948b868c2"
+    },
+    {
+      "id": "thread-de6d7befb92f",
+      "subject": "[datatable-help] Replace a character in one data table column",
+      "message_count": 5,
+      "participants": [
+        "Frank S.",
+        "jim holtman"
+      ],
+      "started": "2014-07-29T16:28:09Z",
+      "last_reply": "2014-07-31T16:35:37Z",
+      "root_message_id": "msg-de6d7befb92f"
+    }
+  ]
+}

@@ -1,0 +1,187 @@
+From iago.mosqueira-sanchez at jrc.ec.europa.eu  Wed Feb 12 11:35:39 2014
+From: iago.mosqueira-sanchez at jrc.ec.europa.eu (Iago MOSQUEIRA (JRC))
+Date: Wed, 12 Feb 2014 11:35:39 +0100
+Subject: [FLR-list] Adding a segregAR1 in FLSR
+In-Reply-To: <525BE1CB.7090802@jrc.ec.europa.eu>
+References: <F94133E16E08E04D8D83797785A94EA218891E@ait-pex02mbx05.win.dtu.dk>
+ <525BD928.6080105@gmail.com>
+ <F94133E16E08E04D8D83797785A94EA2188AEB@ait-pex02mbx05.win.dtu.dk>
+ <525BE1CB.7090802@jrc.ec.europa.eu>
+Message-ID: <52FB4E7B.4080004@jrc.ec.europa.eu>
+
+
+Hi,
+
+With much delay, but added today to FLCore in github
+
+
+Iago
+
+On 10/14/2013 02:21 PM, Iago MOSQUEIRA (JRC) wrote:
+> 
+> Hi,
+> 
+> I will do it, but do you have an exam[ple with the nsher or other
+> dataset I could use to build up a test?
+> 
+> Thanks,
+> 
+> 
+> Iago
+> 
+> On 10/14/2013 02:08 PM, Mark Payne wrote:
+>> Brilliant. Cheers. Here it is: does anyone want to add it to SRmodels.r?
+>>
+>> Mark
+>>
+>> #SegregAR1
+>> segregAR1 <- function(){
+>>     logl <- function(a, b, rho, rec, ssb){
+>>        loglAR1(log(rec), FLQuant(log(ifelse(c(ssb)<=b,a*c(ssb),a*b)),dimnames=dimnames(ssb)),rho=rho)}
+>>
+>>     model <- rec ~ FLQuant(ifelse(c(ssb)<=b,a*c(ssb),a*b),dimnames=dimnames(ssb))
+>>
+>>     initial <- structure(function(rec, ssb){
+>>       return(FLPar(a=median(c(rec/ssb),na.rm=TRUE), b=median(c(ssb),na.rm=TRUE),rho=0))},
+>>       lower=c( 0, 0,-1),
+>>       upper=c(Inf, Inf,1))
+>>
+>> return(list(logl=logl, model=model, initial=initial))
+>> } # }}}
+>>
+>>
+>>
+>>
+>> ________________________________
+>> Fra: flr-list-bounces at r-forge.wu-wien.ac.at [flr-list-bounces at r-forge.wu-wien.ac.at] p? vegne af Laurie [lauriekell at gmail.com]
+>> Sendt: 14. oktober 2013 13:44
+>> Til: flr-list at r-forge.wu-wien.ac.at
+>> Emne: Re: [FLR-list] Adding a segregAR1 in FLSR
+>>
+>> You need to add the initial params and bounds also.
+>>
+>> bevholtAR1 <- function()
+>>   {
+>>   ## log likelihood, assuming normal log.
+>>   logl <- function(a, b, rho, rec, ssb)
+>>       loglAR1(log(rec), log(a*ssb/(b+ssb)), rho=rho)
+>>
+>>   ## initial parameter values
+>>   initial <- structure(function(rec, ssb) {
+>>       a <- max(quantile(c(rec), 0.75, na.rm = TRUE))
+>>     b <- max(quantile(c(rec)/c(ssb), 0.9, na.rm = TRUE))
+>>     return(FLPar(a = a, b = a/b, rho=0))
+>>     },
+>>
+>>   ## bounds
+>>   lower=c(rep(10e-8, 2), -1),
+>>     upper=c(rep(Inf, 2), 1))
+>>
+>>   ## model to be fitted
+>>   model  <- rec~a*ssb/(b+ssb)
+>>
+>>     return(list(logl=logl, model=model, initial=initial))
+>> } # }}}
+>>
+>>
+>> i.e.
+>>      initial <- structure(function(rec, ssb){
+>>       return(FLPar(a=median(c(rec/ssb),na.rm=TRUE), b=median(c(ssb),na.rm=TRUE),rho=0.0))},
+>>       lower=c( 0, 0,-1),
+>>       upper=c(Inf,Inf,1))
+>>
+>>
+>> On 14/10/13 08:49, Mark Payne wrote:
+>> Hi,
+>>
+>> I'm trying to define a segregAR1 FLSR model, as it seems to be missing from the SRmodels available in FLCore. I have modified the segreg model as follows, based on the bevholtAR1 and rickerAR1 models:
+>>
+>> #SegregAR1
+>> segregAR1 <- function(){
+>>     logl <- function(a, b, rho, rec, ssb){
+>>        loglAR1(log(rec), FLQuant(log(ifelse(c(ssb)<=b,a*c(ssb),a*b)),dimnames=dimnames(ssb)),rho=rho)}
+>>
+>>     model <- rec ~ FLQuant(ifelse(c(ssb)<=b,a*c(ssb),a*b),dimnames=dimnames(ssb))
+>>
+>>     initial <- structure(function(rec, ssb){
+>>       return(FLPar(a=median(c(rec/ssb),na.rm=TRUE), b=median(c(ssb),na.rm=TRUE)))},
+>>       lower=rep( 0, 0),
+>>       upper=rep(Inf, 2))
+>>
+>> return(list(logl=logl, model=model, initial=initial))
+>> } # }}}
+>>
+>>
+>> Basically, I've justed added a rho parameter to the likelihood which should, as I understand it, be sufficient to give me what I want. However, it doesn't seem to work when I go to fit it:
+>>> model(base.dat) <- "segregAR1"
+>>> res <- fmle(base.dat)
+>>   Nelder-Mead direct search function minimizer
+>> Error in .local(obs, hat, ...) :
+>>   argument "rho" is missing, with no default
+>>>
+>>
+>> Any ideas what I've done wrong?
+>>
+>> Mark
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> ________________________________
+>> Fra: flr-list-bounces at r-forge.wu-wien.ac.at<mailto:flr-list-bounces at r-forge.wu-wien.ac.at> [flr-list-bounces at r-forge.wu-wien.ac.at<mailto:flr-list-bounces at r-forge.wu-wien.ac.at>] p? vegne af Luis Ridao [luridao at gmail.com<mailto:luridao at gmail.com>]
+>> Sendt: 4. oktober 2013 16:08
+>> Til: flr-list at flr-project.org<mailto:flr-list at flr-project.org>
+>> Emne: [FLR-list] FLBRP<2 sorce code
+>>
+>> FLR help,
+>>
+>> trying to get the source code for FLBRP version<2 (e.g. FLBRP_1.4-1)
+>> but can't find it anywhere.
+>>
+>> anyone with an older source code version of the package around?
+>>
+>> best,
+>> Luis
+>>
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> flr-list mailing list
+>> flr-list at flr-project.org<mailto:flr-list at flr-project.org>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>>
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> flr-list mailing list
+>> flr-list at flr-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/flr-list
+>>
+> 
+> 
+
+
+-- 
+Dr Iago Mosqueira
+
+European Commission ? Joint Research Center
+Institute for the Protection and Security of the Citizen (IPSC)
+Maritime Affairs Unit FISHREG ? Scientific Support to Fisheries
+TP 051, Via Enrico Fermi 2749
+I-21027 Ispra (VA), Italy
+
+Office : +39 0332 785413
+Fax: +39 0332 789658
+
+iago.mosqueira at jrc.ec.europa.eu
+
+http://fishreg.jrc.ec.europa.eu/home
+
+

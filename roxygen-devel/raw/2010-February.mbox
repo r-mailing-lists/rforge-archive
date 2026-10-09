@@ -1,0 +1,369 @@
+From felix at nfrac.org  Tue Feb  2 05:28:40 2010
+From: felix at nfrac.org (Felix Andrews)
+Date: Tue, 2 Feb 2010 15:28:40 +1100
+Subject: [Roxygen-devel] parameters with default NULL value
+Message-ID: <94730b8a1002012028k28080edibd98942a3760aa9f@mail.gmail.com>
+
+Hi all,
+
+I was just looking at this thread from a couple of weeks ago:
+http://lists.r-forge.r-project.org/pipermail/roxygen-devel/2010-January/000115.html
+proposing a change to the function parse.formals in parse.R.
+
+However a more complete change is required to fix not just the "NULL"
+bug but also the problem with long default arguments.
+
+Rather than
+
+  if (is.null(formals)) formals
+  else list(formals=Map(function(formal)
+              if (is.null(formal)) ''
+              else if (is.call(formal)) capture.output(formal)
+              else as.character(maybe.quote(formal)), formals))
+
+I propose
+
+  if (is.null(formals)) formals
+  else list(formals = lapply(formals, function(formal)
+      paste(deparse(formal, width=500, control=c()), collapse = "")
+    )
+
+
+Example:
+
+foo <- function(x, d = NULL, a = "hi", asdasd = list(asd = list(x = 1)))
+    { x }
+
+lapply(formals(foo), function(formal)
+      paste(deparse(formal, width=500, control=c()), collapse = "")
+    )
+$x
+[1] ""
+
+$d
+[1] "NULL"
+
+$a
+[1] "\"hi\""
+
+$asdasd
+[1] "list(asd = list(x = 1))"
+
+
+
+
+-- 
+Felix Andrews / ???
+Postdoctoral Fellow
+Integrated Catchment Assessment and Management (iCAM) Centre
+Fenner School of Environment and Society [Bldg 48a]
+The Australian National University
+Canberra ACT 0200 Australia
+M: +61 410 400 963
+T: + 61 2 6125 4670
+E: felix.andrews at anu.edu.au
+CRICOS Provider No. 00120C
+-- 
+http://www.neurofractal.org/felix/
+
+From felix at nfrac.org  Tue Feb  2 07:18:52 2010
+From: felix at nfrac.org (Felix Andrews)
+Date: Tue, 2 Feb 2010 17:18:52 +1100
+Subject: [Roxygen-devel] skip functions with no roxygen comments
+Message-ID: <94730b8a1002012218i61aae66bx53b26116cdb8b90f@mail.gmail.com>
+
+Hi,
+
+I've just started using roxygen, it's a great system, thanks.
+
+I have been looking into the problem of too many .Rd files being
+generated -- i.e. that .Rd files are generated for *all* functions in
+the source code. I would like internal functions, and those aliased to
+other functions, to be ignored.
+
+I propose that any function which does not have preceding roxygen
+comments should be ignored by roxygen. Perhaps in the future it could
+be possible to generate the @usage for aliased functions, in which
+case they should not be ignored completely, but even in that case I
+think they should have preceding roxygen comments, like "@export".
+
+If that is acceptable, I think the change could be made in
+parse.srcfile(), in parse.R, line 449:
+
+OLD:
+parse.srcfile <- function(srcfile) {
+  srcrefs <- attributes(parse(srcfile$filename,
+                              srcfile=srcfile))$srcref
+  if (length(srcrefs) > 0)
+    parse.refs(zip.list(prerefs(srcfile, srcrefs), srcrefs))
+  else
+    nil
+}
+
+NEW:
+parse.srcfile <- function(srcfile) {
+  srcrefs <- attributes(parse(srcfile$filename,
+                              srcfile=srcfile))$srcref
+  if (length(srcrefs) > 0) {
+    pairs <- zip.list(prerefs(srcfile, srcrefs), srcrefs)
+    empty <- sapply(pairs, function(x) is.nil(car(x)))
+    parse.refs(pairs[!empty])
+  } else
+    nil
+}
+
+
+Note that I have not tested this.
+
+
+-- 
+Felix Andrews / ???
+Postdoctoral Fellow
+Integrated Catchment Assessment and Management (iCAM) Centre
+Fenner School of Environment and Society [Bldg 48a]
+The Australian National University
+Canberra ACT 0200 Australia
+M: +61 410 400 963
+T: + 61 2 6125 4670
+E: felix.andrews at anu.edu.au
+CRICOS Provider No. 00120C
+-- 
+http://www.neurofractal.org/felix/
+
+From Manuel.Eugster at stat.uni-muenchen.de  Tue Feb  2 08:58:25 2010
+From: Manuel.Eugster at stat.uni-muenchen.de (Manuel J. A. Eugster)
+Date: Tue, 02 Feb 2010 08:58:25 +0100
+Subject: [Roxygen-devel] parameters with default NULL value
+In-Reply-To: <94730b8a1002012028k28080edibd98942a3760aa9f@mail.gmail.com>
+References: <94730b8a1002012028k28080edibd98942a3760aa9f@mail.gmail.com>
+Message-ID: <4B67DB21.1030509@stat.uni-muenchen.de>
+
+Hi Felix and all others,
+
+thanks for the Bug-Report and the proposed fix. During testing the fix
+proposed by Melissa for the NULL value problem, I also detected that there
+are some more problems (that's why the proposed fix from Melissa is not in
+the package yet).
+
+I have no time to fix this problem this week (two deadlines, today and on
+friday :-), but then I have time to focus on this problem ... I'll come
+back to you next week, to check if the new code is running for your
+source code.
+
+
+Manuel.
+
+
+
+Felix Andrews schrieb:
+> Hi all,
+> 
+> I was just looking at this thread from a couple of weeks ago:
+> http://lists.r-forge.r-project.org/pipermail/roxygen-devel/2010-January/000115.html
+> proposing a change to the function parse.formals in parse.R.
+> 
+> However a more complete change is required to fix not just the "NULL"
+> bug but also the problem with long default arguments.
+> 
+> Rather than
+> 
+>   if (is.null(formals)) formals
+>   else list(formals=Map(function(formal)
+>               if (is.null(formal)) ''
+>               else if (is.call(formal)) capture.output(formal)
+>               else as.character(maybe.quote(formal)), formals))
+> 
+> I propose
+> 
+>   if (is.null(formals)) formals
+>   else list(formals = lapply(formals, function(formal)
+>       paste(deparse(formal, width=500, control=c()), collapse = "")
+>     )
+> 
+> 
+> Example:
+> 
+> foo <- function(x, d = NULL, a = "hi", asdasd = list(asd = list(x = 1)))
+>     { x }
+> 
+> lapply(formals(foo), function(formal)
+>       paste(deparse(formal, width=500, control=c()), collapse = "")
+>     )
+> $x
+> [1] ""
+> 
+> $d
+> [1] "NULL"
+> 
+> $a
+> [1] "\"hi\""
+> 
+> $asdasd
+> [1] "list(asd = list(x = 1))"
+> 
+> 
+> 
+> 
+
+From seth at userprimary.net  Tue Feb  2 16:12:09 2010
+From: seth at userprimary.net (Seth Falcon)
+Date: Tue, 02 Feb 2010 07:12:09 -0800
+Subject: [Roxygen-devel] skip functions with no roxygen comments
+In-Reply-To: <94730b8a1002012218i61aae66bx53b26116cdb8b90f@mail.gmail.com>
+References: <94730b8a1002012218i61aae66bx53b26116cdb8b90f@mail.gmail.com>
+Message-ID: <4B6840C9.8060307@userprimary.net>
+
+On 2/1/10 10:18 PM, Felix Andrews wrote:
+> Hi,
+> 
+> I've just started using roxygen, it's a great system, thanks.
+> 
+> I have been looking into the problem of too many .Rd files being
+> generated -- i.e. that .Rd files are generated for *all* functions in
+> the source code. I would like internal functions, and those aliased to
+> other functions, to be ignored.
+
+This would make roxygen much more useful to me.  +1
+
+Right now, I pretty much cannot use roxygen for any of the packages that
+I maintain because I don't have the time to convert everything.
+Behavior as you propose would allow folks to convert functions one by
+one alongside existing Rd.
+
++ seth
+
+From h.wickham at gmail.com  Tue Feb  2 17:31:51 2010
+From: h.wickham at gmail.com (hadley wickham)
+Date: Tue, 2 Feb 2010 10:31:51 -0600
+Subject: [Roxygen-devel] skip functions with no roxygen comments
+In-Reply-To: <4B6840C9.8060307@userprimary.net>
+References: <94730b8a1002012218i61aae66bx53b26116cdb8b90f@mail.gmail.com> 
+	<4B6840C9.8060307@userprimary.net>
+Message-ID: <f8e6ff051002020831n1fb68fn484f87a044f1eb21@mail.gmail.com>
+
+>> I have been looking into the problem of too many .Rd files being
+>> generated -- i.e. that .Rd files are generated for *all* functions in
+>> the source code. I would like internal functions, and those aliased to
+>> other functions, to be ignored.
+>
+> This would make roxygen much more useful to me. ?+1
+>
+> Right now, I pretty much cannot use roxygen for any of the packages that
+> I maintain because I don't have the time to convert everything.
+> Behavior as you propose would allow folks to convert functions one by
+> one alongside existing Rd.
+
+I think this is present in the development version of roxygen - if you
+use the Rd2 generator.
+
+I have a personally patched version that does this and additionally
+only tells you which files have changed since the last run.  Very
+handy!
+
+Hadley
+
+-- 
+http://had.co.nz/
+
+From Manuel.Eugster at stat.uni-muenchen.de  Tue Feb  2 18:00:42 2010
+From: Manuel.Eugster at stat.uni-muenchen.de (Manuel J. A. Eugster)
+Date: Tue, 02 Feb 2010 18:00:42 +0100
+Subject: [Roxygen-devel] skip functions with no roxygen comments
+In-Reply-To: <94730b8a1002012218i61aae66bx53b26116cdb8b90f@mail.gmail.com>
+References: <94730b8a1002012218i61aae66bx53b26116cdb8b90f@mail.gmail.com>
+Message-ID: <4B685A3A.2030305@stat.uni-muenchen.de>
+
+> I have been looking into the problem of too many .Rd files being
+> generated -- i.e. that .Rd files are generated for *all* functions in
+> the source code. I would like internal functions, and those aliased to
+> other functions, to be ignored.
+
+If you use 'roxygenize' with use.Rd2 = TRUE, than the default behavior
+is that .Rd files are generated only for documented functions.
+
+You can also restrict Rd2 to produce Rd files only for exported
+functions (see Rd2.R).
+
+
+Manuel.
+
+From felix at nfrac.org  Tue Feb  2 23:25:59 2010
+From: felix at nfrac.org (Felix Andrews)
+Date: Wed, 3 Feb 2010 09:25:59 +1100
+Subject: [Roxygen-devel] skip functions with no roxygen comments
+In-Reply-To: <4B685A3A.2030305@stat.uni-muenchen.de>
+References: <94730b8a1002012218i61aae66bx53b26116cdb8b90f@mail.gmail.com> 
+	<4B685A3A.2030305@stat.uni-muenchen.de>
+Message-ID: <94730b8a1002021425y45394198r3541a132e4b76296@mail.gmail.com>
+
+Wow, yeah, it works. Thanks.
+
+I suggest this be documented somewhere... I found no hint of this in
+the vignette, "manual", website, SVN commit comments, or mailing list.
+
+Regards
+Felix
+
+
+On 3 February 2010 04:00, Manuel J. A. Eugster
+<Manuel.Eugster at stat.uni-muenchen.de> wrote:
+>> I have been looking into the problem of too many .Rd files being
+>> generated -- i.e. that .Rd files are generated for *all* functions in
+>> the source code. I would like internal functions, and those aliased to
+>> other functions, to be ignored.
+>
+> If you use 'roxygenize' with use.Rd2 = TRUE, than the default behavior
+> is that .Rd files are generated only for documented functions.
+>
+> You can also restrict Rd2 to produce Rd files only for exported
+> functions (see Rd2.R).
+>
+>
+> Manuel.
+>
+
+
+
+-- 
+Felix Andrews / ???
+Postdoctoral Fellow
+Integrated Catchment Assessment and Management (iCAM) Centre
+Fenner School of Environment and Society [Bldg 48a]
+The Australian National University
+Canberra ACT 0200 Australia
+M: +61 410 400 963
+T: + 61 2 6125 4670
+E: felix.andrews at anu.edu.au
+CRICOS Provider No. 00120C
+-- 
+http://www.neurofractal.org/felix/
+
+From pcd at roxygen.org  Wed Feb  3 04:03:46 2010
+From: pcd at roxygen.org (Peter Danenberg)
+Date: Tue, 2 Feb 2010 21:03:46 -0600
+Subject: [Roxygen-devel] skip functions with no roxygen comments
+In-Reply-To: <94730b8a1002021425y45394198r3541a132e4b76296@mail.gmail.com>
+References: <94730b8a1002012218i61aae66bx53b26116cdb8b90f@mail.gmail.com>
+	<4B685A3A.2030305@stat.uni-muenchen.de>
+	<94730b8a1002021425y45394198r3541a132e4b76296@mail.gmail.com>
+Message-ID: <20100203030346.GB7823@klutometis.wikitex.org>
+
+> I suggest this be documented somewhere... I found no hint of this in
+> the vignette, "manual", website, SVN commit comments, or mailing
+> list.
+
+Of course; the docs haven't caught up to the code, in this
+case. Should we file a doc bug, Manuel?
+
+Also, should we finally make use.Rd2 = TRUE the default behaviour?
+
+From daniel.sabanesbove at ifspm.uzh.ch  Tue Feb  9 17:01:33 2010
+From: daniel.sabanesbove at ifspm.uzh.ch (=?UTF-8?B?RGFuaWVsIFNhYmFuw6lzIEJvdsOp?=)
+Date: Tue, 09 Feb 2010 17:01:33 +0100
+Subject: [Roxygen-devel] roxygen and subclassing? - Error in
+	cdr(preorder.flatten.expression(expression))
+Message-ID: <4B7186DD.6050706@ifspm.uzh.ch>
+
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/roxygen-devel/attachments/20100209/4fbbdda7/attachment.htm 
+

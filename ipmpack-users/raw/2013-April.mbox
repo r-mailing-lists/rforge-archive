@@ -1,0 +1,1673 @@
+From c.jessica.e.metcalf at gmail.com  Mon Apr  1 09:35:08 2013
+From: c.jessica.e.metcalf at gmail.com (jessica metcalf)
+Date: Mon, 1 Apr 2013 09:35:08 +0200
+Subject: [Ipmpack-users] using a SSlogis model for survival.
+Message-ID: <CAM7gqqTU+g3m5YqFQWqwuBgRsK90Gxq8UBRFDw6EDsVtLKXgqA@mail.gmail.com>
+
+Hi Joachim,
+
+For other list users; Joachim's question is how to define a method of
+survival using SSlogis. Here is a worked through example. First, you need
+to define the new class:
+
+setClass("survObjAsym",
+representation(fit = "nls"))
+
+
+Second, you need to define a make function (this is slightly edited from
+the version you supplied - it seems that "start" needs to be a named vector
+for nls to handle it - and I've also simplified the function because you
+don't need a lot of the checks that are necessary for complex polynomials,
+etc):
+
+makeSurvObjAsym <- function (dataf,Start=c(Asym=0.8,xmid=5,scale=1)){
+    dataf <- subset(dataf, is.na(dataf$surv) == FALSE)
+    if (length(dataf$offspringNext) > 0)
+        dataf <- subset(dataf, !dataf$offspringNext %in% c("sexual",
+            "clonal"))
+    fit <- nls(surv ~ SSlogis(size, Asym, xmid, scale), start=Start, data =
+dataf)
+    sva1 <- new("survObjAsym")
+    sva1 at fit <- fit
+    return(sva1)
+}
+
+
+Third, you need to build a new method that will work with this new class of
+object to predict survival:
+
+setMethod("surv",
+c("numeric","data.frame","survObjAsym"),
+function(size,cov,survObj){
+ newd <- data.frame(cbind(cov,size=size),
+stringsAsFactors = FALSE)
+ u <- as.numeric(predict(survObj at fit,newd,type="response"))
+
+return(u);
+})
+
+Now, an example of this working:
+
+dff<-generateData()
+sv1 <-makeSurvObjAsym(dff)
+surv(1:10,data.frame(11),sv1)
+
+and the rest should follow,
+
+Jess
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20130401/d30b662b/attachment.html>
+
+From e.jongejans at science.ru.nl  Mon Apr  1 09:46:53 2013
+From: e.jongejans at science.ru.nl (Eelke Jongejans)
+Date: Mon, 01 Apr 2013 09:46:53 +0200
+Subject: [Ipmpack-users] annual survival from survival data over longer time
+	spans
+Message-ID: <51593B6D.7090205@science.ru.nl>
+
+Dear Ivan,
+
+You asked whether IPMpack includes functions for estimating annual 
+survival from survival data over longer time spans. At the moment it 
+isn't, but Jess has written some code that you could use (see below). We 
+might include it in later versions of IPMpack.
+
+best wishes,
+Eelke
+
+# Functions for variable time intervals
+
+
+## Function to fit survival with VARYING TIME INCREMENTS using optim
+## and then write parameters - over onto a classic glm framework for use 
+with IPMpack
+#
+# !! MAY BE VERY SENSITIVE TO STARTING VALUES...TEST SEVERAL !!
+#
+# parameters - dataf - a dataframe including columns
+#                  size, surv, exatDate, and exactDatel, the latter two 
+in days
+#            - nyrs - desired number of years in a time-step (here 
+choose 4)
+#            - par - starting values for the parameters
+#                     (must be of length one longer than covNames,
+#                       given intercept)
+#            - covNames - names of chosen covariates
+#            - method - method for optim ("Nelder-Mead", "SANN", etc.)
+#
+# Returns  - output of optim, see R help
+#
+fitSurvVaryingTimeIntervals <- function(dataf,
+                                         nyrs=4,
+                                         par=c(0.01,0.01,0.01,0.01),
+covNames=c("size","size2","size3"),
+                                         method="Nelder-Mead") {
+
+     #warnings
+     if ((length(par)-1)!=length(covNames)) {
+         print("starting values does not match length of covariate names")
+     }
+
+     #run optim
+     tmp <- optim(par,likeSurvVaryingTimeIntervals,
+                  covNames=covNames,nyrs=nyrs,dataf=dataf,
+                  method=method)
+
+     #try re-running if hasn't converged
+     if (tmp$convergence!=0) {
+         tmp <- optim(tmp$par,likeSurvVaryingTimeIntervals,
+                      covNames=covNames,nyrs=nyrs,dataf=dataf,
+                      method=method)
+         if (tmp$convergence!=0)  print("not converged")
+     }
+
+     #write dummy template and then over-write with parameters estimated 
+here
+     if (length(covNames)>0) formula <- 
+as.character(paste("surv~",paste(covNames,collapse="+"),collapse="")) 
+else formula <- as.character("surv~1")
+     fit <- glm(formula,data=dataf,family=binomial)
+     #print(fit)
+     fit$coefficients <- tmp$par
+
+     sv1 <- new("survObj")
+     sv1 at fit <- fit
+
+     tmp$sv1 <- sv1
+
+     return(tmp)
+
+}
+
+#Function to calculate the likelihood for variable time-intervals for 
+survival
+#
+# parameters
+#            - par - starting values for the parameters
+#                     (must be of length one longer than covNames,
+#                       given intercept)
+#            - covNames - names of chosen covariates
+#            - nyrs - desired number of years in a time-step
+#            - dataf - a dataframe including columns in covNames, as well as
+#                  size, surv, exactDate, and exactDatel, the latter two 
+in days
+#
+# Returns  - numeric equal to minus the log likelihood for use with optim
+#
+likeSurvVaryingTimeIntervals <- function(par=c(0.01,0.01,0.01,0.01),
+covNames=c("size","size2","size3"),
+                                          nyrs=4,
+                                          dataf) {
+
+
+     #define time change
+     tdiff <- (dataf$exactDatel-dataf$exactDate)/(nyrs*365)
+
+     #build predictor
+     if (length(covNames)>0) {
+         pred <-  t(t(dataf[,covNames])*par[2:length(par)])
+     }else { pred <- matrix(0,nrow(dataf),1)}
+     pred <- par[1] + rowSums(pred)
+     pred[pred>16] <- 16  #don't want bigger than exp(16) - returns 1
+
+     pred <- (exp(pred)/(1+exp(pred)))^(tdiff)
+
+
+     #estimate likelihood
+     like <- dbinom(dataf$surv,1,pred, log=TRUE)
+     #like[like==-Inf] <- -exp(500)
+     #like[like==Inf] <- exp(500)
+
+     sumRows <- rep(0,nrow(dataf))
+     if (length(covNames)>1) sumRows <- rowSums(dataf[,covNames])
+     if (length(covNames)==1) sumRows <- dataf[,covNames]
+
+     return(-sum(like[!is.na(sumRows) & !is.na(dataf$surv)],na.rm=TRUE))
+
+}
+
+
+
+## Function to fit survival models and compare liklelihoods
+# works with maximizing likelihoods. It will help the function if the models
+# are ordered in increasing nestedness, since R will use parameters 
+estimated for
+# first as starting values for next. QUITE SENSITIVE TO STARTING VALUES!
+#
+# ANALOGUE OF FUNCTION survModelComp in main IPMpack - see that help 
+file for arguments
+
+survModelCompVaryInterval <- function(dataf,
+                                       expVars = c("1", "size", "size + 
+size2"),
+                                       testType = "AIC",
+                                       makePlot = FALSE,
+                                       mainTitle = "",
+                                       nyrs=4, method="Nelder-Mead",...) {
+     require(stringr)
+
+
+     varN <- length(expVars)
+     treatN <- varN
+     summaryTable <- data.frame()
+     svObj <- vector("list", length = treatN)
+
+         parStart <- 0.01
+         newd <- dataf
+
+     i <- 1
+     for(v in 1:varN) {
+             #print(expVars[v])
+
+             if (expVars[v]=="1") {
+                 covNames <- c() } else {
+                     covNames <- 
+str_trim(strsplit(as.character(expVars[v]),"[\\+]")[[1]])
+                 }
+             parStart <- 
+c(parStart,rep(1e-6,length(covNames)-length(parStart)+1))
+             #print(parStart)
+
+             #make sure you have all the right covariates
+             if(length(grep("size2",expVars[v]))==1)
+             dataf$size2=(dataf$size)^2
+             if(length(grep("size3",expVars[v]))==1)
+             dataf$size3=(dataf$size)^3
+             if(length(grep("logsize",expVars[v]))==1)
+             dataf$logsize=log(dataf$size)
+             if(length(grep("logsize2",expVars[v]))==1)
+             dataf$logsize=(log(dataf$size))^2
+
+             #print("starting value")
+             #print(likeSurvVaryingTimeIntervals(par=parStart,
+             #                             covNames=covNames,
+             #                             nyrs=4,
+             #                             dataf=dataf))
+
+             tmp <- 
+fitSurvVaryingTimeIntervals(dataf=dataf,nyrs=nyrs,par=parStart,covNames=covNames, 
+method=method)
+
+             parStart <- tmp$par
+
+             svObj[[i]] <- tmp$sv1
+
+             if (testType=="AIC") val <- 
+(2*(length(covNames)+1))-2*(-tmp$value)
+             if (testType=="logLik") val <- -tmp$value
+             if (testType!="AIC" & testType!="logLik") { print("Unknown 
+test; chose AIC or logLik"); val <- NA}
+
+             summaryTable <- rbind(summaryTable, cbind(expVars[v], val))
+             i <- i + 1
+     }
+     summaryTable <- as.data.frame(summaryTable)
+     names(summaryTable) <- c("Exp. Vars", testType)
+     outputList <- list(summaryTable = summaryTable, survObjects = svObj)
+
+     # redefine formulas for the plot...
+     Formulas <- list()
+     for (k in 1:length(expVars)) Formulas[[k]] <- 
+as.formula(paste("incr","~",expVars[k], sep=""))
+     #print(Formulas)
+
+
+     # PLOT SECTION #
+     if(makePlot == TRUE) {
+         ## this is the surv picture
+         plotSurvModelComp(svObj = svObj,
+                           summaryTable = summaryTable,
+                           dataf = dataf,
+                           expVars = Formulas,#expVars,
+                           testType = testType, plotLegend = TRUE, 
+mainTitle = mainTitle, ncuts=20,...)
+     }
+     return(outputList)
+
+}
+
+
+
+From joachim.spindelbock at bio.uib.no  Tue Apr  2 13:49:39 2013
+From: joachim.spindelbock at bio.uib.no (=?iso-8859-1?Q?Joachim_Spindelb=F6ck?=)
+Date: Tue, 2 Apr 2013 13:49:39 +0200
+Subject: [Ipmpack-users] using a SSlogis model for survival
+Message-ID: <000201ce2f98$283046b0$7890d410$@bio.uib.no>
+
+Thanks, this works really well! 
+
+But now I need to do the same thing for clonality and fecundity
+in my
+species the probabilities of survival, making clones and making flowers
+basically increase until a certain size from which on these probabilities
+stay about constant. When plotting squared models against means of
+sequential values (or using picSurv), data & model do not really show the
+same trends at large sizes
+i.e. survival, clonality & fecundity at the
+largest sizes end up being underestimated.
+
+Is there any way to see the setClass() & setMethod() codes used for
+makeClonalObj and makeFecObj? Or could you otherwise post them? Having
+?templates? that one could try to change would be helpful.
+
+Cheers & thanks,
+
+Joachim
+
+ 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20130402/e443f5ab/attachment.html>
+
+From e.jongejans at science.ru.nl  Tue Apr  2 11:45:52 2013
+From: e.jongejans at science.ru.nl (Eelke Jongejans)
+Date: Tue, 02 Apr 2013 11:45:52 +0200
+Subject: [Ipmpack-users] sensParams problem
+Message-ID: <515AA8D0.5040308@science.ru.nl>
+
+Dear Kimmy,
+
+
+you asked why sensParams doesn't work when all offspring go to discrete 
+classes. We have found the bug (offspringRel (i.e. the relationship 
+between offspring size and parent size) is, of course, not defined in 
+such a case). Below you can find a fixed version of sensParams that will 
+take this into account. It will also be in the next version of IPMpack.
+
+
+best wishes,
+
+Jess, Eelke
+
+-----------------------------------------
+
+Hey all,
+I am trying to use sensParams on my IPM, and am getting the error message
+"Error infecObj at offspringRel  <http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/ipmpack-users>$coeff :
+   object of type 'S4' is not subsettable"
+
+My fecObj is : fvS<-makeFecObj(SIPM,Formula=(fec2~size),Family="binomial",fecConstants
+= data.frame(seedlingsPerRep=2.5),
+                 offspringSplitter=data.frame(continuous=0,Seedling=1),
+
+)
+
+and the offspringRE1 slot says:
+Slot "offspringRel":
+<S4 Type Object>
+attr(,".S3Class")
+[1] "lm"
+
+
+Anyone know how to make it NOT an S4 type object?? Thanks!!
+
+-Kimmy Kellett
+
+------------------------------------------
+
+
+## Sensitivity of parameters - works for an IPM built out of
+## growth, survival, discreteTrans, fecundity and clonality objects.
+##
+sensParams <- function (growObj, survObj, fecObj=NULL, clonalObj=NULL,
+         nBigMatrix, minSize, maxSize,
+         chosenCov = data.frame(covariate = 1), discreteTrans = 1,
+         integrateType = "midpoint", correction = "none", preCensus = TRUE,
+         delta = 1e-04, response="lambda", chosenBin=1) {
+
+     if (response!="lambda" & response!="R0" & response !="lifeExpect")
+         stop("response must be one of lambda or R0 or lifeExpect")
+
+     nmes <- elam <- slam <- c()
+
+     # get the base
+     Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, minSize = minSize,
+             chosenCov = chosenCov, maxSize = maxSize, growObj = growObj,
+             survObj = survObj, discreteTrans = discreteTrans, 
+integrateType = integrateType,
+             correction = correction)
+     if (!is.null(fecObj)) {
+         Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix, minSize = 
+minSize,
+                 chosenCov = chosenCov, maxSize = maxSize, fecObj = fecObj,
+                 integrateType = integrateType, correction = correction,
+                 preCensus = preCensus, survObj = survObj, growObj = 
+growObj)
+     } else {Fmatrix <- Pmatrix*0 }
+     if (!is.null(clonalObj)) {
+         Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, minSize = 
+minSize,
+                 chosenCov = chosenCov, maxSize = maxSize, clonalObj = 
+clonalObj,
+                 integrateType = integrateType, correction = correction,
+                 preCensus = preCensus, survObj = survObj, growObj = 
+growObj)
+     } else {Cmatrix <- Pmatrix*0 }
+
+     IPM <- Pmatrix + Fmatrix + Cmatrix
+
+     if (response=="lambda") rc1 <- Re(eigen(IPM)$value[1])
+     if (response=="R0") rc1 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+     if (response=="lifeExpect") rc1 <- meanLifeExpect(Pmatrix)[chosenBin]
+
+     # 1. survival
+     for (j in 1:length(survObj at fit$coeff)) {
+         survObj at fit$coefficients[j] <- survObj at fit$coefficients[j] * (1 
++ delta)
+         Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                 minSize = minSize, maxSize = maxSize, growObj = growObj,
+                 survObj = survObj, discreteTrans = discreteTrans,
+                 chosenCov = chosenCov, integrateType = integrateType,
+                 correction = correction)
+         if (!is.null(fecObj)) {
+             Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                     minSize = minSize, maxSize = maxSize, fecObj = fecObj,
+                     integrateType = integrateType, correction = correction,
+                     chosenCov = chosenCov, preCensus = preCensus, 
+survObj = survObj,
+                     growObj = growObj)
+         }
+         if (!is.null(clonalObj)) {
+             Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     chosenCov = chosenCov, maxSize = maxSize, clonalObj 
+= clonalObj,
+                     integrateType = integrateType, correction = correction,
+                     preCensus = preCensus, survObj = survObj, growObj = 
+growObj)
+         }
+
+         IPM <- Pmatrix + Fmatrix + Cmatrix
+
+         if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+         if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+         if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+         survObj at fit$coefficients[j] <- survObj at fit$coefficients[j]/(1 + 
+delta)
+
+         slam <- c(slam, (rc2 - 
+rc1)/((as.numeric(survObj at fit$coefficients[j]))* delta))
+         elam <- c(elam, (rc2 - rc1)/(rc1 *delta))
+         nmes <- c(nmes, 
+as.character(paste("survival:",names(survObj at fit$coeff)[j])))
+     }
+
+     # 2 growth
+     for (j in 1:length(growObj at fit$coeff)) {
+         growObj at fit$coefficients[j] <- growObj at fit$coefficients[j] * (1 
++ delta)
+         Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                 minSize = minSize, maxSize = maxSize, growObj = growObj,
+                 chosenCov = chosenCov, survObj = survObj, discreteTrans 
+= discreteTrans,
+                 integrateType = integrateType, correction = correction)
+         if (!is.null(fecObj)) {
+             Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                     minSize = minSize, maxSize = maxSize, fecObj = fecObj,
+                     chosenCov = chosenCov, integrateType = integrateType,
+                     correction = correction, preCensus = preCensus, 
+survObj = survObj,
+                     growObj = growObj)
+         }
+         if (!is.null(clonalObj)) {
+             Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     chosenCov = chosenCov, maxSize = maxSize, clonalObj 
+= clonalObj,
+                     integrateType = integrateType, correction = correction,
+                     preCensus = preCensus, survObj = survObj, growObj = 
+growObj)
+         }
+
+         IPM <- Pmatrix + Fmatrix + Cmatrix
+
+         if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+         if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+         if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+         growObj at fit$coefficients[j] <- growObj at fit$coefficients[j]/(1 + 
+delta)
+
+         slam <- c(slam, (rc2 - 
+rc1)/(as.numeric(growObj at fit$coefficients[j]) * delta))
+         elam <- c(elam, (rc2 - rc1)/(rc1 * delta))
+         nmes <- c(nmes, 
+as.character(paste("growth:",names(growObj at fit$coeff)[j])))
+     }
+
+     growObj at sd <- growObj at sd * (1 + delta)
+     Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, minSize = minSize,
+             maxSize = maxSize, growObj = growObj, survObj = survObj,
+             chosenCov = chosenCov, discreteTrans = discreteTrans,
+             integrateType = integrateType, correction = correction)
+     if (!is.null(fecObj)) {
+         Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix, minSize = 
+minSize,
+                 maxSize = maxSize, fecObj = fecObj, integrateType = 
+integrateType,
+                 chosenCov = chosenCov, correction = correction, 
+preCensus = preCensus,
+                 survObj = survObj, growObj = growObj)
+     }
+     if (!is.null(clonalObj)) {
+         Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, minSize = 
+minSize,
+                 chosenCov = chosenCov, maxSize = maxSize, clonalObj = 
+clonalObj,
+                 integrateType = integrateType, correction = correction,
+                 preCensus = preCensus, survObj = survObj, growObj = 
+growObj)
+     }
+     IPM <- Pmatrix + Fmatrix + Cmatrix
+
+     if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+     if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+     if (response=="lifeExpect") rc2 <- meanLifeExpect(Pmatrix)[chosenBin]
+
+     growObj at sd <- growObj at sd / (1 + delta)
+
+     slam <- c(slam,(rc2 - rc1)/(growObj at sd * delta))
+     elam <- c(elam, (rc2 - rc1)/(rc1 * delta))
+     nmes <- c(nmes, "growth: sd")
+
+     # 3. DiscreteTrans
+     if (class(discreteTrans)=="discreteTrans") {
+         for (j in 1:(ncol(discreteTrans at discreteTrans)-1)) {
+             for (i in 1:(nrow(discreteTrans at discreteTrans)-1)) {
+discreteTrans at discreteTrans[i,j]<-discreteTrans at discreteTrans[i,j] * (1 
++ delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         maxSize = maxSize, growObj = growObj, survObj = 
+survObj,
+                         chosenCov = chosenCov, discreteTrans = 
+discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 if (!is.null(fecObj)) {
+                     Fmatrix <- createIPMFmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             maxSize = maxSize, fecObj = fecObj, 
+integrateType = integrateType,
+                             chosenCov = chosenCov, correction = 
+correction, preCensus = preCensus,
+                             survObj = survObj, growObj = growObj)
+                 }
+                 if (!is.null(clonalObj)) {
+                     Cmatrix <- createIPMCmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                             integrateType = integrateType, correction = 
+correction,
+                             preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+                 }
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+discreteTrans at discreteTrans[i,j]<-discreteTrans at discreteTrans[i,j] / (1 
++ delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(discreteTrans at discreteTrans[i,j] * delta))
+                 elam <- c(elam, (rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes, 
+as.character(paste("discrete:",dimnames(discreteTrans at discreteTrans)[[2]][j],"to",dimnames(discreteTrans at discreteTrans)[[1]][i])))
+             }
+         }
+         #if there is more than 2 discrete stages (beyond "continuous" 
+"dead" and one discrete stage)
+         #then survToDiscrete tells you how many of surviving continuous 
+individuals are going into
+         #discrete classes, but how they distributed also; which is the 
+last column in discreteTrans
+         if (nrow(discreteTrans at discreteTrans)>3) {
+             for (i in 1:(nrow(discreteTrans at discreteTrans)-2)) {
+discreteTrans at discreteTrans[i,"continuous"]<-discreteTrans at discreteTrans[i,"continuous"] 
+* (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         maxSize = maxSize, growObj = growObj, survObj = 
+survObj,
+                         chosenCov = chosenCov, discreteTrans = 
+discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 if (!is.null(fecObj)) {
+                     Fmatrix <- createIPMFmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             maxSize = maxSize, fecObj = fecObj, 
+integrateType = integrateType,
+                             chosenCov = chosenCov, correction = 
+correction, preCensus = preCensus,
+                             survObj = survObj, growObj = growObj)
+                 }
+                 if (!is.null(clonalObj)) {
+                     Cmatrix <- createIPMCmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                             integrateType = integrateType, correction = 
+correction,
+                             preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+                 }
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+discreteTrans at discreteTrans[i,"continuous"]<-discreteTrans at discreteTrans[i,"continuous"] 
+/ (1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(discreteTrans at discreteTrans[i,"continuous"] * delta))
+                 elam <- c(elam, (rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes, as.character(paste("discrete: 
+Continuous to",dimnames(discreteTrans at discreteTrans)[[1]][i])))
+             }
+         }
+
+         for (j in 1:length(discreteTrans at meanToCont)) {
+discreteTrans at meanToCont[1,j]<-discreteTrans at meanToCont[1,j] * (1 + delta)
+             Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     maxSize = maxSize, growObj = growObj, survObj = 
+survObj,
+                     chosenCov = chosenCov, discreteTrans = discreteTrans,
+                     integrateType = integrateType, correction = correction)
+             if (!is.null(fecObj)) {
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         maxSize = maxSize, fecObj = fecObj, 
+integrateType = integrateType,
+                         chosenCov = chosenCov, correction = correction, 
+preCensus = preCensus,
+                         survObj = survObj, growObj = growObj)
+             }
+             if (!is.null(clonalObj)) {
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+             }
+             IPM <- Pmatrix + Fmatrix + Cmatrix
+
+             if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+             if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+             if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+discreteTrans at meanToCont[1,j]<-discreteTrans at meanToCont[1,j] / (1 + delta)
+
+             slam <- c(slam,(rc2 - rc1)/(discreteTrans at meanToCont[1,j] * 
+delta))
+             elam <- c(elam, (rc2 - rc1)/(rc1 * delta))
+             nmes <- c(nmes, as.character(paste("discrete: 
+meanToCont",dimnames(discreteTrans at meanToCont)[[2]][j])))
+         }
+
+         for (j in 1:length(discreteTrans at sdToCont)) {
+discreteTrans at sdToCont[1,j]<-discreteTrans at sdToCont[1,j] * (1 + delta)
+             Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     maxSize = maxSize, growObj = growObj, survObj = 
+survObj,
+                     chosenCov = chosenCov, discreteTrans = discreteTrans,
+                     integrateType = integrateType, correction = correction)
+             if (!is.null(fecObj)) {
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         maxSize = maxSize, fecObj = fecObj, 
+integrateType = integrateType,
+                         chosenCov = chosenCov, correction = correction, 
+preCensus = preCensus,
+                         survObj = survObj, growObj = growObj)
+             }
+             if (!is.null(clonalObj)) {
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+             }
+             IPM <- Pmatrix + Fmatrix + Cmatrix
+
+             if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+             if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+             if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+discreteTrans at sdToCont[1,j]<-discreteTrans at sdToCont[1,j] / (1 + delta)
+
+             slam <- c(slam,(rc2 - rc1)/(discreteTrans at sdToCont[1,j] * 
+delta))
+             elam <- c(elam, (rc2 - rc1)/(rc1 * delta))
+             nmes <- c(nmes, as.character(paste("discrete: 
+sdToCont",dimnames(discreteTrans at sdToCont)[[2]][j])))
+         }
+
+         for (j in 1:length(discreteTrans at survToDiscrete$coef)) {
+discreteTrans at survToDiscrete$coefficients[j]<-discreteTrans at survToDiscrete$coefficients[j] 
+* (1 + delta)
+             Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     maxSize = maxSize, growObj = growObj, survObj = 
+survObj,
+                     chosenCov = chosenCov, discreteTrans = discreteTrans,
+                     integrateType = integrateType, correction = correction)
+             if (!is.null(fecObj)) {
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         maxSize = maxSize, fecObj = fecObj, 
+integrateType = integrateType,
+                         chosenCov = chosenCov, correction = correction, 
+preCensus = preCensus,
+                         survObj = survObj, growObj = growObj)
+             }
+             if (!is.null(clonalObj)) {
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+             }
+             IPM <- Pmatrix + Fmatrix + Cmatrix
+
+             if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+             if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+             if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+discreteTrans at survToDiscrete$coefficients[j]<-discreteTrans at survToDiscrete$coefficients[j] 
+/ (1 + delta)
+
+             slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(discreteTrans at survToDiscrete$coefficients[j]) * delta))
+             elam <- c(elam, (rc2 - rc1)/(rc1 * delta))
+             nmes <- c(nmes, as.character(paste("discrete: 
+survToDiscrete",names(discreteTrans at survToDiscrete$coefficients)[j])))
+         }
+     }
+
+     # 4. Fecundity
+     if (!is.null(fecObj)) {
+         for (i in 1:length(fecObj at fitFec)) {
+             for (j in 1:length(fecObj at fitFec[[i]]$coefficients)) {
+                 fecObj at fitFec[[i]]$coefficients[j] <- 
+fecObj at fitFec[[i]]$coefficients[j] *
+                         (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, fecObj = 
+fecObj,
+                         chosenCov = chosenCov, integrateType = 
+integrateType,
+                         correction = correction, preCensus = preCensus,
+                         survObj = survObj, growObj = growObj)
+                 if (!is.null(clonalObj)) {
+                     Cmatrix <- createIPMCmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                             integrateType = integrateType, correction = 
+correction,
+                             preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+                 }
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 fecObj at fitFec[[i]]$coefficients[j] <- 
+fecObj at fitFec[[i]]$coefficients[j]/(1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/((as.numeric(fecObj at fitFec[[i]]$coefficients[j]) * delta)))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes,paste("fecundity: func", i, 
+names(fecObj at fitFec[[i]]$coefficients)[j]))
+             }
+         }
+
+         chs <- which(!is.na(as.numeric(fecObj at fecConstants)), arr.ind = 
+TRUE)
+         if (length(chs) > 0) {
+             for (j in 1:length(chs)) {
+                 fecObj at fecConstants[1,chs[j]] <- 
+fecObj at fecConstants[1,chs[j]] * (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, fecObj = 
+fecObj,
+                         chosenCov = chosenCov, integrateType = 
+integrateType,
+                         correction = correction, preCensus = preCensus,
+                         survObj = survObj, growObj = growObj)
+                 if (!is.null(clonalObj)) {
+                     Cmatrix <- createIPMCmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                             integrateType = integrateType, correction = 
+correction,
+                             preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+                 }
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 fecObj at fecConstants[1, chs[j]] <- 
+fecObj at fecConstants[1,chs[j]]/(1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(fecObj at fecConstants[1,chs[j]] * delta)))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes,paste("fecundity: 
+constant",names(fecObj at fecConstants)[chs[j]]))
+             }
+         }
+
+         if (max(fecObj at offspringSplitter)<1) {
+             for (j in which(fecObj at offspringSplitter>0)) {
+                 fecObj at offspringSplitter[j] <- 
+fecObj at offspringSplitter[j] * (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, fecObj = 
+fecObj,
+                         chosenCov = chosenCov, integrateType = 
+integrateType,
+                         correction = correction, preCensus = preCensus,
+                         survObj = survObj, growObj = growObj)
+                 if (!is.null(clonalObj)) {
+                     Cmatrix <- createIPMCmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                             integrateType = integrateType, correction = 
+correction,
+                             preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+                 }
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 fecObj at offspringSplitter[j] <- 
+fecObj at offspringSplitter[j] / (1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(fecObj at offspringSplitter[j] * delta)))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes,paste("fecundity: 
+offspringSplitter",names(fecObj at offspringSplitter[j])))
+             }
+         }
+
+         chs <- which(!is.na(as.numeric(fecObj at fecByDiscrete)), arr.ind 
+= TRUE)
+         if (length(chs) > 0) {
+             for (j in 1:length(chs)) {
+                 fecObj at fecByDiscrete[1,chs[j]] <- 
+fecObj at fecByDiscrete[1,chs[j]] * (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, fecObj = 
+fecObj,
+                         chosenCov = chosenCov, integrateType = 
+integrateType,
+                         correction = correction, preCensus = preCensus,
+                         survObj = survObj, growObj = growObj)
+                 if (!is.null(clonalObj)) {
+                     Cmatrix <- createIPMCmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                             integrateType = integrateType, correction = 
+correction,
+                             preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+                 }
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 fecObj at fecByDiscrete[1,chs[j]] <- 
+fecObj at fecByDiscrete[1,chs[j]] / (1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(fecObj at fecByDiscrete[1,chs[j]] * delta)))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes,paste("fecundity: 
+fecByDiscrete",names(fecObj at fecByDiscrete)[chs[j]]))
+             }
+         }
+
+         if (class(fecObj at offspringRel)=="lm") {
+             for (j in 1:length(fecObj at offspringRel$coeff)) {
+                 fecObj at offspringRel$coefficients[j] <- 
+fecObj at offspringRel$coefficients[j] * (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, fecObj = 
+fecObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         chosenCov = chosenCov, preCensus = preCensus, 
+survObj = survObj,
+                         growObj = growObj)
+                 if (!is.null(clonalObj)) {
+                     Cmatrix <- createIPMCmatrix(nBigMatrix = 
+nBigMatrix, minSize = minSize,
+                             chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                             integrateType = integrateType, correction = 
+correction,
+                             preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+                 }
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 fecObj at offspringRel$coefficients[j] <- 
+fecObj at offspringRel$coefficients[j]/(1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(fecObj at offspringRel$coefficients[j]) *delta))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 *delta))
+                 nmes <- c(nmes, as.character(paste("fecundity: 
+offspring rel ",names(fecObj at offspringRel$coeff)[j])))
+             }
+
+             fecObj at sdOffspringSize <- fecObj at sdOffspringSize * (1 + delta)
+             Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     maxSize = maxSize, growObj = growObj, chosenCov = 
+chosenCov,
+                     survObj = survObj, discreteTrans = discreteTrans, 
+integrateType = integrateType,
+                     correction = correction)
+             Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     maxSize = maxSize, fecObj = fecObj, chosenCov = 
+chosenCov,
+                     integrateType = integrateType, correction = correction,
+                     preCensus = preCensus, survObj = survObj, growObj = 
+growObj)
+             if (!is.null(clonalObj)) {
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+             }
+
+             IPM <- Pmatrix + Fmatrix + Cmatrix
+
+             if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+             if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+             if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+             fecObj at sdOffspringSize <- fecObj at sdOffspringSize/(1 + delta)
+
+             slam <- c(slam,(rc2 - rc1)/(fecObj at sdOffspringSize * delta))
+             elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+             nmes <- c(nmes, "fecundity: sd offspring size")
+         }
+     }
+
+# 5. Clonality
+     if (!is.null(clonalObj)) {
+         for (i in 1:length(clonalObj at fitFec)) {
+             for (j in 1:length(clonalObj at fitFec[[i]]$coefficients)) {
+                 clonalObj at fitFec[[i]]$coefficients[j] <- 
+clonalObj at fitFec[[i]]$coefficients[j] *
+                         (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 if (!is.null(fecObj)) {
+                     Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                             minSize = minSize, maxSize = maxSize, 
+fecObj = fecObj,
+                             chosenCov = chosenCov, integrateType = 
+integrateType,
+                             correction = correction, preCensus = preCensus,
+                             survObj = survObj, growObj = growObj)
+                 }
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 clonalObj at fitFec[[i]]$coefficients[j] <- 
+clonalObj at fitFec[[i]]$coefficients[j]/(1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/((as.numeric(clonalObj at fitFec[[i]]$coefficients[j]) * delta)))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes,paste("clonality: func", i, 
+names(clonalObj at fitFec[[i]]$coefficients)[j]))
+             }
+         }
+
+         chs <- which(!is.na(as.numeric(clonalObj at fecConstants)), 
+arr.ind = TRUE)
+         if (length(chs) > 0) {
+             for (j in 1:length(chs)) {
+                 clonalObj at fecConstants[1,chs[j]] <- 
+clonalObj at fecConstants[1,chs[j]] * (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 if (!is.null(fecObj)) {
+                     Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                             minSize = minSize, maxSize = maxSize, 
+fecObj = fecObj,
+                             chosenCov = chosenCov, integrateType = 
+integrateType,
+                             correction = correction, preCensus = preCensus,
+                             survObj = survObj, growObj = growObj)
+                 }
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 clonalObj at fecConstants[1, chs[j]] <- 
+clonalObj at fecConstants[1,chs[j]]/(1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(clonalObj at fecConstants[1,chs[j]] * delta)))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes,paste("clonality: 
+constant",names(clonalObj at fecConstants)[chs[j]]))
+             }
+         }
+
+         if (max(clonalObj at offspringSplitter)<1) {
+             for (j in which(clonalObj at offspringSplitter>0)) {
+                 clonalObj at offspringSplitter[j] <- 
+clonalObj at offspringSplitter[j] * (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 if (!is.null(fecObj)) {
+                     Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                             minSize = minSize, maxSize = maxSize, 
+fecObj = fecObj,
+                             chosenCov = chosenCov, integrateType = 
+integrateType,
+                             correction = correction, preCensus = preCensus,
+                             survObj = survObj, growObj = growObj)
+                 }
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 clonalObj at offspringSplitter[j] <- 
+clonalObj at offspringSplitter[j] / (1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(clonalObj at offspringSplitter[j] * delta)))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes,paste("clonality: 
+offspringSplitter",names(clonalObj at offspringSplitter[j])))
+             }
+         }
+
+         chs <- which(!is.na(as.numeric(clonalObj at fecByDiscrete)), 
+arr.ind = TRUE)
+         if (length(chs) > 0) {
+             for (j in 1:length(chs)) {
+                 clonalObj at fecByDiscrete[1,chs[j]] <- 
+clonalObj at fecByDiscrete[1,chs[j]] * (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 if (!is.null(fecObj)) {
+                     Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                             minSize = minSize, maxSize = maxSize, 
+fecObj = fecObj,
+                             chosenCov = chosenCov, integrateType = 
+integrateType,
+                             correction = correction, preCensus = preCensus,
+                             survObj = survObj, growObj = growObj)
+                 }
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 clonalObj at fecByDiscrete[1,chs[j]] <- 
+clonalObj at fecByDiscrete[1,chs[j]] / (1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(clonalObj at fecByDiscrete[1,chs[j]] * delta)))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+                 nmes <- c(nmes,paste("clonality: 
+fecByDiscrete",names(clonalObj at fecByDiscrete)[chs[j]]))
+             }
+         }
+
+         if (class(clonalObj at offspringRel)=="lm") {
+             for (j in 1:length(clonalObj at offspringRel$coeff)) {
+                 clonalObj at offspringRel$coefficients[j] <- 
+clonalObj at offspringRel$coefficients[j] * (1 + delta)
+                 Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, growObj = 
+growObj,
+                         chosenCov = chosenCov, survObj = survObj, 
+discreteTrans = discreteTrans,
+                         integrateType = integrateType, correction = 
+correction)
+                 if (!is.null(fecObj)) {
+                     Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                             minSize = minSize, maxSize = maxSize, 
+fecObj = fecObj,
+                             chosenCov = chosenCov, integrateType = 
+integrateType,
+                             correction = correction, preCensus = preCensus,
+                             survObj = survObj, growObj = growObj)
+                 }
+                 Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                         chosenCov = chosenCov, maxSize = maxSize, 
+clonalObj = clonalObj,
+                         integrateType = integrateType, correction = 
+correction,
+                         preCensus = preCensus, survObj = survObj, 
+growObj = growObj)
+
+                 IPM <- Pmatrix + Fmatrix + Cmatrix
+
+                 if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+                 if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+                 if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+                 clonalObj at offspringRel$coefficients[j] <- 
+clonalObj at offspringRel$coefficients[j]/(1 + delta)
+
+                 slam <- c(slam,(rc2 - 
+rc1)/(as.numeric(clonalObj at offspringRel$coefficients[j]) *delta))
+                 elam <- c(elam,(rc2 - rc1)/(rc1 *delta))
+                 nmes <- c(nmes, as.character(paste("clonality: 
+offspring rel ",names(clonalObj at offspringRel$coeff)[j])))
+             }
+
+             clonalObj at sdOffspringSize <- clonalObj at sdOffspringSize * (1 
++ delta)
+             Pmatrix <- createIPMPmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     maxSize = maxSize, growObj = growObj, chosenCov = 
+chosenCov,
+                     survObj = survObj, discreteTrans = discreteTrans, 
+integrateType = integrateType,
+                     correction = correction)
+             if (!is.null(fecObj)) {
+                 Fmatrix <- createIPMFmatrix(nBigMatrix = nBigMatrix,
+                         minSize = minSize, maxSize = maxSize, fecObj = 
+fecObj,
+                         chosenCov = chosenCov, integrateType = 
+integrateType,
+                         correction = correction, preCensus = preCensus,
+                         survObj = survObj, growObj = growObj)
+             }
+             Cmatrix <- createIPMCmatrix(nBigMatrix = nBigMatrix, 
+minSize = minSize,
+                     chosenCov = chosenCov, maxSize = maxSize, clonalObj 
+= clonalObj,
+                     integrateType = integrateType, correction = correction,
+                     preCensus = preCensus, survObj = survObj, growObj = 
+growObj)
+
+             IPM <- Pmatrix + Fmatrix + Cmatrix
+
+             if (response=="lambda") rc2 <- Re(eigen(IPM)$value[1])
+             if (response=="R0") rc2 <- R0Calc(Pmatrix, Fmatrix+Cmatrix)
+             if (response=="lifeExpect") rc2 <- 
+meanLifeExpect(Pmatrix)[chosenBin]
+
+             clonalObj at sdOffspringSize <- clonalObj at sdOffspringSize/(1 + 
+delta)
+
+             slam <- c(slam,(rc2 - rc1)/(clonalObj at sdOffspringSize * delta))
+             elam <- c(elam,(rc2 - rc1)/(rc1 * delta))
+             nmes <- c(nmes, "clonality: sd offspring size")
+         }
+     }
+
+     names(slam) <- nmes
+     names(elam) <- nmes
+
+     return(list(sens = slam, elas = elam))
+}
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20130402/d0ff9131/attachment-0001.html>
+
+From e.jongejans at science.ru.nl  Tue Apr  2 15:22:13 2013
+From: e.jongejans at science.ru.nl (Eelke Jongejans)
+Date: Tue, 02 Apr 2013 15:22:13 +0200
+Subject: [Ipmpack-users] sensParams problem
+In-Reply-To: <515AA8D0.5040308@science.ru.nl>
+References: <515AA8D0.5040308@science.ru.nl>
+Message-ID: <515ADB85.2040004@science.ru.nl>
+
+Dear Megan,
+
+the new sensParams function that we send to the list this morning and 
+that will be incorporated in the next version of IPMpack will allow you 
+to get the sensitivity and elasticity of lambda, R0 and LifeExpect for 
+survival, growth, discreteTrans, fecundity and clonality object 
+parameters at the same time.
+
+cheers,
+Eelke
+
+----------------------------------------------
+Is there a version of sensParams that accommodates a model with both a 
+fec and clonal object?  I might be missing something but I haven't found 
+one yet.
+Thanks,
+Megan
+
+On 02-Apr-13 11:45 AM, Eelke Jongejans wrote:
+>
+> Dear Kimmy,
+>
+>
+> you asked why sensParams doesn't work when all offspring go to 
+> discrete classes. We have found the bug (offspringRel (i.e. the 
+> relationship between offspring size and parent size) is, of course, 
+> not defined in such a case). Below you can find a fixed version of 
+> sensParams that will take this into account. It will also be in the 
+> next version of IPMpack.
+>
+>
+> best wishes,
+>
+> Jess, Eelke
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20130402/2cefd803/attachment.html>
+
+From e.jongejans at science.ru.nl  Wed Apr  3 17:54:36 2013
+From: e.jongejans at science.ru.nl (Eelke Jongejans)
+Date: Wed, 03 Apr 2013 17:54:36 +0200
+Subject: [Ipmpack-users] plot legend (or not) with survModelComp
+In-Reply-To: <1364991282.5404.YahooMailNeo@web161706.mail.bf1.yahoo.com>
+References: <1357896525.54868.YahooMailNeo@web161701.mail.bf1.yahoo.com>
+ <1364991282.5404.YahooMailNeo@web161706.mail.bf1.yahoo.com>
+Message-ID: <515C50BC.4060400@science.ru.nl>
+
+Dear Maria Paula,
+
+you are right that it is not yet possible to indicate whether a legend 
+needs to be plotted when running survModelComp and growthModelComp. This 
+functionality will be included in the next version of IPMpack. If you 
+can't wait: I've copied the new functions at the bottom of this email.
+
+best wishes,
+Eelke
+
+>
+> ----- Mensaje reenviado -----
+
+> Dear IPMpack team,
+> First at all it is a fantastic pack, congratulations.
+> Using the IPMpack, I found two errors:
+> 1.When I want to graph the */Survival and Growth models/* using 
+> survModelComp and growthModelComp, I chose *legendPos = FALS, but I 
+> still get the legend in the corner: see figures*
+> resultsurv <- survModelComp(dataf = Sp, expVars = c(surv~1, surv~size, 
+> surv~size +size2,
+> surv~size +size2+size3),
+> testType= "AIC",  makePlot = TRUE, *legendPos = FALSE*,
+> ncuts= 100, mainTitle = "Survival")
+>
+> 2.     ....
+> Thank for your help.
+> Maria Paula
+
+
+
+growthModelComp <- function(dataf,
+         expVars = c(sizeNext~1, sizeNext~size, sizeNext~size + size2),
+         regressionType = "constantVar",
+         testType = "AIC",
+         makePlot = FALSE,
+         mainTitle = "",
+         plotLegend = TRUE,
+         legendPos = "topright", ...) {
+     varN <- length(expVars)
+     typeN <- length(regressionType)
+     treatN <- varN * typeN
+     summaryTable <- data.frame()
+     grObj <- vector("list", length = treatN)
+     i <- 1
+     for(v in 1:varN) {
+         for(t in 1:typeN) {
+             grObj[[i]] <- makeGrowthObj(dataf = dataf, regType = 
+regressionType[t], Formula = expVars[[v]])
+             if 
+(length(grep("decline",tolower(as.character(class(grObj[[i]])))))>0) {
+                 summaryTable <- rbind(summaryTable, 
+cbind(as.character(unlist(expVars))[v], regressionType[t], 
+match.fun(testType)(grObj[[i]]@fit$fit)))
+             } else {
+             summaryTable <- rbind(summaryTable, 
+cbind(as.character(unlist(expVars))[v], regressionType[t], 
+match.fun(testType)(grObj[[i]]@fit)))
+             }
+             i <- i + 1
+         }
+     }
+     summaryTable <- as.data.frame(summaryTable)
+     names(summaryTable) <- c("Exp. Vars", "Reg. Type", testType)
+     outputList <- list(summaryTable = summaryTable, growthObjects = grObj)
+
+     # PLOT SECTION #
+     if(makePlot == TRUE) {
+         plotGrowthModelComp(grObj = grObj, summaryTable = summaryTable, 
+dataf = dataf, expVars = expVars,  testType = "AIC", plotLegend = 
+plotLegend, mainTitle = mainTitle, legendPos, ...)
+     }
+     return(outputList)
+}
+
+
+survModelComp <- function(dataf,
+         expVars = c(surv~1, surv~size, surv~size + size2),
+         testType = "AIC",
+         makePlot = FALSE,
+         mainTitle = "", ncuts = 20,
+         plotLegend = TRUE,
+         legendPos = "bottomleft", ...) {
+     varN <- length(expVars)
+     treatN <- varN
+     summaryTable <- data.frame()
+     svObj <- vector("list", length = treatN)
+     i <- 1
+     for(v in 1:varN) {
+         svObj[[i]] <- makeSurvObj(dataf = dataf, Formula = expVars[[v]])
+         summaryTable <- rbind(summaryTable, 
+cbind(as.character(unlist(expVars))[v], 
+match.fun(testType)(svObj[[i]]@fit)))
+         i <- i + 1
+     }
+     summaryTable <- as.data.frame(summaryTable)
+     names(summaryTable) <- c("Exp. Vars", testType)
+     outputList <- list(summaryTable = summaryTable, survObjects = svObj)
+
+     # PLOT SECTION #
+     if(makePlot == TRUE) {
+         ## this is the surv picture
+         plotSurvModelComp(svObj = svObj, summaryTable = summaryTable, 
+dataf = dataf, expVars = expVars, testType = "AIC", plotLegend = 
+plotLegend, mainTitle = mainTitle, ncuts = ncuts, legendPos = legendPos, 
+...)
+     }
+     return(outputList)
+}
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20130403/595c0670/attachment.html>
+
+From e.jongejans at science.ru.nl  Wed Apr  3 18:18:22 2013
+From: e.jongejans at science.ru.nl (Eelke Jongejans)
+Date: Wed, 03 Apr 2013 18:18:22 +0200
+Subject: [Ipmpack-users] bayesian functions in IPMpack
+In-Reply-To: <1364991282.5404.YahooMailNeo@web161706.mail.bf1.yahoo.com>
+References: <1364991282.5404.YahooMailNeo@web161706.mail.bf1.yahoo.com>
+Message-ID: <515C564E.8020507@science.ru.nl>
+
+Dear Maria Paula,
+
+Good question (see below). Probably you have to specify 
+Family=categorical. However, we've decided to leave out the bayesian 
+functions from the next version of IPMpack onwards. Instead we will 
+place the current functions (including makePostFecObjs) on the website 
+for those people who want to write such code themselves. If you are 
+interested in including uncertainty in your analyses you can also use 
+the current functions getListRegObjects and getListRegObjectsFec in 
+conjunction with makeListPmatrix, makeListFmatrix and makeListIPMs, 
+getIPMoutput.
+
+best wishes,
+Cory, Eelke
+
+
+	
+
+	
+
+	
+
+	
+
+	
+
+
+
+
+
+----- Mensaje reenviado -----
+**
+
+Dear IPMpack team,
+....
+2.The function *makePostFecObjs *is not working*when I use *Family = 
+c("binomial",??..but it supposes to works with binomial: /Family : a 
+character vector containing the names of the families to be used for the 
+glms, e.g., *binomial*, poisson, etc. Again, these must appear in the 
+order defined by the alphabetical order of column names containing "fec"/
+fvlist <- makePostFecObjs(dataf = Sp, fecNames =c("fec0", "fec1"),
+fecConstants= data.frame(NA),
+     explanatoryVariables = c("size", "size"),
+Family = c("binomial", "poisson"), Transform=c("none", "none"),
+meanOffspringSize=NA, sdOffspringSize=NA,
+vitalRatesPerOffspringType=data.frame(NA), burnin=3000, nitt = 5000)
+Once I ran the code, I got this message: Error in MCMCglmm(Formula, data 
+= dataf[!is.na(dataf[, fecNames[i]]),  :
+binomial not a supported distribution
+Thank for your help.
+Maria Paula
+**
+====================================================================================================================
+
+*Maria Paula Balc?zar-Vargas
+Post-Doc*
+Instituut voor Biodiversiteit en Ecosysteem Dynamica (IBED),
+Universiteit van Amsterdam
+Tel: + 31-(020) 5258421
+Bezoekadres:
+Science Park 904, kamer C4.165
+NL-1098 XH  Amsterdam
+PPlease consider your environmental responsibility before printing this 
+e-mail
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20130403/911c71bd/attachment.html>
+
+From berg1546 at umn.edu  Mon Apr  8 19:16:37 2013
+From: berg1546 at umn.edu (Sergey Berg)
+Date: Mon, 8 Apr 2013 12:16:37 -0500
+Subject: [Ipmpack-users] Defining two fecundity objects
+Message-ID: <CALb9Bd=35O-XMtqVNgzV6ADtDffDrqHGqf_05YQnGUO5yC6Ydw@mail.gmail.com>
+
+Good afternoon,
+
+I am hoping to get some help in using IPMpack for evaluating the population
+growth rate of a monocarpic plant species. I've read the documentation
+provided for the IPMpack R package, but I'm having a bit of trouble with
+defining the fecundity objects.
+
+I have five main parameters - size, sizeNext, surv, fec1, and fec2. fec1 is
+a binary variable that measures if a plant successfully produced offspring
+(and subsequently died, fec1=1) or not (fec1=0). fec2 is the number of
+offspring produced by the plant given fec1=1. I'm trying to understand
+whether these two variables need to create separate fecundity objects or if
+they should be combined into a single object, and how to do so.
+
+I was successfully able to define the growth and survival objects via these
+commands
+gr1<-makeGrowthObj(dataf=dat,Formula=sizeNext~size)
+sv1<-makeSurvObj(dataf=dat,Formula=surv~size+size2)
+but the fecundity objects
+fv1<-makeFecObj(dataf=dat,Formula=fec1~size,Family="gaussian",Transform="log")
+are giving "Error in split.default(X, group) : first argument must be a
+vector"
+
+I've included a portion of the data below if that helps.
+         size sizeNext surv fec1 fec2      stage  stageNext
+2704  150       NA    0    0   NA continuous continuous
+2705  225       NA    0    0   NA continuous continuous
+2706  800       NA    0    1  699 continuous continuous
+2707 1260       NA    0    1 1279 continuous continuous
+2708 1380       NA    0    1 1926 continuous continuous
+2709 1859       NA    0    1 1587 continuous continuous
+2710  156      165    1    0   NA continuous continuous
+2711   72      200    1    0   NA continuous continuous
+2712  108      210    1    0   NA continuous continuous
+
+Thank you very much in advance for any advice,
+
+Sergey
+
+-- 
+Sergey S. Berg
+National Science Foundation Research Fellow
+Conservation Biology Graduate Program
+FWCB Collegiate Fee Committee
+CB Seminar Planning Committee
+
+University of Minnesota
+174 McNeal Hall
+1985 Buford Ave
+St. Paul, MN 55108
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20130408/45e75167/attachment.html>
+
+From E.Jongejans at science.ru.nl  Mon Apr  8 22:35:16 2013
+From: E.Jongejans at science.ru.nl (Eelke Jongejans)
+Date: Mon, 08 Apr 2013 22:35:16 +0200
+Subject: [Ipmpack-users] Defining two fecundity objects
+In-Reply-To: <CALb9Bd=35O-XMtqVNgzV6ADtDffDrqHGqf_05YQnGUO5yC6Ydw@mail.gmail.com>
+References: <CALb9Bd=35O-XMtqVNgzV6ADtDffDrqHGqf_05YQnGUO5yC6Ydw@mail.gmail.com>
+Message-ID: <51632A04.4030608@science.ru.nl>
+
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/ipmpack-users/attachments/20130408/e24dfd83/attachment.html>
+

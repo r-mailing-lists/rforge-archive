@@ -1,0 +1,4024 @@
+From francoisromain at free.fr  Sun Nov  1 09:53:24 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Sun, 01 Nov 2009 09:53:24 +0100
+Subject: [Rprotobuf-yada] readProtoFiles
+Message-ID: <4AED4C84.2080706@free.fr>
+
+Hi,
+
+I've exported the readProtoFiles function, and it gains a package 
+argument to simplify reading proto files from R packages, when they 
+follow the convention of storing these in the "proto" directory.
+
+So typically, if package "foo" want to use ours it would have something 
+like this in the .onLoad :
+
+readProtoFiles( package = "foo" )
+
+Are you aware of something that indicates that a new package has been 
+loaded. I know of packageEvent, but this is tied to one particular 
+package, I'd like some sort of message that says : "i've loaded a 
+package", so that we can pick it up and check if it ships proto files, 
+import them, and so on ...
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From francoisromain at free.fr  Mon Nov  2 09:49:40 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Mon, 02 Nov 2009 09:49:40 +0100
+Subject: [Rprotobuf-yada] enabled lookup mechanism
+Message-ID: <4AEE9D24.8030601@free.fr>
+
+Hi,
+
+I've enabled the lookup mechanism :
+
+ > require( RProtoBuf )
+Loading required package: RProtoBuf
+Loading required package: Rcpp
+ > search()
+  [1] ".GlobalEnv"               "package:RProtoBuf"
+  [3] "package:Rcpp"             "package:stats"
+  [5] "package:graphics"         "package:grDevices"
+  [7] "package:utils"            "package:datasets"
+  [9] "package:methods"          "Autoloads"
+[11] "RProtoBuf:DescriptorPool" "package:base"
+ > p <- new( tutorial.Person )
+ > p
+[1] "protobuf message of type 'tutorial.Person' "
+ > new( tutorial.Person.PhoneNumber )
+[1] "protobuf message of type 'tutorial.Person.PhoneNumber' "
+
+At the moment, as you can see it uses the full path of the message type. 
+This might be good enough, but it might also be interesting to maintain 
+a set of prefixes, for example:
+
+setPrefix( "tutorial" )
+new( Person )
+new( Person.PhoneNumber )
+
+For this we would need to attach a c++ object in the privateData slot of 
+the object table, so instead of this (in lookup.cpp) :
+
+   tb->privateData = (void*)0 ;
+
+we would have something like this :
+
+   tb->privateData = (void*)setofprefixes ;
+
+where setofprefixes is something that holds the prefixes.
+
+If you play with this, you probably want to uncomment this line in 
+rprotobuf.h :
+
+// #define LOOKUP_DEBUG
+
+Romain
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From francoisromain at free.fr  Mon Nov  2 11:24:06 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Mon, 02 Nov 2009 11:24:06 +0100
+Subject: [Rprotobuf-yada] partial implementation of mutators
+Message-ID: <4AEEB346.2020202@free.fr>
+
+Hi,
+
+I've partially implemented mutators, so that :
+
+ > p <- new( tutorial.Person )
+ > p$id <- 10
+ > p$email <- "francoisromain at free.fr"
+ > cat( as.character( p ), sep = "\n" )
+id: 10
+email: "francoisromain at free.fr"
+
+At the moment, only non-repeated fields are implemented, and not 
+messages or enum types. The code is in mutators.cpp
+
+Romain
+
+PS: I'm going dark now, but I can still read/write emails.
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From francoisromain at free.fr  Wed Nov  4 18:07:51 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Wed, 04 Nov 2009 18:07:51 +0100
+Subject: [Rprotobuf-yada] lots of updates
+Message-ID: <4AF1B4E7.3050704@free.fr>
+
+Hi,
+
+Back from the connectionless couple of days in london. I've commited 
+lots of updates to the package.
+
+- mutators are now fully working, with all types: primitives, enums, 
+messages
+- "update" method
+- "new" takes care of the ... which is used to fill the message (using 
+update)
+- "clone" method to clone a message
+- "with" method so that we can evaluate an expression "with" a message
+- "has" method to indicate if a message has a given field set
+- "as.list" method
+- more completions
+
+It's all documented.
+
+I've updated the version to 0.0-3 as well.
+
+Here is the TODO file that I've commited :
+
+* finalizers
+* serialize/parse messages from/to connections
+* unit testing
+* vignette
+* what to do when unload the package
+* useR abstract
+* useR presentation
+
+Now, what we really need is ability to serialize and parse these 
+messages from streams, preferably R connections. Does one of you have an 
+idea about streaming these messages in and out ?
+
+We need to use these C++ methods of the Message class:
+
+bool ParseFromIstream(istream * input)
+bool SerializeToOstream(ostream * output) const
+
+meaning we need to create istream and ostream based on R connections.
+
+Romain
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Wed Nov  4 18:39:52 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 4 Nov 2009 11:39:52 -0600
+Subject: [Rprotobuf-yada] lots of updates
+In-Reply-To: <4AF1B4E7.3050704@free.fr>
+References: <4AF1B4E7.3050704@free.fr>
+Message-ID: <19185.48232.743847.801479@ron.nulle.part>
+
+
+Wow! You have so much frigging energy!
+
+On 4 November 2009 at 18:07, Romain Fran?ois wrote:
+| Hi,
+| 
+| Back from the connectionless couple of days in london. I've commited 
+
+I didn't know til yesterday that you were there (at least in part) for the
+London-R meeting. Nice!
+
+| lots of updates to the package.
+| 
+| - mutators are now fully working, with all types: primitives, enums, 
+| messages
+| - "update" method
+| - "new" takes care of the ... which is used to fill the message (using 
+| update)
+| - "clone" method to clone a message
+| - "with" method so that we can evaluate an expression "with" a message
+| - "has" method to indicate if a message has a given field set
+| - "as.list" method
+| - more completions
+
+And you even went to one namespace only :)
+
+Still builds fine. I just added one random commit to get rid of three
+harmless -Wall warnings.
+
+| It's all documented.
+
+Could you possibly set up a little demo() file that just 'does stuff' ?
+Otherwise I get lost between the different man pages.
+ 
+| I've updated the version to 0.0-3 as well.
+| 
+| Here is the TODO file that I've commited :
+| 
+| * finalizers
+| * serialize/parse messages from/to connections
+| * unit testing
+| * vignette
+| * what to do when unload the package
+| * useR abstract
+| * useR presentation
+| 
+| Now, what we really need is ability to serialize and parse these 
+| messages from streams, preferably R connections. Does one of you have an 
+| idea about streaming these messages in and out ?
+| 
+| We need to use these C++ methods of the Message class:
+| 
+| bool ParseFromIstream(istream * input)
+| bool SerializeToOstream(ostream * output) const
+| 
+| meaning we need to create istream and ostream based on R connections.
+
+Never tried that.  We could start pedestrian and parse from text connections
+(files) first and later bring things down to C++ in a more general way.
+
+By the way, if there are Rcpp you need or could think of let me know!
+
+Dirk
+
+ 
+| Romain
+| 
+| 
+| -- 
+| Romain Francois
+| Professional R Enthusiast
+| +33(0) 6 28 91 30 30
+| http://romainfrancois.blog.free.fr
+| |- http://tr.im/BcPw : celebrating R commit #50000
+| |- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+| `- http://tr.im/yw8E : New R package : sos
+| 
+| _______________________________________________
+| Rprotobuf-yada mailing list
+| Rprotobuf-yada at lists.r-forge.r-project.org
+| https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rprotobuf-yada
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Wed Nov  4 19:17:39 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Wed, 04 Nov 2009 19:17:39 +0100
+Subject: [Rprotobuf-yada] lots of updates
+In-Reply-To: <19185.48232.743847.801479@ron.nulle.part>
+References: <4AF1B4E7.3050704@free.fr>
+	<19185.48232.743847.801479@ron.nulle.part>
+Message-ID: <4AF1C543.5020101@dbmail.com>
+
+On 11/04/2009 06:39 PM, Dirk Eddelbuettel wrote:
+>
+> Wow! You have so much frigging energy!
+>
+> On 4 November 2009 at 18:07, Romain Fran?ois wrote:
+> | Hi,
+> |
+> | Back from the connectionless couple of days in london. I've commited
+>
+> I didn't know til yesterday that you were there (at least in part) for the
+> London-R meeting. Nice!
+>
+> | lots of updates to the package.
+> |
+> | - mutators are now fully working, with all types: primitives, enums,
+> | messages
+> | - "update" method
+> | - "new" takes care of the ... which is used to fill the message (using
+> | update)
+> | - "clone" method to clone a message
+> | - "with" method so that we can evaluate an expression "with" a message
+> | - "has" method to indicate if a message has a given field set
+> | - "as.list" method
+> | - more completions
+>
+> And you even went to one namespace only :)
+
+I sort of intercepted your commit. I hope I did not do damage otherwise, 
+please let me know if you commited something else that disappeared
+
+> Still builds fine. I just added one random commit to get rid of three
+> harmless -Wall warnings.
+>
+> | It's all documented.
+>
+> Could you possibly set up a little demo() file that just 'does stuff' ?
+> Otherwise I get lost between the different man pages.
+
+Sure. The page for the protobufMessage class is the one that contains 
+most of the stuff.
+
+> | I've updated the version to 0.0-3 as well.
+> |
+> | Here is the TODO file that I've commited :
+> |
+> | * finalizers
+> | * serialize/parse messages from/to connections
+> | * unit testing
+> | * vignette
+> | * what to do when unload the package
+> | * useR abstract
+> | * useR presentation
+> |
+> | Now, what we really need is ability to serialize and parse these
+> | messages from streams, preferably R connections. Does one of you have an
+> | idea about streaming these messages in and out ?
+> |
+> | We need to use these C++ methods of the Message class:
+> |
+> | bool ParseFromIstream(istream * input)
+> | bool SerializeToOstream(ostream * output) const
+> |
+> | meaning we need to create istream and ostream based on R connections.
+>
+> Never tried that.  We could start pedestrian and parse from text connections
+> (files) first and later bring things down to C++ in a more general way.
+
+Files are easy, but kind of boring. One potential way I'd like to use 
+this is to communicate with some other process, so typically send the 
+message through a binary socket, and it would be a pity to have to go 
+through files for this
+
+We can take R connections completely out of the loop and sort of 
+recreate them, but that's a shame I think.
+
+> By the way, if there are Rcpp you need or could think of let me know!
+
+If we can manage to disguise r connections as c++ streams, I think this 
+fits nicer in Rcpp than in RProtoBuf.
+
+> Dirk
+>
+>
+> | Romain
+> |
+> |
+> | --
+> | Romain Francois
+> | Professional R Enthusiast
+> | +33(0) 6 28 91 30 30
+> | http://romainfrancois.blog.free.fr
+> | |- http://tr.im/BcPw : celebrating R commit #50000
+> | |- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+> | `- http://tr.im/yw8E : New R package : sos
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Wed Nov  4 20:41:19 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 4 Nov 2009 13:41:19 -0600
+Subject: [Rprotobuf-yada] lots of updates
+In-Reply-To: <4AF1C543.5020101@dbmail.com>
+References: <4AF1B4E7.3050704@free.fr>
+	<19185.48232.743847.801479@ron.nulle.part>
+	<4AF1C543.5020101@dbmail.com>
+Message-ID: <19185.55519.601544.832761@ron.nulle.part>
+
+
+On 4 November 2009 at 19:17, Romain Francois wrote:
+| > And you even went to one namespace only :)
+| 
+| I sort of intercepted your commit. I hope I did not do damage otherwise, 
+| please let me know if you commited something else that disappeared
+
+Well for as long as svn cleanly applies it changes we're fine. 
+
+| > Could you possibly set up a little demo() file that just 'does stuff' ?
+| > Otherwise I get lost between the different man pages.
+| 
+| Sure. The page for the protobufMessage class is the one that contains 
+| most of the stuff.
+
+Cool, thanks. I see that we have one now. Haven't tried it yet...
+
+| > | meaning we need to create istream and ostream based on R connections.
+| >
+| > Never tried that.  We could start pedestrian and parse from text connections
+| > (files) first and later bring things down to C++ in a more general way.
+| 
+| Files are easy, but kind of boring. One potential way I'd like to use 
+
+Yes, but a good test case. If those work, extending to other connections
+should be fine.
+
+| this is to communicate with some other process, so typically send the 
+| message through a binary socket, and it would be a pity to have to go 
+| through files for this
+
+Absolutely.
+
+| We can take R connections completely out of the loop and sort of 
+| recreate them, but that's a shame I think.
+
+Oh, maybe I misunderstood. So connections but not R connections?
+
+| > By the way, if there are Rcpp you need or could think of let me know!
+| 
+| If we can manage to disguise r connections as c++ streams, I think this 
+| fits nicer in Rcpp than in RProtoBuf.
+
+Ack. Something to think about.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Wed Nov  4 20:53:01 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 4 Nov 2009 13:53:01 -0600
+Subject: [Rprotobuf-yada] Triplet of addressbook.proto files
+Message-ID: <19185.56221.970992.914007@ron.nulle.part>
+
+
+edd at ron:~/svn/rprotobuf/pkg$ find . -name \*.proto
+./src/addressbook.proto
+./inst/proto/addressbook.proto
+./inst/examples/addressbook.proto
+edd at ron:~/svn/rprotobuf/pkg$
+
+We should clean that up. How about keeping the one inst/proto/, and I'll
+adapt the Makevars file and (if need) my inst/examples/addressbook* example?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Wed Nov  4 20:55:25 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 4 Nov 2009 13:55:25 -0600
+Subject: [Rprotobuf-yada] Error on load
+In-Reply-To: <19185.55519.601544.832761@ron.nulle.part>
+References: <4AF1B4E7.3050704@free.fr>
+	<19185.48232.743847.801479@ron.nulle.part>
+	<4AF1C543.5020101@dbmail.com>
+	<19185.55519.601544.832761@ron.nulle.part>
+Message-ID: <19185.56365.281315.421808@ron.nulle.part>
+
+
+R> library(RProtoBuf)
+Loading required package: Rcpp
+Error in loadNamespace(package, c(which.lib.loc, lib.loc), keep.source =
+keep.source) :
+  in 'RProtoBuf' methods for export not found: clone
+Error: package/namespace load failed for 'RProtoBuf'
+R>
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Wed Nov  4 23:01:11 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 4 Nov 2009 16:01:11 -0600
+Subject: [Rprotobuf-yada] Error on load
+In-Reply-To: <19185.56365.281315.421808@ron.nulle.part>
+References: <4AF1B4E7.3050704@free.fr>
+	<19185.48232.743847.801479@ron.nulle.part>
+	<4AF1C543.5020101@dbmail.com>
+	<19185.55519.601544.832761@ron.nulle.part>
+	<19185.56365.281315.421808@ron.nulle.part>
+Message-ID: <19185.63911.38447.263322@ron.nulle.part>
+
+
+On 4 November 2009 at 13:55, Dirk Eddelbuettel wrote:
+| R> library(RProtoBuf)
+| Loading required package: Rcpp
+| Error in loadNamespace(package, c(which.lib.loc, lib.loc), keep.source =
+| keep.source) :
+|   in 'RProtoBuf' methods for export not found: clone
+| Error: package/namespace load failed for 'RProtoBuf'
+| R>
+
+FWIW that goes away if you comment out clone in NAMESPACES
+
+exportMethods( "new", "$", "$<-", "show",
+	"serialize", "as.character", "update", "has") #, "clone" )
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Thu Nov  5 08:16:46 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 05 Nov 2009 08:16:46 +0100
+Subject: [Rprotobuf-yada] Triplet of addressbook.proto files
+In-Reply-To: <19185.56221.970992.914007@ron.nulle.part>
+References: <19185.56221.970992.914007@ron.nulle.part>
+Message-ID: <4AF27BDE.6050605@dbmail.com>
+
+On 11/04/2009 08:53 PM, Dirk Eddelbuettel wrote:
+> edd at ron:~/svn/rprotobuf/pkg$ find . -name \*.proto
+> ./src/addressbook.proto
+> ./inst/proto/addressbook.proto
+> ./inst/examples/addressbook.proto
+> edd at ron:~/svn/rprotobuf/pkg$
+>
+> We should clean that up. How about keeping the one inst/proto/
+
+Deal. I need this one as an example for the convention used by 
+readProtoFiles.
+
+> and I'll
+> adapt the Makevars file and (if need) my inst/examples/addressbook* example?
+>
+> Dirk
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From romain.francois at dbmail.com  Thu Nov  5 08:18:44 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 05 Nov 2009 08:18:44 +0100
+Subject: [Rprotobuf-yada] lots of updates
+In-Reply-To: <19185.55519.601544.832761@ron.nulle.part>
+References: <4AF1B4E7.3050704@free.fr>	<19185.48232.743847.801479@ron.nulle.part>	<4AF1C543.5020101@dbmail.com>
+	<19185.55519.601544.832761@ron.nulle.part>
+Message-ID: <4AF27C54.6000502@dbmail.com>
+
+On 11/04/2009 08:41 PM, Dirk Eddelbuettel wrote:
+>
+>
+> On 4 November 2009 at 19:17, Romain Francois wrote:
+> |>  And you even went to one namespace only :)
+> |
+> | I sort of intercepted your commit. I hope I did not do damage otherwise,
+> | please let me know if you commited something else that disappeared
+>
+> Well for as long as svn cleanly applies it changes we're fine.
+>
+> |>  Could you possibly set up a little demo() file that just 'does stuff' ?
+> |>  Otherwise I get lost between the different man pages.
+> |
+> | Sure. The page for the protobufMessage class is the one that contains
+> | most of the stuff.
+>
+> Cool, thanks. I see that we have one now. Haven't tried it yet...
+>
+> |>  | meaning we need to create istream and ostream based on R connections.
+> |>
+> |>  Never tried that.  We could start pedestrian and parse from text connections
+> |>  (files) first and later bring things down to C++ in a more general way.
+> |
+> | Files are easy, but kind of boring. One potential way I'd like to use
+>
+> Yes, but a good test case. If those work, extending to other connections
+> should be fine.
+>
+> | this is to communicate with some other process, so typically send the
+> | message through a binary socket, and it would be a pity to have to go
+> | through files for this
+>
+> Absolutely.
+>
+> | We can take R connections completely out of the loop and sort of
+> | recreate them, but that's a shame I think.
+>
+> Oh, maybe I misunderstood. So connections but not R connections?
+
+My aim os to go through R connections. But if it is not possible, then 
+I'll move on.
+
+> |>  By the way, if there are Rcpp you need or could think of let me know!
+> |
+> | If we can manage to disguise r connections as c++ streams, I think this
+> | fits nicer in Rcpp than in RProtoBuf.
+>
+> Ack. Something to think about.
+>
+> Dirk
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From francoisromain at free.fr  Thu Nov  5 11:49:18 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Thu, 05 Nov 2009 11:49:18 +0100
+Subject: [Rprotobuf-yada] added merge
+Message-ID: <4AF2ADAE.1080809@free.fr>
+
+Hi,
+
+I've added a merge method for protobuf messages of the same type:
+
+ > m1 <- new( tutorial.Person, email = "francoisromain at free.fr" )
+ > m2 <- new( tutorial.Person, id = 5 )
+ > m3 <- merge( m1, m2 )
+ > writeLines( as.character( m1 ) )
+email: "francoisromain at free.fr"
+
+ > writeLines( as.character( m2 ) )
+id: 5
+
+ > writeLines( as.character( m3 ) )
+id: 5
+email: "francoisromain at free.fr"
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From francoisromain at free.fr  Thu Nov  5 12:19:14 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Thu, 05 Nov 2009 12:19:14 +0100
+Subject: [Rprotobuf-yada] how to incorporate saptarshi's code into the
+	package
+Message-ID: <4AF2B4B2.9010103@free.fr>
+
+Hi,
+
+I was just thinking about how to integrate Saptarshi's code into this 
+package, so that there is one package doing both approaches.
+
+I think, given the proto file that lives in Saptarshi's package, we can 
+write a bunch of setAs to convert arbitrary data into the correct 
+message type. See ?setAs
+
+What do you think ?
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From francoisromain at free.fr  Fri Nov  6 13:42:55 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Fri, 06 Nov 2009 13:42:55 +0100
+Subject: [Rprotobuf-yada] reading messages from files
+Message-ID: <4AF419CF.6080303@free.fr>
+
+Hi,
+
+Now reading a message from a file :
+
+ > # example file that contains a "tutorial.AddressBook" message
+ > book <- system.file( "examples", "AddressBookFile", package = 
+"RProtoBuf" )
+ > 
+
+ > # read the message 
+
+ > message <- read( tutorial.AddressBook, book ) 
+
+ > 
+
+ > # write its debug string 
+
+ > writeLines( as.character( message ) ) 
+
+person { 
+
+   name: "Humpty Dumpty" 
+
+   id: 1 
+
+   email: "humpty at on.the.wall" 
+
+   phone { 
+
+     number: "123.456.789" 
+
+     type: MOBILE 
+
+   } 
+
+   phone { 
+
+     number: "111.222.333" 
+
+     type: HOME 
+
+   } 
+
+} 
+
+person { 
+
+   name: "Someone WithoutEmail" 
+
+   id: 2 
+
+   phone { 
+
+     number: "345.678.123" 
+
+     type: WORK 
+
+   } 
+
+} 
+
+person { 
+
+   name: "Noemail Nophone" 
+
+   id: 3 
+
+} 
+
+person { 
+
+   name: "Many Phone" 
+
+   id: 4 
+
+   email: "very at important.com" 
+
+   phone { 
+
+     number: "111.111.111" 
+
+     type: WORK 
+
+   } 
+
+   phone { 
+
+     number: "222.222.222"
+     type: MOBILE
+   }
+   phone {
+     number: "333.333.333"
+     type: MOBILE
+   }
+   phone {
+     number: "444.444.444"
+     type: HOME
+   }
+}
+
+ >
+ > # grab the name of each person
+ > sapply( message$person, function(p) p$name )
+[1] "Humpty Dumpty"        "Someone WithoutEmail" "Noemail Nophone"
+[4] "Many Phone"
+
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Fri Nov  6 13:49:55 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Fri, 6 Nov 2009 06:49:55 -0600
+Subject: [Rprotobuf-yada] reading messages from files
+In-Reply-To: <4AF419CF.6080303@free.fr>
+References: <4AF419CF.6080303@free.fr>
+Message-ID: <19188.7027.542511.142709@ron.nulle.part>
+
+
+On 6 November 2009 at 13:42, Romain Fran?ois wrote:
+| Now reading a message from a file :
+[...]
+
+You rock!  Nice work.  I am currently moving RcppList up into Rcpp so at some
+point I may have to make you to upgrade Rcpp from R-Forge, ok?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Fri Nov  6 14:07:59 2009
+From: francoisromain at free.fr (=?UTF-8?B?Um9tYWluIEZyYW7Dp29pcw==?=)
+Date: Fri, 06 Nov 2009 14:07:59 +0100
+Subject: [Rprotobuf-yada] reading messages from files
+In-Reply-To: <19188.7027.542511.142709@ron.nulle.part>
+References: <4AF419CF.6080303@free.fr>
+	<19188.7027.542511.142709@ron.nulle.part>
+Message-ID: <4AF41FAF.8090300@free.fr>
+
+On 11/06/2009 01:49 PM, Dirk Eddelbuettel wrote:
+>
+> On 6 November 2009 at 13:42, Romain Fran?ois wrote:
+> | Now reading a message from a file :
+> [...]
+>
+> You rock!  Nice work.  I am currently moving RcppList up into Rcpp so at some
+> point I may have to make you to upgrade Rcpp from R-Forge, ok?
+
+Why not. I'll request to join.
+
+> Dirk
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From saptarshi.guha at gmail.com  Fri Nov  6 15:57:50 2009
+From: saptarshi.guha at gmail.com (Saptarshi Guha)
+Date: Fri, 6 Nov 2009 09:57:50 -0500
+Subject: [Rprotobuf-yada] reading messages from files
+In-Reply-To: <4AF41FAF.8090300@free.fr>
+References: <4AF419CF.6080303@free.fr>
+	<19188.7027.542511.142709@ron.nulle.part>
+	<4AF41FAF.8090300@free.fr>
+Message-ID: <6B3F1B36-6F93-445A-AA35-BC8DA5C88E89@gmail.com>
+
+Excellent work. A few issues with building
+In both cases i checked out from SVN(fresh copy)
+cd rprotobuf/
+R CMD INSTALL pkg
+
+1) On Leopard 10.5,
+it builds, but when I try to load
+
+library(RProtoBuf)
+Loading required package: Rcpp
+Error in dyn.load(file, DLLpath = DLLpath, ...) :
+   unable to load shared library '/Library/Frameworks/R.framework/ 
+Resources/library/RProtoBuf/libs/i386/RProtoBuf.so':
+   dlopen(/Library/Frameworks/R.framework/Resources/library/RProtoBuf/ 
+libs/i386/RProtoBuf.so, 6): Symbol not found:  
+__ZN8tutorial11AddressBookC1Ev
+   Referenced from: /Library/Frameworks/R.framework/Resources/library/ 
+RProtoBuf/libs/i386/RProtoBuf.so
+   Expected in: dynamic lookup
+
+Error: package/namespace load failed for 'RProtoBuf'
+
+
+2) On RHEL5
+(uname: Linux spica 2.6.18-128.4.1.el5 #1 SMP Thu Jul 23 19:59:19 EDT  
+2009 x86_64 x86_64 x86_64 GNU/Linux)
+even though  I have protobuf installed
+checking for protoc... yes
+checking for ProtoBuf headers and library... no
+
+
+   Your installation does not appear to have ProtoBuf headers and  
+libraries.
+
+   Please make sure that you have a working and complete ProtoBuf  
+installation.
+
+ERROR: configuration failed for package 'RProtoBuf'
+** Removing '/ln/meraki/custom/lib64/R/library/RProtoBuf'
+
+
+3) I now think that it might not be useful to merge rprotobuf (which I  
+plan to rename rpbsz) with this new package.
+I saw the examples and there are really nice. Everything I did in  
+rprotobuf can be done from within R via RProtoBuf(or wrappers around it)
+and my package is just a wrapper around one proto file wherea  
+RProtoBuffer can handle any proto file.
+I'm thinking that it would be enough to keep the proto file i used in  
+the proto directory as an example (though it is a very detailed proto  
+file).
+
+
+Regards
+Saptarshi
+
+
+On Nov 6, 2009, at 8:07 AM, Romain Fran?ois wrote:
+
+> On 11/06/2009 01:49 PM, Dirk Eddelbuettel wrote:
+>>
+>> On 6 November 2009 at 13:42, Romain Fran?ois wrote:
+>> | Now reading a message from a file :
+>> [...]
+>>
+>> You rock!  Nice work.  I am currently moving RcppList up into Rcpp  
+>> so at some
+>> point I may have to make you to upgrade Rcpp from R-Forge, ok?
+>
+> Why not. I'll request to join.
+>
+>> Dirk
+>>
+>
+>
+> -- 
+> Romain Francois
+> Professional R Enthusiast
+> +33(0) 6 28 91 30 30
+> http://romainfrancois.blog.free.fr
+> |- http://tr.im/BcPw : celebrating R commit #50000
+> |- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+> `- http://tr.im/yw8E : New R package : sos
+>
+> _______________________________________________
+> Rprotobuf-yada mailing list
+> Rprotobuf-yada at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rprotobuf-yada
+
+
+From francoisromain at free.fr  Fri Nov  6 16:14:47 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Fri, 06 Nov 2009 16:14:47 +0100
+Subject: [Rprotobuf-yada] reading messages from files
+In-Reply-To: <6B3F1B36-6F93-445A-AA35-BC8DA5C88E89@gmail.com>
+References: <4AF419CF.6080303@free.fr>
+	<19188.7027.542511.142709@ron.nulle.part>
+	<4AF41FAF.8090300@free.fr>
+	<6B3F1B36-6F93-445A-AA35-BC8DA5C88E89@gmail.com>
+Message-ID: <4AF43D67.1060600@free.fr>
+
+On 11/06/2009 03:57 PM, Saptarshi Guha wrote:
+> Excellent work. A few issues with building
+> In both cases i checked out from SVN(fresh copy)
+> cd rprotobuf/
+> R CMD INSTALL pkg
+>
+> 1) On Leopard 10.5,
+> it builds, but when I try to load
+>
+> library(RProtoBuf)
+> Loading required package: Rcpp
+> Error in dyn.load(file, DLLpath = DLLpath, ...) :
+> unable to load shared library
+> '/Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so':
+>
+> dlopen(/Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so,
+> 6): Symbol not found: __ZN8tutorial11AddressBookC1Ev
+> Referenced from:
+> /Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so
+>
+> Expected in: dynamic lookup
+>
+> Error: package/namespace load failed for 'RProtoBuf'
+
+No idea what it could be. Is this because of
+
+addressbook.pb.cc:	../inst/proto/addressbook.proto
+
+and the fact that macs typically build for multiple arch, so need one 
+more level. I think there is something to figure out the root dir of the 
+package instead of using .. but I'm not so sure what.
+
+> 2) On RHEL5
+> (uname: Linux spica 2.6.18-128.4.1.el5 #1 SMP Thu Jul 23 19:59:19 EDT
+> 2009 x86_64 x86_64 x86_64 GNU/Linux)
+> even though I have protobuf installed
+> checking for protoc... yes
+> checking for ProtoBuf headers and library... no
+>
+>
+> Your installation does not appear to have ProtoBuf headers and libraries.
+>
+> Please make sure that you have a working and complete ProtoBuf
+> installation.
+>
+> ERROR: configuration failed for package 'RProtoBuf'
+> ** Removing '/ln/meraki/custom/lib64/R/library/RProtoBuf'
+
+you need to install the libprotobuf-devel rpm. It was easy in fedora, so 
+you might be able to install them through EPEL or something.
+
+> 3) I now think that it might not be useful to merge rprotobuf (which I
+> plan to rename rpbsz) with this new package.
+> I saw the examples and there are really nice. Everything I did in
+> rprotobuf can be done from within R via RProtoBuf(or wrappers around it)
+> and my package is just a wrapper around one proto file wherea
+> RProtoBuffer can handle any proto file.
+> I'm thinking that it would be enough to keep the proto file i used in
+> the proto directory as an example (though it is a very detailed proto
+> file).
+
+The two surely use two very different approaches, you can serialize 
+"any" R data as a protobuf message using one message type, and we can 
+serialize any message type. AFAICS, the bridge between the two simply 
+consists of defining a bunch of setAs methods:
+
+setAs( "integer", "protobufMessage", function(from){
+    # some code that makes an appropriate message
+} )
+
+I think we need this anyway since quite likely people are going to ask 
+"how can i make a message from a data frame", etc ...
+
+
+> Regards
+> Saptarshi
+>
+>
+> On Nov 6, 2009, at 8:07 AM, Romain Fran?ois wrote:
+>
+>> On 11/06/2009 01:49 PM, Dirk Eddelbuettel wrote:
+>>>
+>>> On 6 November 2009 at 13:42, Romain Fran?ois wrote:
+>>> | Now reading a message from a file :
+>>> [...]
+>>>
+>>> You rock! Nice work. I am currently moving RcppList up into Rcpp so
+>>> at some
+>>> point I may have to make you to upgrade Rcpp from R-Forge, ok?
+>>
+>> Why not. I'll request to join.
+>>
+>>> Dirk
+>>>
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Fri Nov  6 16:18:45 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Fri, 6 Nov 2009 09:18:45 -0600
+Subject: [Rprotobuf-yada] reading messages from files
+In-Reply-To: <6B3F1B36-6F93-445A-AA35-BC8DA5C88E89@gmail.com>
+References: <4AF419CF.6080303@free.fr>
+	<19188.7027.542511.142709@ron.nulle.part>
+	<4AF41FAF.8090300@free.fr>
+	<6B3F1B36-6F93-445A-AA35-BC8DA5C88E89@gmail.com>
+Message-ID: <19188.15957.333567.313503@ron.nulle.part>
+
+
+On 6 November 2009 at 09:57, Saptarshi Guha wrote:
+| Excellent work. A few issues with building
+| In both cases i checked out from SVN(fresh copy)
+| cd rprotobuf/
+| R CMD INSTALL pkg
+| 
+| 1) On Leopard 10.5,
+| it builds, but when I try to load
+| 
+| library(RProtoBuf)
+| Loading required package: Rcpp
+| Error in dyn.load(file, DLLpath = DLLpath, ...) :
+|    unable to load shared library '/Library/Frameworks/R.framework/ 
+| Resources/library/RProtoBuf/libs/i386/RProtoBuf.so':
+|    dlopen(/Library/Frameworks/R.framework/Resources/library/RProtoBuf/ 
+| libs/i386/RProtoBuf.so, 6): Symbol not found:  
+| __ZN8tutorial11AddressBookC1Ev
+|    Referenced from: /Library/Frameworks/R.framework/Resources/library/ 
+| RProtoBuf/libs/i386/RProtoBuf.so
+|    Expected in: dynamic lookup
+| 
+| Error: package/namespace load failed for 'RProtoBuf'
+
+Can you please show the gcc compile + link instructions resulting from R CMD INSTALL ?
+ 
+| 2) On RHEL5
+| (uname: Linux spica 2.6.18-128.4.1.el5 #1 SMP Thu Jul 23 19:59:19 EDT  
+| 2009 x86_64 x86_64 x86_64 GNU/Linux)
+| even though  I have protobuf installed
+| checking for protoc... yes
+| checking for ProtoBuf headers and library... no
+| 
+| 
+|    Your installation does not appear to have ProtoBuf headers and  
+| libraries.
+| 
+|    Please make sure that you have a working and complete ProtoBuf  
+| installation.
+| 
+| ERROR: configuration failed for package 'RProtoBuf'
+| ** Removing '/ln/meraki/custom/lib64/R/library/RProtoBuf'
+
+Please install protobuf for RHEL, or directly, and try again.  If you have it
+installed, adjust confiure.in and re-run autoconf.
+
+| 3) I now think that it might not be useful to merge rprotobuf (which I  
+| plan to rename rpbsz) with this new package.
+| I saw the examples and there are really nice. Everything I did in  
+| rprotobuf can be done from within R via RProtoBuf(or wrappers around it)
+| and my package is just a wrapper around one proto file wherea  
+| RProtoBuffer can handle any proto file.
+| I'm thinking that it would be enough to keep the proto file i used in  
+| the proto directory as an example (though it is a very detailed proto  
+| file).
+
+If you really don't want to join, fine.  I still think it would make perfect
+sense to join forces.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Fri Nov  6 17:03:09 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Fri, 6 Nov 2009 10:03:09 -0600
+Subject: [Rprotobuf-yada] reading messages from files
+In-Reply-To: <4AF43D67.1060600@free.fr>
+References: <4AF419CF.6080303@free.fr>
+	<19188.7027.542511.142709@ron.nulle.part>
+	<4AF41FAF.8090300@free.fr>
+	<6B3F1B36-6F93-445A-AA35-BC8DA5C88E89@gmail.com>
+	<4AF43D67.1060600@free.fr>
+Message-ID: <19188.18621.828374.719634@ron.nulle.part>
+
+
+On 6 November 2009 at 16:14, Romain Fran?ois wrote:
+| On 11/06/2009 03:57 PM, Saptarshi Guha wrote:
+| > Excellent work. A few issues with building
+| > In both cases i checked out from SVN(fresh copy)
+| > cd rprotobuf/
+| > R CMD INSTALL pkg
+| >
+| > 1) On Leopard 10.5,
+| > it builds, but when I try to load
+| >
+| > library(RProtoBuf)
+| > Loading required package: Rcpp
+| > Error in dyn.load(file, DLLpath = DLLpath, ...) :
+| > unable to load shared library
+| > '/Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so':
+| >
+| > dlopen(/Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so,
+| > 6): Symbol not found: __ZN8tutorial11AddressBookC1Ev
+| > Referenced from:
+| > /Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so
+| >
+| > Expected in: dynamic lookup
+| >
+| > Error: package/namespace load failed for 'RProtoBuf'
+| 
+| No idea what it could be. Is this because of
+| 
+| addressbook.pb.cc:	../inst/proto/addressbook.proto
+| 
+| and the fact that macs typically build for multiple arch, so need one 
+| more level. I think there is something to figure out the root dir of the 
+| package instead of using .. but I'm not so sure what.
+
+Could be related.
+
+On the other hand that ../inst/proto/ path is fixed an _not_ different on OS X.  
+Headers/libs for e.g. Rcpp live in different files.
+
+Here the obj code for tutorial::AddressBook was not found. Maybe
+addressbook.pb.cc did not get linked?  
+
+Which is why I asked for those lines from R CMD INSTALL
+
+| 
+| > 2) On RHEL5
+| > (uname: Linux spica 2.6.18-128.4.1.el5 #1 SMP Thu Jul 23 19:59:19 EDT
+| > 2009 x86_64 x86_64 x86_64 GNU/Linux)
+| > even though I have protobuf installed
+| > checking for protoc... yes
+| > checking for ProtoBuf headers and library... no
+| >
+| >
+| > Your installation does not appear to have ProtoBuf headers and libraries.
+| >
+| > Please make sure that you have a working and complete ProtoBuf
+| > installation.
+| >
+| > ERROR: configuration failed for package 'RProtoBuf'
+| > ** Removing '/ln/meraki/custom/lib64/R/library/RProtoBuf'
+| 
+| you need to install the libprotobuf-devel rpm. It was easy in fedora, so 
+| you might be able to install them through EPEL or something.
+| 
+| > 3) I now think that it might not be useful to merge rprotobuf (which I
+| > plan to rename rpbsz) with this new package.
+| > I saw the examples and there are really nice. Everything I did in
+| > rprotobuf can be done from within R via RProtoBuf(or wrappers around it)
+| > and my package is just a wrapper around one proto file wherea
+| > RProtoBuffer can handle any proto file.
+| > I'm thinking that it would be enough to keep the proto file i used in
+| > the proto directory as an example (though it is a very detailed proto
+| > file).
+| 
+| The two surely use two very different approaches, you can serialize 
+| "any" R data as a protobuf message using one message type, and we can 
+| serialize any message type. AFAICS, the bridge between the two simply 
+| consists of defining a bunch of setAs methods:
+| 
+| setAs( "integer", "protobufMessage", function(from){
+|     # some code that makes an appropriate message
+| } )
+| 
+| I think we need this anyway since quite likely people are going to ask 
+| "how can i make a message from a data frame", etc ...
+
+Yep!
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Fri Nov  6 18:14:32 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Fri, 6 Nov 2009 11:14:32 -0600
+Subject: [Rprotobuf-yada] reading messages from files
+In-Reply-To: <4AF43D67.1060600@free.fr>
+References: <4AF419CF.6080303@free.fr>
+	<19188.7027.542511.142709@ron.nulle.part>
+	<4AF41FAF.8090300@free.fr>
+	<6B3F1B36-6F93-445A-AA35-BC8DA5C88E89@gmail.com>
+	<4AF43D67.1060600@free.fr>
+Message-ID: <19188.22904.292362.140598@ron.nulle.part>
+
+
+On 6 November 2009 at 16:14, Romain Fran?ois wrote:
+| > library(RProtoBuf)
+| > Loading required package: Rcpp
+| > Error in dyn.load(file, DLLpath = DLLpath, ...) :
+| > unable to load shared library
+| > '/Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so':
+| >
+| > dlopen(/Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so,
+| > 6): Symbol not found: __ZN8tutorial11AddressBookC1Ev
+| > Referenced from:
+| > /Library/Frameworks/R.framework/Resources/library/RProtoBuf/libs/i386/RProtoBuf.so
+| >
+| > Expected in: dynamic lookup
+| >
+| > Error: package/namespace load failed for 'RProtoBuf'
+| 
+| No idea what it could be. Is this because of
+| 
+| addressbook.pb.cc:	../inst/proto/addressbook.proto
+
+Just to rule that out, copy addressbook.proto back to src and change the lines
+in Makevars back to what they were:
+
+addressbook.pb.cc:	addressbook.proto
+			protoc --cpp_out=.  $<
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Fri Nov  6 21:02:17 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Fri, 06 Nov 2009 21:02:17 +0100
+Subject: [Rprotobuf-yada] serialize to files
+Message-ID: <4AF480C9.60807@free.fr>
+
+Hi,
+
+And now for something completely different, serializing a message to a file.
+
+ > p <- new( tutorial.Person, id = 1, name = "Romain", email = 
+"francoisromain at free.fr" )
+ > serialize( p, "/tmp/romain.bin" )
+ > writeLines( as.character( tutorial.Person$read( "/tmp/romain.bin") ) )
+name: "Romain"
+id: 1
+email: "francoisromain at free.fr"
+
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From romain.francois at dbmail.com  Sat Nov  7 10:51:20 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 07 Nov 2009 10:51:20 +0100
+Subject: [Rprotobuf-yada] linking against R shared library
+Message-ID: <4AF54318.7090708@dbmail.com>
+
+Hello,
+
+I'm trying to use the limited connection api using R_outpstream_st that 
+is defined in Rinternals.h
+
+I have code that looks like this (trimmed of do_serializeToConn) :
+
+     Rconnection con   ;
+     struct R_outpstream_st out;
+     R_pstream_format_t type = R_pstream_binary_format ;
+     SEXP (*hook)(SEXP, SEXP) = NULL ;
+     con = getConnection(Rf_asInteger(connection));
+     R_InitConnOutPStream(&out, con, type, 0, hook, R_NilValue );
+
+
+The issue I have at the moment is with the call to "getConnection", so I 
+was trying to do things like this :
+
+#ifndef LibExtern
+#define LibExtern extern
+#endif
+LibExtern Rconnection getConnection(int);
+
+but for this I think we need to link against the R shared lib ? Do you 
+know how to do this.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Sat Nov  7 13:31:58 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 7 Nov 2009 06:31:58 -0600
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <4AF54318.7090708@dbmail.com>
+References: <4AF54318.7090708@dbmail.com>
+Message-ID: <19189.26814.813727.184086@ron.nulle.part>
+
+
+On 7 November 2009 at 10:51, Romain Francois wrote:
+| Hello,
+| 
+| I'm trying to use the limited connection api using R_outpstream_st that 
+| is defined in Rinternals.h
+| 
+| I have code that looks like this (trimmed of do_serializeToConn) :
+| 
+|      Rconnection con   ;
+|      struct R_outpstream_st out;
+|      R_pstream_format_t type = R_pstream_binary_format ;
+|      SEXP (*hook)(SEXP, SEXP) = NULL ;
+|      con = getConnection(Rf_asInteger(connection));
+|      R_InitConnOutPStream(&out, con, type, 0, hook, R_NilValue );
+| 
+| 
+| The issue I have at the moment is with the call to "getConnection", so I 
+| was trying to do things like this :
+| 
+| #ifndef LibExtern
+| #define LibExtern extern
+| #endif
+| LibExtern Rconnection getConnection(int);
+| 
+| but for this I think we need to link against the R shared lib ? Do you 
+| know how to do this.
+
+Yes because projects like littler or RInside do it to embed all of R.
+
+But here we build a loadable module for R -- can it really link to R itself
+when it is loaded into R?  
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Sat Nov  7 15:37:38 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 7 Nov 2009 08:37:38 -0600
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <19189.26814.813727.184086@ron.nulle.part>
+References: <4AF54318.7090708@dbmail.com>
+	<19189.26814.813727.184086@ron.nulle.part>
+Message-ID: <19189.34354.933590.911522@ron.nulle.part>
+
+
+On 7 November 2009 at 06:31, Dirk Eddelbuettel wrote:
+| On 7 November 2009 at 10:51, Romain Francois wrote:
+| | Hello,
+| | 
+| | I'm trying to use the limited connection api using R_outpstream_st that 
+| | is defined in Rinternals.h
+| | 
+| | I have code that looks like this (trimmed of do_serializeToConn) :
+| | 
+| |      Rconnection con   ;
+| |      struct R_outpstream_st out;
+| |      R_pstream_format_t type = R_pstream_binary_format ;
+| |      SEXP (*hook)(SEXP, SEXP) = NULL ;
+| |      con = getConnection(Rf_asInteger(connection));
+| |      R_InitConnOutPStream(&out, con, type, 0, hook, R_NilValue );
+| | 
+| | 
+| | The issue I have at the moment is with the call to "getConnection", so I 
+| | was trying to do things like this :
+| | 
+| | #ifndef LibExtern
+| | #define LibExtern extern
+| | #endif
+| | LibExtern Rconnection getConnection(int);
+| | 
+| | but for this I think we need to link against the R shared lib ? Do you 
+| | know how to do this.
+| 
+| Yes because projects like littler or RInside do it to embed all of R.
+| 
+| But here we build a loadable module for R -- can it really link to R itself
+| when it is loaded into R?  
+
+Saw your r-devel post too. Not sure we can do this if the API "seals it"
+away from us.  When did Jeff post about exposing connections?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Sat Nov  7 16:51:23 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 7 Nov 2009 09:51:23 -0600
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <19189.34354.933590.911522@ron.nulle.part>
+References: <4AF54318.7090708@dbmail.com>
+	<19189.26814.813727.184086@ron.nulle.part>
+	<19189.34354.933590.911522@ron.nulle.part>
+Message-ID: <19189.38779.721095.597128@ron.nulle.part>
+
+
+This compiles, but is otherwise nonsensical.  Does this get you going?
+
+edd at ron:~/svn/rprotobuf$ cat pkg/src/readconnection.cpp
+
+
+#define NEED_CONNECTION_PSTREAMS 1
+#include <Rinternals.h>
+
+#include "rprotobuf.h"
+
+
+namespace rprotobuf {
+
+/**
+ * read a message from a connection
+ *
+ * @param xp external pointer to a Descriptor*
+ * @param connname name of the connection
+ *
+ * @return a new "protobufMessage" S4 instance
+ */
+SEXP readMessageFromConnection( SEXP xp, SEXP pdata ){
+
+        Descriptor* desc = GET_DESCRIPTOR_POINTER_FROM_XP( xp );
+
+        // these inits are just to silence the compiler...
+        R_inpstream_t stream = NULL;
+        Rconnection con = NULL;
+        R_pstream_format_t type = R_pstream_binary_format;
+        SEXP (*phook)(SEXP, SEXP) = NULL;
+        R_InitConnInPStream(stream,  con, type, phook, pdata);
+
+        Message * message = (Message*)MessageFactory::generated_factory()->GetPrototype( desc )->New();
+        if ( !message ) {
+                throwException( "could not call factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+        }
+
+        // do work...
+
+        return( new_RS4_Message_( message ) ) ;
+
+}
+
+} // namespace rprotobuf
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Nov  7 17:45:47 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 07 Nov 2009 17:45:47 +0100
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <19189.34354.933590.911522@ron.nulle.part>
+References: <4AF54318.7090708@dbmail.com>	<19189.26814.813727.184086@ron.nulle.part>
+	<19189.34354.933590.911522@ron.nulle.part>
+Message-ID: <4AF5A43B.6020104@dbmail.com>
+
+On 11/07/2009 03:37 PM, Dirk Eddelbuettel wrote:
+>
+>
+> On 7 November 2009 at 06:31, Dirk Eddelbuettel wrote:
+> | On 7 November 2009 at 10:51, Romain Francois wrote:
+> | | Hello,
+> | |
+> | | I'm trying to use the limited connection api using R_outpstream_st that
+> | | is defined in Rinternals.h
+> | |
+> | | I have code that looks like this (trimmed of do_serializeToConn) :
+> | |
+> | |      Rconnection con   ;
+> | |      struct R_outpstream_st out;
+> | |      R_pstream_format_t type = R_pstream_binary_format ;
+> | |      SEXP (*hook)(SEXP, SEXP) = NULL ;
+> | |      con = getConnection(Rf_asInteger(connection));
+> | |      R_InitConnOutPStream(&out, con, type, 0, hook, R_NilValue );
+> | |
+> | |
+> | | The issue I have at the moment is with the call to "getConnection", so I
+> | | was trying to do things like this :
+> | |
+> | | #ifndef LibExtern
+> | | #define LibExtern extern
+> | | #endif
+> | | LibExtern Rconnection getConnection(int);
+> | |
+> | | but for this I think we need to link against the R shared lib ? Do you
+> | | know how to do this.
+> |
+> | Yes because projects like littler or RInside do it to embed all of R.
+> |
+> | But here we build a loadable module for R -- can it really link to R itself
+> | when it is loaded into R?
+>
+> Saw your r-devel post too. Not sure we can do this if the API "seals it"
+> away from us.  When did Jeff post about exposing connections?
+
+2006. http://tolstoy.newcastle.edu.au/R/e2/devel/06/11/0960.html
+
+I mentionned it to him recently , and he was still frustrated about it.
+
+I'd also like to map connections to stream in rJava and be able to write 
+directly to connections in highlight.
+
+> Dirk
+
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From romain.francois at dbmail.com  Sat Nov  7 17:48:53 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 07 Nov 2009 17:48:53 +0100
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <19189.38779.721095.597128@ron.nulle.part>
+References: <4AF54318.7090708@dbmail.com>	<19189.26814.813727.184086@ron.nulle.part>	<19189.34354.933590.911522@ron.nulle.part>
+	<19189.38779.721095.597128@ron.nulle.part>
+Message-ID: <4AF5A4F5.8020106@dbmail.com>
+
+On 11/07/2009 04:51 PM, Dirk Eddelbuettel wrote:
+>
+>
+> This compiles, but is otherwise nonsensical.  Does this get you going?
+
+I think I still need to call getConnection to get the Rconn* that 
+corresponds to the connection index. What do you pass as pdata here ?
+
+> edd at ron:~/svn/rprotobuf$ cat pkg/src/readconnection.cpp
+>
+>
+> #define NEED_CONNECTION_PSTREAMS 1
+> #include<Rinternals.h>
+>
+> #include "rprotobuf.h"
+>
+>
+> namespace rprotobuf {
+>
+> /**
+>   * read a message from a connection
+>   *
+>   * @param xp external pointer to a Descriptor*
+>   * @param connname name of the connection
+>   *
+>   * @return a new "protobufMessage" S4 instance
+>   */
+> SEXP readMessageFromConnection( SEXP xp, SEXP pdata ){
+>
+>          Descriptor* desc = GET_DESCRIPTOR_POINTER_FROM_XP( xp );
+>
+>          // these inits are just to silence the compiler...
+>          R_inpstream_t stream = NULL;
+>          Rconnection con = NULL;
+>          R_pstream_format_t type = R_pstream_binary_format;
+>          SEXP (*phook)(SEXP, SEXP) = NULL;
+>          R_InitConnInPStream(stream,  con, type, phook, pdata);
+>
+>          Message * message = (Message*)MessageFactory::generated_factory()->GetPrototype( desc )->New();
+>          if ( !message ) {
+>                  throwException( "could not call factory->GetPrototype(desc)->New()", "MessageCreationException" ) ;
+>          }
+>
+>          // do work...
+>
+>          return( new_RS4_Message_( message ) ) ;
+>
+> }
+>
+> } // namespace rprotobuf
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Sat Nov  7 18:46:12 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 7 Nov 2009 11:46:12 -0600
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <4AF5A4F5.8020106@dbmail.com>
+References: <4AF54318.7090708@dbmail.com>
+	<19189.26814.813727.184086@ron.nulle.part>
+	<19189.34354.933590.911522@ron.nulle.part>
+	<19189.38779.721095.597128@ron.nulle.part>
+	<4AF5A4F5.8020106@dbmail.com>
+Message-ID: <19189.45668.473622.344222@ron.nulle.part>
+
+
+On 7 November 2009 at 17:48, Romain Francois wrote:
+| On 11/07/2009 04:51 PM, Dirk Eddelbuettel wrote:
+| >
+| >
+| > This compiles, but is otherwise nonsensical.  Does this get you going?
+| 
+| I think I still need to call getConnection to get the Rconn* that 
+| corresponds to the connection index. What do you pass as pdata here ?
+
+Dunno, I never used these. I just thought I'd help you to get it out of
+Rinternals and to make it available.  
+
+I would have to look at the R sources to see what they do with the
+connections.  I guess I misunderstood your snippet
+
+     Rconnection con   ;
+     struct R_outpstream_st out;
+     R_pstream_format_t type = R_pstream_binary_format ;
+     SEXP (*hook)(SEXP, SEXP) = NULL ;
+     con = getConnection(Rf_asInteger(connection));
+     R_InitConnOutPStream(&out, con, type, 0, hook, R_NilValue );
+
+as you're ahead of me and only missing getConnection. My bad.
+
+Looking at $R/src/main/connections.c, getConnection is clearly hidden so I am
+not sure what we can do ... short of patching R or re-implementing the
+connection business outside of R.  Either way, this sucks :-/
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Nov  7 19:07:07 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 07 Nov 2009 19:07:07 +0100
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <19189.45668.473622.344222@ron.nulle.part>
+References: <4AF54318.7090708@dbmail.com>	<19189.26814.813727.184086@ron.nulle.part>	<19189.34354.933590.911522@ron.nulle.part>	<19189.38779.721095.597128@ron.nulle.part>	<4AF5A4F5.8020106@dbmail.com>
+	<19189.45668.473622.344222@ron.nulle.part>
+Message-ID: <4AF5B74B.9070706@dbmail.com>
+
+On 11/07/2009 06:46 PM, Dirk Eddelbuettel wrote:
+>
+>
+> On 7 November 2009 at 17:48, Romain Francois wrote:
+> | On 11/07/2009 04:51 PM, Dirk Eddelbuettel wrote:
+> |>
+> |>
+> |>  This compiles, but is otherwise nonsensical.  Does this get you going?
+> |
+> | I think I still need to call getConnection to get the Rconn* that
+> | corresponds to the connection index. What do you pass as pdata here ?
+>
+> Dunno, I never used these. I just thought I'd help you to get it out of
+> Rinternals and to make it available.
+>
+> I would have to look at the R sources to see what they do with the
+> connections.  I guess I misunderstood your snippet
+>
+>       Rconnection con   ;
+>       struct R_outpstream_st out;
+>       R_pstream_format_t type = R_pstream_binary_format ;
+>       SEXP (*hook)(SEXP, SEXP) = NULL ;
+>       con = getConnection(Rf_asInteger(connection));
+>       R_InitConnOutPStream(&out, con, type, 0, hook, R_NilValue );
+>
+> as you're ahead of me and only missing getConnection. My bad.
+>
+> Looking at $R/src/main/connections.c, getConnection is clearly hidden so I am
+> not sure what we can do ... short of patching R or re-implementing the
+> connection business outside of R.  Either way, this sucks :-/
+>
+> Dirk
+
+I'm close to give up. I don't see why they would make this available:
+
+void R_InitConnOutPStream(R_outpstream_t stream, Rconnection con,
+			  R_pstream_format_t type, int version,
+			  SEXP (*phook)(SEXP, SEXP), SEXP pdata);
+
+when there seems to be no way to get hold of __any__ Rconnection. If I 
+could get to some Rconnection, then knowing its number I'd be able to 
+jump to the one I'm interested in I think since they are in an array ...
+
+The closest I can get is to the con->exp_ptr which is this guy:
+
+ > f <- file( "/tmp/foo", open = "w" )
+ > attr( f, "conn_id")
+<pointer: 0x30>
+
+which would be useful if the external pointer did point to something 
+useful, but that's not what I gather from these :
+
+     con->ex_ptr = R_MakeExternalPtr(con->id, install("connection"),
+				    R_NilValue);
+     setAttrib(ans, install("conn_id"), con->ex_ptr);
+
+
+
+
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Sat Nov  7 20:01:01 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 7 Nov 2009 13:01:01 -0600
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <4AF5B74B.9070706@dbmail.com>
+References: <4AF54318.7090708@dbmail.com>
+	<19189.26814.813727.184086@ron.nulle.part>
+	<19189.34354.933590.911522@ron.nulle.part>
+	<19189.38779.721095.597128@ron.nulle.part>
+	<4AF5A4F5.8020106@dbmail.com>
+	<19189.45668.473622.344222@ron.nulle.part>
+	<4AF5B74B.9070706@dbmail.com>
+Message-ID: <19189.50157.669963.229058@ron.nulle.part>
+
+
+On 7 November 2009 at 19:07, Romain Francois wrote:
+| I'm close to give up. I don't see why they would make this available:
+| 
+| void R_InitConnOutPStream(R_outpstream_t stream, Rconnection con,
+| 			  R_pstream_format_t type, int version,
+| 			  SEXP (*phook)(SEXP, SEXP), SEXP pdata);
+| 
+| when there seems to be no way to get hold of __any__ Rconnection. If I 
+| could get to some Rconnection, then knowing its number I'd be able to 
+| jump to the one I'm interested in I think since they are in an array ...
+| 
+| The closest I can get is to the con->exp_ptr which is this guy:
+| 
+|  > f <- file( "/tmp/foo", open = "w" )
+|  > attr( f, "conn_id")
+| <pointer: 0x30>
+| 
+| which would be useful if the external pointer did point to something 
+| useful, but that's not what I gather from these :
+| 
+|      con->ex_ptr = R_MakeExternalPtr(con->id, install("connection"),
+| 				    R_NilValue);
+|      setAttrib(ans, install("conn_id"), con->ex_ptr);
+
+Is it worth talking to Simon? What does he do to get the connections?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Nov  7 20:06:19 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 07 Nov 2009 20:06:19 +0100
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <19189.50157.669963.229058@ron.nulle.part>
+References: <4AF54318.7090708@dbmail.com>	<19189.26814.813727.184086@ron.nulle.part>	<19189.34354.933590.911522@ron.nulle.part>	<19189.38779.721095.597128@ron.nulle.part>	<4AF5A4F5.8020106@dbmail.com>	<19189.45668.473622.344222@ron.nulle.part>	<4AF5B74B.9070706@dbmail.com>
+	<19189.50157.669963.229058@ron.nulle.part>
+Message-ID: <4AF5C52B.7080304@dbmail.com>
+
+On 11/07/2009 08:01 PM, Dirk Eddelbuettel wrote:
+>
+>
+> On 7 November 2009 at 19:07, Romain Francois wrote:
+> | I'm close to give up. I don't see why they would make this available:
+> |
+> | void R_InitConnOutPStream(R_outpstream_t stream, Rconnection con,
+> | 			  R_pstream_format_t type, int version,
+> | 			  SEXP (*phook)(SEXP, SEXP), SEXP pdata);
+> |
+> | when there seems to be no way to get hold of __any__ Rconnection. If I
+> | could get to some Rconnection, then knowing its number I'd be able to
+> | jump to the one I'm interested in I think since they are in an array ...
+> |
+> | The closest I can get is to the con->exp_ptr which is this guy:
+> |
+> |>  f<- file( "/tmp/foo", open = "w" )
+> |>  attr( f, "conn_id")
+> |<pointer: 0x30>
+> |
+> | which would be useful if the external pointer did point to something
+> | useful, but that's not what I gather from these :
+> |
+> |      con->ex_ptr = R_MakeExternalPtr(con->id, install("connection"),
+> | 				    R_NilValue);
+> |      setAttrib(ans, install("conn_id"), con->ex_ptr);
+>
+> Is it worth talking to Simon?
+
+It always is, but I don't think he gets them, since it appears you 
+cannot. Did I say something that confused you about using connections in 
+rJava ? It would be nice, but I don't think it is done.
+
+> What does he do to get the connections?
+>
+> Dirk
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Sat Nov  7 20:20:15 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 7 Nov 2009 13:20:15 -0600
+Subject: [Rprotobuf-yada] linking against R shared library
+In-Reply-To: <4AF5C52B.7080304@dbmail.com>
+References: <4AF54318.7090708@dbmail.com>
+	<19189.26814.813727.184086@ron.nulle.part>
+	<19189.34354.933590.911522@ron.nulle.part>
+	<19189.38779.721095.597128@ron.nulle.part>
+	<4AF5A4F5.8020106@dbmail.com>
+	<19189.45668.473622.344222@ron.nulle.part>
+	<4AF5B74B.9070706@dbmail.com>
+	<19189.50157.669963.229058@ron.nulle.part>
+	<4AF5C52B.7080304@dbmail.com>
+Message-ID: <19189.51311.703619.979030@ron.nulle.part>
+
+
+On 7 November 2009 at 20:06, Romain Francois wrote:
+| It always is, but I don't think he gets them, since it appears you 
+| cannot. Did I say something that confused you about using connections in 
+| rJava ? It would be nice, but I don't think it is done.
+
+Ack, so file connections it is then for now.  Else, there's always Rserve or
+something else.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Sun Nov  8 13:28:24 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Sun, 08 Nov 2009 13:28:24 +0100
+Subject: [Rprotobuf-yada] workaround for serializing to arbitrary binary
+	connections
+Message-ID: <4AF6B968.9040408@free.fr>
+
+Hi,
+
+I've commited a workaround for serializing messages to arbitrary binary 
+connections. Basically instead of going through a file as before, I am 
+now grabbing the payload of the message as a raw vector and write the 
+payload using writeBin.
+
+It is less efficient than if I had access to connections at the C level, 
+maybe one day.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Sun Nov  8 15:17:48 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sun, 8 Nov 2009 08:17:48 -0600
+Subject: [Rprotobuf-yada] workaround for serializing to arbitrary
+	binary	connections
+In-Reply-To: <4AF6B968.9040408@free.fr>
+References: <4AF6B968.9040408@free.fr>
+Message-ID: <19190.54028.503475.319889@ron.nulle.part>
+
+
+On 8 November 2009 at 13:28, Romain Fran?ois wrote:
+| Hi,
+| 
+| I've commited a workaround for serializing messages to arbitrary binary 
+| connections. Basically instead of going through a file as before, I am 
+| now grabbing the payload of the message as a raw vector and write the 
+| payload using writeBin.
+| 
+| It is less efficient than if I had access to connections at the C level, 
+| maybe one day.
+
+I can't build it:
+
+[...]
+g++ -I/usr/share/R/include -I/usr/local/lib/R/site-library/Rcpp/lib -I/usr/include     -fpic  -g -O3 -Wall -pipe -c read.cpp -o read.o
+In file included from read.cpp:1:
+rprotobuf.h:13:59: error: google/protobuf/io/zero_copy_stream_impl_lite.h: No such file or directory
+make: *** [read.o] Error 1
+ERROR: compilation failed for package ?RProtoBuf?
+* removing ?/usr/local/lib/R/site-library/RProtoBuf?
+* restoring previous ?/usr/local/lib/R/site-library/RProtoBuf?
+
+edd at ron:~/svn/rprotobuf$ ls /usr/include/google/protobuf/io/
+coded_stream.h  gzip_stream.h  printer.h  tokenizer.h  zero_copy_stream.h  zero_copy_stream_impl.h
+edd at ron:~/svn/rprotobuf$
+
+Version prior to 2.2 do not have the *_lite.h variants, I suppose.
+
+We could require 2.2, but then we'd need to test for it too in configure.  
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Sun Nov  8 16:24:31 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sun, 8 Nov 2009 09:24:31 -0600
+Subject: [Rprotobuf-yada] workaround for serializing to
+	arbitrary	binary	connections
+In-Reply-To: <19190.54028.503475.319889@ron.nulle.part>
+References: <4AF6B968.9040408@free.fr>
+	<19190.54028.503475.319889@ron.nulle.part>
+Message-ID: <19190.58031.286164.633485@ron.nulle.part>
+
+
+On 8 November 2009 at 08:17, Dirk Eddelbuettel wrote:
+| I can't build it:
+
+Fixed in SVN r75:
+
+edd at ron:~/svn/rprotobuf$ svn diff -r74 pkg/src/rprotobuf.h
+Index: pkg/src/rprotobuf.h
+===================================================================
+--- pkg/src/rprotobuf.h (revision 74)
++++ pkg/src/rprotobuf.h (working copy)
+@@ -10,7 +10,8 @@
+ #include <google/protobuf/compiler/importer.h>
+ #include <google/protobuf/dynamic_message.h>
+ #include <google/protobuf/message.h>
+-#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
++#include <google/protobuf/io/zero_copy_stream_impl.h>
++#include <google/protobuf/io/coded_stream.h>
+
+ #define R_NO_REMAP
+
+edd at ron:~/svn/rprotobuf$
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sun Nov  8 17:34:15 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sun, 08 Nov 2009 17:34:15 +0100
+Subject: [Rprotobuf-yada] workaround for serializing to	arbitrary	binary
+ connections
+In-Reply-To: <19190.58031.286164.633485@ron.nulle.part>
+References: <4AF6B968.9040408@free.fr>	<19190.54028.503475.319889@ron.nulle.part>
+	<19190.58031.286164.633485@ron.nulle.part>
+Message-ID: <4AF6F307.2010409@dbmail.com>
+
+Thanks. I've been confused by the API documentation.
+
+On 11/08/2009 04:24 PM, Dirk Eddelbuettel wrote:
+> On 8 November 2009 at 08:17, Dirk Eddelbuettel wrote:
+> | I can't build it:
+>
+> Fixed in SVN r75:
+>
+> edd at ron:~/svn/rprotobuf$ svn diff -r74 pkg/src/rprotobuf.h
+> Index: pkg/src/rprotobuf.h
+> ===================================================================
+> --- pkg/src/rprotobuf.h (revision 74)
+> +++ pkg/src/rprotobuf.h (working copy)
+> @@ -10,7 +10,8 @@
+>   #include<google/protobuf/compiler/importer.h>
+>   #include<google/protobuf/dynamic_message.h>
+>   #include<google/protobuf/message.h>
+> -#include<google/protobuf/io/zero_copy_stream_impl_lite.h>
+> +#include<google/protobuf/io/zero_copy_stream_impl.h>
+> +#include<google/protobuf/io/coded_stream.h>
+>
+>   #define R_NO_REMAP
+>
+> edd at ron:~/svn/rprotobuf$
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From francoisromain at free.fr  Sun Nov  8 20:27:16 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Sun, 08 Nov 2009 20:27:16 +0100
+Subject: [Rprotobuf-yada] read from arbitrary binary connection
+Message-ID: <4AF71B94.5040309@free.fr>
+
+Hi,
+
+Same as for the serializing out, I have commited some code to read a 
+message from a binary connection. It is a little bit more tricky because 
+we don't know the size of the payload before we read the file, so I've 
+had to subclass CopyingInputStream [1] with some 
+RconnectionCopyingInputStream which essentially calls the readBin 
+function of R many each time to get a part of the payload.
+
+This is my first real C++ code in the package, so please check that it 
+is sound. It seems to work anyway with this simple enough example :
+
+ > require( RProtoBuf )
+Loading required package: RProtoBuf
+Loading required package: Rcpp
+
+ > message <- new( tutorial.Person, name = "Romain", email = "", id = 2 )
+ > serialize( message, "romain.bin" )
+ > # using google's code to read rom the file
+ > m <- read( tutorial.Person, "/tmp/romain.bin" )
+ > writeLines( direct <- as.character(m) )
+name: "Romain"
+id: 2
+email: ""
+
+ > # reading from a binary R connection
+ > f <- file( "/tmp/romain.bin", open = "rb" )
+ > me <- read( tutorial.Person, f )
+ > close( f)
+ > writeLines( connect <- as.character(me) )
+name: "Romain"
+id: 2
+email: ""
+
+ > stopifnot( identical( direct, connect ) )
+
+
+
+[1] 
+http://code.google.com/apis/protocolbuffers/docs/reference/cpp/google.protobuf.io.zero_copy_stream_impl_lite.html#CopyingInputStream
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From francoisromain at free.fr  Mon Nov  9 09:44:31 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Mon, 09 Nov 2009 09:44:31 +0100
+Subject: [Rprotobuf-yada] strategy for releasing (e.g. what to do about
+	windows)
+Message-ID: <4AF7D66F.4000303@free.fr>
+
+Hi,
+
+I'm getting quite happy about the package now.
+
+I plan to integrate Saptarshi's proto file and implement some setAs 
+methods so that we can represent "any" R data as a message, which should 
+be nice.
+
+But I'd like to release before that, so that people can start to play 
+with it, ...
+
+I'm quite uncertain about what to do to release the package so that it 
+works on windows. I'm sure windows people would expect to only have to 
+install the package, so should be distribute a compiled libproto ?
+
+Another thing I'm not sure about is these lines in rprotobuf.cpp :
+
+	MockErrorCollector error_collector ;
+	DiskSourceTree source_tree;
+	// FIXME : this works only on linux I suppose
+	source_tree.MapPath("/", "/");
+	Importer importer(&source_tree, &error_collector);
+
+which for obvious reasons won't work on windows. This is quite central 
+to the package because if we can't read proto files, we can't do anything.
+
+
+BTW, I was just comparing the byte size of R serialization with the byte 
+size of protobuf's, and it is quite striking:
+
+ > message <- new( tutorial.Person, name = "dddd", email = "eeeeeee", id 
+= 1 )
+ > length( serialize( message, NULL ) )
+[1] 17
+ > length( serialize( as.list(message), NULL ) )
+[1] 166
+
+Now I understand what Saptarshi meant with R serialization being verbose.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/BcPw : celebrating R commit #50000
+|- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+`- http://tr.im/yw8E : New R package : sos
+
+
+From edd at debian.org  Mon Nov  9 13:59:03 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Mon, 9 Nov 2009 06:59:03 -0600
+Subject: [Rprotobuf-yada] strategy for releasing (e.g. what to do
+	about	windows)
+In-Reply-To: <4AF7D66F.4000303@free.fr>
+References: <4AF7D66F.4000303@free.fr>
+Message-ID: <19192.4631.166265.58030@ron.nulle.part>
+
+
+On 9 November 2009 at 09:44, Romain Fran?ois wrote:
+| Hi,
+| 
+| I'm getting quite happy about the package now.
+| 
+| I plan to integrate Saptarshi's proto file and implement some setAs 
+| methods so that we can represent "any" R data as a message, which should 
+| be nice.
+
+Ok.
+
+One wishlist item I had was to see if you could please upgrade to Rcpp 0.6.7
+from CRAN, tell me that you've done so ... and I'd then commit my changed
+list_people_R.rcpp that uses RcppList() from Rcpp.  
+
+With that, we could change the asList() code to actually use it. And/or
+change other parts to use Rcpp.  Yay or rather Nay?
+
+| But I'd like to release before that, so that people can start to play 
+| with it, ...
+| 
+| I'm quite uncertain about what to do to release the package so that it 
+| works on windows. I'm sure windows people would expect to only have to 
+| install the package, so should be distribute a compiled libproto ?
+
+Tricky!
+
+I own several CRAN packages that interface external libs and this issue comes
+up all the time. So far I have never re-packaged the external lib. It would
+help the uninitiated, but it is also somewhat crude.   Plus, I don't really
+like Windows and don't like maintaining build code on that side.  How do you
+feel about that?
+
+| Another thing I'm not sure about is these lines in rprotobuf.cpp :
+| 
+| 	MockErrorCollector error_collector ;
+| 	DiskSourceTree source_tree;
+| 	// FIXME : this works only on linux I suppose
+| 	source_tree.MapPath("/", "/");
+| 	Importer importer(&source_tree, &error_collector);
+
+Wow, do we actually walk the entire disk? That sounds crazy!
+
+| which for obvious reasons won't work on windows. This is quite central 
+| to the package because if we can't read proto files, we can't do anything.
+
+I think we should respond to an env var RPROTO_TREE_TOP (or some other name)
+and search from there.  Given a dir, we can walk it in either OS.  Doing more
+in a portable manner is an attempt at suicide....
+ 
+| BTW, I was just comparing the byte size of R serialization with the byte 
+| size of protobuf's, and it is quite striking:
+| 
+|  > message <- new( tutorial.Person, name = "dddd", email = "eeeeeee", id 
+| = 1 )
+|  > length( serialize( message, NULL ) )
+| [1] 17
+|  > length( serialize( as.list(message), NULL ) )
+| [1] 166
+| 
+| Now I understand what Saptarshi meant with R serialization being verbose.
+
+Nice!
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Mon Nov  9 15:53:45 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Mon, 09 Nov 2009 15:53:45 +0100
+Subject: [Rprotobuf-yada] strategy for releasing (e.g. what to do	about
+ windows)
+In-Reply-To: <19192.4631.166265.58030@ron.nulle.part>
+References: <4AF7D66F.4000303@free.fr> <19192.4631.166265.58030@ron.nulle.part>
+Message-ID: <4AF82CF9.4040704@dbmail.com>
+
+On 11/09/2009 01:59 PM, Dirk Eddelbuettel wrote:
+>
+> On 9 November 2009 at 09:44, Romain Fran?ois wrote:
+> | Hi,
+> |
+> | I'm getting quite happy about the package now.
+> |
+> | I plan to integrate Saptarshi's proto file and implement some setAs
+> | methods so that we can represent "any" R data as a message, which should
+> | be nice.
+>
+> Ok.
+>
+> One wishlist item I had was to see if you could please upgrade to Rcpp 0.6.7
+> from CRAN, tell me that you've done so ... and I'd then commit my changed
+> list_people_R.rcpp that uses RcppList() from Rcpp.
+
+Now requiring Rcpp >= 0.6.7
+
+It does not compile, but I guess this is the part you want to fix:
+
+  -I/usr/local/include    -fpic  -g -O2 -c list_people_R.cpp -o 
+list_people_R.o
+list_people_R.cpp:14: error: redefinition of ?class RcppList?
+/usr/local/lib/R/library/Rcpp/lib/RcppList.h:40: error: previous 
+definition of ?class RcppList?
+make: *** [list_people_R.o] Error 1
+
+> With that, we could change the asList() code to actually use it. And/or
+> change other parts to use Rcpp.  Yay or rather Nay?
+
+In the long run, we definitely should use some class encapsulation, 
+rather than plain old SEXP stuff.
+
+But right I'm invoking the "it works" excuse, so I'd prefer to write 
+unit tests that stress it out, and then refactor so that we know quickly 
+what we break.
+
+That's also why I'd like to release before integrating saptarshi's proto 
+file
+
+> | But I'd like to release before that, so that people can start to play
+> | with it, ...
+> |
+> | I'm quite uncertain about what to do to release the package so that it
+> | works on windows. I'm sure windows people would expect to only have to
+> | install the package, so should be distribute a compiled libproto ?
+>
+> Tricky!
+>
+> I own several CRAN packages that interface external libs and this issue comes
+> up all the time. So far I have never re-packaged the external lib. It would
+> help the uninitiated, but it is also somewhat crude.   Plus, I don't really
+> like Windows and don't like maintaining build code on that side.  How do you
+> feel about that?
+
+I don't like or care about windows, but I want this package to be used ...
+
+We can release saying : right now it only works on unix systems, but 
+we'd appreciate help to make a windows binary. Maybe Brian Ripley would 
+care to help us, like he does with the XML package IIRC
+
+> | Another thing I'm not sure about is these lines in rprotobuf.cpp :
+> |
+> | 	MockErrorCollector error_collector ;
+> | 	DiskSourceTree source_tree;
+> | 	// FIXME : this works only on linux I suppose
+> | 	source_tree.MapPath("/", "/");
+> | 	Importer importer(&source_tree,&error_collector);
+>
+> Wow, do we actually walk the entire disk? That sounds crazy!
+
+Of course not. It does not recurse at all, it just replaces the "virtual 
+path" with the "physical path", paste with the file name and check if it 
+is there.
+
+On the R side, I make sure to pass the full path using 
+tools:::file_path_as_absolute so we don't actually need any fancy mapping.
+
+Now that I am a bit more C++ confident, maybe I'll just make my own 
+SourceTree implementation instead of using DiskSourceTree
+
+http://code.google.com/apis/protocolbuffers/docs/reference/cpp/google.protobuf.compiler.importer.html#SourceTree
+
+> | which for obvious reasons won't work on windows. This is quite central
+> | to the package because if we can't read proto files, we can't do anything.
+>
+> I think we should respond to an env var RPROTO_TREE_TOP (or some other name)
+> and search from there.  Given a dir, we can walk it in either OS.  Doing more
+> in a portable manner is an attempt at suicide....
+
+I'd prefer avoiding yet another environment variable.
+
+> | BTW, I was just comparing the byte size of R serialization with the byte
+> | size of protobuf's, and it is quite striking:
+> |
+> |>  message<- new( tutorial.Person, name = "dddd", email = "eeeeeee", id
+> | = 1 )
+> |>  length( serialize( message, NULL ) )
+> | [1] 17
+> |>  length( serialize( as.list(message), NULL ) )
+> | [1] 166
+> |
+> | Now I understand what Saptarshi meant with R serialization being verbose.
+>
+> Nice!
+>
+> Dirk
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Mon Nov  9 16:51:35 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Mon, 9 Nov 2009 09:51:35 -0600
+Subject: [Rprotobuf-yada] strategy for releasing (e.g. what to do	about
+ windows)
+In-Reply-To: <4AF82CF9.4040704@dbmail.com>
+References: <4AF7D66F.4000303@free.fr> <19192.4631.166265.58030@ron.nulle.part>
+	<4AF82CF9.4040704@dbmail.com>
+Message-ID: <19192.14983.940239.708839@ron.nulle.part>
+
+
+On 9 November 2009 at 15:53, Romain Francois wrote:
+| Now requiring Rcpp >= 0.6.7
+| 
+| It does not compile, but I guess this is the part you want to fix:
+
+Exactly. Done as r90.
+
+| In the long run, we definitely should use some class encapsulation, 
+| rather than plain old SEXP stuff.
+| 
+| But right I'm invoking the "it works" excuse, so I'd prefer to write 
+| unit tests that stress it out, and then refactor so that we know quickly 
+| what we break.
+| 
+| That's also why I'd like to release before integrating saptarshi's proto 
+| file
+
+Ok.  Tests would indeed be good.
+
+| I don't like or care about windows, but I want this package to be used ...
+| 
+| We can release saying : right now it only works on unix systems, but 
+| we'd appreciate help to make a windows binary. Maybe Brian Ripley would 
+| care to help us, like he does with the XML package IIRC
+
+Works for me. RProtoBuf is for 'real' computers anyway. If someone wants it
+on Windows (and someone will) they can come and offer help.  Let's not waste
+time there now for a 0.1 CRAN release.
+
+| Of course not. It does not recurse at all, it just replaces the "virtual 
+| path" with the "physical path", paste with the file name and check if it 
+| is there.
+
+So if '/' is virtual, why would it not work on Windows? How can we tell
+without testing?
+
+| > I think we should respond to an env var RPROTO_TREE_TOP (or some other name)
+| > and search from there.  Given a dir, we can walk it in either OS.  Doing more
+| > in a portable manner is an attempt at suicide....
+| 
+| I'd prefer avoiding yet another environment variable.
+
+I misunderstood the issue so the suggestion is moot. No env var needed.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Mon Nov  9 17:05:26 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Mon, 09 Nov 2009 17:05:26 +0100
+Subject: [Rprotobuf-yada] strategy for releasing (e.g. what to do	about
+ windows)
+In-Reply-To: <19192.14983.940239.708839@ron.nulle.part>
+References: <4AF7D66F.4000303@free.fr>
+	<19192.4631.166265.58030@ron.nulle.part>	<4AF82CF9.4040704@dbmail.com>
+	<19192.14983.940239.708839@ron.nulle.part>
+Message-ID: <4AF83DC6.8090204@dbmail.com>
+
+On 11/09/2009 04:51 PM, Dirk Eddelbuettel wrote:
+>
+>
+> On 9 November 2009 at 15:53, Romain Francois wrote:
+> | Now requiring Rcpp>= 0.6.7
+> |
+> | It does not compile, but I guess this is the part you want to fix:
+>
+> Exactly. Done as r90.
+>
+> | In the long run, we definitely should use some class encapsulation,
+> | rather than plain old SEXP stuff.
+> |
+> | But right I'm invoking the "it works" excuse, so I'd prefer to write
+> | unit tests that stress it out, and then refactor so that we know quickly
+> | what we break.
+> |
+> | That's also why I'd like to release before integrating saptarshi's proto
+> | file
+>
+> Ok.  Tests would indeed be good.
+>
+> | I don't like or care about windows, but I want this package to be used ...
+> |
+> | We can release saying : right now it only works on unix systems, but
+> | we'd appreciate help to make a windows binary. Maybe Brian Ripley would
+> | care to help us, like he does with the XML package IIRC
+>
+> Works for me. RProtoBuf is for 'real' computers anyway. If someone wants it
+> on Windows (and someone will) they can come and offer help.  Let's not waste
+> time there now for a 0.1 CRAN release.
+
+Alright. There are a few more things I'd like to do before release, but 
+we're not far.
+
+> | Of course not. It does not recurse at all, it just replaces the "virtual
+> | path" with the "physical path", paste with the file name and check if it
+> | is there.
+>
+> So if '/' is virtual, why would it not work on Windows? How can we tell
+> without testing?
+
+I've replaced the DiskSourceTree with an RSourceTree class which does no 
+such mappings and just use the path verbatim, since we take care of 
+making the full path on the R side.
+
+Later, we can do funnies like file = "http://somewhere/something.proto" 
+and control how we want to stream in the file.
+
+> |>  I think we should respond to an env var RPROTO_TREE_TOP (or some other name)
+> |>  and search from there.  Given a dir, we can walk it in either OS.  Doing more
+> |>  in a portable manner is an attempt at suicide....
+> |
+> | I'd prefer avoiding yet another environment variable.
+>
+> I misunderstood the issue so the suggestion is moot. No env var needed.
+>
+> Dirk
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From francoisromain at free.fr  Tue Nov 10 18:33:40 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Tue, 10 Nov 2009 18:33:40 +0100
+Subject: [Rprotobuf-yada] added some methods
+Message-ID: <4AF9A3F4.4000500@free.fr>
+
+Hi,
+
+I've added some methods today to the R interface.
+
+- clear : to clear a message, or a field of a message
+- swap : swap elements of a repeated field of a message
+- size : number of elements of a repeated field
+- [[ : which can index a message by field name or field tag number
+
+and cleaned some of the mutator code : less copy and paste and slightly 
+more efficient (I think).
+
+I see that the proto library contains some unit test, so I'll base ours 
+on it, at least I'll use the same messages, etc ...
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Tue Nov 10 18:54:56 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Tue, 10 Nov 2009 11:54:56 -0600
+Subject: [Rprotobuf-yada] added some methods
+In-Reply-To: <4AF9A3F4.4000500@free.fr>
+References: <4AF9A3F4.4000500@free.fr>
+Message-ID: <19193.43248.432714.543791@ron.nulle.part>
+
+
+On 10 November 2009 at 18:33, Romain Fran?ois wrote:
+| I've added some methods today to the R interface.
+| 
+| - clear : to clear a message, or a field of a message
+| - swap : swap elements of a repeated field of a message
+| - size : number of elements of a repeated field
+| - [[ : which can index a message by field name or field tag number
+| 
+| and cleaned some of the mutator code : less copy and paste and slightly 
+| more efficient (I think).
+| 
+| I see that the proto library contains some unit test, so I'll base ours 
+| on it, at least I'll use the same messages, etc ...
+
+Awesome on all count, but please do add to demo() as well so that's easy to
+showcase what it can do.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Tue Nov 10 19:47:10 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Tue, 10 Nov 2009 19:47:10 +0100
+Subject: [Rprotobuf-yada] added some methods
+In-Reply-To: <19193.43248.432714.543791@ron.nulle.part>
+References: <4AF9A3F4.4000500@free.fr>
+	<19193.43248.432714.543791@ron.nulle.part>
+Message-ID: <4AF9B52E.6020602@dbmail.com>
+
+On 11/10/2009 06:54 PM, Dirk Eddelbuettel wrote:
+>
+> On 10 November 2009 at 18:33, Romain Fran?ois wrote:
+> | I've added some methods today to the R interface.
+> |
+> | - clear : to clear a message, or a field of a message
+> | - swap : swap elements of a repeated field of a message
+> | - size : number of elements of a repeated field
+> | - [[ : which can index a message by field name or field tag number
+> |
+> | and cleaned some of the mutator code : less copy and paste and slightly
+> | more efficient (I think).
+> |
+> | I see that the proto library contains some unit test, so I'll base ours
+> | on it, at least I'll use the same messages, etc ...
+>
+> Awesome on all count, but please do add to demo() as well so that's easy to
+> showcase what it can do.
+>
+> Dirk
+
+I've added a bit more.
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From francoisromain at free.fr  Wed Nov 11 20:57:35 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Wed, 11 Nov 2009 20:57:35 +0100
+Subject: [Rprotobuf-yada] first pass at a vignette
+Message-ID: <4AFB172F.6020501@free.fr>
+
+Hi,
+
+I've started to write a vignette for the package, currently very light.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Wed Nov 11 21:20:45 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 11 Nov 2009 14:20:45 -0600
+Subject: [Rprotobuf-yada] Build errors
+Message-ID: <19195.7325.188795.869773@ron.nulle.part>
+
+
+edd at ron:~/svn/rprotobuf> R CMD INSTALL pkg
+* installing to library ?/usr/local/lib/R/site-library?
+* installing *source* package ?RProtoBuf? ...
+checking for g++... g++
+checking for C++ compiler default output file name... a.out
+checking whether the C++ compiler works... yes
+checking whether we are cross compiling... no
+checking for suffix of executables... 
+checking for suffix of object files... o
+checking whether we are using the GNU C++ compiler... yes
+checking whether g++ accepts -g... yes
+checking how to run the C++ preprocessor... g++ -E
+checking whether we are using the GNU C++ compiler... (cached) yes
+checking whether g++ accepts -g... (cached) yes
+checking for R... yes
+checking for Rscript... yes
+checking for protoc... yes
+checking for ProtoBuf headers and library... yes
+configure: creating ./config.status
+config.status: creating src/Makevars
+Completed configuration and ready to build.
+** libs
+g++ -I/usr/share/R/include -I/usr/local/lib/R/site-library/Rcpp/lib -I/usr/include     -fpic  -g -O3 -Wall -pipe -c mutators.cpp -o mutators.o
+mutators.cpp: In function ?SEXPREC* rprotobuf::setMessageField(SEXPREC*, SEXPREC*, SEXPREC*)?:
+mutators.cpp:198: warning: enumeration value ?TYPE_DOUBLE? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_FLOAT? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_INT64? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_UINT64? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_INT32? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_FIXED64? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_FIXED32? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_BOOL? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_STRING? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_BYTES? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_UINT32? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_SFIXED32? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_SFIXED64? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_SINT32? not handled in switch
+mutators.cpp:198: warning: enumeration value ?TYPE_SINT64? not handled in switch
+mutators.cpp:198: warning: enumeration value ?MAX_TYPE? not handled in switch
+mutators.cpp:312: error: ?const class google::protobuf::Reflection? has no member named ?RemoveLast?
+mutators.cpp:175: warning: unused variable ?desc?
+make: *** [mutators.o] Error 1
+ERROR: compilation failed for package ?RProtoBuf?
+* removing ?/usr/local/lib/R/site-library/RProtoBuf?
+* restoring previous ?/usr/local/lib/R/site-library/RProtoBuf?
+edd at ron:~/svn/rprotobuf> 
+
+I'll take a peek.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Wed Nov 11 21:34:47 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 11 Nov 2009 14:34:47 -0600
+Subject: [Rprotobuf-yada] Build errors
+In-Reply-To: <19195.7325.188795.869773@ron.nulle.part>
+References: <19195.7325.188795.869773@ron.nulle.part>
+Message-ID: <19195.8167.972276.994557@ron.nulle.part>
+
+
+On 11 November 2009 at 14:20, Dirk Eddelbuettel wrote:
+| mutators.cpp:312: error: ?const class google::protobuf::Reflection? has no member named ?RemoveLast?
+| mutators.cpp:175: warning: unused variable ?desc?
+| make: *** [mutators.o] Error 1
+| ERROR: compilation failed for package ?RProtoBuf?
+
+We may now require protobuf 2.2 :-/ 
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From edd at debian.org  Wed Nov 11 21:41:31 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 11 Nov 2009 14:41:31 -0600
+Subject: [Rprotobuf-yada] Build errors
+In-Reply-To: <19195.7325.188795.869773@ron.nulle.part>
+References: <19195.7325.188795.869773@ron.nulle.part>
+Message-ID: <19195.8571.72184.847480@ron.nulle.part>
+
+
+RemoveLast() and SwapElements() are not in 2.1.
+
+What shall we do?  I can 'build' with these difference but that is obviously
+not a fix.
+
+Dirk
+
+
+
+edd at ron:~/svn/rprotobuf> svn di 
+Index: pkg/src/size.cpp
+===================================================================
+--- pkg/src/size.cpp	(revision 107)
++++ pkg/src/size.cpp	(working copy)
+@@ -48,10 +48,13 @@
+ 		if( target == 0){
+ 			ref->ClearField( message, field_desc );
+ 		} else if( current > target ){
++#define GrossHack 1
++#if ! GrossHack
+ 			while( current != target ){
+ 				ref->RemoveLast( message, field_desc ) ;
+ 				current-- ;
+ 			}
++#endif
+ 		} else if( current == target ) {
+ 			/* nothing to do */
+ 		} else { /* current < target */
+Index: pkg/src/mutators.cpp
+===================================================================
+--- pkg/src/mutators.cpp	(revision 107)
++++ pkg/src/mutators.cpp	(working copy)
+@@ -304,7 +304,8 @@
+     			}
+ 		}
+ 		// }}}
+-		  
++#define GrossHack 1
++#if ! GrossHack
+ 		/* {{{ remove some items once if there are too many */
+ 		if( field_size > value_size ) {
+ 			/* we need to remove some */
+@@ -314,7 +315,7 @@
+ 			}
+ 		}
+ 		// }}}
+-		
++#endif 		
+ 		switch( field_desc->type() ){
+ 			// {{{ int32
+     		case TYPE_INT32:
+Index: pkg/src/swap.cpp
+===================================================================
+--- pkg/src/swap.cpp	(revision 107)
++++ pkg/src/swap.cpp	(working copy)
+@@ -11,9 +11,12 @@
+ 			Rf_error( "swap can only be used with repeated fields" ) ; 
+ 		}
+ 		int n = LENGTH(left); /* we know that length(left) == length(right) */ 
++#define GrossHack 1
++#if ! GrossHack
+ 		for( int i=0; i<n; i++){
+ 			ref->SwapElements(m, field_desc, GET_int(left, i) , GET_int(right,i) ) ;
+ 		}
++#endif
+ 		return( R_NilValue ); 
+ 	}
+ 
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Thu Nov 12 08:33:07 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 12 Nov 2009 08:33:07 +0100
+Subject: [Rprotobuf-yada] Build errors
+In-Reply-To: <19195.8571.72184.847480@ron.nulle.part>
+References: <19195.7325.188795.869773@ron.nulle.part>
+	<19195.8571.72184.847480@ron.nulle.part>
+Message-ID: <4AFBBA33.1050107@dbmail.com>
+
+Ah.
+
+If there is no RemoveLast, we have to do it as I did before :
+
+ClearField to remove all
+Add to Add* to re-add the one we want to keep.
+
+I can work around swap I guess using Set* stuff
+
+How close is debian to get 2.2 ?
+
+Romain
+
+On 11/11/2009 09:41 PM, Dirk Eddelbuettel wrote:
+> RemoveLast() and SwapElements() are not in 2.1.
+>
+> What shall we do?  I can 'build' with these difference but that is obviously
+> not a fix.
+>
+> Dirk
+>
+>
+>
+> edd at ron:~/svn/rprotobuf>  svn di
+> Index: pkg/src/size.cpp
+> ===================================================================
+> --- pkg/src/size.cpp	(revision 107)
+> +++ pkg/src/size.cpp	(working copy)
+> @@ -48,10 +48,13 @@
+>   		if( target == 0){
+>   			ref->ClearField( message, field_desc );
+>   		} else if( current>  target ){
+> +#define GrossHack 1
+> +#if ! GrossHack
+>   			while( current != target ){
+>   				ref->RemoveLast( message, field_desc ) ;
+>   				current-- ;
+>   			}
+> +#endif
+>   		} else if( current == target ) {
+>   			/* nothing to do */
+>   		} else { /* current<  target */
+> Index: pkg/src/mutators.cpp
+> ===================================================================
+> --- pkg/src/mutators.cpp	(revision 107)
+> +++ pkg/src/mutators.cpp	(working copy)
+> @@ -304,7 +304,8 @@
+>       			}
+>   		}
+>   		// }}}
+> -		
+> +#define GrossHack 1
+> +#if ! GrossHack
+>   		/* {{{ remove some items once if there are too many */
+>   		if( field_size>  value_size ) {
+>   			/* we need to remove some */
+> @@ -314,7 +315,7 @@
+>   			}
+>   		}
+>   		// }}}
+> -		
+> +#endif 		
+>   		switch( field_desc->type() ){
+>   			// {{{ int32
+>       		case TYPE_INT32:
+> Index: pkg/src/swap.cpp
+> ===================================================================
+> --- pkg/src/swap.cpp	(revision 107)
+> +++ pkg/src/swap.cpp	(working copy)
+> @@ -11,9 +11,12 @@
+>   			Rf_error( "swap can only be used with repeated fields" ) ;
+>   		}
+>   		int n = LENGTH(left); /* we know that length(left) == length(right) */
+> +#define GrossHack 1
+> +#if ! GrossHack
+>   		for( int i=0; i<n; i++){
+>   			ref->SwapElements(m, field_desc, GET_int(left, i) , GET_int(right,i) ) ;
+>   		}
+> +#endif
+>   		return( R_NilValue );
+>   	}
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From romain.francois at dbmail.com  Thu Nov 12 10:42:16 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 12 Nov 2009 10:42:16 +0100
+Subject: [Rprotobuf-yada] Build errors
+In-Reply-To: <19195.8571.72184.847480@ron.nulle.part>
+References: <19195.7325.188795.869773@ron.nulle.part>
+	<19195.8571.72184.847480@ron.nulle.part>
+Message-ID: <4AFBD878.4020501@dbmail.com>
+
+
+I've added some conditional compiling, lots of
+
+#if GOOGLE_PROTOBUF_VERSION < 2002001
+try to hack around
+#else
+do the real thing
+#endif
+
+The code I've put in for the < 2.2 branch is kind of redundant and 
+probably less efficient than google's, and in some cases the code is only :
+
+			Rf_error( "cannot shrink the size with this version of the protobuf 
+library, either update to 2.2 or submit a patch" ) ;
+
+I don't like conditional compiling. Please let me know when we can 
+assume that 2.2 is available on debian.
+
+
+On 11/11/2009 09:41 PM, Dirk Eddelbuettel wrote:
+>
+>
+> RemoveLast() and SwapElements() are not in 2.1.
+>
+> What shall we do?  I can 'build' with these difference but that is obviously
+> not a fix.
+>
+> Dirk
+>
+>
+>
+> edd at ron:~/svn/rprotobuf>  svn di
+> Index: pkg/src/size.cpp
+> ===================================================================
+> --- pkg/src/size.cpp	(revision 107)
+> +++ pkg/src/size.cpp	(working copy)
+> @@ -48,10 +48,13 @@
+>   		if( target == 0){
+>   			ref->ClearField( message, field_desc );
+>   		} else if( current>  target ){
+> +#define GrossHack 1
+> +#if ! GrossHack
+>   			while( current != target ){
+>   				ref->RemoveLast( message, field_desc ) ;
+>   				current-- ;
+>   			}
+> +#endif
+>   		} else if( current == target ) {
+>   			/* nothing to do */
+>   		} else { /* current<  target */
+> Index: pkg/src/mutators.cpp
+> ===================================================================
+> --- pkg/src/mutators.cpp	(revision 107)
+> +++ pkg/src/mutators.cpp	(working copy)
+> @@ -304,7 +304,8 @@
+>       			}
+>   		}
+>   		// }}}
+> -		
+> +#define GrossHack 1
+> +#if ! GrossHack
+>   		/* {{{ remove some items once if there are too many */
+>   		if( field_size>  value_size ) {
+>   			/* we need to remove some */
+> @@ -314,7 +315,7 @@
+>   			}
+>   		}
+>   		// }}}
+> -		
+> +#endif 		
+>   		switch( field_desc->type() ){
+>   			// {{{ int32
+>       		case TYPE_INT32:
+> Index: pkg/src/swap.cpp
+> ===================================================================
+> --- pkg/src/swap.cpp	(revision 107)
+> +++ pkg/src/swap.cpp	(working copy)
+> @@ -11,9 +11,12 @@
+>   			Rf_error( "swap can only be used with repeated fields" ) ;
+>   		}
+>   		int n = LENGTH(left); /* we know that length(left) == length(right) */
+> +#define GrossHack 1
+> +#if ! GrossHack
+>   		for( int i=0; i<n; i++){
+>   			ref->SwapElements(m, field_desc, GET_int(left, i) , GET_int(right,i) ) ;
+>   		}
+> +#endif
+>   		return( R_NilValue );
+>   	}
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Thu Nov 12 13:41:30 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 12 Nov 2009 06:41:30 -0600
+Subject: [Rprotobuf-yada] Build errors
+In-Reply-To: <4AFBBA33.1050107@dbmail.com>
+References: <19195.7325.188795.869773@ron.nulle.part>
+	<19195.8571.72184.847480@ron.nulle.part>
+	<4AFBBA33.1050107@dbmail.com>
+Message-ID: <19196.634.94362.144733@ron.nulle.part>
+
+
+On 12 November 2009 at 08:33, Romain Francois wrote:
+| I can work around swap I guess using Set* stuff
+
+Thanks for that. It builds now.
+
+| How close is debian to get 2.2 ?
+
+I filed a bug report weeks ago saying that 2.1 is outdated. The maintainer is
+friendly, but hasn't updated. The package's files, applied to new 2.2
+sources, work perfectly.  So I just pinged him and indicated that I'd do a
+so-called 'non-maintainer upload' of 2.2 in the next few days, but gave him a
+chance to it instead.
+
+We have 2.1 in Debian (so Kurt could build this for CRAN). But I guess having
+2.2 would be preferable.  The API looks bigger too.  Are there other features
+we need or does it simply makes things easier?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Thu Nov 12 13:52:00 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 12 Nov 2009 13:52:00 +0100
+Subject: [Rprotobuf-yada] Build errors
+In-Reply-To: <19196.634.94362.144733@ron.nulle.part>
+References: <19195.7325.188795.869773@ron.nulle.part>	<19195.8571.72184.847480@ron.nulle.part>	<4AFBBA33.1050107@dbmail.com>
+	<19196.634.94362.144733@ron.nulle.part>
+Message-ID: <4AFC04F0.50304@dbmail.com>
+
+On 11/12/2009 01:41 PM, Dirk Eddelbuettel wrote:
+> On 12 November 2009 at 08:33, Romain Francois wrote:
+> | I can work around swap I guess using Set* stuff
+>
+> Thanks for that. It builds now.
+>
+> | How close is debian to get 2.2 ?
+>
+> I filed a bug report weeks ago saying that 2.1 is outdated. The maintainer is
+> friendly, but hasn't updated. The package's files, applied to new 2.2
+> sources, work perfectly.  So I just pinged him and indicated that I'd do a
+> so-called 'non-maintainer upload' of 2.2 in the next few days, but gave him a
+> chance to it instead.
+
+Let me know then so that I can free the conditional compiling stuff.
+
+I've also added a field in the DESCRIPTION to control which version of 
+the library we require, currently set to 2.1 (but would like it to be 
+2.2) and code that checks the version as part of .onLoad and suicides if 
+the version is too old.
+
+This is probably too strict, but I don't want to have to maintain 
+compatibility. I'd be happy to let someone do it, but I see conditional 
+compiling as too dangerous.
+
+> We have 2.1 in Debian (so Kurt could build this for CRAN). But I guess having
+> 2.2 would be preferable.  The API looks bigger too.  Are there other features
+> we need or does it simply makes things easier?
+
+Here is the changes in 2.2. swaping messages content is more efficient 
+in google's version. My version makes copies of the messages, where I 
+think they operate directly on pointers and addresses, ...
+
+
+2009-08-11 version 2.2.0:
+
+   C++
+   * Lite mode:  The "optimize_for = LITE_RUNTIME" option causes the 
+compiler
+     to generate code which only depends libprotobuf-lite, which is much 
+smaller
+     than libprotobuf but lacks descriptors, reflection, and some other 
+features.
+   * Fixed bug where Message.Swap(Message) was only implemented for
+     optimize_for_speed.  Swap now properly implemented in both modes
+     (Issue 91).
+   * Added RemoveLast and SwapElements(index1, index2) to Reflection
+     interface for repeated elements.
+   * Added Swap(Message) to Reflection interface.
+   * Floating-point literals in generated code that are intended to be
+     single-precision now explicitly have 'f' suffix to avoid pedantic 
+warnings
+     produced by some compilers.
+   * The [deprecated=true] option now causes the C++ code generator to 
+generate
+     a GCC-style deprecation annotation (no-op on other compilers).
+   * google::protobuf::GetEnumDescriptor<SomeGeneratedEnumType>() 
+returns the
+     EnumDescriptor for that type -- useful for templates which cannot call
+     SomeGeneratedEnumType_descriptor().
+   * Various optimizations and obscure bug fixes.
+
+   Java
+   * Lite mode:  The "optimize_for = LITE_RUNTIME" option causes the 
+compiler
+     to generate code which only depends libprotobuf-lite, which is much 
+smaller
+     than libprotobuf but lacks descriptors, reflection, and some other 
+features.
+   * Lots of style cleanups.
+
+   Python
+   * Fixed endianness bug with floats and doubles.
+   * Text format parsing support.
+   * Fix bug with parsing packed repeated fields in embedded messages.
+   * Ability to initialize fields by passing keyword args to constructor.
+   * Support iterators in extend and __setslice__ for containers.
+
+
+> Dirk
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Thu Nov 12 16:27:08 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 12 Nov 2009 09:27:08 -0600
+Subject: [Rprotobuf-yada] Sweave
+Message-ID: <19196.10572.91902.474284@ron.nulle.part>
+
+
+This doesn't work on Debian / Ubuntu:
+
+   \usepackage{\Sexpr{file.path( R.home(), "share/texmf/Sweave" ) }}
+
+as we have 
+
+   edd at ron:~> ls /usr/share/R
+   debian	doc  include  share
+   edd at ron:~> ls /usr/lib/R
+   bin  COPYING  etc  lib	library  modules  NEWS	site-library  SVN-REVISION
+   edd at ron:~> 
+
+i.e. we do not have file-system tree below R_HOME.  On the other hand, we do
+integrate with LaTeX so I just say
+
+  \usepackage{Sweave}
+
+and things work.  Short of having configure deal with this, what else can we do?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Thu Nov 12 16:33:30 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Thu, 12 Nov 2009 16:33:30 +0100
+Subject: [Rprotobuf-yada] Sweave
+In-Reply-To: <19196.10572.91902.474284@ron.nulle.part>
+References: <19196.10572.91902.474284@ron.nulle.part>
+Message-ID: <4AFC2ACA.4030508@dbmail.com>
+
+Sorry about that. I fixed it. R CMD build takes care of it all.
+
+It is when I manually do Rscript -e "Sweave( 'RProtoBuf.Rnw' )" that I 
+need to specify Sweave's location. I need to update my texmf tree, etc ...
+
+
+On 11/12/2009 04:27 PM, Dirk Eddelbuettel wrote:
+> This doesn't work on Debian / Ubuntu:
+>
+>     \usepackage{\Sexpr{file.path( R.home(), "share/texmf/Sweave" ) }}
+>
+> as we have
+>
+>     edd at ron:~>  ls /usr/share/R
+>     debian	doc  include  share
+>     edd at ron:~>  ls /usr/lib/R
+>     bin  COPYING  etc  lib	library  modules  NEWS	site-library  SVN-REVISION
+>     edd at ron:~>
+>
+> i.e. we do not have file-system tree below R_HOME.  On the other hand, we do
+> integrate with LaTeX so I just say
+>
+>    \usepackage{Sweave}
+>
+> and things work.  Short of having configure deal with this, what else can we do?
+>
+> Dirk
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From francoisromain at free.fr  Thu Nov 12 18:43:20 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Thu, 12 Nov 2009 18:43:20 +0100
+Subject: [Rprotobuf-yada] more content in the vignette
+Message-ID: <4AFC4938.7060409@free.fr>
+
+Dirk, Saptarshi,
+
+Just to let you know that I'm done with the vignette for today, so if 
+you want to make changes to it (such as correct the spelling of your 
+name), now is a good time
+
+I'll probably also make a much shorter (1 pager) vignette to just 
+extract the most relevant part, but not today.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Fri Nov 13 04:20:44 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 12 Nov 2009 21:20:44 -0600
+Subject: [Rprotobuf-yada] more content in the vignette
+In-Reply-To: <4AFC4938.7060409@free.fr>
+References: <4AFC4938.7060409@free.fr>
+Message-ID: <19196.53388.90851.877906@ron.nulle.part>
+
+
+Salut Romain,
+
+On 12 November 2009 at 18:43, Romain Fran?ois wrote:
+| Just to let you know that I'm done with the vignette for today, so if 
+| you want to make changes to it (such as correct the spelling of your 
+| name), now is a good time
+
+I made some changes to page 1 by extending the abstract and intro a little.
+I unfortunately don;t quite have the time or energy right now to do a full edit.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Fri Nov 13 08:32:40 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Fri, 13 Nov 2009 08:32:40 +0100
+Subject: [Rprotobuf-yada] more content in the vignette
+In-Reply-To: <19196.53388.90851.877906@ron.nulle.part>
+References: <4AFC4938.7060409@free.fr>
+	<19196.53388.90851.877906@ron.nulle.part>
+Message-ID: <4AFD0B98.2090603@dbmail.com>
+
+On 11/13/2009 04:20 AM, Dirk Eddelbuettel wrote:
+>
+> Salut Romain,
+>
+> On 12 November 2009 at 18:43, Romain Fran?ois wrote:
+> | Just to let you know that I'm done with the vignette for today, so if
+> | you want to make changes to it (such as correct the spelling of your
+> | name), now is a good time
+>
+> I made some changes to page 1 by extending the abstract and intro a little.
+> I unfortunately don;t quite have the time or energy right now to do a full edit.
+>
+> Dirk
+>
+
+Thanks.
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Sat Nov 14 00:06:57 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Fri, 13 Nov 2009 17:06:57 -0600
+Subject: [Rprotobuf-yada] Build errors
+In-Reply-To: <4AFBBA33.1050107@dbmail.com>
+References: <19195.7325.188795.869773@ron.nulle.part>
+	<19195.8571.72184.847480@ron.nulle.part>
+	<4AFBBA33.1050107@dbmail.com>
+Message-ID: <19197.59025.985419.370745@ron.nulle.part>
+
+
+On 12 November 2009 at 08:33, Romain Francois wrote:
+| How close is debian to get 2.2 ?
+
+Closer!  The maintainer agreed to let me make an so-called NMU upload of his
+package. I'll do that this weekend.
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Sat Nov 14 09:13:58 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Sat, 14 Nov 2009 09:13:58 +0100
+Subject: [Rprotobuf-yada] Build errors
+In-Reply-To: <19197.59025.985419.370745@ron.nulle.part>
+References: <19195.7325.188795.869773@ron.nulle.part>	<19195.8571.72184.847480@ron.nulle.part>	<4AFBBA33.1050107@dbmail.com>
+	<19197.59025.985419.370745@ron.nulle.part>
+Message-ID: <4AFE66C6.4070507@dbmail.com>
+
+On 11/14/2009 12:06 AM, Dirk Eddelbuettel wrote:
+> On 12 November 2009 at 08:33, Romain Francois wrote:
+> | How close is debian to get 2.2 ?
+>
+> Closer!  The maintainer agreed to let me make an so-called NMU upload of his
+> package. I'll do that this weekend.
+>
+> Dirk
+>
+
+Great. After this I think we can require 2.2, there is already code in 
+the package to make sure it does not load if the version is too old.
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From francoisromain at free.fr  Sat Nov 14 11:30:54 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Sat, 14 Nov 2009 11:30:54 +0100
+Subject: [Rprotobuf-yada] identical, ==, !=
+Message-ID: <4AFE86DE.4010708@free.fr>
+
+Hi,
+
+I've added identical, == and != methods to compare two messages:
+
+ > m1 <- new( tutorial.Person, email = "foo at bar.com", id = 2 )
+ > m2 <- update( new( tutorial.Person) , email = "foo at bar.com", id = 2 )
+ > identical( m1, m2 )
+[1] TRUE
+ > m1 == m2
+[1] TRUE
+ > m1 != m2
+[1] FALSE
+
+I need to also do all.equal at some point to allow less strict comparisons
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From francoisromain at free.fr  Mon Nov 16 11:54:14 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Mon, 16 Nov 2009 11:54:14 +0100
+Subject: [Rprotobuf-yada] quick ref vignette
+Message-ID: <4B012F56.1000200@free.fr>
+
+Hi,
+
+Added a one-pager vignette showcasing the most important features.
+
+Next steps:
+- check the vignettes
+- cran release
+- add html content here : http://rprotobuf.r-forge.r-project.org/
+- announce on protobuf : so that we get added on the third party support 
+page
+
+Dirk, is everything sorted with the 2.2 version ?
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Mon Nov 16 13:42:53 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Mon, 16 Nov 2009 06:42:53 -0600
+Subject: [Rprotobuf-yada] quick ref vignette
+In-Reply-To: <4B012F56.1000200@free.fr>
+References: <4B012F56.1000200@free.fr>
+Message-ID: <19201.18637.681206.309203@ron.nulle.part>
+
+
+On 16 November 2009 at 11:54, Romain Fran?ois wrote:
+| Hi,
+| 
+| Added a one-pager vignette showcasing the most important features.
+
+Thanks.
+ 
+| Next steps:
+| - check the vignettes
+| - cran release
+| - add html content here : http://rprotobuf.r-forge.r-project.org/
+| - announce on protobuf : so that we get added on the third party support 
+| page
+
+| Dirk, is everything sorted with the 2.2 version ?
+
+I think so. So we can 
+
+-- update configure.in to test for ProtoBuf >= 2.2
+-- update configire.in to use pkg-config
+-- simplify the code ie reove the #ifdefs ?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Mon Nov 16 13:48:21 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Mon, 16 Nov 2009 13:48:21 +0100
+Subject: [Rprotobuf-yada] quick ref vignette
+In-Reply-To: <19201.18637.681206.309203@ron.nulle.part>
+References: <4B012F56.1000200@free.fr>
+	<19201.18637.681206.309203@ron.nulle.part>
+Message-ID: <4B014A15.70307@dbmail.com>
+
+On 11/16/2009 01:42 PM, Dirk Eddelbuettel wrote:
+>
+> On 16 November 2009 at 11:54, Romain Fran?ois wrote:
+> | Hi,
+> |
+> | Added a one-pager vignette showcasing the most important features.
+>
+> Thanks.
+>
+> | Next steps:
+> | - check the vignettes
+> | - cran release
+> | - add html content here : http://rprotobuf.r-forge.r-project.org/
+> | - announce on protobuf : so that we get added on the third party support
+> | page
+>
+> | Dirk, is everything sorted with the 2.2 version ?
+>
+> I think so. So we can
+
+Please do the first 2 (whenever). I'll take the last item.
+
+> -- update configure.in to test for ProtoBuf>= 2.2
+> -- update configire.in to use pkg-config
+> -- simplify the code ie reove the #ifdefs ?
+>
+> Dirk
+>
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Mon Nov 16 16:27:42 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Mon, 16 Nov 2009 09:27:42 -0600
+Subject: [Rprotobuf-yada] quick ref vignette
+In-Reply-To: <4B014A15.70307@dbmail.com>
+References: <4B012F56.1000200@free.fr>
+	<19201.18637.681206.309203@ron.nulle.part>
+	<4B014A15.70307@dbmail.com>
+Message-ID: <19201.28526.546502.601002@ron.nulle.part>
+
+
+On 16 November 2009 at 13:48, Romain Francois wrote:
+| On 11/16/2009 01:42 PM, Dirk Eddelbuettel wrote:
+| > I think so. So we can
+| 
+| Please do the first 2 (whenever). I'll take the last item.
+| 
+| > -- update configure.in to test for ProtoBuf>= 2.2
+| > -- update configire.in to use pkg-config
+
+Done. 
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From romain.francois at dbmail.com  Tue Nov 17 09:14:55 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Tue, 17 Nov 2009 09:14:55 +0100
+Subject: [Rprotobuf-yada] quick ref vignette
+In-Reply-To: <4B014A15.70307@dbmail.com>
+References: <4B012F56.1000200@free.fr>	<19201.18637.681206.309203@ron.nulle.part>
+	<4B014A15.70307@dbmail.com>
+Message-ID: <4B025B7F.8000603@dbmail.com>
+
+>> -- simplify the code ie reove the #ifdefs ?
+
+Done
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From francoisromain at free.fr  Tue Nov 17 09:31:06 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Tue, 17 Nov 2009 09:31:06 +0100
+Subject: [Rprotobuf-yada] rpc first steps
+Message-ID: <4B025F4A.3070205@free.fr>
+
+Hi,
+
+One of the things we have not played with yet is the rcp mechanism that 
+comes with protobuf. see 
+http://code.google.com/apis/protocolbuffers/docs/proto.html#services
+
+I started to bring ServiceDescriptor and MethodDescriptor at the R 
+level, with the classes "protobufServiceDescriptor" and 
+"protobufMethodDescriptor", and added an example of a service/method in 
+the example proto file:
+
+service EchoService {
+   rpc Echo (Person) returns (Person);
+}
+
+I also added the invokeLocally method that, well, invokes a service 
+method locally, without using any rpc stuff, just to get started and to 
+start thinking about how to organize this.
+
+At the moment, it goes like this :
+
+- You have to set the implementation of the method, which must be an R 
+function that takes one argument (only requirement so far):
+
+ > tutorial.EchoService.Echo$implementation <- function(message) message
+
+and then you can invoke the method using invokeLocally:
+
+ > p <- new( tutorial.Person, email = "foo at bar.com", name = "foo", id = 2 )
+
+ > invokeLocally( tutorial.EchoService.Echo, p )$toString()
+[1] "name: \"foo\"\nid: 2\nemail: \"foo at bar.com\"\n"
+
+or, as usual:
+
+ > tutorial.EchoService.Echo$invokeLocally( p )
+[1] "name: \"foo\"\nid: 2\nemail: \"foo at bar.com\"\n"
+
+
+Now the real thing is going to be the "invoke" method (not yet in) which 
+will connect to another R peer, invoke the service locally and send the 
+result back. for this I need to play with RpcChannel, RpcController and 
+Closure, like in : 
+http://code.google.com/apis/protocolbuffers/docs/reference/cpp/google.protobuf.service.html
+
+The problem I currently have with this is that it seems to want to be 
+asynchronous, which does not fit well in R.
+
+Apart from Rserve, xGD might be an interesting starting point:
+http://www.rforge.net/xGD/
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Tue Nov 17 12:19:42 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Tue, 17 Nov 2009 05:19:42 -0600
+Subject: [Rprotobuf-yada] rpc first steps
+In-Reply-To: <4B025F4A.3070205@free.fr>
+References: <4B025F4A.3070205@free.fr>
+Message-ID: <19202.34510.13376.487418@ron.nulle.part>
+
+
+On 17 November 2009 at 09:31, Romain Fran?ois wrote:
+| One of the things we have not played with yet is the rcp mechanism that 
+| comes with protobuf. see 
+| http://code.google.com/apis/protocolbuffers/docs/proto.html#services
+
+I amd very confused about this but it sometimes states that ProtoBuf has no
+RPC besides some stubs whereas, say, Thrift has a full RPC stack.
+
+I saw Google's class stubs but what exactly do you think we can make happen
+without having to use Rserve and/or Connections?
+
+Dirk
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Tue Nov 17 12:34:11 2009
+From: francoisromain at free.fr (=?UTF-8?B?Um9tYWluIEZyYW7Dp29pcw==?=)
+Date: Tue, 17 Nov 2009 12:34:11 +0100
+Subject: [Rprotobuf-yada] rpc first steps
+In-Reply-To: <19202.34510.13376.487418@ron.nulle.part>
+References: <4B025F4A.3070205@free.fr>
+	<19202.34510.13376.487418@ron.nulle.part>
+Message-ID: <4B028A33.4040000@free.fr>
+
+On 11/17/2009 12:19 PM, Dirk Eddelbuettel wrote:
+>
+> On 17 November 2009 at 09:31, Romain Fran?ois wrote:
+> | One of the things we have not played with yet is the rcp mechanism that
+> | comes with protobuf. see
+> | http://code.google.com/apis/protocolbuffers/docs/proto.html#services
+>
+> I amd very confused about this but it sometimes states that ProtoBuf has no
+> RPC besides some stubs whereas, say, Thrift has a full RPC stack.
+>
+> I saw Google's class stubs but what exactly do you think we can make happen
+> without having to use Rserve and/or Connections?
+>
+> Dirk
+>
+
+I am confused about it too. Google is the first to admit that this part 
+of protobuf is not the best designed. Apparently their rpc stack is too 
+complex so they cannot open source it easily, which is why they came up 
+with these stubs.
+
+The only thing the official protobuf provides are the stubs generated by 
+the compiler (can't use this because we work at runtime using reflection).
+
+There are some third party RPC implementations available. I'll check 
+what they have to offer.
+
+It seems that basically you are left on your own when it comes to the 
+concrete rpc implementation.
+
+What I have in mind is a simple tcp/ip sockets based mechanism that 
+connects two R peers (I'd like it to be symmetric rather than 
+client/server), which is why I am looking at xGD. This is Simon's 
+external graphics device using sockets to basically forward graphics 
+device low level calls to some other process. This is quite promising.
+
+The other thing I want to have a look at is the new dynamic help system 
+that came with R 2.10.0. R now embeds a simple web server that displays 
+html help pages that are dynamically created at runtime. I am wondering 
+if this can be used to serve binary content as well as html pages. BTW, 
+the web server is also Simon's (at least he first commited it to the R's 
+repository). It might be worth sending him an email about this.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From romain.francois at dbmail.com  Tue Nov 17 14:26:32 2009
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Tue, 17 Nov 2009 14:26:32 +0100
+Subject: [Rprotobuf-yada] rpc first steps
+In-Reply-To: <4B028A33.4040000@free.fr>
+References: <4B025F4A.3070205@free.fr>	<19202.34510.13376.487418@ron.nulle.part>
+	<4B028A33.4040000@free.fr>
+Message-ID: <4B02A488.8040306@dbmail.com>
+
+On 11/17/2009 12:34 PM, Romain Fran?ois wrote:
+> On 11/17/2009 12:19 PM, Dirk Eddelbuettel wrote:
+>>
+>> On 17 November 2009 at 09:31, Romain Fran?ois wrote:
+>> | One of the things we have not played with yet is the rcp mechanism that
+>> | comes with protobuf. see
+>> | http://code.google.com/apis/protocolbuffers/docs/proto.html#services
+>>
+>> I amd very confused about this but it sometimes states that ProtoBuf has no
+>> RPC besides some stubs whereas, say, Thrift has a full RPC stack.
+>>
+>> I saw Google's class stubs but what exactly do you think we can make happen
+>> without having to use Rserve and/or Connections?
+>>
+>> Dirk
+>>
+>
+> I am confused about it too. Google is the first to admit that this part
+> of protobuf is not the best designed. Apparently their rpc stack is too
+> complex so they cannot open source it easily, which is why they came up
+> with these stubs.
+>
+> The only thing the official protobuf provides are the stubs generated by
+> the compiler (can't use this because we work at runtime using reflection).
+>
+> There are some third party RPC implementations available. I'll check
+> what they have to offer.
+>
+> It seems that basically you are left on your own when it comes to the
+> concrete rpc implementation.
+>
+> What I have in mind is a simple tcp/ip sockets based mechanism that
+> connects two R peers (I'd like it to be symmetric rather than
+> client/server), which is why I am looking at xGD. This is Simon's
+> external graphics device using sockets to basically forward graphics
+> device low level calls to some other process. This is quite promising.
+>
+> The other thing I want to have a look at is the new dynamic help system
+> that came with R 2.10.0. R now embeds a simple web server that displays
+> html help pages that are dynamically created at runtime. I am wondering
+> if this can be used to serve binary content as well as html pages. BTW,
+> the web server is also Simon's (at least he first commited it to the R's
+> repository). It might be worth sending him an email about this.
+
+There is also svSocket which actually uses tcl/tk sockets. not sure it 
+handles binary connections though, which might not be a problem because 
+I think we can serialize the full protobuf message as a string.
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From francoisromain at free.fr  Thu Nov 19 08:07:55 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Thu, 19 Nov 2009 08:07:55 +0100
+Subject: [Rprotobuf-yada] [protobuf] 2.2.0a release -- fixes SONAME
+In-Reply-To: <4112ecad0911181707y53ab140cs377fb6cf98351fc1@mail.gmail.com>
+References: <4112ecad0911181707y53ab140cs377fb6cf98351fc1@mail.gmail.com>
+Message-ID: <4B04EECB.9020005@free.fr>
+
+Just seen this on the protobuf mailing list. Should we do anything about 
+it ?
+
+On 11/19/2009 02:07 AM, Kenton Varda wrote:
+> Hi all,
+>
+> The 2.2.0 release had a problem:  I forgot to bump the binary interface
+> version number, so the installed libprotobuf.so would overwrite the
+> 2.1.0 libprotobuf.so.  This would break any binaries on your system that
+> depended on the old version; you'd have to recompile them.  Bumping the
+> SONAME prevents this, and doing so is part of our release process, but
+> somehow I missed it.  Argh.
+>
+> The Debian maintainers asked me to do a minor release just to fix this
+> problem, so I am releasing 2.2.0a.  This release is irrelevant for
+> anyone who has already installed 2.2.0, unless you are compiling
+> programs which will be distributed in binary form and are
+> dynamically-linked.  (Unless you are a Linux distribution maintainer,
+> I'd strongly recommend statically-linking any binaries which you intend
+> to distribute to others in binary form to avoid problems like this.)
+>
+> I've placed the release candidate here:
+> http://groups.google.com/group/protobuf/web/protobuf-2.2.0a.tar.bz2
+>
+> (.tar.bz2 only because there's no reason to care about this on non-unix
+> platforms.)
+>
+> I'll upload to the official site as soon as the Debian people have
+> confirmed that it fixes the problem.
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/EAD5 : LondonR slides
+|- http://tr.im/BcPw : celebrating R commit #50000
+`- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+
+
+From edd at debian.org  Thu Nov 19 17:13:30 2009
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Thu, 19 Nov 2009 10:13:30 -0600
+Subject: [Rprotobuf-yada] [protobuf] 2.2.0a release -- fixes SONAME
+In-Reply-To: <4B04EECB.9020005@free.fr>
+References: <4112ecad0911181707y53ab140cs377fb6cf98351fc1@mail.gmail.com>
+	<4B04EECB.9020005@free.fr>
+Message-ID: <19205.28330.876601.873811@ron.nulle.part>
+
+
+On 19 November 2009 at 08:07, Romain Fran?ois wrote:
+| Just seen this on the protobuf mailing list. Should we do anything about 
+| it ?
+
+I was squarely in the middle of this.  See Debian bug report 556563 for
+details.
+
+You and I need to do nothing. I uploaded a new package to Debian and we have
+to wait for that to reach testing so that Kurt has it.  
+
+The only change was the SONAME bump. I noticed that they hadn't done, but
+wrongly thought it was on purpose. So 'my' 2.2.0 packages broken users of the
+2.1.0 package leading to the bug report, and to someone (correctly!!)
+pointing at Google / talking to Kenton who promptly responded. Quite
+impressive.   You don't even need to rebuild your lib unless you plan to keep
+both 2.1.0 and 2.2.0 binaries around/
+
+Nice work on the one-page vignette, by the way. Thanks for that fix.
+
+Dirk
+
+| 
+| On 11/19/2009 02:07 AM, Kenton Varda wrote:
+| > Hi all,
+| >
+| > The 2.2.0 release had a problem:  I forgot to bump the binary interface
+| > version number, so the installed libprotobuf.so would overwrite the
+| > 2.1.0 libprotobuf.so.  This would break any binaries on your system that
+| > depended on the old version; you'd have to recompile them.  Bumping the
+| > SONAME prevents this, and doing so is part of our release process, but
+| > somehow I missed it.  Argh.
+| >
+| > The Debian maintainers asked me to do a minor release just to fix this
+| > problem, so I am releasing 2.2.0a.  This release is irrelevant for
+| > anyone who has already installed 2.2.0, unless you are compiling
+| > programs which will be distributed in binary form and are
+| > dynamically-linked.  (Unless you are a Linux distribution maintainer,
+| > I'd strongly recommend statically-linking any binaries which you intend
+| > to distribute to others in binary form to avoid problems like this.)
+| >
+| > I've placed the release candidate here:
+| > http://groups.google.com/group/protobuf/web/protobuf-2.2.0a.tar.bz2
+| >
+| > (.tar.bz2 only because there's no reason to care about this on non-unix
+| > platforms.)
+| >
+| > I'll upload to the official site as soon as the Debian people have
+| > confirmed that it fixes the problem.
+| 
+| 
+| -- 
+| Romain Francois
+| Professional R Enthusiast
+| +33(0) 6 28 91 30 30
+| http://romainfrancois.blog.free.fr
+| |- http://tr.im/EAD5 : LondonR slides
+| |- http://tr.im/BcPw : celebrating R commit #50000
+| `- http://tr.im/ztCu : RGG #158:161: examples of package IDPmisc
+| 
+| _______________________________________________
+| Rprotobuf-yada mailing list
+| Rprotobuf-yada at lists.r-forge.r-project.org
+| https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rprotobuf-yada
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From francoisromain at free.fr  Mon Nov 30 09:56:23 2009
+From: francoisromain at free.fr (=?ISO-8859-1?Q?Romain_Fran=E7ois?=)
+Date: Mon, 30 Nov 2009 09:56:23 +0100
+Subject: [Rprotobuf-yada] playing with sockets.
+Message-ID: <4B1388B7.7080907@free.fr>
+
+Hello,
+
+I've added some code in trunk to start playing with sockets. It is 
+absolutely not functional currently, and was more an excuse to learn 
+about sockets programming in C.
+
+I have based it on the protocol used by this rpc implementation: 
+http://code.google.com/p/protobuf-rpc/ but I am not sure this is the 
+best one to use.
+
+The client side, as in "R invokes a remote rpc method" is not so hard I 
+think: open a socket, write the input message and read the result 
+message back.
+
+The server side is going to be more tricky because I need to understand 
+threads on top of sockets.
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/FtUu : new package : highlight
+|- http://tr.im/EAD5 : LondonR slides
+`- http://tr.im/BcPw : celebrating R commit #50000
+
+

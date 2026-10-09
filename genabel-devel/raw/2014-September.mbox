@@ -1,0 +1,3488 @@
+From lennart at karssen.org  Wed Sep 10 22:39:08 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 10 Sep 2014 22:39:08 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1819 - in pkg/OmicABELnoMM: .
+ examples src tests
+In-Reply-To: <20140909135405.56D94187666@r-forge.r-project.org>
+References: <20140909135405.56D94187666@r-forge.r-project.org>
+Message-ID: <5410B6EC.4060003@karssen.org>
+
+Hi Alvaro,
+
+On 09-09-14 15:54, noreply at r-forge.r-project.org wrote:
+> Author: afrank
+> Date: 2014-09-09 15:54:05 +0200 (Tue, 09 Sep 2014)
+> New Revision: 1819
+> 
+> Added:
+>    pkg/OmicABELnoMM/examples/dosages_2.txt
+> Modified:
+>    pkg/OmicABELnoMM/ChangeLog
+>    pkg/OmicABELnoMM/configure.ac
+>    pkg/OmicABELnoMM/src/AIOwrapper.cpp
+>    pkg/OmicABELnoMM/src/AIOwrapper.h
+>    pkg/OmicABELnoMM/src/Algorithm.cpp
+>    pkg/OmicABELnoMM/src/Algorithm.h
+>    pkg/OmicABELnoMM/src/Definitions.h
+>    pkg/OmicABELnoMM/src/Utility.cpp
+>    pkg/OmicABELnoMM/src/main.cpp
+>    pkg/OmicABELnoMM/tests/test.cpp
+> Log:
+> Fixed bug related to reusing the same instance of the solver.
+> AIOwrapper is now recreated on every call. Added Additive,Recessive,
+> Dominant models. Added option for Custom Models. Custom Additive Model
+> uses custom factors. Custom Linear Model uses custom models with beta
+> coefficients for each column of the independent variable.
+
+Great to see you implemented new genetic models to the code. That's a
+great addition and makes OmicABELnoMM more feature-comparable to ProbABEL.
+
+I also noticed a steady increase in the number of cpplint warnings in
+Jenkins (see
+http://jenkins.genabel.org/jenkins/ob/OmicABELnoMM/39/violations/). A
+lot of them seem to have to do with code layout issues like lines that
+are longer than 80 characters and missing or too many spaces. It would
+be great if you could fix these as it makes the code easier to read (and
+thus to maintain). Of course it would be great if you tackle (some of)
+the other cpplint issues as well!
+
+
+Thanks a lot for all the good work,
+
+Lennart.
+
+> 
+> Modified: pkg/OmicABELnoMM/ChangeLog
+> ===================================================================
+> --- pkg/OmicABELnoMM/ChangeLog	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/ChangeLog	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -5,20 +5,24 @@
+>  -Add exclusion lists for single sets of elements of phenotypes
+>  -Add exclusion lists for single sets of elements of genotypes
+>  -Compare ID lists of all dvi files to assure correct ordering
+> --Allow for runtime dosage models
+>  
+>  Optimizations:
+>  
+>  -Reduce memcpy overhead of XR and XR XL factors
+> --Reduce computation time of XR and XR XL factors (do GEMMS)
+>  
+>  
+>  
+> -
+>  Changes
+>  -------------
+>  -------------
+>  
+> +9-9-2014
+> +--------------
+> +Fixed bug related to reusing the same instance  of the solver. AIOwrapper is now recreated on every call.
+> +Added Additive,Recessive, Dominant models.
+> +Added option for Custom Models. Custom Additive Model uses custom factors.
+> +Custom Linear Model uses custom models with beta coefficients for each column of the independent variable.
+> +
+>  8-9-2014
+>  --------------
+>  Removed individuals with covariates missing
+> 
+> Modified: pkg/OmicABELnoMM/configure.ac
+> ===================================================================
+> --- pkg/OmicABELnoMM/configure.ac	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/configure.ac	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -18,8 +18,8 @@
+>  # Set some default compile flags
+>  if test -z "$CXXFLAGS"; then
+>     # User did not set CXXFLAGS, so we can put in our own defaults
+> -   CXXFLAGS=" -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops"
+> -  #CXXFLAGS="-g -ggdb"
+> +   #CXXFLAGS=" -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops"
+> +  CXXFLAGS="-g -ggdb"
+>  fi
+>  if test -z "$CPPFLAGS"; then
+>     # User did not set CPPFLAGS, so we can put in our own defaults
+> @@ -37,7 +37,7 @@
+>  AC_OPENMP
+>  AC_SUBST(AM_CXXFLAGS, "$OPENMP_CFLAGS")
+>  
+> -AM_CXXFLAGS="-static -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops -I../libs/include -I./libs/include $AM_CXXFLAGS"
+> +AM_CXXFLAGS="-static  -g -ggdb -I../libs/include -I./libs/include $AM_CXXFLAGS"
+>  #AM_CXXFLAGS="-static  -I../libs/include -I./libs/include $AM_CXXFLAGS"
+>  # Checks for libraries.
+>  # pthread library
+> 
+> Added: pkg/OmicABELnoMM/examples/dosages_2.txt
+> ===================================================================
+> --- pkg/OmicABELnoMM/examples/dosages_2.txt	                        (rev 0)
+> +++ pkg/OmicABELnoMM/examples/dosages_2.txt	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -0,0 +1 @@
+> +2 1
+> \ No newline at end of file
+> 
+> Modified: pkg/OmicABELnoMM/src/AIOwrapper.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/AIOwrapper.cpp	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/AIOwrapper.cpp	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -31,8 +31,17 @@
+>      Fhandler->fakefiles = params.use_fake_files;
+>  
+>  
+> +    Fhandler->use_dosages = params.dosages;
+> +    if(params.dosages && Fhandler->model ==-1)
+> +    {
+> +        cout << "Requested dosages model wihtout a valid model!" << endl;
+> +        exit(1);
+> +    }
+> +    Fhandler->not_done = true;
+> +    Fhandler->model = params.model;
+> +    Fhandler->fname_dosages = params.fname_dosages;
+> +
+>  
+> -    Fhandler->not_done = true;
+>  
+>      if(!Fhandler->fakefiles)
+>      {
+> @@ -47,8 +56,9 @@
+>          Fhandler->storePInd = params.storePInd;
+>  
+>          Fhandler->min_p_disp = params.minPdisp;
+> -        Fhandler->min_R2_disp = params.minR2disp;
+> +        Fhandler->min_R2_disp = params.minR2disp;
+>  
+> +
+>          Yfvi  = load_databel_fvi( (Fhandler->fnameY+".fvi").c_str() );
+>          ALfvi = load_databel_fvi( (Fhandler->fnameAL+".fvi").c_str() );
+>          ARfvi = load_databel_fvi( (Fhandler->fnameAR+".fvi").c_str() );
+> @@ -56,7 +66,8 @@
+>  
+>  
+>          params.n = ALfvi->fvi_header.numObservations;
+> -        Fhandler->fileN = params.n;
+> +        Fhandler->fileN = params.n;
+> +        Fhandler->fileR = params.r;
+>          params.m = ARfvi->fvi_header.numVariables/params.r;
+>          params.t = Yfvi->fvi_header.numVariables;
+>          params.l = ALfvi->fvi_header.numVariables;
+> @@ -81,12 +92,24 @@
+>  
+>  
+>          int Aname_idx=params.n*ARfvi->fvi_header.namelength;//skip the names of the rows
+> -        for(int i = 0; i < params.m*params.r; i++)
+> +        if(Fhandler->use_dosages)
+>          {
+> -            Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+> -            Aname_idx += ARfvi->fvi_header.namelength;
+> +            for(int i = 0; i < params.m; i++)
+> +            {
+> +                Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+> +                Aname_idx += ARfvi->fvi_header.namelength*Fhandler->fileR;
+> +            }
+>          }
+> +        else
+> +        {
+> +            for(int i = 0; i < params.m*params.r; i++)
+> +            {
+> +                Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+> +                Aname_idx += ARfvi->fvi_header.namelength;
+> +            }
+> +        }
+>  
+> +
+>          Aname_idx=params.n*ALfvi->fvi_header.namelength;
+>          for(int i = 0; i < params.l; i++)
+>          {
+> @@ -100,18 +123,17 @@
+>  
+>  
+>          int opt_tb = 1000;
+> -        int opt_mb = 1000;
+> +        int opt_mb = 100;
+>  
+> -        params.mb = min(params.m, opt_tb);
+> -        params.tb = min(params.t, opt_mb);
+> +        params.mb = min(params.m, opt_mb);
+> +        params.tb = min(params.t, opt_tb);
+>  
+> -
+>  
+>  
+>      }
+>      else
+>      {
+> -
+> +        //other params come from outside
+>      }
+>  
+>      //params.fname_excludelist = "exclfile.txt";
+> @@ -137,7 +159,60 @@
+>  
+>      }
+>  
+> -    params.n -= (excl_count + Almissings);
+> +    params.n -= (excl_count + Almissings);
+> +
+> +    if(params.dosages)
+> +    {
+> +
+> +        Fhandler->ArDosage = new float[Fhandler->fileR*params.n];
+> +        Fhandler->dosages = new float[Fhandler->fileR];
+> +
+> +
+> +        switch (Fhandler->model)
+> +        {
+> +        case -1://nomodel
+> +
+> +        break;
+> +        case 0://add
+> +            if(Fhandler->fileR != 3)
+> +            {
+> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Additive Model!" << endl;
+> +                exit(1);
+> +            }
+> +            Fhandler->dosages[0] = 2;Fhandler->dosages[1] = 1;Fhandler->dosages[2] = 0;
+> +            params.r = 1;
+> +            Fhandler->add_dosages = true;
+> +        break;
+> +        case 1://dom
+> +            if(Fhandler->fileR != 3)
+> +            {
+> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Dominant Model!" << endl;
+> +                exit(1);
+> +            }
+> +            Fhandler->dosages[0] = 1;Fhandler->dosages[1] = 1;Fhandler->dosages[2] = 0;
+> +            params.r = 1;
+> +            Fhandler->add_dosages = true;
+> +        break;
+> +        case 2://rec
+> +            if(Fhandler->fileR != 3)
+> +            {
+> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Recessive Model!" << endl;
+> +                exit(1);
+> +            }
+> +            Fhandler->dosages[0] = 1;Fhandler->dosages[1] = 0;Fhandler->dosages[2] = 0;
+> +            params.r = 1;
+> +            Fhandler->add_dosages = true;
+> +        break;
+> +        case 3://linear
+> +            read_dosages(params.fname_dosages,Fhandler->fileR,Fhandler->dosages);
+> +        break;
+> +        case 4://additive
+> +            read_dosages(params.fname_dosages,Fhandler->fileR,Fhandler->dosages);
+> +            params.r = 1;
+> +            Fhandler->add_dosages = true;
+> +        break;
+> +        }
+> +    }
+>  
+>      params.p = params.l + params.r;
+>  
+> @@ -174,7 +249,18 @@
+>          fp_InfoResults.write( (char*)&ALfvi->fvi_data[Aname_idx],ALfvi->fvi_header.namelength*(params.l-1)*sizeof(char));
+>  
+>          Aname_idx=params.n*ARfvi->fvi_header.namelength;//skip the names of the rows
+> -        fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],ARfvi->fvi_header.namelength*params.r*params.m*sizeof(char));
+> +        if(Fhandler->use_dosages)
+> +        {
+> +            for(int i = 0; i < params.m; i++)
+> +            {
+> +                fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],ARfvi->fvi_header.namelength*sizeof(char));
+> +                Aname_idx += Fhandler->fileR*ARfvi->fvi_header.namelength*sizeof(char);
+> +            }
+> +        }
+> +        else
+> +        {
+> +            fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],Fhandler->fileR*params.m*ARfvi->fvi_header.namelength*sizeof(char));
+> +        }
+>  
+>          int Yname_idx=params.n*Yfvi->fvi_header.namelength;//skip the names of the rows
+>          fp_InfoResults.write( (char*)&Yfvi->fvi_data[Yname_idx],Yfvi->fvi_header.namelength*params.t*sizeof(char));
+> @@ -190,8 +276,8 @@
+>  //    int opt_tb = max(4*2000,opt_block);
+>  //    int opt_mb = max(2000,opt_block);
+>  //
+> -//    params.mb = min(params.m,opt_tb);
+> -//    params.tb = min(params.t,opt_mb);
+> +    params.mb = min(params.m,params.mb);
+> +    params.tb = min(params.t,params.tb);
+>  
+>      prepare_AL(params.l,params.n);
+>      prepare_AR(  params.mb,  params.n,  params.m,  params.r);
+> @@ -231,6 +317,11 @@
+>      pthread_cond_destroy(&(Fhandler->condition_read));
+>  
+>      delete Fhandler->excl_List;
+> +    if(Fhandler->use_dosages)
+> +    {
+> +            delete [](Fhandler->ArDosage);
+> +            delete [](Fhandler->dosages);
+> +    }
+>  
+>  
+>  
+> @@ -361,7 +452,8 @@
+>              Fhandler->empty_buffers.pop();
+>  
+>  
+> -            tobeFilled->size = tmp_y_blockSize;
+> +            tobeFilled->size = tmp_y_blockSize;
+> +            //cout << "tbz:" << tmp_y_blockSize << " " << flush;
+>  
+>              if(Fhandler->fakefiles)
+>              {
+> @@ -454,21 +546,74 @@
+>                  int chunk_size_buff;
+>                  int buff_pos=0;
+>                  int file_pos;
+> +                float* destination = Fhandler->ArDosage;
+>  
+> -                for(int i = 0; i < tmp_ar_blockSize*Fhandler->r; i++)
+> +                if(Fhandler->use_dosages)
+>                  {
+> -                    for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+> +
+> +                    if(!Fhandler->add_dosages)
+>                      {
+> -                        file_pos = Fhandler->fileN*i + it->first;
+> -                        fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+> +                        destination = tobeFilled->buff;//no need to use temp variable
+> +                    }
+>  
+> -                        chunk_size_buff = it->second;
+> -                        size_t result = fread (&tobeFilled->buff[buff_pos],sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+> -                        buff_pos += chunk_size_buff;
+> +                    for(int i = 0; i < tmp_ar_blockSize; i++)
+> +                    {
+> +                        buff_pos=0;
+> +                        for(int ii = 0; ii < Fhandler->fileR; ii++)
+> +                        {
+> +                            for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+> +                            {
+> +                                file_pos = Fhandler->fileN*i + it->first;
+> +                                fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+>  
+> +                                chunk_size_buff = it->second;
+>  
+> +                                size_t result = fread (&(destination[buff_pos]),sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+> +                                buff_pos += chunk_size_buff;
+> +                            }
+> +                        }
+> +
+> +                        if(Fhandler->add_dosages)
+> +                        {
+> +                            cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+> +                                Fhandler->n, 1, Fhandler->fileR, 1.0, Fhandler->ArDosage, Fhandler->n, Fhandler->dosages,Fhandler->fileR ,
+> +                                    0.0, &(tobeFilled->buff[i*Fhandler->n]), Fhandler->n);
+> +                        }
+> +                        else
+> +                        {
+> +                            for(int ii = 0; ii < Fhandler->fileR; ii++)
+> +                            {
+> +                                for(int k=0; k < Fhandler->n; k++)
+> +                                {
+> +                                    destination[Fhandler->n*ii+k] *= Fhandler->dosages[ii];
+> +                                }
+> +                            }
+> +                        }
+> +
+>                      }
+> +
+> +
+> +
+>                  }
+> +                else
+> +                {
+> +                    for(int i = 0; i < tmp_ar_blockSize*Fhandler->r; i++)
+> +                    {
+> +                        for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+> +                        {
+> +                            file_pos = Fhandler->fileN*i + it->first;
+> +                            fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+> +
+> +                            chunk_size_buff = it->second;
+> +                            size_t result = fread (&tobeFilled->buff[buff_pos],sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+> +                            buff_pos += chunk_size_buff;
+> +
+> +
+> +                        }
+> +                    }
+> +                }
+> +
+> +
+>  
+>  
+>              }
+> @@ -702,6 +847,7 @@
+>         Fhandler->write_empty_buffers.pop();
+>         delete tmp2;
+>      }
+> +
+>      }
+>  
+>  
+> @@ -1016,7 +1162,8 @@
+>  void AIOwrapper::prepare_AR( int desired_blockSize, int n, int totalR, int columnsAR)
+>  {
+>  
+> -    Fhandler->Ar = new type_precision[desired_blockSize*columnsAR*n];
+> +    Fhandler->Ar = new type_precision[desired_blockSize*columnsAR*n];
+> +
+>      Fhandler->Ar_blockSize = desired_blockSize;
+>      Fhandler->r = columnsAR;
+>      Fhandler->Ar_Amount = totalR;
+> @@ -1352,6 +1499,29 @@
+>  
+>  }
+>  
+> +
+> +void AIOwrapper::read_dosages(string fname_dosages, int expected_count, float* vec)
+> +{
+> +    ifstream fp_dos(fname_dosages.c_str());
+> +    if(fp_dos == 0)
+> +    {
+> +        cout << "Error reading dosages file."<< endl;
+> +        exit(1);
+> +    }
+> +    int i;
+> +    for (i=0; i < expected_count && !fp_dos.eof(); i++)
+> +    {
+> +       fp_dos >> vec[i];
+> +       //cout << vec[i];
+> +    }
+> +    if(i!=expected_count)
+> +    {
+> +        cout << "not enough factor for the dosage model! required " << expected_count << endl;
+> +        exit(1);
+> +    }
+> +
+> +}
+> +
+>  
+>  void AIOwrapper::free_databel_fvi( struct databel_fvi **fvi )
+>  {
+> 
+> Modified: pkg/OmicABELnoMM/src/AIOwrapper.h
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/AIOwrapper.h	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/AIOwrapper.h	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -29,8 +29,10 @@
+>  
+>  
+>      string fnameOutFiles;
+> +    string fname_dosages;
+>  
+>  
+> +
+>      list< pair<int,int> >* excl_List;
+>  
+>  
+> @@ -48,7 +50,8 @@
+>      vector< string > ALnames;
+>  
+>      type_precision* Yb;
+> -    type_precision* Ar;
+> +    type_precision* Ar;
+> +    type_precision* ArDosage;
+>      type_precision* AL;
+>      type_precision* B;
+>      type_buffElement* currentReadBuff;
+> @@ -66,11 +69,14 @@
+>      queue<type_buffElement*> ar_full_buffers;
+>  
+>      int index;
+> -    int fileN;
+> +    int fileN;
+> +    int fileR;
+>      int n;
+>      int r;
+>      int l;
+> -    int p;
+> +    int p;
+> +
+> +    int model;
+>  
+>      int Ar_Amount;
+>      int Ar_blockSize;
+> @@ -84,10 +90,17 @@
+>      int max_b_blockSize;
+>  
+>      bool not_done;
+> -    bool reset_wait;
+> +    bool reset_wait;
+> +    bool use_dosages;
+> +    bool add_dosages;
+>  
+>      int seed;
+> -    int Aseed;
+> +    int Aseed;
+> +
+> +    float* dosages;
+> +    vector< vector <float> > cov_2_Terms;
+> +    vector< vector <float> > x_Terms;
+> +    vector< vector <float> > xcov_2_Terms;
+>  
+>      pthread_mutex_t m_more     ;
+>      pthread_cond_t  condition_more   ;
+> @@ -165,7 +178,8 @@
+>  
+>      private:
+>  
+> -        void read_excludeList(list< pair<int,int> >* excl, int &excl_count, int max_excl, string fname_excludeList);
+> +        void read_excludeList(list< pair<int,int> >* excl, int &excl_count, int max_excl, string fname_excludeList);
+> +        void read_dosages(string fname_dosages, int expected_count, float* vec);
+>  
+>  
+>          void prepare_AR( int desired_blockSize, int n, int totalR, int columnsR);
+> 
+> Modified: pkg/OmicABELnoMM/src/Algorithm.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/Algorithm.cpp	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/Algorithm.cpp	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -396,8 +396,10 @@
+>      params.disp_cov = false;
+>      params.storePInd = false;
+>      params.storeBin = false;
+> +    params.dosages = false;
+>      params.threads = 1;
+>      params.r = 1;
+> +    params.model = -1;
+>  
+>  
+>      params.minR2store = 0.00001;
+> @@ -434,7 +436,7 @@
+>      if(params.minPdisp > params.minPstore || params.storeBin)
+>          params.minPstore = params.minPdisp;
+>  
+> -
+> +    AIOwrapper AIOfile;//leave here to avoid memory errors of reusing old threads
+>      AIOfile.initialize(params);//THIS HAS TO BE DONE FIRST! ALWAYS
+>  
+>      //cout << params.n <<  "\n";
+> @@ -455,7 +457,8 @@
+>  
+>  
+>      int y_amount = params.t;
+> -    int y_block_size = params.tb;  // kk
+> +    int y_block_size = params.tb;  // kk
+> +    //cout << "yt:"<< y_amount << " oybz:"<<y_block_size << flush;
+>  
+>      int a_amount = params.m;
+>      int a_block_size = params.mb;
+> @@ -464,7 +467,7 @@
+>  
+>      int y_iters = (y_amount + y_block_size - 1) / y_block_size;
+>  
+> -    //cout << y_iters << " " << a_iters << endl;
+> +    //cout << "yiters:" <<  y_iters << " aiters:" << a_iters << endl;
+>  
+>  
+>      lda = n;
+> @@ -581,11 +584,13 @@
+>          get_ticks(start_tick2);
+>  
+>          AIOfile.load_Yblock(&Y, y_block_size);
+> +        //cout << "ybz:"<< y_block_size << " " << flush;
+>  
+>          get_ticks(end_tick);
+>          out.acc_loady += ticks2sec(end_tick,start_tick2);
+>  
+>          get_ticks(start_tick2);
+> +
+>          replace_nans(&y_nan_idxs[0],y_block_size, Y, n,1);
+>          sumSquares(Y,y_block_size,n,ssY,y_nan_idxs);
+>  
+> 
+> Modified: pkg/OmicABELnoMM/src/Algorithm.h
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/Algorithm.h	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/Algorithm.h	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -50,8 +50,8 @@
+>      protected:
+>      private:
+>  
+> -        AIOwrapper AIOfile;
+>  
+> +
+>          list < resultH > sigResults;
+>  
+>          int max_threads;
+> 
+> Modified: pkg/OmicABELnoMM/src/Definitions.h
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/Definitions.h	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/Definitions.h	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -164,13 +164,16 @@
+>      float minR2disp;
+>      float minR2store;
+>      bool storePInd;
+> -    bool disp_cov;
+> +    bool disp_cov;
+> +    bool dosages;
+> +    int model;//recessive additive dominant etc
+>  
+>      string fnameAL;
+>      string fnameAR;
+>      string fnameY;
+>      string fnameOutFiles;
+> -    string fname_excludelist;
+> +    string fname_excludelist;
+> +    string fname_dosages;
+>  
+>      bool doublefileType;
+>  
+> 
+> Modified: pkg/OmicABELnoMM/src/Utility.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/Utility.cpp	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/Utility.cpp	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -141,10 +141,12 @@
+>                  int idx = k*cols*rows+i*rows+j;
+>  
+>                  //cout << idx;
+> +                if(idx >= rows*cols*vec_blocksize)
+> +                    exit(1);
+> +
+>  
+> -                if(/*idx < rows*cols*vec_blocksize &&*/ isnan( vec[idx] ))
+> -                {
+> -
+> +                if(isnan( vec[idx] ))
+> +                {
+>                      vec[idx] = 0;
+>                      if(indexs_vec)
+>                      {
+> 
+> Modified: pkg/OmicABELnoMM/src/main.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/main.cpp	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/main.cpp	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -26,7 +26,7 @@
+>  Optional: \n\t\
+>  -n --ngpred \t <#SNPcols> Number of columns in the geno file that represent a single SNP \n\t\
+>  -t --thr    \t <#CPUs> Number of computing threads to use to speed computations \n\t\
+> --x --excl   \t <path/filename> file containing list of individuals to exclude from input files \n\t\
+> +-x --excl   \t <path/filename> file containing list of individuals to exclude from input files, (see example file) \n\t\
+>  -d --pdisp  \t <0.0~1.0> Value to use as maximum threshold for significance.\n\t\
+>  \t\t Results with P-values UNDER this threshold will be displayed in the putput .txt file \n\t\
+>  -r --rdisp  \t <-10.0~1.0> Value to use as minimum threshold for R2. \n\t\
+> @@ -35,7 +35,17 @@
+>  -s --psto   \t <0.0~1.0>  Results with P-values UNDER this threshold will be displayed in the putput binary files \n\t\
+>  -e --rsto   \t <-10.0~1.0> Results with R2-values ABOVE this threshold will be stored in the putput binary files \n\t\
+>  -i --fdcov  \t Flag that forces to include covariates as part of the results that are stored in .txt and binary files \n\t\
+> --f --fdgen  \t Flag that forces to consider all included results (causes the analisis to ignores ALL threshold values).";
+> +-f --fdgen  \t Flag that forces to consider all included results (causes the analisis to ignores ALL threshold values). \n\t\
+> +-j --additive  \t Flag that runs the analisis with an Additive Model with (2*AA,1*AB,0*BB) effects \n\t\
+> +-k --dominant  \t Flag that runs the analisis with an Dominant Model with (1*AA,1*AB,0*BB) effects \n\t\
+> +-l --recessive \t Flag that runs the analisis with an Recessive Model with (1*AA,0*AB,0*BB) effects \n\t\
+> +-z --mylinear \t <path/filename> to read Factors 'f_i' for a Custom Linear Model with f1*X1,f2*X2,f3*X3...fn*X_ngpred as effects,\n\t\
+> +              \t each column of each independent variable will be multiplied with the specified factors. \n\t\
+> +              \t Formula: y~alpha*cov + beta_1*f1*X1 + beta_2*f2*X2 +...+ beta_n*fn*Xn, (see example files!) \n\t\
+> +-y --myaddit  \t <path/filename> to read Factors 'f_i' for a Custom Additive Model with (f1*X1,f2*X2,f3*X3...fn*X_ngpred) as effects,\n\t\
+> +              \t each column of each independent variable will be multiplied with the specified factors and then added together. \n\t\
+> +              \t Formula: y~alpha*cov + beta*(f1*X1 + f2*X2 +...+ fn*Xn), (see example files!) \n\t\
+> +";
+>  
+>  
+>  
+> @@ -89,6 +99,11 @@
+>              {"rsto",    required_argument, 0, 'e'},//
+>              {"fdcov",    no_argument, 0, 'i'},//
+>              {"fdgen",    no_argument, 0, 'f'},//
+> +            {"additive",    no_argument, 0, 'j'},//
+> +            {"dominant",   no_argument, 0, 'k'},//
+> +            {"recessive",    no_argument, 0, 'l'},//
+> +            {"mylinear",    required_argument, 0, 'z'},//
+> +            {"myaddit",    required_argument, 0, 'y'},//
+>              {"help",    no_argument, 0, 'h'},//
+>              {0, 0, 0, 0}
+>          };
+> @@ -96,7 +111,7 @@
+>          // getopt_long stores the option index here.
+>          int option_index = 0;
+>  
+> -        c = getopt_long(argc, argv, "c:p:g:o:n:t:m:x:d:s:r:e:fibh", long_options, &option_index);
+> +        c = getopt_long(argc, argv, "c:p:g:o:n:t:m:x:d:s:r:e:z:y:fibhjkl", long_options, &option_index);
+>  
+>  
+>          // Detect the end of the options.
+> @@ -220,9 +235,45 @@
+>              cout << "-f Forcing all included results to be considered independently of max P-val or min R2. (SLOW!)"<< endl;
+>              break;
+>  
+> +        case 'j':
+> +            params.model = 1;
+> +            params.dosages = true;
+> +
+> +            cout << "-j Using Additive Model with (2*AA,1*AB,0*BB) effects"<< endl;
+> +            break;
+> +
+> +        case 'k':
+> +            params.model = 2;
+> +            params.dosages = true;
+> +
+> +            cout << "-j Using Dominant Model with (1*AA,1*AB,0*BB) effects"<< endl;
+> +            break;
+> +
+> +        case 'l':
+> +            params.model = 3;
+> +            params.dosages = true;
+> +
+> +            cout << "-j Using Recessive Model with (0*AA,0*AB,1*BB) effects"<< endl;
+> +            break;
+> +
+> +        case 'z':
+> +            params.model = 4;
+> +            params.dosages = true;
+> +
+> +            cout << "-z Using Custom Linear Model with parameters read from the file "<< params.fname_dosages << endl;
+> +            break;
+> +
+> +        case 'y':
+> +            params.model = 5;
+> +            params.dosages = true;
+> +
+> +            cout << "-z Using Custom Additive Model with parameters read from the file "<< params.fname_dosages << endl;
+> +            break;
+> +
+>          case 'b':
+> -            params.storeBin = true;
+> +            params.storeBin = true;
+>  
+> +
+>              cout << "-b Results will be stored in binary format too"<< endl;
+>              break;
+>  
+> 
+> Modified: pkg/OmicABELnoMM/tests/test.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/tests/test.cpp	2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/tests/test.cpp	2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -95,9 +95,9 @@
+>      int factor = 0;
+>      params.n=2000; params.l=3;  params.r=1;
+>      params.t=800; params.tb=min(800,params.t); params.m=1600; params.mb=min(1600,params.m);
+> -    alg.solve(params, out2, P_NEQ_B_OPT_MD);
+> +    //alg.solve(params, out2, P_NEQ_B_OPT_MD);
+>  
+> -    print_output(out2, gemm_gflopsPsec);
+> +    //print_output(out2, gemm_gflopsPsec);
+>  
+>  
+>      cout << "\nDone\n";
+> @@ -117,6 +117,9 @@
+>      params.fnameAR="examples/XR";
+>      params.fnameY="examples/Y";
+>      params.fnameOutFiles="resultsSig";
+> +//    params.dosages = true;
+> +//    params.model = 4;
+> +//    params.fname_dosages = "examples/dosages_2.txt";
+>  
+>  
+>      for(int th = 0; th < max_threads; th++)
+> @@ -138,6 +141,8 @@
+>  
+>      max_threads = 2;
+>      int iters = 10;
+> +
+> +    //cout << "misc tests" << endl;
+>  
+>      for (int th = 1; th < max_threads+1; th++)
+>      {
+> 
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140910/54ea6cd2/attachment-0001.sig>
+
+From lennart at karssen.org  Wed Sep 10 23:03:13 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Wed, 10 Sep 2014 23:03:13 +0200
+Subject: [GenABEL-dev] impute2databel FLOAT
+In-Reply-To: <244CF001646FF74FB34F372310A332C5011571D3@MBX-S2.rwth-ad.de>
+References: <244CF001646FF74FB34F372310A332C5011571D3@MBX-S2.rwth-ad.de>
+Message-ID: <5410BC91.7030308@karssen.org>
+
+Hi Alvaro,
+
+On 27-08-14 16:37, Frank, Alvaro Jesus wrote:
+> Hi All,
+> 
+> I am in the process of finishing the first USER usable version of
+> omicabelnomm and would need help converting real data from impute2 to
+> databel.
+
+That's great news!
+
+> 
+> The function impute2databel seems ok but I have no idea if it stores in
+> FLOAT or DOUBLE the values.
+
+That's easy to find out. Simple look up the help information for the
+function (help(impute2databel), which shows:
+
+Usage:
+
+       impute2databel(genofile, samplefile, outfile,
+         makeprob = TRUE, old = FALSE, dataOutType = "FLOAT")
+
+So the default dataOutType is FLOAT.
+
+Another way to find out is type the name of an R function without the
+brackets, then you'll see the underlying code. For example here are the
+first few lines of the impute2databel() function:
+
+> library(GenABEL)
+Loading required package: MASS
+Loading required package: GenABEL.data
+> impute2databel
+function (genofile, samplefile, outfile, makeprob = TRUE, old = FALSE,
+    dataOutType = "FLOAT")
+{
+
+As you can see the default for the dataOutType variable is really coded
+as FLOAT.
+
+> 
+> I found this on the mailing list, would it work?
+
+It's been a while since I converted Impute2 data. If you search the
+forum you'll see some reports of problems with this function. At least
+one was a bug that has been fixed. Please let us know if you run into
+any trouble. Since this bug involves DatABEL as well please note that
+Maksim is in the process of releasing a new DatABEL version to CRAN. I'm
+not sure of the top of my head if this new version contains the
+aforementioned bug fix or if that was already released before.
+
+About the example below, please make sure if you want to set
+makeprob=TRUE. Does OmicABELnoMM accept probability data or only dosage
+data?
+
+
+Best,
+
+Lennart.
+
+> 
+>>/ owd<- setwd(pth)
+> />/ fls<- list.files(pattern="^chr")
+> />/ ufls<- unique(sapply(strsplit(fls, "_"), "[", 1))
+> />/ for(i in ufls){
+> />/       of<- strsplit(i, "\\.")[[1]]
+> />/       of<- paste(of[1], tail(of, 1), sep=".")
+> />/       impute2databel(genofile = i,
+> />/                      samplefile = paste(i, "info", sep="_"),
+> />/                      outfile = of,
+> />/                      makeprob=TRUE, old=FALSE)
+> />/ }
+> />/ setwd(owd)
+> 
+> Best,
+> 
+> Alvaro
+> /
+> 
+> 
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140910/b93914d8/attachment.sig>
+
+From lennart at karssen.org  Thu Sep 11 01:29:08 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Thu, 11 Sep 2014 01:29:08 +0200
+Subject: [GenABEL-dev] databel vs impute2 vs me
+In-Reply-To: <244CF001646FF74FB34F372310A332C5011571F9@MBX-S2.rwth-ad.de>
+References: <244CF001646FF74FB34F372310A332C5011571F9@MBX-S2.rwth-ad.de>
+Message-ID: <5410DEC4.3030706@karssen.org>
+
+Hi Alvaro,
+
+Sorry for the late reply.
+
+On 27-08-14 18:56, Frank, Alvaro Jesus wrote:
+> Hi Lennart,
+> 
+> I wanted to re-introduce the issue of compression, file sizes and formats.
+
+Great! I think it's a fun topic and IIRC we disagreed last time, so lots
+of opportunities for a good discussion :-).
+
+> 
+> At the moment I am trying to use a a file in format impute2, which seems
+> to code a lot of 0 1 and every now and then a 0. + 3digits.
+
+Yup.
+
+> 
+> When converting such a file to databel, the size is clearly BIGGER,
+> since (instead of using 1 byte for 1,0 s, like impute2) DATABEL will use
+> 4bytes. Databel has no idea what is binary and what is not so codes all
+> as floats/doubles.
+
+Indeed.
+
+> Never the less a compressed 7z of the databel format can reduce 200MBs
+> to less than 4MBs.
+> 80MB of impute2 get compressed to 5Mbs in gz format and around 3MB in 7z
+> format.
+> 
+> Compression is already an option for databel as is. 
+
+So far, we agree :-).
+
+> 
+> Now to the real issue, Compression of data SHOULD NEVER HAPPEN!
+> (Decompression of data on the fly, (to analyze it) is just adding
+> compute overhead (cpus are being used to decompress!))
+
+I think this is a point that you still need to convince me of (I accept
+the fact that decompression uses CPU cycles, but I'm not convinced yet
+that that is a bad thing).
+
+I haven't yet read the rest of the e-mail, so I may be getting ahead of
+things, but I can see that from a computer science/computational
+efficiency point of view you are right. However, from the point of view
+of a system administrator or a financial decision maker (storage (also
+for backups) is expensive) I don't agree with that. The way I see it is
+as follows: Let's say that OmicABELnoMM is 10? faster than current
+'state of the art' ProbABEL, for example finishing a GWAS in a day
+instead of 1.5 week on a given system. If using compressed data
+increases computation time by 10% or 25% I would still be OK with that
+if that means I reduce the amount of disk space for a given imputed data
+set from 1TB to e.g. 100GB.
+Moreover, if you also use DatABEL format files to store output data, the
+advantage of the decreased file size is even bigger. For example, an
+imputed data set you probably back up only once, but user data changes
+more often and thus will consume much more backup space in a scheme with
+daily, weekly, monthly incremental backups.
+
+But that's just to give you an idea if my current point of view. I'll
+read on to see what's waiting there for me.
+
+> 
+> 
+> To deal with (not using compressed) output data I developed a small
+> footprint format of the data and a program that reads it and outputs
+> .txt human readable versions of the results (for subsets of the
+> results). The binary custom version of the output is very aware of data
+> and stores significant values (user defined) only, as well as required
+> data to reproduce the entire output, independently of the source data
+> used to produce it. This means that p values, t statistics and such can
+> be recomputed with the outputfiles and only very minimal data is stored
+> and virtually no compute time is required. As an extra, a .txt file is
+> also produced automatically by omicabelnomm which contains significant
+> data only (another parameter set by the user). The output binary data
+> can then be used to produce new txt files according to different degrees
+> of significance, as long as the data had been stored.
+
+That sounds very interesting! So just to see if I understand you:
+OmicABELnoMM produces in principle two files:
+- a small text file with significant hits (at a user-definable threshold
+T_1)
+- a 'reasonably' sized binary file containing significant values at
+another user-definable threshold T_2. This file contains all data to
+create new text files with the results at any threshold T < T_2 (if I
+understand your example below correctly).
+
+> 
+> For example, from 1000 Phe and 1000 SNP, 10^6 results are meant to be
+> computed. from those only 0.1% are relevant/significant. The user says,
+> display as txt  only P < 0.05 and store all results with P < 0.1. This
+> is done. File sizes are minimal. User then comes in a week and wants to
+> see not only what he had but perhaps only P < 0.0005. This results were
+> stored. He also want to see P < 0.9 
+
+Do you mean 0.09 here? Because only data with P < 0.1 was stored.
+
+> and those were stored too, so for
+> both cases he receives new .txts with human readable format. If he wants
+> to see all results above P >0.1, those were not stored.... so no luck
+> there. Re-computation should not be an issue as it is FAST.
+
+That sounds very convincing, I must say. Can you give me an indication
+of the compute times we are talking about (i.e. what is FAST)? For
+example, how fast would the above 1000?1000 analysis run in your case?
+And what would the cost (in computation time) be should compression be
+added (or is that too difficult to estimate without a proper
+implementaiton)?
+
+> 
+> That is just a sample of how to handle the "big data" problem, which I
+> insist, is not a problem at all.
+> The next issue is storing data like the one from impute2 I have
+> encountered here.
+> Is this kind of data normal? or are there situations where EVERY entry
+> (90%+?) are floating point numbers? 
+
+> Are 3 digits after the . the maximum impute2 supports?
+
+I haven't checked with Impute2, but Mach and minimac (two other programs
+used for genetic imputation) indeed only output 3 decimals. From an
+experimental precision point of view that is enough. Even if you assume
+that the genotyping + imputation process is perfect (or has e.g. 1e-9
+precision), most (if not all) phenotype measurements are much less
+precise. For example, nobody measures human height in mm, or,
+concentrations of HDL cholesterol, for example, are measured with two or
+three significant digits.
+
+> If so, I can already envision a super "compressed" file format to
+> contain this impute2 like data with megabytes instead of
+> gygabytes/terabytes. What other formats are used for bot Y and X?
+> (genotypes/phenotypes) Do they have same impute2 structure?
+
+Two other commonly used tools for genetic imputation are MaCH and its
+newer sibling minimac [1] and Beagle [2]. Currently I'd say that minimac
+and Impute2 are used the most.
+
+The ProbABEL example files (.mldose, .mlprob and .mlinfo) are typical
+examples of the MaCH/minimac formats. Rows are individuals and columns
+contain SNP data (dosage or probabilities), all with ~3 digits after the
+decimal point. By default minimac outputs these as gzipped text files.
+
+> I know there is non imputed datatypes, how do they look?
+
+I guess with non-imputed data types you mean what we call (measured)
+genotype data. This is the type of data that comes from the biochemical
+process of determining the genotypes (DNA bases) of a given individual
+(see below for some more info). Incidentally, this type of measured
+genotype data serves as input for the imputation process.
+
+The files resulting from this process (after quality control) can be
+stored in various formats. Typical dimensions would be 100 to 10000
+people and 2e5 to 2e6 SNPs.
+
+One format would be SNPs as rows, individuals as columns and each entry
+would be AA or AC or TG or any other combination of two letters/DNA
+bases A C T and G. In case a call cannot be made for a given person and
+SNP missing data will occur.
+
+Another very common set of formats are the Plink (a tool [3]) formats.
+There are three file formats, each encoding the same information:
+- .ped files have people as rows, SNPs as columns and the first 6
+columns contain additional information like person and family IDs, IDs
+of the parents and sex.
+- .tped is the transposed version of the above file, so SNPs as rows and
+people as columns
+- .bed files are the binary version of the above (either SNP major or
+person major), see [4] or the specs.
+
+And lastly the GenABEL format, i.e. the binary format of R objects of
+the gwaa.data-class, which uses two bits to encode the four genotype
+options (AA, AB, BB, missing) for a given person at a given DNA location.
+
+A bit more background: This genotypng process is done on so-called
+genotyping arrays, which contain roughly 1e6 SNPs per person. The
+lab/machine measures fluorescence intensities. These intensity values
+(usually between 0 and 1) are plotted as a 2D scatter plot, see for
+example http://urr.cat/cnv/im1.jpg. There you see three groups of dots.
+Each dot is the intensity data for one individual. This plot shows all
+individuals for one SNP. The three groups are the three possible
+genotypes. If at the DNA location of that SNP people can have an A or a
+C there are three options: AA, AC or CC.
+If the three clusters are well separated and all dots (people) fall well
+into a cluster confident calls (AA or AC or CC) can be made for each
+person. However, if the data looks like plot A at
+http://www.biomedcentral.com/content/figures/1471-2164-13-140-1-l.jpg
+making good genotype calls is difficult/impossible. Or, for example, the
+red dot in figure D, is it a good call or just one spurious measurement?
+That is why after these measurements various QC steps are taken and the
+resulting data are confident calls (no uncertainty).
+
+
+And, just to give you a taste of what other stuff there is: another way
+of measuring genotype data is through NGS (Next-Generation Sequencing).
+With this method (nearly) all 3e9 base pairs of the human DNA can be
+measured. But depending on the method accuracy can vary, so the genotype
+call at a given location is usually accompanied by a quality metric.
+Just to give you an idea: storing intermediate data from this process
+for 1300 people, 30e6 genotypes used 14TB. Consequently people to a lot
+of filtering and quality control reducing the file size and actually
+ending up with files in the aforementioned Plink format (thus loosing
+all uncertainty information!!).
+But let's not go into this, because that's a completely different topic
+and too much for an e-mail discussion. If you'd like to know more a call
+would be better.
+
+> 
+> Hope to commit the new omicabelnomm soon and will work on a real life
+> sample usage too.
+
+That splendid news! Looking forward to see/discuss the results.
+
+> 
+> Thank you for any help on the matter!
+> 
+
+
+Hope this helps! If not, let me know.
+
+And, just to summarise my view of the compress or not compress discussion:
+- I think your solution for the output data is a good one.
+- As for the input data (imputed genetic data), I still think that
+compression can help there (not for the computations, but to reduce disk
+space usage).
+
+One more thing to note is that neither DatABEL, nor your binary format
+takes care of endianness. So people on different architectures may run
+into problems. Nowadays Apple's Macs no longer use PowerPC CPUs, but in
+the future we may see ARM processors coming up (which are bi-endian
+IIRC). So that may be something to keep in mind.
+This is the right time to plug my idea of using the HDF5 format again
+(or maybe the BioHDF subproject). It has several advantages:
+- it's hierarchical (by definition) nature allows it to be
+self-describing, so understanding what information (e.g. phenotype,
+measured genotypes, imputed genotypes) is stored where in the file is easy.
+- allows compression (with various backends like gzip or LZ4),
+- takes care of endianness,
+- has C, C++, Python, Matlab and R bindings (and more)
+- has an MPI interface that allows both parallel writing and reading
+- is developed and maintained by a non-profit organisation
+- is used by many institutions that have large data sets, e.g. NASA, so
+its proven technology.
+
+Unfortunately, I haven't had the time to do proper performance testing,
+but maybe you could have a look at it (I guess the MPI part is the most
+relevant to your expertise) and tell me what you think.
+
+
+Lennart.
+
+[1] http://genome.sph.umich.edu/wiki/Minimac,
+http://www.sph.umich.edu/csg/abecasis/MaCH/tour/imputation.html
+[2] http://faculty.washington.edu/browning/beagle/beagle.html and the
+manual for a description of the file formats:
+http://faculty.washington.edu/browning/beagle/beagle_3.3.2_31Oct11.pdf
+[3] http://pngu.mgh.harvard.edu/~purcell/plink/data.shtml#ped
+[4] http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml
+
+> -Alvaro
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140911/cf852259/attachment.sig>
+
+From yurii at bionet.nsc.ru  Thu Sep 11 08:30:24 2014
+From: yurii at bionet.nsc.ru (Yurii Aulchenko)
+Date: Thu, 11 Sep 2014 13:30:24 +0700
+Subject: [GenABEL-dev] Fwd: CRAN submission DatABEL 0.9-5
+References: <54113445.2050807@stats.ox.ac.uk>
+Message-ID: <2C9F6B0B-B34D-40D8-897D-FAE221CF0C52@bionet.nsc.ru>
+
+Thanks to Maksim!
+
+----------------------
+Yurii Aulchenko 
+(sent from mobile device)
+
+Begin forwarded message:
+
+> From: Prof Brian Ripley <ripley at stats.ox.ac.uk>
+> Date: September 11, 2014 at 12:33:57 GMT+7
+> To: Yurii Aulchenko <yurii at bionet.nsc.ru>, CRAN <cran at r-project.org>
+> Subject: Re: CRAN submission DatABEL 0.9-5
+> 
+> On CRAN now.
+> 
+> On 11/09/2014 04:42, Yurii Aulchenko wrote:
+>> [This was generated from CRAN.R-project.org/submit.html]
+>> 
+>> The following package was uploaded to CRAN:
+>> ===========================================
+>> 
+>> Package Information:
+>> Package: DatABEL
+>> Version: 0.9-5
+>> Title: file-based access to large matrices stored on HDD in binary format
+>> Author(s): Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel Kempenaar,
+>>   Maksim Struchalin
+>> Maintainer: Yurii Aulchenko <yurii at bionet.nsc.ru>
+>> Depends: R (>= 2.4.0), methods, utils
+>> Suggests: GenABEL, RUnit
+>> Description: a package providing an interface to the C++ FILEVECTOR
+>>   library facilitating analysis of large (giga- to tera-bytes)
+>>   matrices; matrix storage is organized in a way that either
+>>   columns or rows are quickly accessible; primarily aimed to
+>>   support genome-wide association analyses e.g. using GenABEL,
+>>   MixABEL and ProbABEL
+>> License: GPL (>= 2)
+>> 
+>> 
+>> The maintainer confirms that he or she
+>> has read and agrees to the CRAN policies.
+>> 
+>> Submitter's comment: 'NOTE's from the previous unsuccessful submisson have
+>>   been fixed and new futures have been added.
+> 
+> 
+> -- 
+> Brian D. Ripley,                  ripley at stats.ox.ac.uk
+> Emeritus Professor of Applied Statistics, University of Oxford
+> 1 South Parks Road, Oxford OX1 3TG, UK
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140911/bb57e640/attachment.html>
+
+From lennart at karssen.org  Thu Sep 11 11:25:18 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Thu, 11 Sep 2014 11:25:18 +0200
+Subject: [GenABEL-dev] Fwd: CRAN submission DatABEL 0.9-5
+In-Reply-To: <2C9F6B0B-B34D-40D8-897D-FAE221CF0C52@bionet.nsc.ru>
+References: <54113445.2050807@stats.ox.ac.uk>
+ <2C9F6B0B-B34D-40D8-897D-FAE221CF0C52@bionet.nsc.ru>
+Message-ID: <54116A7E.4000607@karssen.org>
+
+Thanks for the work Maksim!
+
+I'll push announcements to the forum, the GenABEL website and the
+announce mailing list. I'll also create an SVN tag (unless you'd like to
+do that; let me know).
+
+
+Best,
+Lennart.
+
+On 11-09-14 08:30, Yurii Aulchenko wrote:
+> Thanks to Maksim!
+> 
+> ----------------------
+> Yurii Aulchenko 
+> (sent from mobile device)
+> 
+> Begin forwarded message:
+> 
+>> *From:* Prof Brian Ripley <ripley at stats.ox.ac.uk
+>> <mailto:ripley at stats.ox.ac.uk>>
+>> *Date:* September 11, 2014 at 12:33:57 GMT+7
+>> *To:* Yurii Aulchenko <yurii at bionet.nsc.ru
+>> <mailto:yurii at bionet.nsc.ru>>, CRAN <cran at r-project.org
+>> <mailto:cran at r-project.org>>
+>> *Subject:* *Re: CRAN submission DatABEL 0.9-5*
+>>
+>> On CRAN now.
+>>
+>> On 11/09/2014 04:42, Yurii Aulchenko wrote:
+>>> [This was generated from CRAN.R-project.org/submit.html]
+>>> <http://CRAN.R-project.org/submit.html]>
+>>>
+>>> The following package was uploaded to CRAN:
+>>> ===========================================
+>>>
+>>> Package Information:
+>>> Package: DatABEL
+>>> Version: 0.9-5
+>>> Title: file-based access to large matrices stored on HDD in binary format
+>>> Author(s): Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel
+>>> Kempenaar,
+>>>   Maksim Struchalin
+>>> Maintainer: Yurii Aulchenko <yurii at bionet.nsc.ru
+>>> <mailto:yurii at bionet.nsc.ru>>
+>>> Depends: R (>= 2.4.0), methods, utils
+>>> Suggests: GenABEL, RUnit
+>>> Description: a package providing an interface to the C++ FILEVECTOR
+>>>   library facilitating analysis of large (giga- to tera-bytes)
+>>>   matrices; matrix storage is organized in a way that either
+>>>   columns or rows are quickly accessible; primarily aimed to
+>>>   support genome-wide association analyses e.g. using GenABEL,
+>>>   MixABEL and ProbABEL
+>>> License: GPL (>= 2)
+>>>
+>>>
+>>> The maintainer confirms that he or she
+>>> has read and agrees to the CRAN policies.
+>>>
+>>> Submitter's comment: 'NOTE's from the previous unsuccessful submisson
+>>> have
+>>>   been fixed and new futures have been added.
+>>>
+>>
+>>
+>> -- 
+>> Brian D. Ripley,                  ripley at stats.ox.ac.uk
+>> <mailto:ripley at stats.ox.ac.uk>
+>> Emeritus Professor of Applied Statistics, University of Oxford
+>> 1 South Parks Road, Oxford OX1 3TG, UK
+> 
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140911/064a9a09/attachment-0001.sig>
+
+From alvaro.frank at rwth-aachen.de  Thu Sep 11 13:45:13 2014
+From: alvaro.frank at rwth-aachen.de (Frank, Alvaro Jesus)
+Date: Thu, 11 Sep 2014 11:45:13 +0000
+Subject: [GenABEL-dev] [Genabel-commits] r1819 - in pkg/OmicABELnoMM: .
+ examples src tests
+In-Reply-To: <5410B6EC.4060003@karssen.org>
+References: <20140909135405.56D94187666@r-forge.r-project.org>,
+ <5410B6EC.4060003@karssen.org>
+Message-ID: <244CF001646FF74FB34F372310A332C501157D1D@MBX-S2.rwth-ad.de>
+
+The warnings will be removed once a few more functionality is present to avoid breaking existing one.
+________________________________________
+From: genabel-devel-bounces at lists.r-forge.r-project.org [genabel-devel-bounces at lists.r-forge.r-project.org] on behalf of L.C. Karssen [lennart at karssen.org]
+Sent: Wednesday, September 10, 2014 10:39 PM
+To: genabel-devel at lists.r-forge.r-project.org
+Subject: Re: [GenABEL-dev] [Genabel-commits] r1819 - in pkg/OmicABELnoMM: . examples src tests
+
+Hi Alvaro,
+
+On 09-09-14 15:54, noreply at r-forge.r-project.org wrote:
+> Author: afrank
+> Date: 2014-09-09 15:54:05 +0200 (Tue, 09 Sep 2014)
+> New Revision: 1819
+>
+> Added:
+>    pkg/OmicABELnoMM/examples/dosages_2.txt
+> Modified:
+>    pkg/OmicABELnoMM/ChangeLog
+>    pkg/OmicABELnoMM/configure.ac
+>    pkg/OmicABELnoMM/src/AIOwrapper.cpp
+>    pkg/OmicABELnoMM/src/AIOwrapper.h
+>    pkg/OmicABELnoMM/src/Algorithm.cpp
+>    pkg/OmicABELnoMM/src/Algorithm.h
+>    pkg/OmicABELnoMM/src/Definitions.h
+>    pkg/OmicABELnoMM/src/Utility.cpp
+>    pkg/OmicABELnoMM/src/main.cpp
+>    pkg/OmicABELnoMM/tests/test.cpp
+> Log:
+> Fixed bug related to reusing the same instance of the solver.
+> AIOwrapper is now recreated on every call. Added Additive,Recessive,
+> Dominant models. Added option for Custom Models. Custom Additive Model
+> uses custom factors. Custom Linear Model uses custom models with beta
+> coefficients for each column of the independent variable.
+
+Great to see you implemented new genetic models to the code. That's a
+great addition and makes OmicABELnoMM more feature-comparable to ProbABEL.
+
+I also noticed a steady increase in the number of cpplint warnings in
+Jenkins (see
+http://jenkins.genabel.org/jenkins/ob/OmicABELnoMM/39/violations/). A
+lot of them seem to have to do with code layout issues like lines that
+are longer than 80 characters and missing or too many spaces. It would
+be great if you could fix these as it makes the code easier to read (and
+thus to maintain). Of course it would be great if you tackle (some of)
+the other cpplint issues as well!
+
+
+Thanks a lot for all the good work,
+
+Lennart.
+
+>
+> Modified: pkg/OmicABELnoMM/ChangeLog
+> ===================================================================
+> --- pkg/OmicABELnoMM/ChangeLog        2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/ChangeLog        2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -5,20 +5,24 @@
+>  -Add exclusion lists for single sets of elements of phenotypes
+>  -Add exclusion lists for single sets of elements of genotypes
+>  -Compare ID lists of all dvi files to assure correct ordering
+> --Allow for runtime dosage models
+>
+>  Optimizations:
+>
+>  -Reduce memcpy overhead of XR and XR XL factors
+> --Reduce computation time of XR and XR XL factors (do GEMMS)
+>
+>
+>
+> -
+>  Changes
+>  -------------
+>  -------------
+>
+> +9-9-2014
+> +--------------
+> +Fixed bug related to reusing the same instance  of the solver. AIOwrapper is now recreated on every call.
+> +Added Additive,Recessive, Dominant models.
+> +Added option for Custom Models. Custom Additive Model uses custom factors.
+> +Custom Linear Model uses custom models with beta coefficients for each column of the independent variable.
+> +
+>  8-9-2014
+>  --------------
+>  Removed individuals with covariates missing
+>
+> Modified: pkg/OmicABELnoMM/configure.ac
+> ===================================================================
+> --- pkg/OmicABELnoMM/configure.ac     2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/configure.ac     2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -18,8 +18,8 @@
+>  # Set some default compile flags
+>  if test -z "$CXXFLAGS"; then
+>     # User did not set CXXFLAGS, so we can put in our own defaults
+> -   CXXFLAGS=" -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops"
+> -  #CXXFLAGS="-g -ggdb"
+> +   #CXXFLAGS=" -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops"
+> +  CXXFLAGS="-g -ggdb"
+>  fi
+>  if test -z "$CPPFLAGS"; then
+>     # User did not set CPPFLAGS, so we can put in our own defaults
+> @@ -37,7 +37,7 @@
+>  AC_OPENMP
+>  AC_SUBST(AM_CXXFLAGS, "$OPENMP_CFLAGS")
+>
+> -AM_CXXFLAGS="-static -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops -I../libs/include -I./libs/include $AM_CXXFLAGS"
+> +AM_CXXFLAGS="-static  -g -ggdb -I../libs/include -I./libs/include $AM_CXXFLAGS"
+>  #AM_CXXFLAGS="-static  -I../libs/include -I./libs/include $AM_CXXFLAGS"
+>  # Checks for libraries.
+>  # pthread library
+>
+> Added: pkg/OmicABELnoMM/examples/dosages_2.txt
+> ===================================================================
+> --- pkg/OmicABELnoMM/examples/dosages_2.txt                           (rev 0)
+> +++ pkg/OmicABELnoMM/examples/dosages_2.txt   2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -0,0 +1 @@
+> +2 1
+> \ No newline at end of file
+>
+> Modified: pkg/OmicABELnoMM/src/AIOwrapper.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/AIOwrapper.cpp       2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/AIOwrapper.cpp       2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -31,8 +31,17 @@
+>      Fhandler->fakefiles = params.use_fake_files;
+>
+>
+> +    Fhandler->use_dosages = params.dosages;
+> +    if(params.dosages && Fhandler->model ==-1)
+> +    {
+> +        cout << "Requested dosages model wihtout a valid model!" << endl;
+> +        exit(1);
+> +    }
+> +    Fhandler->not_done = true;
+> +    Fhandler->model = params.model;
+> +    Fhandler->fname_dosages = params.fname_dosages;
+> +
+>
+> -    Fhandler->not_done = true;
+>
+>      if(!Fhandler->fakefiles)
+>      {
+> @@ -47,8 +56,9 @@
+>          Fhandler->storePInd = params.storePInd;
+>
+>          Fhandler->min_p_disp = params.minPdisp;
+> -        Fhandler->min_R2_disp = params.minR2disp;
+> +        Fhandler->min_R2_disp = params.minR2disp;
+>
+> +
+>          Yfvi  = load_databel_fvi( (Fhandler->fnameY+".fvi").c_str() );
+>          ALfvi = load_databel_fvi( (Fhandler->fnameAL+".fvi").c_str() );
+>          ARfvi = load_databel_fvi( (Fhandler->fnameAR+".fvi").c_str() );
+> @@ -56,7 +66,8 @@
+>
+>
+>          params.n = ALfvi->fvi_header.numObservations;
+> -        Fhandler->fileN = params.n;
+> +        Fhandler->fileN = params.n;
+> +        Fhandler->fileR = params.r;
+>          params.m = ARfvi->fvi_header.numVariables/params.r;
+>          params.t = Yfvi->fvi_header.numVariables;
+>          params.l = ALfvi->fvi_header.numVariables;
+> @@ -81,12 +92,24 @@
+>
+>
+>          int Aname_idx=params.n*ARfvi->fvi_header.namelength;//skip the names of the rows
+> -        for(int i = 0; i < params.m*params.r; i++)
+> +        if(Fhandler->use_dosages)
+>          {
+> -            Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+> -            Aname_idx += ARfvi->fvi_header.namelength;
+> +            for(int i = 0; i < params.m; i++)
+> +            {
+> +                Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+> +                Aname_idx += ARfvi->fvi_header.namelength*Fhandler->fileR;
+> +            }
+>          }
+> +        else
+> +        {
+> +            for(int i = 0; i < params.m*params.r; i++)
+> +            {
+> +                Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+> +                Aname_idx += ARfvi->fvi_header.namelength;
+> +            }
+> +        }
+>
+> +
+>          Aname_idx=params.n*ALfvi->fvi_header.namelength;
+>          for(int i = 0; i < params.l; i++)
+>          {
+> @@ -100,18 +123,17 @@
+>
+>
+>          int opt_tb = 1000;
+> -        int opt_mb = 1000;
+> +        int opt_mb = 100;
+>
+> -        params.mb = min(params.m, opt_tb);
+> -        params.tb = min(params.t, opt_mb);
+> +        params.mb = min(params.m, opt_mb);
+> +        params.tb = min(params.t, opt_tb);
+>
+> -
+>
+>
+>      }
+>      else
+>      {
+> -
+> +        //other params come from outside
+>      }
+>
+>      //params.fname_excludelist = "exclfile.txt";
+> @@ -137,7 +159,60 @@
+>
+>      }
+>
+> -    params.n -= (excl_count + Almissings);
+> +    params.n -= (excl_count + Almissings);
+> +
+> +    if(params.dosages)
+> +    {
+> +
+> +        Fhandler->ArDosage = new float[Fhandler->fileR*params.n];
+> +        Fhandler->dosages = new float[Fhandler->fileR];
+> +
+> +
+> +        switch (Fhandler->model)
+> +        {
+> +        case -1://nomodel
+> +
+> +        break;
+> +        case 0://add
+> +            if(Fhandler->fileR != 3)
+> +            {
+> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Additive Model!" << endl;
+> +                exit(1);
+> +            }
+> +            Fhandler->dosages[0] = 2;Fhandler->dosages[1] = 1;Fhandler->dosages[2] = 0;
+> +            params.r = 1;
+> +            Fhandler->add_dosages = true;
+> +        break;
+> +        case 1://dom
+> +            if(Fhandler->fileR != 3)
+> +            {
+> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Dominant Model!" << endl;
+> +                exit(1);
+> +            }
+> +            Fhandler->dosages[0] = 1;Fhandler->dosages[1] = 1;Fhandler->dosages[2] = 0;
+> +            params.r = 1;
+> +            Fhandler->add_dosages = true;
+> +        break;
+> +        case 2://rec
+> +            if(Fhandler->fileR != 3)
+> +            {
+> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Recessive Model!" << endl;
+> +                exit(1);
+> +            }
+> +            Fhandler->dosages[0] = 1;Fhandler->dosages[1] = 0;Fhandler->dosages[2] = 0;
+> +            params.r = 1;
+> +            Fhandler->add_dosages = true;
+> +        break;
+> +        case 3://linear
+> +            read_dosages(params.fname_dosages,Fhandler->fileR,Fhandler->dosages);
+> +        break;
+> +        case 4://additive
+> +            read_dosages(params.fname_dosages,Fhandler->fileR,Fhandler->dosages);
+> +            params.r = 1;
+> +            Fhandler->add_dosages = true;
+> +        break;
+> +        }
+> +    }
+>
+>      params.p = params.l + params.r;
+>
+> @@ -174,7 +249,18 @@
+>          fp_InfoResults.write( (char*)&ALfvi->fvi_data[Aname_idx],ALfvi->fvi_header.namelength*(params.l-1)*sizeof(char));
+>
+>          Aname_idx=params.n*ARfvi->fvi_header.namelength;//skip the names of the rows
+> -        fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],ARfvi->fvi_header.namelength*params.r*params.m*sizeof(char));
+> +        if(Fhandler->use_dosages)
+> +        {
+> +            for(int i = 0; i < params.m; i++)
+> +            {
+> +                fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],ARfvi->fvi_header.namelength*sizeof(char));
+> +                Aname_idx += Fhandler->fileR*ARfvi->fvi_header.namelength*sizeof(char);
+> +            }
+> +        }
+> +        else
+> +        {
+> +            fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],Fhandler->fileR*params.m*ARfvi->fvi_header.namelength*sizeof(char));
+> +        }
+>
+>          int Yname_idx=params.n*Yfvi->fvi_header.namelength;//skip the names of the rows
+>          fp_InfoResults.write( (char*)&Yfvi->fvi_data[Yname_idx],Yfvi->fvi_header.namelength*params.t*sizeof(char));
+> @@ -190,8 +276,8 @@
+>  //    int opt_tb = max(4*2000,opt_block);
+>  //    int opt_mb = max(2000,opt_block);
+>  //
+> -//    params.mb = min(params.m,opt_tb);
+> -//    params.tb = min(params.t,opt_mb);
+> +    params.mb = min(params.m,params.mb);
+> +    params.tb = min(params.t,params.tb);
+>
+>      prepare_AL(params.l,params.n);
+>      prepare_AR(  params.mb,  params.n,  params.m,  params.r);
+> @@ -231,6 +317,11 @@
+>      pthread_cond_destroy(&(Fhandler->condition_read));
+>
+>      delete Fhandler->excl_List;
+> +    if(Fhandler->use_dosages)
+> +    {
+> +            delete [](Fhandler->ArDosage);
+> +            delete [](Fhandler->dosages);
+> +    }
+>
+>
+>
+> @@ -361,7 +452,8 @@
+>              Fhandler->empty_buffers.pop();
+>
+>
+> -            tobeFilled->size = tmp_y_blockSize;
+> +            tobeFilled->size = tmp_y_blockSize;
+> +            //cout << "tbz:" << tmp_y_blockSize << " " << flush;
+>
+>              if(Fhandler->fakefiles)
+>              {
+> @@ -454,21 +546,74 @@
+>                  int chunk_size_buff;
+>                  int buff_pos=0;
+>                  int file_pos;
+> +                float* destination = Fhandler->ArDosage;
+>
+> -                for(int i = 0; i < tmp_ar_blockSize*Fhandler->r; i++)
+> +                if(Fhandler->use_dosages)
+>                  {
+> -                    for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+> +
+> +                    if(!Fhandler->add_dosages)
+>                      {
+> -                        file_pos = Fhandler->fileN*i + it->first;
+> -                        fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+> +                        destination = tobeFilled->buff;//no need to use temp variable
+> +                    }
+>
+> -                        chunk_size_buff = it->second;
+> -                        size_t result = fread (&tobeFilled->buff[buff_pos],sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+> -                        buff_pos += chunk_size_buff;
+> +                    for(int i = 0; i < tmp_ar_blockSize; i++)
+> +                    {
+> +                        buff_pos=0;
+> +                        for(int ii = 0; ii < Fhandler->fileR; ii++)
+> +                        {
+> +                            for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+> +                            {
+> +                                file_pos = Fhandler->fileN*i + it->first;
+> +                                fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+>
+> +                                chunk_size_buff = it->second;
+>
+> +                                size_t result = fread (&(destination[buff_pos]),sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+> +                                buff_pos += chunk_size_buff;
+> +                            }
+> +                        }
+> +
+> +                        if(Fhandler->add_dosages)
+> +                        {
+> +                            cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+> +                                Fhandler->n, 1, Fhandler->fileR, 1.0, Fhandler->ArDosage, Fhandler->n, Fhandler->dosages,Fhandler->fileR ,
+> +                                    0.0, &(tobeFilled->buff[i*Fhandler->n]), Fhandler->n);
+> +                        }
+> +                        else
+> +                        {
+> +                            for(int ii = 0; ii < Fhandler->fileR; ii++)
+> +                            {
+> +                                for(int k=0; k < Fhandler->n; k++)
+> +                                {
+> +                                    destination[Fhandler->n*ii+k] *= Fhandler->dosages[ii];
+> +                                }
+> +                            }
+> +                        }
+> +
+>                      }
+> +
+> +
+> +
+>                  }
+> +                else
+> +                {
+> +                    for(int i = 0; i < tmp_ar_blockSize*Fhandler->r; i++)
+> +                    {
+> +                        for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+> +                        {
+> +                            file_pos = Fhandler->fileN*i + it->first;
+> +                            fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+> +
+> +                            chunk_size_buff = it->second;
+> +                            size_t result = fread (&tobeFilled->buff[buff_pos],sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+> +                            buff_pos += chunk_size_buff;
+> +
+> +
+> +                        }
+> +                    }
+> +                }
+> +
+> +
+>
+>
+>              }
+> @@ -702,6 +847,7 @@
+>         Fhandler->write_empty_buffers.pop();
+>         delete tmp2;
+>      }
+> +
+>      }
+>
+>
+> @@ -1016,7 +1162,8 @@
+>  void AIOwrapper::prepare_AR( int desired_blockSize, int n, int totalR, int columnsAR)
+>  {
+>
+> -    Fhandler->Ar = new type_precision[desired_blockSize*columnsAR*n];
+> +    Fhandler->Ar = new type_precision[desired_blockSize*columnsAR*n];
+> +
+>      Fhandler->Ar_blockSize = desired_blockSize;
+>      Fhandler->r = columnsAR;
+>      Fhandler->Ar_Amount = totalR;
+> @@ -1352,6 +1499,29 @@
+>
+>  }
+>
+> +
+> +void AIOwrapper::read_dosages(string fname_dosages, int expected_count, float* vec)
+> +{
+> +    ifstream fp_dos(fname_dosages.c_str());
+> +    if(fp_dos == 0)
+> +    {
+> +        cout << "Error reading dosages file."<< endl;
+> +        exit(1);
+> +    }
+> +    int i;
+> +    for (i=0; i < expected_count && !fp_dos.eof(); i++)
+> +    {
+> +       fp_dos >> vec[i];
+> +       //cout << vec[i];
+> +    }
+> +    if(i!=expected_count)
+> +    {
+> +        cout << "not enough factor for the dosage model! required " << expected_count << endl;
+> +        exit(1);
+> +    }
+> +
+> +}
+> +
+>
+>  void AIOwrapper::free_databel_fvi( struct databel_fvi **fvi )
+>  {
+>
+> Modified: pkg/OmicABELnoMM/src/AIOwrapper.h
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/AIOwrapper.h 2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/AIOwrapper.h 2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -29,8 +29,10 @@
+>
+>
+>      string fnameOutFiles;
+> +    string fname_dosages;
+>
+>
+> +
+>      list< pair<int,int> >* excl_List;
+>
+>
+> @@ -48,7 +50,8 @@
+>      vector< string > ALnames;
+>
+>      type_precision* Yb;
+> -    type_precision* Ar;
+> +    type_precision* Ar;
+> +    type_precision* ArDosage;
+>      type_precision* AL;
+>      type_precision* B;
+>      type_buffElement* currentReadBuff;
+> @@ -66,11 +69,14 @@
+>      queue<type_buffElement*> ar_full_buffers;
+>
+>      int index;
+> -    int fileN;
+> +    int fileN;
+> +    int fileR;
+>      int n;
+>      int r;
+>      int l;
+> -    int p;
+> +    int p;
+> +
+> +    int model;
+>
+>      int Ar_Amount;
+>      int Ar_blockSize;
+> @@ -84,10 +90,17 @@
+>      int max_b_blockSize;
+>
+>      bool not_done;
+> -    bool reset_wait;
+> +    bool reset_wait;
+> +    bool use_dosages;
+> +    bool add_dosages;
+>
+>      int seed;
+> -    int Aseed;
+> +    int Aseed;
+> +
+> +    float* dosages;
+> +    vector< vector <float> > cov_2_Terms;
+> +    vector< vector <float> > x_Terms;
+> +    vector< vector <float> > xcov_2_Terms;
+>
+>      pthread_mutex_t m_more     ;
+>      pthread_cond_t  condition_more   ;
+> @@ -165,7 +178,8 @@
+>
+>      private:
+>
+> -        void read_excludeList(list< pair<int,int> >* excl, int &excl_count, int max_excl, string fname_excludeList);
+> +        void read_excludeList(list< pair<int,int> >* excl, int &excl_count, int max_excl, string fname_excludeList);
+> +        void read_dosages(string fname_dosages, int expected_count, float* vec);
+>
+>
+>          void prepare_AR( int desired_blockSize, int n, int totalR, int columnsR);
+>
+> Modified: pkg/OmicABELnoMM/src/Algorithm.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/Algorithm.cpp        2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/Algorithm.cpp        2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -396,8 +396,10 @@
+>      params.disp_cov = false;
+>      params.storePInd = false;
+>      params.storeBin = false;
+> +    params.dosages = false;
+>      params.threads = 1;
+>      params.r = 1;
+> +    params.model = -1;
+>
+>
+>      params.minR2store = 0.00001;
+> @@ -434,7 +436,7 @@
+>      if(params.minPdisp > params.minPstore || params.storeBin)
+>          params.minPstore = params.minPdisp;
+>
+> -
+> +    AIOwrapper AIOfile;//leave here to avoid memory errors of reusing old threads
+>      AIOfile.initialize(params);//THIS HAS TO BE DONE FIRST! ALWAYS
+>
+>      //cout << params.n <<  "\n";
+> @@ -455,7 +457,8 @@
+>
+>
+>      int y_amount = params.t;
+> -    int y_block_size = params.tb;  // kk
+> +    int y_block_size = params.tb;  // kk
+> +    //cout << "yt:"<< y_amount << " oybz:"<<y_block_size << flush;
+>
+>      int a_amount = params.m;
+>      int a_block_size = params.mb;
+> @@ -464,7 +467,7 @@
+>
+>      int y_iters = (y_amount + y_block_size - 1) / y_block_size;
+>
+> -    //cout << y_iters << " " << a_iters << endl;
+> +    //cout << "yiters:" <<  y_iters << " aiters:" << a_iters << endl;
+>
+>
+>      lda = n;
+> @@ -581,11 +584,13 @@
+>          get_ticks(start_tick2);
+>
+>          AIOfile.load_Yblock(&Y, y_block_size);
+> +        //cout << "ybz:"<< y_block_size << " " << flush;
+>
+>          get_ticks(end_tick);
+>          out.acc_loady += ticks2sec(end_tick,start_tick2);
+>
+>          get_ticks(start_tick2);
+> +
+>          replace_nans(&y_nan_idxs[0],y_block_size, Y, n,1);
+>          sumSquares(Y,y_block_size,n,ssY,y_nan_idxs);
+>
+>
+> Modified: pkg/OmicABELnoMM/src/Algorithm.h
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/Algorithm.h  2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/Algorithm.h  2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -50,8 +50,8 @@
+>      protected:
+>      private:
+>
+> -        AIOwrapper AIOfile;
+>
+> +
+>          list < resultH > sigResults;
+>
+>          int max_threads;
+>
+> Modified: pkg/OmicABELnoMM/src/Definitions.h
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/Definitions.h        2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/Definitions.h        2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -164,13 +164,16 @@
+>      float minR2disp;
+>      float minR2store;
+>      bool storePInd;
+> -    bool disp_cov;
+> +    bool disp_cov;
+> +    bool dosages;
+> +    int model;//recessive additive dominant etc
+>
+>      string fnameAL;
+>      string fnameAR;
+>      string fnameY;
+>      string fnameOutFiles;
+> -    string fname_excludelist;
+> +    string fname_excludelist;
+> +    string fname_dosages;
+>
+>      bool doublefileType;
+>
+>
+> Modified: pkg/OmicABELnoMM/src/Utility.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/Utility.cpp  2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/Utility.cpp  2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -141,10 +141,12 @@
+>                  int idx = k*cols*rows+i*rows+j;
+>
+>                  //cout << idx;
+> +                if(idx >= rows*cols*vec_blocksize)
+> +                    exit(1);
+> +
+>
+> -                if(/*idx < rows*cols*vec_blocksize &&*/ isnan( vec[idx] ))
+> -                {
+> -
+> +                if(isnan( vec[idx] ))
+> +                {
+>                      vec[idx] = 0;
+>                      if(indexs_vec)
+>                      {
+>
+> Modified: pkg/OmicABELnoMM/src/main.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/src/main.cpp     2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/src/main.cpp     2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -26,7 +26,7 @@
+>  Optional: \n\t\
+>  -n --ngpred \t <#SNPcols> Number of columns in the geno file that represent a single SNP \n\t\
+>  -t --thr    \t <#CPUs> Number of computing threads to use to speed computations \n\t\
+> --x --excl   \t <path/filename> file containing list of individuals to exclude from input files \n\t\
+> +-x --excl   \t <path/filename> file containing list of individuals to exclude from input files, (see example file) \n\t\
+>  -d --pdisp  \t <0.0~1.0> Value to use as maximum threshold for significance.\n\t\
+>  \t\t Results with P-values UNDER this threshold will be displayed in the putput .txt file \n\t\
+>  -r --rdisp  \t <-10.0~1.0> Value to use as minimum threshold for R2. \n\t\
+> @@ -35,7 +35,17 @@
+>  -s --psto   \t <0.0~1.0>  Results with P-values UNDER this threshold will be displayed in the putput binary files \n\t\
+>  -e --rsto   \t <-10.0~1.0> Results with R2-values ABOVE this threshold will be stored in the putput binary files \n\t\
+>  -i --fdcov  \t Flag that forces to include covariates as part of the results that are stored in .txt and binary files \n\t\
+> --f --fdgen  \t Flag that forces to consider all included results (causes the analisis to ignores ALL threshold values).";
+> +-f --fdgen  \t Flag that forces to consider all included results (causes the analisis to ignores ALL threshold values). \n\t\
+> +-j --additive  \t Flag that runs the analisis with an Additive Model with (2*AA,1*AB,0*BB) effects \n\t\
+> +-k --dominant  \t Flag that runs the analisis with an Dominant Model with (1*AA,1*AB,0*BB) effects \n\t\
+> +-l --recessive \t Flag that runs the analisis with an Recessive Model with (1*AA,0*AB,0*BB) effects \n\t\
+> +-z --mylinear \t <path/filename> to read Factors 'f_i' for a Custom Linear Model with f1*X1,f2*X2,f3*X3...fn*X_ngpred as effects,\n\t\
+> +              \t each column of each independent variable will be multiplied with the specified factors. \n\t\
+> +              \t Formula: y~alpha*cov + beta_1*f1*X1 + beta_2*f2*X2 +...+ beta_n*fn*Xn, (see example files!) \n\t\
+> +-y --myaddit  \t <path/filename> to read Factors 'f_i' for a Custom Additive Model with (f1*X1,f2*X2,f3*X3...fn*X_ngpred) as effects,\n\t\
+> +              \t each column of each independent variable will be multiplied with the specified factors and then added together. \n\t\
+> +              \t Formula: y~alpha*cov + beta*(f1*X1 + f2*X2 +...+ fn*Xn), (see example files!) \n\t\
+> +";
+>
+>
+>
+> @@ -89,6 +99,11 @@
+>              {"rsto",    required_argument, 0, 'e'},//
+>              {"fdcov",    no_argument, 0, 'i'},//
+>              {"fdgen",    no_argument, 0, 'f'},//
+> +            {"additive",    no_argument, 0, 'j'},//
+> +            {"dominant",   no_argument, 0, 'k'},//
+> +            {"recessive",    no_argument, 0, 'l'},//
+> +            {"mylinear",    required_argument, 0, 'z'},//
+> +            {"myaddit",    required_argument, 0, 'y'},//
+>              {"help",    no_argument, 0, 'h'},//
+>              {0, 0, 0, 0}
+>          };
+> @@ -96,7 +111,7 @@
+>          // getopt_long stores the option index here.
+>          int option_index = 0;
+>
+> -        c = getopt_long(argc, argv, "c:p:g:o:n:t:m:x:d:s:r:e:fibh", long_options, &option_index);
+> +        c = getopt_long(argc, argv, "c:p:g:o:n:t:m:x:d:s:r:e:z:y:fibhjkl", long_options, &option_index);
+>
+>
+>          // Detect the end of the options.
+> @@ -220,9 +235,45 @@
+>              cout << "-f Forcing all included results to be considered independently of max P-val or min R2. (SLOW!)"<< endl;
+>              break;
+>
+> +        case 'j':
+> +            params.model = 1;
+> +            params.dosages = true;
+> +
+> +            cout << "-j Using Additive Model with (2*AA,1*AB,0*BB) effects"<< endl;
+> +            break;
+> +
+> +        case 'k':
+> +            params.model = 2;
+> +            params.dosages = true;
+> +
+> +            cout << "-j Using Dominant Model with (1*AA,1*AB,0*BB) effects"<< endl;
+> +            break;
+> +
+> +        case 'l':
+> +            params.model = 3;
+> +            params.dosages = true;
+> +
+> +            cout << "-j Using Recessive Model with (0*AA,0*AB,1*BB) effects"<< endl;
+> +            break;
+> +
+> +        case 'z':
+> +            params.model = 4;
+> +            params.dosages = true;
+> +
+> +            cout << "-z Using Custom Linear Model with parameters read from the file "<< params.fname_dosages << endl;
+> +            break;
+> +
+> +        case 'y':
+> +            params.model = 5;
+> +            params.dosages = true;
+> +
+> +            cout << "-z Using Custom Additive Model with parameters read from the file "<< params.fname_dosages << endl;
+> +            break;
+> +
+>          case 'b':
+> -            params.storeBin = true;
+> +            params.storeBin = true;
+>
+> +
+>              cout << "-b Results will be stored in binary format too"<< endl;
+>              break;
+>
+>
+> Modified: pkg/OmicABELnoMM/tests/test.cpp
+> ===================================================================
+> --- pkg/OmicABELnoMM/tests/test.cpp   2014-09-08 14:36:26 UTC (rev 1818)
+> +++ pkg/OmicABELnoMM/tests/test.cpp   2014-09-09 13:54:05 UTC (rev 1819)
+> @@ -95,9 +95,9 @@
+>      int factor = 0;
+>      params.n=2000; params.l=3;  params.r=1;
+>      params.t=800; params.tb=min(800,params.t); params.m=1600; params.mb=min(1600,params.m);
+> -    alg.solve(params, out2, P_NEQ_B_OPT_MD);
+> +    //alg.solve(params, out2, P_NEQ_B_OPT_MD);
+>
+> -    print_output(out2, gemm_gflopsPsec);
+> +    //print_output(out2, gemm_gflopsPsec);
+>
+>
+>      cout << "\nDone\n";
+> @@ -117,6 +117,9 @@
+>      params.fnameAR="examples/XR";
+>      params.fnameY="examples/Y";
+>      params.fnameOutFiles="resultsSig";
+> +//    params.dosages = true;
+> +//    params.model = 4;
+> +//    params.fname_dosages = "examples/dosages_2.txt";
+>
+>
+>      for(int th = 0; th < max_threads; th++)
+> @@ -138,6 +141,8 @@
+>
+>      max_threads = 2;
+>      int iters = 10;
+> +
+> +    //cout << "misc tests" << endl;
+>
+>      for (int th = 1; th < max_threads+1; th++)
+>      {
+>
+> _______________________________________________
+> Genabel-commits mailing list
+> Genabel-commits at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+>
+
+--
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+
+From lennart at karssen.org  Thu Sep 11 14:35:47 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Thu, 11 Sep 2014 14:35:47 +0200
+Subject: [GenABEL-dev] [Genabel-commits] r1819 - in pkg/OmicABELnoMM: .
+ examples src tests
+In-Reply-To: <244CF001646FF74FB34F372310A332C501157D1D@MBX-S2.rwth-ad.de>
+References: <20140909135405.56D94187666@r-forge.r-project.org>,
+ <5410B6EC.4060003@karssen.org>
+ <244CF001646FF74FB34F372310A332C501157D1D@MBX-S2.rwth-ad.de>
+Message-ID: <54119723.90204@karssen.org>
+
+
+
+On 11-09-14 13:45, Frank, Alvaro Jesus wrote:
+> The warnings will be removed once a few more functionality is
+> present to avoid breaking existing one.
+
+Great! Thanks.
+
+
+Lennart.
+
+
+> ________________________________________
+> From: genabel-devel-bounces at lists.r-forge.r-project.org [genabel-devel-bounces at lists.r-forge.r-project.org] on behalf of L.C. Karssen [lennart at karssen.org]
+> Sent: Wednesday, September 10, 2014 10:39 PM
+> To: genabel-devel at lists.r-forge.r-project.org
+> Subject: Re: [GenABEL-dev] [Genabel-commits] r1819 - in pkg/OmicABELnoMM: . examples src tests
+> 
+> Hi Alvaro,
+> 
+> On 09-09-14 15:54, noreply at r-forge.r-project.org wrote:
+>> Author: afrank
+>> Date: 2014-09-09 15:54:05 +0200 (Tue, 09 Sep 2014)
+>> New Revision: 1819
+>>
+>> Added:
+>>    pkg/OmicABELnoMM/examples/dosages_2.txt
+>> Modified:
+>>    pkg/OmicABELnoMM/ChangeLog
+>>    pkg/OmicABELnoMM/configure.ac
+>>    pkg/OmicABELnoMM/src/AIOwrapper.cpp
+>>    pkg/OmicABELnoMM/src/AIOwrapper.h
+>>    pkg/OmicABELnoMM/src/Algorithm.cpp
+>>    pkg/OmicABELnoMM/src/Algorithm.h
+>>    pkg/OmicABELnoMM/src/Definitions.h
+>>    pkg/OmicABELnoMM/src/Utility.cpp
+>>    pkg/OmicABELnoMM/src/main.cpp
+>>    pkg/OmicABELnoMM/tests/test.cpp
+>> Log:
+>> Fixed bug related to reusing the same instance of the solver.
+>> AIOwrapper is now recreated on every call. Added Additive,Recessive,
+>> Dominant models. Added option for Custom Models. Custom Additive Model
+>> uses custom factors. Custom Linear Model uses custom models with beta
+>> coefficients for each column of the independent variable.
+> 
+> Great to see you implemented new genetic models to the code. That's a
+> great addition and makes OmicABELnoMM more feature-comparable to ProbABEL.
+> 
+> I also noticed a steady increase in the number of cpplint warnings in
+> Jenkins (see
+> http://jenkins.genabel.org/jenkins/ob/OmicABELnoMM/39/violations/). A
+> lot of them seem to have to do with code layout issues like lines that
+> are longer than 80 characters and missing or too many spaces. It would
+> be great if you could fix these as it makes the code easier to read (and
+> thus to maintain). Of course it would be great if you tackle (some of)
+> the other cpplint issues as well!
+> 
+> 
+> Thanks a lot for all the good work,
+> 
+> Lennart.
+> 
+>>
+>> Modified: pkg/OmicABELnoMM/ChangeLog
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/ChangeLog        2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/ChangeLog        2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -5,20 +5,24 @@
+>>  -Add exclusion lists for single sets of elements of phenotypes
+>>  -Add exclusion lists for single sets of elements of genotypes
+>>  -Compare ID lists of all dvi files to assure correct ordering
+>> --Allow for runtime dosage models
+>>
+>>  Optimizations:
+>>
+>>  -Reduce memcpy overhead of XR and XR XL factors
+>> --Reduce computation time of XR and XR XL factors (do GEMMS)
+>>
+>>
+>>
+>> -
+>>  Changes
+>>  -------------
+>>  -------------
+>>
+>> +9-9-2014
+>> +--------------
+>> +Fixed bug related to reusing the same instance  of the solver. AIOwrapper is now recreated on every call.
+>> +Added Additive,Recessive, Dominant models.
+>> +Added option for Custom Models. Custom Additive Model uses custom factors.
+>> +Custom Linear Model uses custom models with beta coefficients for each column of the independent variable.
+>> +
+>>  8-9-2014
+>>  --------------
+>>  Removed individuals with covariates missing
+>>
+>> Modified: pkg/OmicABELnoMM/configure.ac
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/configure.ac     2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/configure.ac     2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -18,8 +18,8 @@
+>>  # Set some default compile flags
+>>  if test -z "$CXXFLAGS"; then
+>>     # User did not set CXXFLAGS, so we can put in our own defaults
+>> -   CXXFLAGS=" -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops"
+>> -  #CXXFLAGS="-g -ggdb"
+>> +   #CXXFLAGS=" -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops"
+>> +  CXXFLAGS="-g -ggdb"
+>>  fi
+>>  if test -z "$CPPFLAGS"; then
+>>     # User did not set CPPFLAGS, so we can put in our own defaults
+>> @@ -37,7 +37,7 @@
+>>  AC_OPENMP
+>>  AC_SUBST(AM_CXXFLAGS, "$OPENMP_CFLAGS")
+>>
+>> -AM_CXXFLAGS="-static -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto -funroll-loops -I../libs/include -I./libs/include $AM_CXXFLAGS"
+>> +AM_CXXFLAGS="-static  -g -ggdb -I../libs/include -I./libs/include $AM_CXXFLAGS"
+>>  #AM_CXXFLAGS="-static  -I../libs/include -I./libs/include $AM_CXXFLAGS"
+>>  # Checks for libraries.
+>>  # pthread library
+>>
+>> Added: pkg/OmicABELnoMM/examples/dosages_2.txt
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/examples/dosages_2.txt                           (rev 0)
+>> +++ pkg/OmicABELnoMM/examples/dosages_2.txt   2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -0,0 +1 @@
+>> +2 1
+>> \ No newline at end of file
+>>
+>> Modified: pkg/OmicABELnoMM/src/AIOwrapper.cpp
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/src/AIOwrapper.cpp       2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/src/AIOwrapper.cpp       2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -31,8 +31,17 @@
+>>      Fhandler->fakefiles = params.use_fake_files;
+>>
+>>
+>> +    Fhandler->use_dosages = params.dosages;
+>> +    if(params.dosages && Fhandler->model ==-1)
+>> +    {
+>> +        cout << "Requested dosages model wihtout a valid model!" << endl;
+>> +        exit(1);
+>> +    }
+>> +    Fhandler->not_done = true;
+>> +    Fhandler->model = params.model;
+>> +    Fhandler->fname_dosages = params.fname_dosages;
+>> +
+>>
+>> -    Fhandler->not_done = true;
+>>
+>>      if(!Fhandler->fakefiles)
+>>      {
+>> @@ -47,8 +56,9 @@
+>>          Fhandler->storePInd = params.storePInd;
+>>
+>>          Fhandler->min_p_disp = params.minPdisp;
+>> -        Fhandler->min_R2_disp = params.minR2disp;
+>> +        Fhandler->min_R2_disp = params.minR2disp;
+>>
+>> +
+>>          Yfvi  = load_databel_fvi( (Fhandler->fnameY+".fvi").c_str() );
+>>          ALfvi = load_databel_fvi( (Fhandler->fnameAL+".fvi").c_str() );
+>>          ARfvi = load_databel_fvi( (Fhandler->fnameAR+".fvi").c_str() );
+>> @@ -56,7 +66,8 @@
+>>
+>>
+>>          params.n = ALfvi->fvi_header.numObservations;
+>> -        Fhandler->fileN = params.n;
+>> +        Fhandler->fileN = params.n;
+>> +        Fhandler->fileR = params.r;
+>>          params.m = ARfvi->fvi_header.numVariables/params.r;
+>>          params.t = Yfvi->fvi_header.numVariables;
+>>          params.l = ALfvi->fvi_header.numVariables;
+>> @@ -81,12 +92,24 @@
+>>
+>>
+>>          int Aname_idx=params.n*ARfvi->fvi_header.namelength;//skip the names of the rows
+>> -        for(int i = 0; i < params.m*params.r; i++)
+>> +        if(Fhandler->use_dosages)
+>>          {
+>> -            Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+>> -            Aname_idx += ARfvi->fvi_header.namelength;
+>> +            for(int i = 0; i < params.m; i++)
+>> +            {
+>> +                Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+>> +                Aname_idx += ARfvi->fvi_header.namelength*Fhandler->fileR;
+>> +            }
+>>          }
+>> +        else
+>> +        {
+>> +            for(int i = 0; i < params.m*params.r; i++)
+>> +            {
+>> +                Fhandler->ARnames.push_back(string(&(ARfvi->fvi_data[Aname_idx])));
+>> +                Aname_idx += ARfvi->fvi_header.namelength;
+>> +            }
+>> +        }
+>>
+>> +
+>>          Aname_idx=params.n*ALfvi->fvi_header.namelength;
+>>          for(int i = 0; i < params.l; i++)
+>>          {
+>> @@ -100,18 +123,17 @@
+>>
+>>
+>>          int opt_tb = 1000;
+>> -        int opt_mb = 1000;
+>> +        int opt_mb = 100;
+>>
+>> -        params.mb = min(params.m, opt_tb);
+>> -        params.tb = min(params.t, opt_mb);
+>> +        params.mb = min(params.m, opt_mb);
+>> +        params.tb = min(params.t, opt_tb);
+>>
+>> -
+>>
+>>
+>>      }
+>>      else
+>>      {
+>> -
+>> +        //other params come from outside
+>>      }
+>>
+>>      //params.fname_excludelist = "exclfile.txt";
+>> @@ -137,7 +159,60 @@
+>>
+>>      }
+>>
+>> -    params.n -= (excl_count + Almissings);
+>> +    params.n -= (excl_count + Almissings);
+>> +
+>> +    if(params.dosages)
+>> +    {
+>> +
+>> +        Fhandler->ArDosage = new float[Fhandler->fileR*params.n];
+>> +        Fhandler->dosages = new float[Fhandler->fileR];
+>> +
+>> +
+>> +        switch (Fhandler->model)
+>> +        {
+>> +        case -1://nomodel
+>> +
+>> +        break;
+>> +        case 0://add
+>> +            if(Fhandler->fileR != 3)
+>> +            {
+>> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Additive Model!" << endl;
+>> +                exit(1);
+>> +            }
+>> +            Fhandler->dosages[0] = 2;Fhandler->dosages[1] = 1;Fhandler->dosages[2] = 0;
+>> +            params.r = 1;
+>> +            Fhandler->add_dosages = true;
+>> +        break;
+>> +        case 1://dom
+>> +            if(Fhandler->fileR != 3)
+>> +            {
+>> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Dominant Model!" << endl;
+>> +                exit(1);
+>> +            }
+>> +            Fhandler->dosages[0] = 1;Fhandler->dosages[1] = 1;Fhandler->dosages[2] = 0;
+>> +            params.r = 1;
+>> +            Fhandler->add_dosages = true;
+>> +        break;
+>> +        case 2://rec
+>> +            if(Fhandler->fileR != 3)
+>> +            {
+>> +                cout << "The amount of columns per Independent Variable (--ngpred) is not 3 for a valid Recessive Model!" << endl;
+>> +                exit(1);
+>> +            }
+>> +            Fhandler->dosages[0] = 1;Fhandler->dosages[1] = 0;Fhandler->dosages[2] = 0;
+>> +            params.r = 1;
+>> +            Fhandler->add_dosages = true;
+>> +        break;
+>> +        case 3://linear
+>> +            read_dosages(params.fname_dosages,Fhandler->fileR,Fhandler->dosages);
+>> +        break;
+>> +        case 4://additive
+>> +            read_dosages(params.fname_dosages,Fhandler->fileR,Fhandler->dosages);
+>> +            params.r = 1;
+>> +            Fhandler->add_dosages = true;
+>> +        break;
+>> +        }
+>> +    }
+>>
+>>      params.p = params.l + params.r;
+>>
+>> @@ -174,7 +249,18 @@
+>>          fp_InfoResults.write( (char*)&ALfvi->fvi_data[Aname_idx],ALfvi->fvi_header.namelength*(params.l-1)*sizeof(char));
+>>
+>>          Aname_idx=params.n*ARfvi->fvi_header.namelength;//skip the names of the rows
+>> -        fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],ARfvi->fvi_header.namelength*params.r*params.m*sizeof(char));
+>> +        if(Fhandler->use_dosages)
+>> +        {
+>> +            for(int i = 0; i < params.m; i++)
+>> +            {
+>> +                fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],ARfvi->fvi_header.namelength*sizeof(char));
+>> +                Aname_idx += Fhandler->fileR*ARfvi->fvi_header.namelength*sizeof(char);
+>> +            }
+>> +        }
+>> +        else
+>> +        {
+>> +            fp_InfoResults.write( (char*)&ARfvi->fvi_data[Aname_idx],Fhandler->fileR*params.m*ARfvi->fvi_header.namelength*sizeof(char));
+>> +        }
+>>
+>>          int Yname_idx=params.n*Yfvi->fvi_header.namelength;//skip the names of the rows
+>>          fp_InfoResults.write( (char*)&Yfvi->fvi_data[Yname_idx],Yfvi->fvi_header.namelength*params.t*sizeof(char));
+>> @@ -190,8 +276,8 @@
+>>  //    int opt_tb = max(4*2000,opt_block);
+>>  //    int opt_mb = max(2000,opt_block);
+>>  //
+>> -//    params.mb = min(params.m,opt_tb);
+>> -//    params.tb = min(params.t,opt_mb);
+>> +    params.mb = min(params.m,params.mb);
+>> +    params.tb = min(params.t,params.tb);
+>>
+>>      prepare_AL(params.l,params.n);
+>>      prepare_AR(  params.mb,  params.n,  params.m,  params.r);
+>> @@ -231,6 +317,11 @@
+>>      pthread_cond_destroy(&(Fhandler->condition_read));
+>>
+>>      delete Fhandler->excl_List;
+>> +    if(Fhandler->use_dosages)
+>> +    {
+>> +            delete [](Fhandler->ArDosage);
+>> +            delete [](Fhandler->dosages);
+>> +    }
+>>
+>>
+>>
+>> @@ -361,7 +452,8 @@
+>>              Fhandler->empty_buffers.pop();
+>>
+>>
+>> -            tobeFilled->size = tmp_y_blockSize;
+>> +            tobeFilled->size = tmp_y_blockSize;
+>> +            //cout << "tbz:" << tmp_y_blockSize << " " << flush;
+>>
+>>              if(Fhandler->fakefiles)
+>>              {
+>> @@ -454,21 +546,74 @@
+>>                  int chunk_size_buff;
+>>                  int buff_pos=0;
+>>                  int file_pos;
+>> +                float* destination = Fhandler->ArDosage;
+>>
+>> -                for(int i = 0; i < tmp_ar_blockSize*Fhandler->r; i++)
+>> +                if(Fhandler->use_dosages)
+>>                  {
+>> -                    for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+>> +
+>> +                    if(!Fhandler->add_dosages)
+>>                      {
+>> -                        file_pos = Fhandler->fileN*i + it->first;
+>> -                        fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+>> +                        destination = tobeFilled->buff;//no need to use temp variable
+>> +                    }
+>>
+>> -                        chunk_size_buff = it->second;
+>> -                        size_t result = fread (&tobeFilled->buff[buff_pos],sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+>> -                        buff_pos += chunk_size_buff;
+>> +                    for(int i = 0; i < tmp_ar_blockSize; i++)
+>> +                    {
+>> +                        buff_pos=0;
+>> +                        for(int ii = 0; ii < Fhandler->fileR; ii++)
+>> +                        {
+>> +                            for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+>> +                            {
+>> +                                file_pos = Fhandler->fileN*i + it->first;
+>> +                                fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+>>
+>> +                                chunk_size_buff = it->second;
+>>
+>> +                                size_t result = fread (&(destination[buff_pos]),sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+>> +                                buff_pos += chunk_size_buff;
+>> +                            }
+>> +                        }
+>> +
+>> +                        if(Fhandler->add_dosages)
+>> +                        {
+>> +                            cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+>> +                                Fhandler->n, 1, Fhandler->fileR, 1.0, Fhandler->ArDosage, Fhandler->n, Fhandler->dosages,Fhandler->fileR ,
+>> +                                    0.0, &(tobeFilled->buff[i*Fhandler->n]), Fhandler->n);
+>> +                        }
+>> +                        else
+>> +                        {
+>> +                            for(int ii = 0; ii < Fhandler->fileR; ii++)
+>> +                            {
+>> +                                for(int k=0; k < Fhandler->n; k++)
+>> +                                {
+>> +                                    destination[Fhandler->n*ii+k] *= Fhandler->dosages[ii];
+>> +                                }
+>> +                            }
+>> +                        }
+>> +
+>>                      }
+>> +
+>> +
+>> +
+>>                  }
+>> +                else
+>> +                {
+>> +                    for(int i = 0; i < tmp_ar_blockSize*Fhandler->r; i++)
+>> +                    {
+>> +                        for (list<  pair<int,int>  >::iterator it=excl_List->begin(); it != excl_List->end(); ++it)
+>> +                        {
+>> +                            file_pos = Fhandler->fileN*i + it->first;
+>> +                            fseek ( fp_Ar , file_pos*sizeof(type_precision) , SEEK_SET );
+>> +
+>> +                            chunk_size_buff = it->second;
+>> +                            size_t result = fread (&tobeFilled->buff[buff_pos],sizeof(type_precision),chunk_size_buff,fp_Ar); result++;
+>> +                            buff_pos += chunk_size_buff;
+>> +
+>> +
+>> +                        }
+>> +                    }
+>> +                }
+>> +
+>> +
+>>
+>>
+>>              }
+>> @@ -702,6 +847,7 @@
+>>         Fhandler->write_empty_buffers.pop();
+>>         delete tmp2;
+>>      }
+>> +
+>>      }
+>>
+>>
+>> @@ -1016,7 +1162,8 @@
+>>  void AIOwrapper::prepare_AR( int desired_blockSize, int n, int totalR, int columnsAR)
+>>  {
+>>
+>> -    Fhandler->Ar = new type_precision[desired_blockSize*columnsAR*n];
+>> +    Fhandler->Ar = new type_precision[desired_blockSize*columnsAR*n];
+>> +
+>>      Fhandler->Ar_blockSize = desired_blockSize;
+>>      Fhandler->r = columnsAR;
+>>      Fhandler->Ar_Amount = totalR;
+>> @@ -1352,6 +1499,29 @@
+>>
+>>  }
+>>
+>> +
+>> +void AIOwrapper::read_dosages(string fname_dosages, int expected_count, float* vec)
+>> +{
+>> +    ifstream fp_dos(fname_dosages.c_str());
+>> +    if(fp_dos == 0)
+>> +    {
+>> +        cout << "Error reading dosages file."<< endl;
+>> +        exit(1);
+>> +    }
+>> +    int i;
+>> +    for (i=0; i < expected_count && !fp_dos.eof(); i++)
+>> +    {
+>> +       fp_dos >> vec[i];
+>> +       //cout << vec[i];
+>> +    }
+>> +    if(i!=expected_count)
+>> +    {
+>> +        cout << "not enough factor for the dosage model! required " << expected_count << endl;
+>> +        exit(1);
+>> +    }
+>> +
+>> +}
+>> +
+>>
+>>  void AIOwrapper::free_databel_fvi( struct databel_fvi **fvi )
+>>  {
+>>
+>> Modified: pkg/OmicABELnoMM/src/AIOwrapper.h
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/src/AIOwrapper.h 2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/src/AIOwrapper.h 2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -29,8 +29,10 @@
+>>
+>>
+>>      string fnameOutFiles;
+>> +    string fname_dosages;
+>>
+>>
+>> +
+>>      list< pair<int,int> >* excl_List;
+>>
+>>
+>> @@ -48,7 +50,8 @@
+>>      vector< string > ALnames;
+>>
+>>      type_precision* Yb;
+>> -    type_precision* Ar;
+>> +    type_precision* Ar;
+>> +    type_precision* ArDosage;
+>>      type_precision* AL;
+>>      type_precision* B;
+>>      type_buffElement* currentReadBuff;
+>> @@ -66,11 +69,14 @@
+>>      queue<type_buffElement*> ar_full_buffers;
+>>
+>>      int index;
+>> -    int fileN;
+>> +    int fileN;
+>> +    int fileR;
+>>      int n;
+>>      int r;
+>>      int l;
+>> -    int p;
+>> +    int p;
+>> +
+>> +    int model;
+>>
+>>      int Ar_Amount;
+>>      int Ar_blockSize;
+>> @@ -84,10 +90,17 @@
+>>      int max_b_blockSize;
+>>
+>>      bool not_done;
+>> -    bool reset_wait;
+>> +    bool reset_wait;
+>> +    bool use_dosages;
+>> +    bool add_dosages;
+>>
+>>      int seed;
+>> -    int Aseed;
+>> +    int Aseed;
+>> +
+>> +    float* dosages;
+>> +    vector< vector <float> > cov_2_Terms;
+>> +    vector< vector <float> > x_Terms;
+>> +    vector< vector <float> > xcov_2_Terms;
+>>
+>>      pthread_mutex_t m_more     ;
+>>      pthread_cond_t  condition_more   ;
+>> @@ -165,7 +178,8 @@
+>>
+>>      private:
+>>
+>> -        void read_excludeList(list< pair<int,int> >* excl, int &excl_count, int max_excl, string fname_excludeList);
+>> +        void read_excludeList(list< pair<int,int> >* excl, int &excl_count, int max_excl, string fname_excludeList);
+>> +        void read_dosages(string fname_dosages, int expected_count, float* vec);
+>>
+>>
+>>          void prepare_AR( int desired_blockSize, int n, int totalR, int columnsR);
+>>
+>> Modified: pkg/OmicABELnoMM/src/Algorithm.cpp
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/src/Algorithm.cpp        2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/src/Algorithm.cpp        2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -396,8 +396,10 @@
+>>      params.disp_cov = false;
+>>      params.storePInd = false;
+>>      params.storeBin = false;
+>> +    params.dosages = false;
+>>      params.threads = 1;
+>>      params.r = 1;
+>> +    params.model = -1;
+>>
+>>
+>>      params.minR2store = 0.00001;
+>> @@ -434,7 +436,7 @@
+>>      if(params.minPdisp > params.minPstore || params.storeBin)
+>>          params.minPstore = params.minPdisp;
+>>
+>> -
+>> +    AIOwrapper AIOfile;//leave here to avoid memory errors of reusing old threads
+>>      AIOfile.initialize(params);//THIS HAS TO BE DONE FIRST! ALWAYS
+>>
+>>      //cout << params.n <<  "\n";
+>> @@ -455,7 +457,8 @@
+>>
+>>
+>>      int y_amount = params.t;
+>> -    int y_block_size = params.tb;  // kk
+>> +    int y_block_size = params.tb;  // kk
+>> +    //cout << "yt:"<< y_amount << " oybz:"<<y_block_size << flush;
+>>
+>>      int a_amount = params.m;
+>>      int a_block_size = params.mb;
+>> @@ -464,7 +467,7 @@
+>>
+>>      int y_iters = (y_amount + y_block_size - 1) / y_block_size;
+>>
+>> -    //cout << y_iters << " " << a_iters << endl;
+>> +    //cout << "yiters:" <<  y_iters << " aiters:" << a_iters << endl;
+>>
+>>
+>>      lda = n;
+>> @@ -581,11 +584,13 @@
+>>          get_ticks(start_tick2);
+>>
+>>          AIOfile.load_Yblock(&Y, y_block_size);
+>> +        //cout << "ybz:"<< y_block_size << " " << flush;
+>>
+>>          get_ticks(end_tick);
+>>          out.acc_loady += ticks2sec(end_tick,start_tick2);
+>>
+>>          get_ticks(start_tick2);
+>> +
+>>          replace_nans(&y_nan_idxs[0],y_block_size, Y, n,1);
+>>          sumSquares(Y,y_block_size,n,ssY,y_nan_idxs);
+>>
+>>
+>> Modified: pkg/OmicABELnoMM/src/Algorithm.h
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/src/Algorithm.h  2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/src/Algorithm.h  2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -50,8 +50,8 @@
+>>      protected:
+>>      private:
+>>
+>> -        AIOwrapper AIOfile;
+>>
+>> +
+>>          list < resultH > sigResults;
+>>
+>>          int max_threads;
+>>
+>> Modified: pkg/OmicABELnoMM/src/Definitions.h
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/src/Definitions.h        2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/src/Definitions.h        2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -164,13 +164,16 @@
+>>      float minR2disp;
+>>      float minR2store;
+>>      bool storePInd;
+>> -    bool disp_cov;
+>> +    bool disp_cov;
+>> +    bool dosages;
+>> +    int model;//recessive additive dominant etc
+>>
+>>      string fnameAL;
+>>      string fnameAR;
+>>      string fnameY;
+>>      string fnameOutFiles;
+>> -    string fname_excludelist;
+>> +    string fname_excludelist;
+>> +    string fname_dosages;
+>>
+>>      bool doublefileType;
+>>
+>>
+>> Modified: pkg/OmicABELnoMM/src/Utility.cpp
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/src/Utility.cpp  2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/src/Utility.cpp  2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -141,10 +141,12 @@
+>>                  int idx = k*cols*rows+i*rows+j;
+>>
+>>                  //cout << idx;
+>> +                if(idx >= rows*cols*vec_blocksize)
+>> +                    exit(1);
+>> +
+>>
+>> -                if(/*idx < rows*cols*vec_blocksize &&*/ isnan( vec[idx] ))
+>> -                {
+>> -
+>> +                if(isnan( vec[idx] ))
+>> +                {
+>>                      vec[idx] = 0;
+>>                      if(indexs_vec)
+>>                      {
+>>
+>> Modified: pkg/OmicABELnoMM/src/main.cpp
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/src/main.cpp     2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/src/main.cpp     2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -26,7 +26,7 @@
+>>  Optional: \n\t\
+>>  -n --ngpred \t <#SNPcols> Number of columns in the geno file that represent a single SNP \n\t\
+>>  -t --thr    \t <#CPUs> Number of computing threads to use to speed computations \n\t\
+>> --x --excl   \t <path/filename> file containing list of individuals to exclude from input files \n\t\
+>> +-x --excl   \t <path/filename> file containing list of individuals to exclude from input files, (see example file) \n\t\
+>>  -d --pdisp  \t <0.0~1.0> Value to use as maximum threshold for significance.\n\t\
+>>  \t\t Results with P-values UNDER this threshold will be displayed in the putput .txt file \n\t\
+>>  -r --rdisp  \t <-10.0~1.0> Value to use as minimum threshold for R2. \n\t\
+>> @@ -35,7 +35,17 @@
+>>  -s --psto   \t <0.0~1.0>  Results with P-values UNDER this threshold will be displayed in the putput binary files \n\t\
+>>  -e --rsto   \t <-10.0~1.0> Results with R2-values ABOVE this threshold will be stored in the putput binary files \n\t\
+>>  -i --fdcov  \t Flag that forces to include covariates as part of the results that are stored in .txt and binary files \n\t\
+>> --f --fdgen  \t Flag that forces to consider all included results (causes the analisis to ignores ALL threshold values).";
+>> +-f --fdgen  \t Flag that forces to consider all included results (causes the analisis to ignores ALL threshold values). \n\t\
+>> +-j --additive  \t Flag that runs the analisis with an Additive Model with (2*AA,1*AB,0*BB) effects \n\t\
+>> +-k --dominant  \t Flag that runs the analisis with an Dominant Model with (1*AA,1*AB,0*BB) effects \n\t\
+>> +-l --recessive \t Flag that runs the analisis with an Recessive Model with (1*AA,0*AB,0*BB) effects \n\t\
+>> +-z --mylinear \t <path/filename> to read Factors 'f_i' for a Custom Linear Model with f1*X1,f2*X2,f3*X3...fn*X_ngpred as effects,\n\t\
+>> +              \t each column of each independent variable will be multiplied with the specified factors. \n\t\
+>> +              \t Formula: y~alpha*cov + beta_1*f1*X1 + beta_2*f2*X2 +...+ beta_n*fn*Xn, (see example files!) \n\t\
+>> +-y --myaddit  \t <path/filename> to read Factors 'f_i' for a Custom Additive Model with (f1*X1,f2*X2,f3*X3...fn*X_ngpred) as effects,\n\t\
+>> +              \t each column of each independent variable will be multiplied with the specified factors and then added together. \n\t\
+>> +              \t Formula: y~alpha*cov + beta*(f1*X1 + f2*X2 +...+ fn*Xn), (see example files!) \n\t\
+>> +";
+>>
+>>
+>>
+>> @@ -89,6 +99,11 @@
+>>              {"rsto",    required_argument, 0, 'e'},//
+>>              {"fdcov",    no_argument, 0, 'i'},//
+>>              {"fdgen",    no_argument, 0, 'f'},//
+>> +            {"additive",    no_argument, 0, 'j'},//
+>> +            {"dominant",   no_argument, 0, 'k'},//
+>> +            {"recessive",    no_argument, 0, 'l'},//
+>> +            {"mylinear",    required_argument, 0, 'z'},//
+>> +            {"myaddit",    required_argument, 0, 'y'},//
+>>              {"help",    no_argument, 0, 'h'},//
+>>              {0, 0, 0, 0}
+>>          };
+>> @@ -96,7 +111,7 @@
+>>          // getopt_long stores the option index here.
+>>          int option_index = 0;
+>>
+>> -        c = getopt_long(argc, argv, "c:p:g:o:n:t:m:x:d:s:r:e:fibh", long_options, &option_index);
+>> +        c = getopt_long(argc, argv, "c:p:g:o:n:t:m:x:d:s:r:e:z:y:fibhjkl", long_options, &option_index);
+>>
+>>
+>>          // Detect the end of the options.
+>> @@ -220,9 +235,45 @@
+>>              cout << "-f Forcing all included results to be considered independently of max P-val or min R2. (SLOW!)"<< endl;
+>>              break;
+>>
+>> +        case 'j':
+>> +            params.model = 1;
+>> +            params.dosages = true;
+>> +
+>> +            cout << "-j Using Additive Model with (2*AA,1*AB,0*BB) effects"<< endl;
+>> +            break;
+>> +
+>> +        case 'k':
+>> +            params.model = 2;
+>> +            params.dosages = true;
+>> +
+>> +            cout << "-j Using Dominant Model with (1*AA,1*AB,0*BB) effects"<< endl;
+>> +            break;
+>> +
+>> +        case 'l':
+>> +            params.model = 3;
+>> +            params.dosages = true;
+>> +
+>> +            cout << "-j Using Recessive Model with (0*AA,0*AB,1*BB) effects"<< endl;
+>> +            break;
+>> +
+>> +        case 'z':
+>> +            params.model = 4;
+>> +            params.dosages = true;
+>> +
+>> +            cout << "-z Using Custom Linear Model with parameters read from the file "<< params.fname_dosages << endl;
+>> +            break;
+>> +
+>> +        case 'y':
+>> +            params.model = 5;
+>> +            params.dosages = true;
+>> +
+>> +            cout << "-z Using Custom Additive Model with parameters read from the file "<< params.fname_dosages << endl;
+>> +            break;
+>> +
+>>          case 'b':
+>> -            params.storeBin = true;
+>> +            params.storeBin = true;
+>>
+>> +
+>>              cout << "-b Results will be stored in binary format too"<< endl;
+>>              break;
+>>
+>>
+>> Modified: pkg/OmicABELnoMM/tests/test.cpp
+>> ===================================================================
+>> --- pkg/OmicABELnoMM/tests/test.cpp   2014-09-08 14:36:26 UTC (rev 1818)
+>> +++ pkg/OmicABELnoMM/tests/test.cpp   2014-09-09 13:54:05 UTC (rev 1819)
+>> @@ -95,9 +95,9 @@
+>>      int factor = 0;
+>>      params.n=2000; params.l=3;  params.r=1;
+>>      params.t=800; params.tb=min(800,params.t); params.m=1600; params.mb=min(1600,params.m);
+>> -    alg.solve(params, out2, P_NEQ_B_OPT_MD);
+>> +    //alg.solve(params, out2, P_NEQ_B_OPT_MD);
+>>
+>> -    print_output(out2, gemm_gflopsPsec);
+>> +    //print_output(out2, gemm_gflopsPsec);
+>>
+>>
+>>      cout << "\nDone\n";
+>> @@ -117,6 +117,9 @@
+>>      params.fnameAR="examples/XR";
+>>      params.fnameY="examples/Y";
+>>      params.fnameOutFiles="resultsSig";
+>> +//    params.dosages = true;
+>> +//    params.model = 4;
+>> +//    params.fname_dosages = "examples/dosages_2.txt";
+>>
+>>
+>>      for(int th = 0; th < max_threads; th++)
+>> @@ -138,6 +141,8 @@
+>>
+>>      max_threads = 2;
+>>      int iters = 10;
+>> +
+>> +    //cout << "misc tests" << endl;
+>>
+>>      for (int th = 1; th < max_threads+1; th++)
+>>      {
+>>
+>> _______________________________________________
+>> Genabel-commits mailing list
+>> Genabel-commits at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-commits
+>>
+> 
+> --
+> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+> L.C. Karssen
+> Utrecht
+> The Netherlands
+> 
+> lennart at karssen.org
+> http://blog.karssen.org
+> GPG key ID: A88F554A
+> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+> 
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140911/d8bb84c6/attachment-0001.sig>
+
+From m.v.struchalin at mail.ru  Thu Sep 11 17:46:14 2014
+From: m.v.struchalin at mail.ru (Maksim Struchalin)
+Date: Thu, 11 Sep 2014 22:46:14 +0700
+Subject: [GenABEL-dev] Fwd: CRAN submission DatABEL 0.9-5
+In-Reply-To: <54116A7E.4000607@karssen.org>
+References: <54113445.2050807@stats.ox.ac.uk>
+ <2C9F6B0B-B34D-40D8-897D-FAE221CF0C52@bionet.nsc.ru>
+ <54116A7E.4000607@karssen.org>
+Message-ID: <2AD15666-46A4-4596-8440-402413C4085C@mail.ru>
+
+Hi Lennart,
+
+Would be good if you will create this SVN tag.
+
+Best,
+Maksim
+
+Sent from my iPhone
+
+
+
+> 11 ????. 2014 ?., ? 16:25, "L.C. Karssen" <lennart at karssen.org> ???????(?):
+> 
+> Thanks for the work Maksim!
+> 
+> I'll push announcements to the forum, the GenABEL website and the
+> announce mailing list. I'll also create an SVN tag (unless you'd like to
+> do that; let me know).
+> 
+> 
+> Best,
+> Lennart.
+> 
+>> On 11-09-14 08:30, Yurii Aulchenko wrote:
+>> Thanks to Maksim!
+>> 
+>> ----------------------
+>> Yurii Aulchenko 
+>> (sent from mobile device)
+>> 
+>> Begin forwarded message:
+>> 
+>>> *From:* Prof Brian Ripley <ripley at stats.ox.ac.uk
+>>> <mailto:ripley at stats.ox.ac.uk>>
+>>> *Date:* September 11, 2014 at 12:33:57 GMT+7
+>>> *To:* Yurii Aulchenko <yurii at bionet.nsc.ru
+>>> <mailto:yurii at bionet.nsc.ru>>, CRAN <cran at r-project.org
+>>> <mailto:cran at r-project.org>>
+>>> *Subject:* *Re: CRAN submission DatABEL 0.9-5*
+>>> 
+>>> On CRAN now.
+>>> 
+>>> On 11/09/2014 04:42, Yurii Aulchenko wrote:
+>>>> [This was generated from CRAN.R-project.org/submit.html]
+>>>> <http://CRAN.R-project.org/submit.html]>
+>>>> 
+>>>> The following package was uploaded to CRAN:
+>>>> ===========================================
+>>>> 
+>>>> Package Information:
+>>>> Package: DatABEL
+>>>> Version: 0.9-5
+>>>> Title: file-based access to large matrices stored on HDD in binary format
+>>>> Author(s): Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel
+>>>> Kempenaar,
+>>>> Maksim Struchalin
+>>>> Maintainer: Yurii Aulchenko <yurii at bionet.nsc.ru
+>>>> <mailto:yurii at bionet.nsc.ru>>
+>>>> Depends: R (>= 2.4.0), methods, utils
+>>>> Suggests: GenABEL, RUnit
+>>>> Description: a package providing an interface to the C++ FILEVECTOR
+>>>> library facilitating analysis of large (giga- to tera-bytes)
+>>>> matrices; matrix storage is organized in a way that either
+>>>> columns or rows are quickly accessible; primarily aimed to
+>>>> support genome-wide association analyses e.g. using GenABEL,
+>>>> MixABEL and ProbABEL
+>>>> License: GPL (>= 2)
+>>>> 
+>>>> 
+>>>> The maintainer confirms that he or she
+>>>> has read and agrees to the CRAN policies.
+>>>> 
+>>>> Submitter's comment: 'NOTE's from the previous unsuccessful submisson
+>>>> have
+>>>> been fixed and new futures have been added.
+>>> 
+>>> 
+>>> -- 
+>>> Brian D. Ripley,                  ripley at stats.ox.ac.uk
+>>> <mailto:ripley at stats.ox.ac.uk>
+>>> Emeritus Professor of Applied Statistics, University of Oxford
+>>> 1 South Parks Road, Oxford OX1 3TG, UK
+>> 
+>> 
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+> -- 
+> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+> L.C. Karssen
+> Utrecht
+> The Netherlands
+> 
+> lennart at karssen.org
+> http://blog.karssen.org
+> GPG key ID: A88F554A
+> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+> 
+> _______________________________________________
+> genabel-devel mailing list
+> genabel-devel at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+
+From l.c.karssen at polyomica.com  Fri Sep 12 10:20:33 2014
+From: l.c.karssen at polyomica.com (L.C. Karssen)
+Date: Fri, 12 Sep 2014 10:20:33 +0200
+Subject: [GenABEL-dev] default CXXFLAGS in OmicABELnoMM's configure.ac
+Message-ID: <5412ACD1.4070802@polyomica.com>
+
+Dear Alvaro, dear all,
+
+I was going through OmicsABELnoMM's configure.ac and found the following
+lines where you set the default compiler flags:
+
+# Set some default compile flags
+if test -z "$CXXFLAGS"; then
+   # User did not set CXXFLAGS, so we can put in our own defaults
+   CXXFLAGS=" -O3  -march=corei7 -mfpmath=sse -mtune=corei7 -flto
+-funroll-loops"
+fi
+
+I was wondering why you explicitly set -march=corei7 and -mtune=corei7.
+IMHO this is too specific and will break on other machines. The GCC
+manual [1] specifies the following:
+"-march=cpu-type allows GCC to generate code that may not run at all on
+processors other than the one indicated."
+
+According to the manual, the -march option has an argument 'native':
+
+"This selects the CPU to generate code for at compilation time by
+determining the processor type of the compiling machine. Using
+-march=native enables all instruction subsets supported by the local
+machine (hence the result might not run on different machines). Using
+-mtune=native produces code optimized for the local machine under the
+constraints of the selected instruction set."
+
+The way I interpret that is that using -march=native tells the compiler
+to use the correct option for the current machine (be it corei7, core2,
+or whatever CPU the user has).
+
+Moreover, the manual says: "Specifying -march=cpu-type implies
+-mtune=cpu-type." So we only need to specify -march here. Therefore I
+would suggest to change this line to:
+ CXXFLAGS=" -O3  -march=native -mfpmath=sse -flto -funroll-loops"
+
+What do you think?
+
+
+As a side note: the manual [1] also says that -mfpmath=sse is the
+default choice for the x86_64 compiler, so we can remove that option as
+well.
+
+
+Best regards,
+
+Lennart.
+
+
+[1]
+https://gcc.gnu.org/onlinedocs/gcc-4.8.1/gcc/i386-and-x86_002d64-Options.html
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+Lennart C. Karssen
+PolyOmica
+Groningen
+The Netherlands
+
+l.c.karssen at polyomica.com
+GPG key ID: 1A15AF2A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140912/4706d5cd/attachment.sig>
+
+From lennart at karssen.org  Fri Sep 12 11:10:13 2014
+From: lennart at karssen.org (L.C. Karssen)
+Date: Fri, 12 Sep 2014 11:10:13 +0200
+Subject: [GenABEL-dev] Fwd: CRAN submission DatABEL 0.9-5
+In-Reply-To: <2AD15666-46A4-4596-8440-402413C4085C@mail.ru>
+References: <54113445.2050807@stats.ox.ac.uk>
+ <2C9F6B0B-B34D-40D8-897D-FAE221CF0C52@bionet.nsc.ru>
+ <54116A7E.4000607@karssen.org> <2AD15666-46A4-4596-8440-402413C4085C@mail.ru>
+Message-ID: <5412B875.9000409@karssen.org>
+
+
+On 11-09-14 17:46, Maksim Struchalin wrote:
+> Hi Lennart,
+> 
+> Would be good if you will create this SVN tag.
+
+Done!
+
+
+Lennart.
+
+> 
+> Best,
+> Maksim
+> 
+> Sent from my iPhone
+> 
+> 
+> 
+>> 11 ????. 2014 ?., ? 16:25, "L.C. Karssen" <lennart at karssen.org> ???????(?):
+>>
+>> Thanks for the work Maksim!
+>>
+>> I'll push announcements to the forum, the GenABEL website and the
+>> announce mailing list. I'll also create an SVN tag (unless you'd like to
+>> do that; let me know).
+>>
+>>
+>> Best,
+>> Lennart.
+>>
+>>> On 11-09-14 08:30, Yurii Aulchenko wrote:
+>>> Thanks to Maksim!
+>>>
+>>> ----------------------
+>>> Yurii Aulchenko 
+>>> (sent from mobile device)
+>>>
+>>> Begin forwarded message:
+>>>
+>>>> *From:* Prof Brian Ripley <ripley at stats.ox.ac.uk
+>>>> <mailto:ripley at stats.ox.ac.uk>>
+>>>> *Date:* September 11, 2014 at 12:33:57 GMT+7
+>>>> *To:* Yurii Aulchenko <yurii at bionet.nsc.ru
+>>>> <mailto:yurii at bionet.nsc.ru>>, CRAN <cran at r-project.org
+>>>> <mailto:cran at r-project.org>>
+>>>> *Subject:* *Re: CRAN submission DatABEL 0.9-5*
+>>>>
+>>>> On CRAN now.
+>>>>
+>>>> On 11/09/2014 04:42, Yurii Aulchenko wrote:
+>>>>> [This was generated from CRAN.R-project.org/submit.html]
+>>>>> <http://CRAN.R-project.org/submit.html]>
+>>>>>
+>>>>> The following package was uploaded to CRAN:
+>>>>> ===========================================
+>>>>>
+>>>>> Package Information:
+>>>>> Package: DatABEL
+>>>>> Version: 0.9-5
+>>>>> Title: file-based access to large matrices stored on HDD in binary format
+>>>>> Author(s): Yurii Aulchenko, Stepan Yakovenko, Erik Roos, Marcel
+>>>>> Kempenaar,
+>>>>> Maksim Struchalin
+>>>>> Maintainer: Yurii Aulchenko <yurii at bionet.nsc.ru
+>>>>> <mailto:yurii at bionet.nsc.ru>>
+>>>>> Depends: R (>= 2.4.0), methods, utils
+>>>>> Suggests: GenABEL, RUnit
+>>>>> Description: a package providing an interface to the C++ FILEVECTOR
+>>>>> library facilitating analysis of large (giga- to tera-bytes)
+>>>>> matrices; matrix storage is organized in a way that either
+>>>>> columns or rows are quickly accessible; primarily aimed to
+>>>>> support genome-wide association analyses e.g. using GenABEL,
+>>>>> MixABEL and ProbABEL
+>>>>> License: GPL (>= 2)
+>>>>>
+>>>>>
+>>>>> The maintainer confirms that he or she
+>>>>> has read and agrees to the CRAN policies.
+>>>>>
+>>>>> Submitter's comment: 'NOTE's from the previous unsuccessful submisson
+>>>>> have
+>>>>> been fixed and new futures have been added.
+>>>>
+>>>>
+>>>> -- 
+>>>> Brian D. Ripley,                  ripley at stats.ox.ac.uk
+>>>> <mailto:ripley at stats.ox.ac.uk>
+>>>> Emeritus Professor of Applied Statistics, University of Oxford
+>>>> 1 South Parks Road, Oxford OX1 3TG, UK
+>>>
+>>>
+>>> _______________________________________________
+>>> genabel-devel mailing list
+>>> genabel-devel at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+>>
+>> -- 
+>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>> L.C. Karssen
+>> Utrecht
+>> The Netherlands
+>>
+>> lennart at karssen.org
+>> http://blog.karssen.org
+>> GPG key ID: A88F554A
+>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>
+>> _______________________________________________
+>> genabel-devel mailing list
+>> genabel-devel at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+
+-- 
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+L.C. Karssen
+Utrecht
+The Netherlands
+
+lennart at karssen.org
+http://blog.karssen.org
+GPG key ID: A88F554A
+-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.r-forge.r-project.org/pipermail/genabel-devel/attachments/20140912/350a5541/attachment.sig>
+
+From yurii.aulchenko at gmail.com  Wed Sep 24 16:53:51 2014
+From: yurii.aulchenko at gmail.com (Yury Aulchenko)
+Date: Wed, 24 Sep 2014 16:53:51 +0200
+Subject: [GenABEL-dev] Why is doRUnit.R removed from the final package?
+In-Reply-To: <53A4256C.4070406@karssen.org>
+References: <53A40A5C.6000903@karssen.org>
+ <8F9D92B7-2F93-4587-B4DE-436299A5A897@gmail.com>
+ <53A4256C.4070406@karssen.org>
+Message-ID: <528654F5-06E2-43ED-9067-2521C79FDB1A@gmail.com>
+
+I really meant "address" - show the way to.., :)
+
+----------------
+Sent from mobile device, please excuse possible typos
+
+> On 20 Jun 2014, at 14:13, L.C. Karssen <lennart at karssen.org> wrote:
+> 
+> Hi Yurii,
+> 
+> I see Andreas already contacted you before I noticed his commit.
+> 
+> 
+>> On 20-06-14 12:25, Yury Aulchenko wrote:
+>> because CRAN requested NOT to include unit tests into distrib - my
+>> unerstanding was that it takes to long + tests are not stable; again,
+>> for the latter my understanding was that it is not specifically GenABEL,
+>> it is something general
+> 
+> I quickly checked a few packages on CRAN and I'm not sure about what the
+> results mean:
+> - Rcpp: has doRunit.R
+> - MASS: has tests, but no doRUnit.R (maybe not using RUnit?)
+> - ggplot2: has tests, but no doRUnit.R (maybe not using RUnit?)
+> - HMisc: has tests, but no doRUnit.R (maybe not using RUnit?)
+> 
+> As far as I can see the "Writing R Extensions" manual doesn't mention
+> anything about doRUnit.R specifically.
+> 
+> 
+>> 
+>> Lennart, so you think we should address Andreas to our SVN?
+> 
+> I guess you meant "add" instead of "address"? If so, then no, that
+> wasn't my idea. Andreas is one of the main forces behind the Debian Med
+> team, which focusses on making Debian packages for Medical/Life Sciences
+> software. I don't think he is interested in participating in the
+> development of GenABEL specifically (but we could ask).
+> 
+> 
+> Lennart.
+> 
+>> 
+>> Yurii
+>> 
+>> 
+>>> On Jun 20, 2014, at 12:18, L.C. Karssen <lennart at karssen.org> wrote:
+>>> 
+>>> Dear list,
+>>> 
+>>> I just noticed a commit in the Debian packaging system for the Debian
+>>> package of GenABEL (r-cran-genabel) [1]. The packager (Andreas Tille)
+>>> wrote in the log that a file is missing (tests/doRUnit.R). It turns out
+>>> that this file is removed in our makedistrib_GenABEL.sh script [2]. Does
+>>> anyone remember why this is done?
+>>> 
+>>> 
+>>> Thanks,
+>>> 
+>>> Lennart.
+>>> 
+>>> 
+>>> [1] http://anonscm.debian.org/viewvc/debian-med?view=revision&revision=17252
+>>> [2]
+>>> https://r-forge.r-project.org/scm/viewvc.php/pkg/GenABEL-general/distrib_scripts/makedistrib_GenABEL.sh?view=markup&revision=1684&root=genabel
+>>> -- 
+>>> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+>>> L.C. Karssen
+>>> Utrecht
+>>> The Netherlands
+>>> 
+>>> lennart at karssen.org
+>>> http://blog.karssen.org
+>>> GPG key ID: A88F554A
+>>> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+>>> 
+>>> _______________________________________________
+>>> genabel-devel mailing list
+>>> genabel-devel at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/genabel-devel
+> 
+> -- 
+> *-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+> L.C. Karssen
+> Utrecht
+> The Netherlands
+> 
+> lennart at karssen.org
+> http://blog.karssen.org
+> GPG key ID: A88F554A
+> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+> 
+

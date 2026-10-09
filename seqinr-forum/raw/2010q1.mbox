@@ -1,0 +1,3571 @@
+From A.Coghlan at ucc.ie  Tue Jan 19 16:09:39 2010
+From: A.Coghlan at ucc.ie (Coghlan, Avril)
+Date: Tue, 19 Jan 2010 15:09:39 -0000
+Subject: [Seqinr-forum] zscore() function in SeqinR
+Message-ID: <1B7A6C35CDB2BD4DBABBC6FF4275FF14865AB1@EXCH1.central.ad.ucc.ie>
+
+Dear all,
+
+ 
+
+I am wondering would it be nice to make a small addition to the zscore()
+function in SeqinR, so that it computes a P-value for the Z-score?
+
+ 
+
+As far as I understand, this would involve adding a line to calculate
+the P-value based on the Z-score (where zscore is the variable holding
+the Z-score):
+
+1 - pnorm(zscore, mean=1,sd=1)
+
+Is this right?
+
+ 
+
+Would you consider adding this to the zscore() function? I think it
+would be nice if it gave a P-value.
+
+ 
+
+Also, I am wondering would it be nice to extend the rho() and zscore()
+functions so that they work for word sizes of greater than 2 ?
+
+I think this would be easy to do for the rho() function. I can provide
+some suggestion for code if you are interested.
+
+For zscore(), I think the easiest way would be to calculate a P-value
+would be to use simulated sequences to calculate the expected
+distribution of Z-scores according to some null model (eg. a multinomial
+model for DNA).
+
+What do you think? Would you like me to send my suggestion for some
+code? I have written part of it already. 
+
+ 
+
+Regards,
+
+Avril
+
+ 
+
+Avril Coghlan
+
+University College Cork, Ireland
+
+ 
+
+ 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100119/340a638d/attachment.htm 
+
+From oliver.clay at gmail.com  Fri Feb 19 04:06:31 2010
+From: oliver.clay at gmail.com (Oliver Clay)
+Date: Thu, 18 Feb 2010 22:06:31 -0500
+Subject: [Seqinr-forum] FASTA output splits into all headers then all
+	sequences
+Message-ID: <8bca3be91002181906j6a273994p7dc8d0ccbc12c40@mail.gmail.com>
+
+   - [Seqinr-forum] suggested SeqinR function for printing a list of
+   sequences to a fasta file
+   <http://lists.r-forge.r-project.org/pipermail/seqinr-forum/2009q4/000057.html>
+     *Coghlan, Avril  **Thu Dec 10 17:51:11 CET 2009*
+
+Dear Jean and Simon,
+
+I took Jean's example from the above thread,
+
+> library(seqinr)
+> choosebank("genbank")
+> query("humtRNAs", "SP=homo sapiens AND M=TRNA")
+> myseqs <- getSequence(humtRNAs)
+> mynames <- getName(humtRNAs)
+> write.fasta(myseqs,mynames, file = "myseqs.fasta") ######
+
+and made a few changes, but after those changes my output was no
+longer a normal FASTA file: instead, it first had all header lines
+bunched together, then all the DNA sequences concatenated in one
+block. Here are the commands I used:
+
+library(seqinr)
+choosebank("genbank")
+query("mydat", "AU=Matute")
+modifylist("mydat",operation=">613")
+modifylist("mydat",operation="<615")
+myseqs <- getSequence(mydat)
+mynames <- getName(mydat)
+write.fasta(myseqs,mynames, file = "myseqs.fasta")
+
+I've tried repeating this example many times under the same conditions
+(new R console, on Mac OSX). The problem seem to be intermittent,
+because very rarely I do get the normal FASTA output, but then the
+next time everything segregates again. Do you have an idea what might
+be causing this?
+
+Many thanks for your help,
+
+Best regards,
+
+Oliver Clay
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100218/845de6e6/attachment.htm 
+
+From lionel.guy at unil.ch  Fri Feb 19 08:19:24 2010
+From: lionel.guy at unil.ch (Lionel Guy)
+Date: Fri, 19 Feb 2010 08:19:24 +0100
+Subject: [Seqinr-forum] FASTA output splits into all headers then all
+	sequences
+In-Reply-To: <8bca3be91002181906j6a273994p7dc8d0ccbc12c40@mail.gmail.com>
+References: <8bca3be91002181906j6a273994p7dc8d0ccbc12c40@mail.gmail.com>
+Message-ID: <786ECFC2-EBEC-42A7-9B48-53F73ED444B7@unil.ch>
+
+Hi Oliver,
+
+This is due to the fact that you have sequences that have only the  
+same length. Thus, getSequence returns a matrix instead of a list,  
+which confuses write.fasta.
+
+getSequence.list <- function (object, as.string = FALSE, ...) {
+    lapply(seq_len(length(object)), function(i) getSequence(object[[i]],
+      as.string = as.string, ...))
+}
+
+I don't have a patch to propose, but as a workaround, you can do the  
+following:
+
+library(seqinr)
+choosebank("genbank")
+query("mydat", "AU=Matute")
+modifylist("mydat",operation=">614")
+modifylist("mydat",operation="<615")
+
+myseqs <- getSequence(mydat)
+mynames <- getName(mydat)
+
+# this won't work
+write.fasta(myseqs,mynames, file = "myseqs.fasta")
+# change the matrix to a list
+mylist <- list()
+for (i in 1:ncol(myseqs)){
+     mylist <- c(mylist, list(myseqs[,i]))
+}
+# this should work
+write.fasta(mylist,mynames, file = "myseqs2.fasta")
+Best,
+
+Lionel
+
+On 19 Feb 2010, at 4:06 , Oliver Clay wrote:
+
+> 	? [Seqinr-forum] suggested SeqinR function for printing a list of	 
+> sequences to a fasta file   Coghlan, Avril  Thu Dec 10 17:51:11 CET  
+> 2009
+> Dear Jean and Simon,
+>
+> I took Jean's example from the above thread,
+> > library(seqinr)
+> > choosebank("genbank")
+> > query("humtRNAs", "SP=homo sapiens AND M=TRNA")
+> > myseqs <- getSequence(humtRNAs)
+> > mynames <- getName(humtRNAs)
+>
+> > write.fasta(myseqs,mynames, file = "myseqs.fasta") ######
+>
+> and made a few changes, but after those changes my output was no
+> longer a normal FASTA file: instead, it first had all header lines
+> bunched together, then all the DNA sequences concatenated in one
+>
+> block. Here are the commands I used:
+>
+> library(seqinr)
+> choosebank("genbank")
+> query("mydat", "AU=Matute")
+> modifylist("mydat",operation=">613")
+> modifylist("mydat",operation="<615")
+>
+> myseqs <- getSequence(mydat)
+> mynames <- getName(mydat)
+> write.fasta(myseqs,mynames, file = "myseqs.fasta")
+>
+> I've tried repeating this example many times under the same conditions
+> (new R console, on Mac OSX). The problem seem to be intermittent,
+>
+> because very rarely I do get the normal FASTA output, but then the
+> next time everything segregates again. Do you have an idea what might
+> be causing this?
+>
+> Many thanks for your help,
+>
+> Best regards,
+>
+>
+> Oliver Clay
+>
+>
+> _______________________________________________
+> Seqinr-forum mailing list
+> Seqinr-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/seqinr-forum
+
+
+From lobry at biomserv.univ-lyon1.fr  Sat Feb 20 10:29:40 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Sat, 20 Feb 2010 10:29:40 +0100
+Subject: [Seqinr-forum] FASTA output splits into all headers then all
+ sequences
+In-Reply-To: <786ECFC2-EBEC-42A7-9B48-53F73ED444B7@unil.ch>
+References: <8bca3be91002181906j6a273994p7dc8d0ccbc12c40@mail.gmail.com>
+	<786ECFC2-EBEC-42A7-9B48-53F73ED444B7@unil.ch>
+Message-ID: <p06002000c7a558a6e120@[134.214.233.20]>
+
+Hi Oliver and Lionel,
+
+thanks for pointing and solving this bug.
+
+>This is due to the fact that you have sequences that have only the
+>same length. Thus, getSequence returns a matrix instead of a list,
+>which confuses write.fasta.
+
+Yes indeed !
+
+>getSequence.list <- function (object, as.string = FALSE, ...) {
+>     lapply(seq_len(length(object)), function(i) getSequence(object[[i]],
+>       as.string = as.string, ...))
+>}
+>
+>I don't have a patch to propose, but as a workaround, you can do the
+>following:
+
+Where did you get this version of getSequence.list() from? Because
+this *** is *** the fix!!! The trouble comes from that in the
+current version (2.0-7) sapply() is used instead of lapply():
+
+>  getSequence.list
+function (object, as.string = FALSE, ...)
+sapply(seq_len(length(object)), function(i) getSequence(object[[i]],
+     as.string = as.string, ...))
+
+So that when all sequences have the same length sapply() returns
+the result in a matrix form which confuses write.fasta().
+
+A quick fix is then just to evaluate the lapply form:
+
+###
+getSequence.list <- function(object, as.string = FALSE, ...)
+   lapply(seq_len(length(object)), function(i) getSequence(object[[i]],
+   as.string = as.string, ...))
+###
+
+before calling getSequence().
+
+I can't commit the fix right now because R-Forge is down, but the
+problem will be corrected in seqinr release 2.0-8.
+
+Best,
+
+Z.
+
+
+-- 
+Jean R. Lobry            (lobry at biomserv.univ-lyon1.fr)
+Laboratoire BBE-CNRS-UMR-5558, Univ. C. Bernard - LYON I,
+43 Bd 11/11/1918, F-69622 VILLEURBANNE CEDEX, FRANCE
+allo  : +33 472 43 27 56     fax    : +33 472 43 13 88
+http://pbil.univ-lyon1.fr/members/lobry/
+
+
+
+From lionel.guy at unil.ch  Mon Feb 22 08:34:53 2010
+From: lionel.guy at unil.ch (Lionel Guy)
+Date: Mon, 22 Feb 2010 08:34:53 +0100
+Subject: [Seqinr-forum] FASTA output splits into all headers then all
+	sequences
+In-Reply-To: <p06002000c7a558a6e120@[134.214.233.20]>
+References: <8bca3be91002181906j6a273994p7dc8d0ccbc12c40@mail.gmail.com>
+	<786ECFC2-EBEC-42A7-9B48-53F73ED444B7@unil.ch>
+	<p06002000c7a558a6e120@[134.214.233.20]>
+Message-ID: <149FFE6A-7434-4099-A41D-B5D62DA0E0F2@unil.ch>
+
+Hi Jean,
+On 20 Feb 2010, at 10:29 , Jean lobry wrote:
+
+> Where did you get this version of getSequence.list() from? Because
+> this *** is *** the fix!!! The trouble comes from that in the
+> current version (2.0-7) sapply() is used instead of lapply():
+
+It's actually a fix I tried (not from the source), but it dosen't  
+work. It returns a list with an entry for each nucleotide, and thus...  
+is not usable as is.
+
+Best,
+
+Lionel
+
+From lobry at biomserv.univ-lyon1.fr  Mon Feb 22 19:45:52 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Mon, 22 Feb 2010 19:45:52 +0100
+Subject: [Seqinr-forum] FASTA output splits into all headers then all
+ sequences
+In-Reply-To: <149FFE6A-7434-4099-A41D-B5D62DA0E0F2@unil.ch>
+References: <8bca3be91002181906j6a273994p7dc8d0ccbc12c40@mail.gmail.com>
+	<786ECFC2-EBEC-42A7-9B48-53F73ED444B7@unil.ch>
+	<p06002000c7a558a6e120@[134.214.233.20]>
+	<149FFE6A-7434-4099-A41D-B5D62DA0E0F2@unil.ch>
+Message-ID: <p06002000c7a87bb5ec21@[134.214.233.20]>
+
+At 8:34 +0100 22/02/10, Lionel Guy wrote:
+>Hi Jean,
+>On 20 Feb 2010, at 10:29 , Jean lobry wrote:
+>
+>>  Where did you get this version of getSequence.list() from? Because
+>>  this *** is *** the fix!!! The trouble comes from that in the
+>>  current version (2.0-7) sapply() is used instead of lapply():
+>
+>It's actually a fix I tried (not from the source), but it dosen't 
+>work. It returns a list with an entry for each nucleotide, and 
+>thus... is not usable as is.
+>
+>Best,
+>
+>Lionel
+
+Hi Lionel,
+
+That's strange because it works for me:
+
+sueoka:~ lobry$ R --vanilla --silent
+>  library(seqinr)
+>  sessionInfo()
+R version 2.10.0 (2009-10-26)
+i386-apple-darwin8.11.1
+
+locale:
+[1] C
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] seqinr_2.0-7
+>  getSequence.list <- function(object, as.string = FALSE, ...)
++    lapply(seq_len(length(object)), function(i) getSequence(object[[i]],
++    as.string = as.string, ...))
+>  library(seqinr)
+>  choosebank("genbank")
+>  query("mydat", "AU=Matute")
+>  modifylist("mydat",operation=">614")
+>  modifylist("mydat",operation="<615")
+>
+>  myseqs <- getSequence(mydat)
+>  length(myseqs) # get one entry per sequece here
+[1] 65
+>  mynames <- getName(mydat)
+>  write.fasta(myseqs,mynames, file = "myseqs.fasta") # Fasta file seems OK
+
+Anyway, I have commited the change yesterday on R-forge, you can give
+it a try by installing this devel version (revision >= 1723) by entering:
+
+install.packages("seqinr", repos="http://R-Forge.R-project.org")
+
+at your R prompt.
+
+If nobody complains I'd like to release it as seqinr 2.0-8 on CRAN
+by the end of the week.
+
+Best,
+
+Z.
+
+
+-- 
+Jean R. Lobry            (lobry at biomserv.univ-lyon1.fr)
+Laboratoire BBE-CNRS-UMR-5558, Univ. C. Bernard - LYON I,
+43 Bd 11/11/1918, F-69622 VILLEURBANNE CEDEX, FRANCE
+allo  : +33 472 43 27 56     fax    : +33 472 43 13 88
+http://pbil.univ-lyon1.fr/members/lobry/
+
+
+
+From penel at biomserv.univ-lyon1.fr  Thu Feb 25 10:02:50 2010
+From: penel at biomserv.univ-lyon1.fr (penel at biomserv.univ-lyon1.fr)
+Date: Thu, 25 Feb 2010 10:02:50 +0100
+Subject: [Seqinr-forum] Seqinr write.fasta problem with max characters
+	per line
+In-Reply-To: <fe5cf69b1002241010p29d0c051taf214cee812aefee@mail.gmail.com>
+References: <fe5cf69b1002241010p29d0c051taf214cee812aefee@mail.gmail.com>
+Message-ID: <4B863CBA.9010901@biomserv.univ-lyon1.fr>
+
+Dear Jonathan,
+
+I suspect the way you retrieve your sequence data   may be the problem:
+
+when using getSequence, you have to use the option as.string = FALSE 
+(this is the default).
+
+There is an example where the 2 options are tested:
+
+
+in R:
+=======
+choosebank("embl")
+query("test1","n=AB009279")
+
+
+seq1<-sapply(test1$req[1:1],getSequence, as.string = TRUE)
+seq2<-sapply(test1$req[1:1],getSequence)
+write.fasta(sequences = seq1, names = "test string is TRUE", nbchar = 10 
+, file.out = "test1.fasta")
+write.fasta(sequences = seq2, names = "test string is FALSE", nbchar = 
+10 , file.out = "test2.fasta")
+========
+
+
+you should get the following data  your files:
+ head test1.fasta
+ >test string is TRUE
+catgaaggggccctgggccgtccgttggctgatacttacctctgttgccggatccctgttcagaggcgacagcgctcaggtcaccgatgtcagctccaaggtgttgaaattgagtaagaacgctaccgaaggggagcctggatgcaaggaaggtctgcatcgtgggagcaagttctgctgtctgccatgccctcctggcacacgaaaagctgccgactgtgaagaagatgggggtagaccatcctgtataccctgtgaagaagcgaaggactacacagacaggagccatttttctcccagatgcagaagatgtaaaatttgtgatgaagagcatggcttagaagtggaaaaaaactgtacccggacccagaataccaagtgcagatgtaaatcaaactttttttgtaacgtctctcagtgtgaccactgtaacccgtgcatgatgtgtgaacatggaatccttgagaattgcacaccaaccagcagcaccaaatgtaaacaaggatccagctccaaacttctgtggctttgtgccctgctcctgattctaccgtccgcactagtgtgttgctgtgtgttgaaaaagtacgggaatacgaagaatggccgccgggaatctacagtctcagttactgagagtatgccgatgaatttcacagacatcgacttgagtaaatacatcagtagcattgccgaacaaatgaaaataactcaagtcagagaatttgtccgcaagaatggtatcaacgaagccaaaatagacgagatcaagaacgacaacctccaagacacagctgaacagaaagtccaactgctccggaattggtaccagctccacgggaggaagggcgcgtattacgctctggtgaaaggtctcaggaaagccaatctctgcgctcttgccgagaaaattgaagatatggtccagaaggacagtgcgagctaacttgagaatggaaactgcaaacacgaaaataaaagacaaagcctggctgaatgtgaaaaacaact
+
+ head test2.fasta
+ >test string is FALSE
+catgaagggg
+ccctgggccg
+tccgttggct
+gatacttacc
+tctgttgccg
+gatccctgtt
+cagaggcgac
+agcgctcagg
+tcaccgatgt
+
+
+I hope this help,
+
+all the best,
+
+Simon
+
+
+
+
+
+
+
+Jonathan Reichel a ?crit :
+> Greetings!
+>
+> I'm trying to write DNA sequences to a file in fasta format.  the
+> seqinr library has a function called write.fasta, which works fine,
+> except for one crucial point:
+> there's supposed to be a maximum number of characters per line (the
+> default is supposed to be 60), but when I call the function, it
+> prints the entire sequence on a single line, regardless of how long it
+> is (in every case, the sequence is longer than the value used for the
+> nbchar argument)...
+>
+> Any idea why I might be experiencing this?
+>
+> I'm using Windows 7 64-bit, R version 2.10.1.
+>
+> Regards,
+> Jonathan Reichel
+>
+>
+>
+>   
+
+
+-- 
+Simon Penel
+Laboratoire de Biometrie et Biologie Evolutive           Bat 711  -   CNRS UMR 5558  -    Universite Lyon 1              43 bd du 11 novembre 1918 69622 Villeurbanne Cedex       Tel:   04 72 43 29 04      Fax:  04 72 43 13 88
+http://lbbe.univ-lyon1.fr/-Penel-Simon-.html?lang=fr
+
+
+
+From lobry at biomserv.univ-lyon1.fr  Fri Feb 26 21:28:10 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Fri, 26 Feb 2010 21:28:10 +0100
+Subject: [Seqinr-forum] release 2.0-8
+Message-ID: <p06002003c7add91b59cb@[192.168.1.12]>
+
+Dear seqinR,
+
+release 2.0-8 is on its way to CRAN. This is a not so minor release
+as it fixes a bug kindly reported last week by Oliver Clay. Although
+the probability of this bug is low it may puzzle many users so that
+my advice would be to upgrade if you are using seqinR for teaching
+purposes. I would suggest to wait for R release 2.11 (not yet
+schedulded but usually in the spring) just to save your time. But you
+can upgrade with the current version if you need it.
+
+Best,
+
+Z.
+
+
+
+Release Notes for version 2.0-8
+-------------------------------
+
+o As pointed by Oliver Clay and Lionel Guy on the seqinr diffusion
+   list on 19-FEB-2010 there was a bug in getSequence.list()
+   function that confused write.fasta() when all sequences were
+   of the same length (a similar bug was reported by Yann Lesecque
+   on 30-MAR-2009 for the getTrans() function). This is now
+   fixed.
+
+o The message printed when function where.is.this.acc() fails
+   to find a database with a given accession number for a sequence is now
+   completed to warn the user that (s)he may have supplied a sequence name
+   instead of a genuine accession number.
+
+o The title in the documentation for the function write.fasta()
+   was changed to make clear that more than one sequence can be written at once.
+   The function now does not return anything instead of NULL previously.
+   The argument file.out was moved to the left so that it is easier now
+   to use it by position during function call.
+
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From A.Coghlan at ucc.ie  Tue Mar  2 12:44:46 2010
+From: A.Coghlan at ucc.ie (Coghlan, Avril)
+Date: Tue, 2 Mar 2010 11:44:46 -0000
+Subject: [Seqinr-forum] rho() and zscore() functions in SeqinR
+Message-ID: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+
+Dear all,
+
+I have written some code to extend the rho() function in SeqinR so that
+it can calculate rho values for wordsizes of greater than 2.
+I have included my  suggested code below for an extended rho() function.
+It has an extra argument, which is the word size that the user wants to
+calculate rho for (default = 2).
+
+Would you consider extending the current SeqinR rho() function in this
+way?
+
+By the way, if you do extend the current SeqinR rho() function in this
+way so that it can calculate rho values for wordsizes of greater than 2,
+then as far as I can see, it is very simple to extend the zscore()
+function so that it also can calculate zscore values for wordsizes of
+greater than 2 (by using simulated sequences to calculate the expected
+mean and variance for rho).
+It would just involve adding an extra argument "wordsize" to zscore(),
+and then calling my rho() function (below) with that wordsize value.
+
+I think it would also be nice to give a P-value for a particular zscore.
+
+I think this could just be calculated as: 
+    1 - pnorm(zscore, mean=1,sd=1)
+Is this true?
+Would you consider adding this too?
+
+Kind Regards,
+Avril
+
+Avril Coghlan
+University College Cork, Ireland
+
+rho <- function (sequence, alphabet = s2c("acgt"), wordsize=2)
+{
+   wordcount <- count(sequence, wordsize, freq=TRUE, alphabet =
+alphabet)
+   uni <- count(sequence, 1, freq = TRUE, alphabet = alphabet)
+ 
+   # Calculate the total number of possible words of size "wordsize"
+   total_words <- wordsize^4
+
+   # Calculate the expected wordcount
+   expected_wordcount <- rep(uni,(4^(wordsize-1))) # The expected
+frequencies of the first letters in the total_words possible words
+
+   for (i in 1:(wordsize-1)) # Find the expected frequencies of the next
+(wordsize-1) letters in the total_words possible words
+   {
+      # If this is the second letter of a 4-letter word, should have:
+i=1, rep(rep(uni, each = 4),16)
+      # If this is the third letter of a 4-letter word, should have:
+i=2, rep(rep(uni, each = 16, 4)
+      # If this is the fourth letter of a 4-letter word, should have:
+i=3, rep(rep(uni, each = 64, 1)
+      expected_freq_for_letter <- rep(rep(uni, each = 4^i),
+4^(wordsize-i-1))
+      expected_wordcount <- expected_wordcount *
+expected_freq_for_letter
+   }
+
+   rho <- wordcount/expected_wordcount
+
+   return(rho)
+}
+
+
+From A.Coghlan at ucc.ie  Tue Mar  2 13:21:49 2010
+From: A.Coghlan at ucc.ie (Coghlan, Avril)
+Date: Tue, 2 Mar 2010 12:21:49 -0000
+Subject: [Seqinr-forum] zscore() function in SeqinR - "base" model
+In-Reply-To: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+Message-ID: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622D4@EXCH1.central.ad.ucc.ie>
+
+Dear all,
+
+I have been looking at the zscore() function in SeqinR, and noticed that
+the "modele="base" option generates a random sequence using the
+permutation() function.  
+
+As far as I can see, zscore() function calls permutation() with default
+options, which means that permutation() will generate a random sequence
+by randomly sampling the letters in the input sequence without
+replacement. 
+
+However, I am wondering whether it would be better if zscore() called
+permutation() with the "replace=TRUE" option, so that permutation() will
+generate a random sequence by randomly sampling the letters in the input
+sequence *with replacement*. 
+
+I think it would be better to shuffle the letters with replacement,
+because then that would be generating a random sequence by using a
+multinomial probability distribution, where the probabilities of A, C,
+G, and T are set equal to their frequencies in the input sequence. This
+will result in sequences that do not have exactly the same frequencies
+of A, C, G, and T as the input sequence (in contrast, generating a
+random sequence by sampling the letters without replacement will
+generate a random sequence with exactly the same frequencies of A, C, G,
+and T in the input sequence).
+
+My thinking is that if you generate the random sequences that do not
+have exactly the same frequencies of A, C, G, and T as the input
+sequence, you will get a more accurate estimate of the expected mean and
+variance of rho (in particular, of the expected variance of rho, which
+will probably be estimated as a larger number), and this will in turn
+give a more accurate estimate of zscore (probably a more conservative
+estimate of rho, as the estimate for the expected variance of rho will
+probably be larger). 
+
+Do you agree with me? 
+If so, would you consider changing the lines in the zscore function:
+   rhopermut <- sapply(seq(simulations), function(x) {
+            rho(permutation(sequence = sequence, modele = modele, 
+                ...))
+        })
+to be:
+   rhopermut <- sapply(seq(simulations), function(x) {
+            rho(permutation(sequence = sequence, modele = modele,
+replace = TRUE, 
+                ...))
+        })
+instead ?
+
+Kind Regards,
+Avril 
+
+Avril Coghlan
+University College Cork, Ireland
+
+
+
+
+
+
+
+
+
+From darren.obbard at ed.ac.uk  Fri Mar  5 11:22:08 2010
+From: darren.obbard at ed.ac.uk (Darren Obbard)
+Date: Fri, 05 Mar 2010 10:22:08 +0000
+Subject: [Seqinr-forum] Memory leak?
+Message-ID: <4B90DB50.1030204@ed.ac.uk>
+
+Hi!
+
+Not sure if this is an R problem or a seqinr problem or merely stupidity 
+on my part, but I found it in a seqinr context using read.alignment()
+
+my sesionInfo() is
+
+R version 2.9.2 (2009-08-24)
+i386-pc-mingw32
+
+locale:
+LC_COLLATE=English_United Kingdom.1252;LC_CTYPE=English_United 
+Kingdom.1252;LC_MONETARY=English_United 
+Kingdom.1252;LC_NUMERIC=C;LC_TIME=English_United Kingdom.1252
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] seqinr_2.0-7
+
+
+
+and here is a fairly minimal example of the problem:
+#--------------------------------------------------
+require(seqinr)
+
+#make a test file
+write.fasta(seq=as.list(apply(matrix(rep("N",500000),nrow=100),1,paste,collapse="")),rep("seq",100),file="temp1.fas")
+
+#run the loop until we run out of memory
+counter<-0
+memory.plot<-vector()
+while(TRUE){
+	temp<-read.alignment("temp1.fas",format="fasta")
+	counter<-counter+1
+}
+counter
+ > sessionInfo()
+#cleanup
+file.remove("temp.fas")
+#--------------------------------------------------
+
+-- 
+
+Darren Obbard
+Institute of Evolutionary Biology
+Kings Buildings
+University of Edinburgh, UK
+
+
+The University of Edinburgh is a charitable body, registered in
+Scotland, with registration number SC005336.
+
+
+From lobry at biomserv.univ-lyon1.fr  Fri Mar  5 17:41:57 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Fri, 5 Mar 2010 17:41:57 +0100
+Subject: [Seqinr-forum] Memory leak?
+In-Reply-To: <4B90DB50.1030204@ed.ac.uk>
+References: <4B90DB50.1030204@ed.ac.uk>
+Message-ID: <p06002009c7b6e38a4bd0@[192.168.1.12]>
+
+At 10:22 +0000 5/03/10, Darren Obbard wrote:
+>Hi!
+>
+>Not sure if this is an R problem or a seqinr problem or merely stupidity
+>on my part, but I found it in a seqinr context using read.alignment()
+>
+
+I can reproduce the bug. Calling for garbage collection within the
+loop with gc() does not fix it. My first guess is that there is
+a memory leak problem at the C level in the read.alignment()
+function.
+
+Thanks for spotting the bug with a nice small reproducible example,
+I will investigate this further.
+
+Best,
+
+Z.
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From lobry at biomserv.univ-lyon1.fr  Sat Mar  6 11:07:35 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Sat, 6 Mar 2010 11:07:35 +0100
+Subject: [Seqinr-forum] Memory leak?
+In-Reply-To: <p06002009c7b6e38a4bd0@[192.168.1.12]>
+References: <4B90DB50.1030204@ed.ac.uk> <p06002009c7b6e38a4bd0@[192.168.1.12]>
+Message-ID: <p0600200ec7b7d8a8605a@[192.168.1.12]>
+
+At 17:41 +0100 5/03/10, Jean lobry wrote:
+>At 10:22 +0000 5/03/10, Darren Obbard wrote:
+>>Hi!
+>>
+>>Not sure if this is an R problem or a seqinr problem or merely stupidity
+>>on my part, but I found it in a seqinr context using read.alignment()
+>>
+>
+>I can reproduce the bug. Calling for garbage collection within the
+>loop with gc() does not fix it. My first guess is that there is
+>a memory leak problem at the C level in the read.alignment()
+>function.
+>
+>Thanks for spotting the bug with a nice small reproducible example,
+>I will investigate this further.
+>
+>Best,
+>
+
+I have just commited a fix that should be available out-of-the-box
+in R-forge in a day or two (revision >= 1727). I have cleaned up memory
+allocation at the C level in the read_fasta_align function. I didn't check
+the remaining formats.
+
+Best,
+
+Z.
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientifique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From lobry at biomserv.univ-lyon1.fr  Sun Mar  7 12:25:15 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Sun, 7 Mar 2010 12:25:15 +0100
+Subject: [Seqinr-forum] rho() and zscore() functions in SeqinR
+In-Reply-To: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+Message-ID: <p0600200fc7b93b64cfad@[192.168.1.12]>
+
+At 11:44 +0000 2/03/10, Coghlan, Avril wrote:
+>Dear all,
+>
+>I have written some code to extend the rho() function in SeqinR so that
+>it can calculate rho values for wordsizes of greater than 2.
+>I have included my  suggested code below for an extended rho() function.
+>It has an extra argument, which is the word size that the user wants to
+>calculate rho for (default = 2).
+>
+>Would you consider extending the current SeqinR rho() function in this
+>way?
+
+
+Hi Avril,
+
+I think it's a very good idea. I have just commited the thereafter
+modification for the rho() function, main difference with yours
+is that it can handle alphabets of any size. Will be available
+on R-forge soon (revision >= 1741).
+
+###
+rho <- function (sequence, wordsize = 2, alphabet = s2c("acgt"))
+{
+   wordcount <- count(sequence, wordsize, freq = FALSE, alphabet = alphabet)
+   uni <- count(sequence, 1, freq = TRUE, alphabet = alphabet)
+
+   expected_wordfreq <- function (wordsize, uni)
+   {
+     if (wordsize == 1)
+         return(uni)
+     else kronecker(uni, expected_wordfreq(wordsize - 1, uni))
+   }
+
+   expected_wordcount <- sum(wordcount)*expected_wordfreq(wordsize, uni)
+
+   return(wordcount/expected_wordcount)
+}
+###
+
+>By the way, if you do extend the current SeqinR rho() function in this
+>way so that it can calculate rho values for wordsizes of greater than 2,
+>then as far as I can see, it is very simple to extend the zscore()
+>function so that it also can calculate zscore values for wordsizes of
+>greater than 2 (by using simulated sequences to calculate the expected
+>mean and variance for rho).
+>It would just involve adding an extra argument "wordsize" to zscore(),
+>and then calling my rho() function (below) with that wordsize value.
+
+Good idea too, but I would like to see first if the new rho() version
+does not break previous code.
+
+>I think it would also be nice to give a P-value for a particular zscore.
+>
+>I think this could just be calculated as:
+>     1 - pnorm(zscore, mean=1,sd=1)
+>Is this true?
+>Would you consider adding this too?
+
+I would feel much more comfortable if the responsability for using
+the normal approximation was left on the user side :-)
+
+Best,
+
+Z.
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientifique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From lobry at biomserv.univ-lyon1.fr  Sun Mar  7 12:53:57 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Sun, 7 Mar 2010 12:53:57 +0100
+Subject: [Seqinr-forum] zscore() function in SeqinR - "base" model
+In-Reply-To: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622D4@EXCH1.central.ad.ucc.ie>
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B622D4@EXCH1.central.ad.ucc.ie>
+Message-ID: <p06002010c7b940c612ba@[192.168.1.12]>
+
+>Dear all,
+>
+>I have been looking at the zscore() function in SeqinR, and noticed that
+>the "modele="base" option generates a random sequence using the
+>permutation() function.
+>
+>As far as I can see, zscore() function calls permutation() with default
+>options, which means that permutation() will generate a random sequence
+>by randomly sampling the letters in the input sequence without
+>replacement.
+>
+>However, I am wondering whether it would be better if zscore() called
+>permutation() with the "replace=TRUE" option, so that permutation() will
+>generate a random sequence by randomly sampling the letters in the input
+>sequence *with replacement*.
+>
+>I think it would be better to shuffle the letters with replacement,
+>because then that would be generating a random sequence by using a
+>multinomial probability distribution, where the probabilities of A, C,
+>G, and T are set equal to their frequencies in the input sequence. This
+>will result in sequences that do not have exactly the same frequencies
+>of A, C, G, and T as the input sequence (in contrast, generating a
+>random sequence by sampling the letters without replacement will
+>generate a random sequence with exactly the same frequencies of A, C, G,
+>and T in the input sequence).
+>
+>My thinking is that if you generate the random sequences that do not
+>have exactly the same frequencies of A, C, G, and T as the input
+>sequence, you will get a more accurate estimate of the expected mean and
+>variance of rho (in particular, of the expected variance of rho, which
+>will probably be estimated as a larger number), and this will in turn
+>give a more accurate estimate of zscore (probably a more conservative
+>estimate of rho, as the estimate for the expected variance of rho will
+>probably be larger).
+>
+>Do you agree with me?
+>If so, would you consider changing the lines in the zscore function:
+>    rhopermut <- sapply(seq(simulations), function(x) {
+>             rho(permutation(sequence = sequence, modele = modele,
+>                 ...))
+>         })
+>to be:
+>    rhopermut <- sapply(seq(simulations), function(x) {
+>             rho(permutation(sequence = sequence, modele = modele,
+>replace = TRUE,
+>                 ...))
+>         })
+>instead ?
+>
+>Kind Regards,
+>Avril
+>
+>Avril Coghlan
+>University College Cork, Ireland
+>
+
+Hi Avril,
+
+thanks to the dot-dot-dot argument you can already do that if you
+want: the 'replace' argument will be forwarded to the permutation()
+function. For instance:
+
+###
+>  set.seed(1)
+>  sequence <- sample(x = s2c("acgt"), size = 6000, replace = TRUE)
+>  set.seed(1)
+>  zscore(sequence, modele = "base", simulation = 10)
+
+         aa         ac         ag         at         ca         cc 
+cg         ct
+  0.4964146  0.2304339 -0.2904738 -0.5860529 -1.2189081 -0.2670835 
+0.6720315  1.4506118
+         ga         gc         gg         gt         ta         tc 
+tg         tt
+-0.5799489  0.5563278 -0.7861945  0.4491624  1.2411472 -0.4528621 
+0.2757699 -1.6667786
+>  set.seed(1)
+>  zscore(sequence, modele = "base", simulation = 10, replace = TRUE)
+
+         aa         ac         ag         at         ca         cc 
+cg         ct
+  0.9257696  0.2787500 -0.4081940 -0.7942528 -2.0559923 -0.1371734 
+0.7658307  0.7498670
+         ga         gc         gg         gt         ta         tc 
+tg         tt
+-0.3817298  0.2818443 -0.7577013  1.1394403  1.0662898 -0.5083124 
+0.3406378 -0.7612934
+###
+
+Not sure to follow you on saying it's better to do so. For me it looks like
+removing the margin sums constraints in a chi-square independency 
+test performed
+by simulation.
+
+Best,
+
+Z.
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientifique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From tal.galili at gmail.com  Thu Mar 11 22:03:25 2010
+From: tal.galili at gmail.com (Tal Galili)
+Date: Thu, 11 Mar 2010 23:03:25 +0200
+Subject: [Seqinr-forum] How (and where) to get aligned tRNA sequences (and
+	import it into R)
+Message-ID: <440d7af41003111303j40b498b9nb37c8d4456aa7a3a@mail.gmail.com>
+
+Hello dear list.
+
+I wish (for my thesis work), to import tRNA data into R and have it aligned.
+
+My questions are:
+1) What resources can I use for the data.
+2) What commands might help me with the import/alignment.
+
+
+So far, I found two nice repositories that holds such data:
+1) <http://trnadb.bioinf.uni-leipzig.de/Result>
+http://trnadb.bioinf.uni-leipzig.de/Result
+2) <http://gtrnadb.ucsc.edu/download.html>
+http://gtrnadb.ucsc.edu/download.html
+
+And also the  readFASTA command from Biostrings, that does basic importing
+of the data into R.
+
+My problem still remains with how to handle the alignment of the tRNA.
+
+Since I am not from the field, I might be missing a very basic answer (like
+where I should download the data from, or what command to use).
+If you might be willing to advice me, that would be most helpful.
+
+Many thanks in advance,
+Tal
+
+
+----------------Contact
+Details:-------------------------------------------------------
+Contact me: Tal.Galili at gmail.com |  972-52-7275845
+Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+www.r-statistics.com (English)
+----------------------------------------------------------------------------------------------
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100311/5f8acebc/attachment.htm 
+
+From A.Coghlan at ucc.ie  Fri Mar 12 15:01:11 2010
+From: A.Coghlan at ucc.ie (Coghlan, Avril)
+Date: Fri, 12 Mar 2010 14:01:11 -0000
+Subject: [Seqinr-forum] error connecting to ACNUC with choosebank()
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie> 
+Message-ID: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+
+Dear all,
+
+I am wondering if the ACNUC database is down today?
+When I try to connect using SeqinR, I get this error:
+
+> library("seqinr")
+> choosebank("genbank")
+Error in acnucopen(bank, socket) : 
+  I don't know what this error code means for acnucopen:
+
+I guess it means that the ACNUC database is down? I thought I'd tell you
+in case you didn't realise.
+
+Kind Regards,
+Avril
+
+Avril Coghlan
+University College Cork, Ireland
+
+
+From penel at biomserv.univ-lyon1.fr  Fri Mar 12 18:46:50 2010
+From: penel at biomserv.univ-lyon1.fr (penel at biomserv.univ-lyon1.fr)
+Date: Fri, 12 Mar 2010 18:46:50 +0100
+Subject: [Seqinr-forum] error connecting to ACNUC with choosebank()
+In-Reply-To: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+Message-ID: <4B9A7E0A.3000108@biomserv.univ-lyon1.fr>
+
+Dear Avril,
+
+it seems there is a problem with the server, I will check this as soon 
+as possible.
+
+all the best
+
+Simon
+
+
+Coghlan, Avril a ?crit :
+> Dear all,
+>
+> I am wondering if the ACNUC database is down today?
+> When I try to connect using SeqinR, I get this error:
+>
+>   
+>> library("seqinr")
+>> choosebank("genbank")
+>>     
+> Error in acnucopen(bank, socket) : 
+>   I don't know what this error code means for acnucopen:
+>
+> I guess it means that the ACNUC database is down? I thought I'd tell you
+> in case you didn't realise.
+>
+> Kind Regards,
+> Avril
+>
+> Avril Coghlan
+> University College Cork, Ireland
+>
+> _______________________________________________
+> Seqinr-forum mailing list
+> Seqinr-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/seqinr-forum
+>
+>
+>   
+
+
+-- 
+Simon Penel
+Laboratoire de Biometrie et Biologie Evolutive           Bat 711  -   CNRS UMR 5558  -    Universite Lyon 1              43 bd du 11 novembre 1918 69622 Villeurbanne Cedex       Tel:   04 72 43 29 04      Fax:  04 72 43 13 88
+http://lbbe.univ-lyon1.fr/-Penel-Simon-.html?lang=fr
+
+
+From penel at biomserv.univ-lyon1.fr  Fri Mar 12 18:53:31 2010
+From: penel at biomserv.univ-lyon1.fr (penel at biomserv.univ-lyon1.fr)
+Date: Fri, 12 Mar 2010 18:53:31 +0100
+Subject: [Seqinr-forum] error connecting to ACNUC with choosebank()
+In-Reply-To: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+Message-ID: <4B9A7F9B.2030901@biomserv.univ-lyon1.fr>
+
+Dear all,
+
+connections to ACNUC databases  should work correctly now.
+
+all the best,
+
+Simon
+
+
+
+
+
+Coghlan, Avril a ?crit :
+> Dear all,
+>
+> I am wondering if the ACNUC database is down today?
+> When I try to connect using SeqinR, I get this error:
+>
+>   
+>> library("seqinr")
+>> choosebank("genbank")
+>>     
+> Error in acnucopen(bank, socket) : 
+>   I don't know what this error code means for acnucopen:
+>
+> I guess it means that the ACNUC database is down? I thought I'd tell you
+> in case you didn't realise.
+>
+> Kind Regards,
+> Avril
+>
+> Avril Coghlan
+> University College Cork, Ireland
+>
+> _______________________________________________
+> Seqinr-forum mailing list
+> Seqinr-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/seqinr-forum
+>
+>
+>   
+
+
+-- 
+Simon Penel
+Laboratoire de Biometrie et Biologie Evolutive           Bat 711  -   CNRS UMR 5558  -    Universite Lyon 1              43 bd du 11 novembre 1918 69622 Villeurbanne Cedex       Tel:   04 72 43 29 04      Fax:  04 72 43 13 88
+http://lbbe.univ-lyon1.fr/-Penel-Simon-.html?lang=fr
+
+
+From lobry at biomserv.univ-lyon1.fr  Sat Mar 13 19:06:36 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Sat, 13 Mar 2010 19:06:36 +0100
+Subject: [Seqinr-forum] How (and where) to get aligned tRNA sequences
+ (and import it into R)
+In-Reply-To: <440d7af41003111303j40b498b9nb37c8d4456aa7a3a@mail.gmail.com>
+References: <440d7af41003111303j40b498b9nb37c8d4456aa7a3a@mail.gmail.com>
+Message-ID: <p0600201cc7c1803cdd68@[192.168.1.12]>
+
+At 23:03 +0200 11/03/10, Tal Galili wrote:
+Hello dear list.
+
+I wish (for my thesis work), to import tRNA data into R and have it aligned.
+
+My questions are:
+1) What resources can I use for the data.
+2) What commands might help me with the import/alignment.
+
+
+So far, I found two nice repositories that holds such data:
+
+1) 
+<<http://trnadb.bioinf.uni-leipzig.de/Result>http://trnadb.bioinf.uni-leipzig.de/Result><http://trnadb.bioinf.uni-leipzig.de/Result>http://trnadb.bioinf.uni-leipzig.de/Result
+2) 
+<<http://gtrnadb.ucsc.edu/download.html>http://gtrnadb.ucsc.edu/download.html><http://gtrnadb.ucsc.edu/download.html>http://gtrnadb.ucsc.edu/download.html
+
+And also the  readFASTA command from Biostrings, that does basic 
+importing of the data into R.
+
+My problem still remains with how to handle the alignment of the tRNA.
+
+Since I am not from the field, I might be missing a very basic answer 
+(like where I should download the data from, or what command to use).
+If you might be willing to advice me, that would be most helpful.
+
+Many thanks in advance,
+Tal
+
+Hi Tal,
+
+let's start from http://trnadb.bioinf.uni-leipzig.de/Search which is
+a nice ressource and suppose that you are interested in Ala tRNA.
+
+Select the Alanine checkbox and then click on the "search database"
+button. Wait for the search result page. At the bottom, select
+the "select all sequences of search" checkbox, on the scrolling
+menu just on the right select the "send alignment (multiFASTA)"
+and then click on the "submit" button. A file called "fasta.mfa"
+should be downloaded on your computer.
+
+Then under R:
+
+###
+library(seqinr)
+res <- read.alignment(file.choose(), format = "fasta")
+names(res)
+[1] "nb"  "nam" "seq" "com"
+res$nb
+[1] 605
+###
+
+The alignment of 605 tRNA sequences has been imported in the
+object called "res", now you can play with it. For instance
+the consensus with the majority rule is:
+
+###
+consensus(res)
+  [1] "-" "g" "g" "g" "g" "c" "t" "g" "t" "a" "g" "c" "t" "c"
+[15] "a" "g" "c" "t" "-" "g" "g" "t" "-" "-" "a" "g" "a" "g"
+[29] "c" "g" "c" "c" "t" "g" "c" "t" "t" "t" "g" "c" "a" "t"
+[43] "g" "c" "a" "g" "g" "a" "g" "-" "g" "t" "c" "a" "g" "g"
+[57] "g" "g" "t" "t" "c" "g" "a" "t" "c" "c" "c" "c" "c" "t"
+[71] "c" "a" "g" "c" "t" "c" "c" "a" "-" "-" "-"
+###
+
+HTH,
+
+Z.
+
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientifique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From tal.galili at gmail.com  Sat Mar 13 23:50:12 2010
+From: tal.galili at gmail.com (Tal Galili)
+Date: Sun, 14 Mar 2010 00:50:12 +0200
+Subject: [Seqinr-forum] How (and where) to get aligned tRNA sequences
+	(and import it into R)
+In-Reply-To: <p0600201cc7c1803cdd68@192.168.1.12>
+References: <440d7af41003111303j40b498b9nb37c8d4456aa7a3a@mail.gmail.com> 
+	<p0600201cc7c1803cdd68@192.168.1.12>
+Message-ID: <440d7af41003131450j3f1f83br1db2c9903a37c956@mail.gmail.com>
+
+(Question at the end of the e-mail)
+
+Hi Jean,
+
+After asking for help in several places, I got the following reply from a
+very helpful member of this database:
+http://gtrnadb.ucsc.edu/
+
+She wrote to me that:
+
+Primary sequences of different tRNA isotypes do not align well. You will
+> have to include the secondary structure to do the alignments. The secondary
+> structure page of each genome in GtRNAdb shows the linear representation of
+> the secondary structure for each tRNA produced with covariance model. You
+> can use that to align the tRNAs you are interested.
+
+
+> Hope this help.
+
+Patricia
+
+
+Now, for our example, if I want to have this:
+http://gtrnadb.ucsc.edu/Aero_pern/Aero_pern-align.html
+Imported into R, I could try to use a file from here:
+http://gtrnadb.ucsc.edu/Aero_pern/Aero_pern-structs.html
+(Which is based on a calculation of the secondary structure of the tRNA)
+If I had that file easily available that would be nice. But I can't seem to
+download it from the site.
+
+Which leaves me asking:
+1) Should I (somehow) compute the secondary structures of tRNA's, and then
+use that for alignment ?
+2) (if yes) How can I compute the secondary structures of tRNA's in R? (is
+it even possible?!)
+3) After doing that, is there a tool to easily align the tRNA's ? (in the
+dataset I gave links to there is a legend
+<http://gtrnadb.ucsc.edu/legend.html>of how to do this with that algorithm
+coding.  But I imagine this will be different for each coding system)
+
+
+Thanks for any help,
+Tal
+
+
+
+
+----------------Contact
+Details:-------------------------------------------------------
+Contact me: Tal.Galili at gmail.com |  972-52-7275845
+Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+www.r-statistics.com (English)
+----------------------------------------------------------------------------------------------
+
+
+
+
+On Sat, Mar 13, 2010 at 8:06 PM, Jean lobry <lobry at biomserv.univ-lyon1.fr>wrote:
+
+> At 23:03 +0200 11/03/10, Tal Galili wrote:
+> Hello dear list.
+>
+> I wish (for my thesis work), to import tRNA data into R and have it
+> aligned.
+>
+> My questions are:
+> 1) What resources can I use for the data.
+> 2) What commands might help me with the import/alignment.
+>
+>
+> So far, I found two nice repositories that holds such data:
+>
+> 1) <<http://trnadb.bioinf.uni-leipzig.de/Result>
+> http://trnadb.bioinf.uni-leipzig.de/Result><
+> http://trnadb.bioinf.uni-leipzig.de/Result>
+> http://trnadb.bioinf.uni-leipzig.de/Result
+> 2) <<http://gtrnadb.ucsc.edu/download.html>
+> http://gtrnadb.ucsc.edu/download.html><
+> http://gtrnadb.ucsc.edu/download.html>
+> http://gtrnadb.ucsc.edu/download.html
+>
+>
+> And also the  readFASTA command from Biostrings, that does basic importing
+> of the data into R.
+>
+> My problem still remains with how to handle the alignment of the tRNA.
+>
+> Since I am not from the field, I might be missing a very basic answer (like
+> where I should download the data from, or what command to use).
+> If you might be willing to advice me, that would be most helpful.
+>
+> Many thanks in advance,
+> Tal
+>
+> Hi Tal,
+>
+> let's start from http://trnadb.bioinf.uni-leipzig.de/Search which is
+> a nice ressource and suppose that you are interested in Ala tRNA.
+>
+> Select the Alanine checkbox and then click on the "search database"
+> button. Wait for the search result page. At the bottom, select
+> the "select all sequences of search" checkbox, on the scrolling
+> menu just on the right select the "send alignment (multiFASTA)"
+> and then click on the "submit" button. A file called "fasta.mfa"
+> should be downloaded on your computer.
+>
+> Then under R:
+>
+> ###
+> library(seqinr)
+> res <- read.alignment(file.choose(), format = "fasta")
+> names(res)
+> [1] "nb"  "nam" "seq" "com"
+> res$nb
+> [1] 605
+> ###
+>
+> The alignment of 605 tRNA sequences has been imported in the
+> object called "res", now you can play with it. For instance
+> the consensus with the majority rule is:
+>
+> ###
+> consensus(res)
+>  [1] "-" "g" "g" "g" "g" "c" "t" "g" "t" "a" "g" "c" "t" "c"
+> [15] "a" "g" "c" "t" "-" "g" "g" "t" "-" "-" "a" "g" "a" "g"
+> [29] "c" "g" "c" "c" "t" "g" "c" "t" "t" "t" "g" "c" "a" "t"
+> [43] "g" "c" "a" "g" "g" "a" "g" "-" "g" "t" "c" "a" "g" "g"
+> [57] "g" "g" "t" "t" "c" "g" "a" "t" "c" "c" "c" "c" "c" "t"
+> [71] "c" "a" "g" "c" "t" "c" "c" "a" "-" "-" "-"
+> ###
+>
+> HTH,
+>
+> Z.
+>
+>
+> --
+> Pr. Jean R. Lobry (Dr. phil. hab.)
+> Head of Laboratoire de Police Scientifique de Lyon
+> Institut National de Police Scientifique
+> 31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+> Allo: +33 (0)4 72 86 89 60
+> e-mail: jean.lobry at interieur.gouv.fr
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100314/bbdae36c/attachment.htm 
+
+From lobry at biomserv.univ-lyon1.fr  Sun Mar 14 10:04:31 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Sun, 14 Mar 2010 10:04:31 +0100
+Subject: [Seqinr-forum] How (and where) to get aligned tRNA sequences
+ (and import it into R)
+In-Reply-To: <440d7af41003131450j3f1f83br1db2c9903a37c956@mail.gmail.com>
+References: <440d7af41003111303j40b498b9nb37c8d4456aa7a3a@mail.gmail.com> 
+	<p0600201cc7c1803cdd68@192.168.1.12>
+	<440d7af41003131450j3f1f83br1db2c9903a37c956@mail.gmail.com>
+Message-ID: <p0600201dc7c2568b5d2e@[192.168.1.12]>
+
+>  Which leaves me asking:
+>
+>  1) Should I (somehow) compute the secondary structures of
+>  tRNA's, and then use that for alignment ?
+>
+>  2) (if yes) How can I compute the secondary structures of
+>  tRNA's in R? (is it even possible?!)
+>
+>  3) After doing that, is there a tool to easily align the
+>  tRNA's ? (in the dataset I gave links to there is a
+>  <http://gtrnadb.ucsc.edu/legend.html>legend of how to do
+>  this with that algorithm coding.  But I imagine this will be
+>  different for each coding system)
+>
+>
+>  Thanks for any help,
+>
+>  Tal
+
+Hi Tal,
+
+I'm not aware of tools under R to align tRNA sequences, based on
+secondary structure or not. The best IMHO is to start from a
+database where the job was already done to avoid re-inventing
+the wheel. In my previous example we wouldn't have been able
+to compute a consensus sequence with the simple majority rule
+if the alignment was a mess.
+
+It's always a good idea to check the the quality of an alignment,
+you can do this easily under R by inspecting it in a spreadsheet-
+like environment this way:
+
+###
+resmat <- as.matrix(res)
+fix(resmat)
+###
+
+Now, depending on your goals and skills you may also consider
+implementing your own tRNA alignment utility, but I suspect
+this will involve some encoding at C level for efficiency
+purposes.
+
+
+Best,
+
+Z.
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientifique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From tal.galili at gmail.com  Sun Mar 14 21:39:14 2010
+From: tal.galili at gmail.com (Tal Galili)
+Date: Sun, 14 Mar 2010 22:39:14 +0200
+Subject: [Seqinr-forum] Suggestions for web-scraping a webpage with R ?
+Message-ID: <440d7af41003141339s4c1b7bd3h29b4ccbd98e11873@mail.gmail.com>
+
+Hi all,
+
+After searching on how to do a tRNA alignment based on the secondary
+structure folding, I abandoned this strategy and am now trying to reply on
+the processed data that is available online. But now, I need to
+download/parse it - and here is where I would love for any suggestion/help.
+
+
+I would like to go through all the "species pages" present in this link:
+
+http://gtrnadb.ucsc.edu/
+
+So for each of them I will go to:
+
+   1. The species page link (for example: http://gtrnadb.ucsc.edu/Aero_pern/
+   )
+   2. And then to the "Secondary Structures" page link (for example:
+   http://gtrnadb.ucsc.edu/Aero_pern/Aero_pern-structs.html)
+
+Inside that link I wish to scrap the data in the page so that I will have a
+long list containing this data (for example):
+
+chr.trna3 (1-77)    Length: 77 bp
+Type: Ala   Anticodon: CGC at 35-37 (35-37) Score: 93.45
+Seq: GGGCCGGTAGCTCAGCCtGGAAGAGCGCCGCCCTCGCACGGCGGAGGcCCCGGGTTCAAATCCCGGCCGGTCCACCA
+Str: >>>>>>>..>>>>.........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<....
+
+Where each line will have it's own list (inside the list for each "trna"
+inside the list for each animal)
+
+I remember coming across the packages Rcurl and XML (in R) that can allow
+for such a task. But I don't know how to use them. So what I would love to
+have is: 1. Some suggestion on how to build such a code. 2. And
+recommendation for how to learn the knowledge needed for performing such a
+task.
+
+Thanks for any help,
+
+Tal
+
+----------------Contact
+Details:-------------------------------------------------------
+Contact me: Tal.Galili at gmail.com |  972-52-7275845
+Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+www.r-statistics.com (English)
+----------------------------------------------------------------------------------------------
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100314/b04c7daa/attachment-0001.htm 
+
+From A.Coghlan at ucc.ie  Mon Mar 15 16:45:03 2010
+From: A.Coghlan at ucc.ie (Coghlan, Avril)
+Date: Mon, 15 Mar 2010 15:45:03 -0000
+Subject: [Seqinr-forum] error connecting to ACNUC with choosebank()
+In-Reply-To: <4B9A7F9B.2030901@biomserv.univ-lyon1.fr>
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+	<4B9A7F9B.2030901@biomserv.univ-lyon1.fr>
+Message-ID: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B62940@EXCH1.central.ad.ucc.ie>
+
+Dear Simon,
+
+Thank you for your reply.
+I'm afraid however that I am still getting this error message today.
+Is it possible that the ACNUC database server has crashed again?
+I tried connecting from two different computers so I don't think the problem is at my end.
+
+Kind Regards,
+Avril
+
+-----Original Message-----
+From: penel at biomserv.univ-lyon1.fr [mailto:penel at biomserv.univ-lyon1.fr] 
+Sent: 12 March 2010 17:54
+To: Coghlan, Avril
+Cc: seqinr-forum at r-forge.wu-wien.ac.at
+Subject: Re: [Seqinr-forum] error connecting to ACNUC with choosebank()
+
+Dear all,
+
+connections to ACNUC databases  should work correctly now.
+
+all the best,
+
+Simon
+
+
+
+
+
+Coghlan, Avril a ?crit :
+> Dear all,
+>
+> I am wondering if the ACNUC database is down today?
+> When I try to connect using SeqinR, I get this error:
+>
+>   
+>> library("seqinr")
+>> choosebank("genbank")
+>>     
+> Error in acnucopen(bank, socket) : 
+>   I don't know what this error code means for acnucopen:
+>
+> I guess it means that the ACNUC database is down? I thought I'd tell you
+> in case you didn't realise.
+>
+> Kind Regards,
+> Avril
+>
+> Avril Coghlan
+> University College Cork, Ireland
+>
+> _______________________________________________
+> Seqinr-forum mailing list
+> Seqinr-forum at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/seqinr-forum
+>
+>
+>   
+
+
+-- 
+Simon Penel
+Laboratoire de Biometrie et Biologie Evolutive           Bat 711  -   CNRS UMR 5558  -    Universite Lyon 1              43 bd du 11 novembre 1918 69622 Villeurbanne Cedex       Tel:   04 72 43 29 04      Fax:  04 72 43 13 88
+http://lbbe.univ-lyon1.fr/-Penel-Simon-.html?lang=fr
+
+
+From penel at biomserv.univ-lyon1.fr  Mon Mar 15 18:49:11 2010
+From: penel at biomserv.univ-lyon1.fr (penel at biomserv.univ-lyon1.fr)
+Date: Mon, 15 Mar 2010 18:49:11 +0100
+Subject: [Seqinr-forum] error connecting to ACNUC with choosebank()
+In-Reply-To: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B62940@EXCH1.central.ad.ucc.ie>
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+	<4B9A7F9B.2030901@biomserv.univ-lyon1.fr>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B62940@EXCH1.central.ad.ucc.ie>
+Message-ID: <4B9E7317.2030206@biomserv.univ-lyon1.fr>
+
+Dear Avril,
+
+sorry  that this problem occured again. This is due to the way some  
+databases are updated.
+The problem is fixed now.
+
+all  the best,
+
+Simon
+
+
+
+
+Coghlan, Avril a ?crit :
+> Dear Simon,
+>
+> Thank you for your reply.
+> I'm afraid however that I am still getting this error message today.
+> Is it possible that the ACNUC database server has crashed again?
+> I tried connecting from two different computers so I don't think the problem is at my end.
+>
+> Kind Regards,
+> Avril
+>
+> -----Original Message-----
+> From: penel at biomserv.univ-lyon1.fr [mailto:penel at biomserv.univ-lyon1.fr] 
+> Sent: 12 March 2010 17:54
+> To: Coghlan, Avril
+> Cc: seqinr-forum at r-forge.wu-wien.ac.at
+> Subject: Re: [Seqinr-forum] error connecting to ACNUC with choosebank()
+>
+> Dear all,
+>
+> connections to ACNUC databases  should work correctly now.
+>
+> all the best,
+>
+> Simon
+>
+>
+>
+>
+>
+> Coghlan, Avril a ?crit :
+>   
+>> Dear all,
+>>
+>> I am wondering if the ACNUC database is down today?
+>> When I try to connect using SeqinR, I get this error:
+>>
+>>   
+>>     
+>>> library("seqinr")
+>>> choosebank("genbank")
+>>>     
+>>>       
+>> Error in acnucopen(bank, socket) : 
+>>   I don't know what this error code means for acnucopen:
+>>
+>> I guess it means that the ACNUC database is down? I thought I'd tell you
+>> in case you didn't realise.
+>>
+>> Kind Regards,
+>> Avril
+>>
+>> Avril Coghlan
+>> University College Cork, Ireland
+>>
+>> _______________________________________________
+>> Seqinr-forum mailing list
+>> Seqinr-forum at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/seqinr-forum
+>>
+>>
+>>   
+>>     
+>
+>
+>   
+
+
+-- 
+Simon Penel
+Laboratoire de Biometrie et Biologie Evolutive           Bat 711  -   CNRS UMR 5558  -    Universite Lyon 1              43 bd du 11 novembre 1918 69622 Villeurbanne Cedex       Tel:   04 72 43 29 04      Fax:  04 72 43 13 88
+http://lbbe.univ-lyon1.fr/-Penel-Simon-.html?lang=fr
+
+
+From tal.galili at gmail.com  Tue Mar 16 11:10:55 2010
+From: tal.galili at gmail.com (Tal Galili)
+Date: Tue, 16 Mar 2010 12:10:55 +0200
+Subject: [Seqinr-forum] How to parse a string (by a "new" markup) with R ?
+Message-ID: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com>
+
+Hello all,
+
+For some work I am doing on RNA, I want to use R to do string parsing that
+(I think) is like a simplistic HTML parsing.
+
+
+For example, let's say we have the following two variables:
+
+    Seq <-
+"GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA"
+    Str <-
+">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<."
+
+Say that I want to parse "Seq" According to "Str", by using the legend here
+
+Seq: GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA
+Str: >>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<.
+
+     |     |  |              | |               |     |               ||     |
+
+     +-----+  +--------------+ +---------------+     +---------------++-----+
+
+        |        Stem 1            Stem 2                 Stem 3         |
+
+        |                                                                |
+
+        +----------------------------------------------------------------+
+
+                                Stem 0
+
+Assume that we always have 4 stems (0 to 3), but that the length of letters
+before and after each of them can very.
+
+The output should be something like the following list structure:
+
+
+    list(
+     "Stem 0 opening" = "GCCTCGA",
+     "before Stem 1" = "TA",
+     "Stem 1" = list(opening = "GCTC",
+     inside = "AGTTGGGA",
+     closing = "GAGC"
+     ),
+     "between Stem 1 and 2" = "G",
+     "Stem 2" = list(opening = "TACGA",
+     inside = "CTGAAGA",
+     closing = "TCGTA"
+     ),
+     "between Stem 2 and 3" = "AGGtC",
+     "Stem 3" = list(opening = "ACCAG",
+     inside = "TTCGATC",
+     closing = "CTGGT"
+     ),
+     "After Stem 3" = "",
+     "Stem 0 closing" = "TCGGGGC"
+    )
+
+
+I don't have any experience with programming a parser, and would like
+advices as to what strategy to use when programming something like this (and
+any recommended R commands to use).
+
+
+What I was thinking of is to first get rid of the "Stem 0", then go through
+the inner string with a recursive function (let's call it "seperate.stem")
+that each time will split the string into:
+1. before stem
+2. opening stem
+3. inside stem
+4. closing stem
+5. after stem
+
+Where the "after stem" will then be recursively entered into the same
+function ("seperate.stem")
+
+The thing is that I am not sure how to try and do this coding without using
+a loop.
+
+Any advices will be most welcomed.
+
+
+----------------Contact
+Details:-------------------------------------------------------
+Contact me: Tal.Galili at gmail.com |  972-52-7275845
+Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+www.r-statistics.com (English)
+----------------------------------------------------------------------------------------------
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100316/ea084ac7/attachment-0001.htm 
+
+From tal.galili at gmail.com  Tue Mar 16 15:00:18 2010
+From: tal.galili at gmail.com (Tal Galili)
+Date: Tue, 16 Mar 2010 16:00:18 +0200
+Subject: [Seqinr-forum] [R] How to parse a string (by a "new" markup)
+	with R ?
+In-Reply-To: <644e1f321003160459i37fbf5f0i1373c7d194f8bf13@mail.gmail.com>
+References: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com> 
+	<644e1f321003160459i37fbf5f0i1373c7d194f8bf13@mail.gmail.com>
+Message-ID: <440d7af41003160700l6a483a91l81fe5eacb009752f@mail.gmail.com>
+
+Hi Jim,
+Thanks for the questions, here are my answers:
+
+*Q: Does each sequence have the same number of ">>>>" for the opening
+sequence as it does for "<<<<" on the ending sequence?  *
+A: Yes
+
+*Q: Does the parsing always start with a partial stem 0 as your example
+shows? *
+A: No. Sometimes it will start with a few "."
+
+*Q: Is there a way of making sure you have the right sequences when you
+start? *
+A: I am not sure I understand what you mean.
+
+*Q: Is there a chance of error in the middle of the string that you have to
+restart from?*
+A: Sadly, yes. In which case, I'll need to ignore one of the inner stems...
+
+*Q: How long are these strings that you want to parse? *
+A: Each string has between 60 to 150 characters (and I have tens
+of thousands of them...)
+
+*Q: Is each one a self contained sequence like you show in your example, or
+do they go on for thousands of characters? *
+A: each sequence is self contained.
+
+*Q: Is there always at least one '.' between stems?  *
+A: No.
+
+*Q: A full set of rules as to how the parsing should be done would be
+useful.*
+A: I agree.  But since I don't have even a basic idea on how to start coding
+this, I thought first to have some help on the beginning and try to tweak
+with the other cases that will come up before turning back for help.
+
+*Q: Do you have the BNF syntax for parsing?*
+A: No. Your e-mail is the first time I came across it (
+http://en.wikipedia.org/wiki/Backus?Naur_Form<http://en.wikipedia.org/wiki/Backus%E2%80%93Naur_Form>
+).
+
+
+Thanks for the help,
+Tal
+
+
+
+----------------Contact
+Details:-------------------------------------------------------
+Contact me: Tal.Galili at gmail.com |  972-52-7275845
+Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+www.r-statistics.com (English)
+----------------------------------------------------------------------------------------------
+
+
+
+
+On Tue, Mar 16, 2010 at 1:59 PM, jim holtman <jholtman at gmail.com> wrote:
+
+> How are you supposed to interprete the string that is doing the parsing?
+> Does each sequence have the same number of ">>>>" for the opening sequence
+> as it does for "<<<<" on the ending sequence?  That what it appears to be
+> looking at the way stem 3 is parsed.  You will have to provide a little more
+> insight on how to interprete the  symbols.  Does the parsing always start
+> with a partial stem 0 as your example shows?  Is there a way of making sure
+> you have the right sequences when you start?  Is there a chance of error in
+> the middle of the string that you have to restart from?  How long are these
+> strings that you want to parse?  Is each one a self contained sequence like
+> you show in your example, or do they go on for thousands of characters?  Is
+> there always at least one '.' between stems?  A full set of rules as to how
+> the parsing should be done would be useful.  Do you have the BNF syntax for
+> parsing?
+>
+> On Tue, Mar 16, 2010 at 6:10 AM, Tal Galili <tal.galili at gmail.com> wrote:
+>
+>> Hello all,
+>>
+>> For some work I am doing on RNA, I want to use R to do string parsing that
+>> (I think) is like a simplistic HTML parsing.
+>>
+>>
+>> For example, let's say we have the following two variables:
+>>
+>>    Seq <-
+>>
+>> "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA"
+>>    Str <-
+>>
+>> ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<."
+>>
+>> Say that I want to parse "Seq" According to "Str", by using the legend
+>> here
+>>
+>> Seq:
+>> GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA
+>> Str:
+>> >>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<.
+>>
+>>     |     |  |              | |               |     |               ||
+>> |
+>>
+>>     +-----+  +--------------+ +---------------+
+>> +---------------++-----+
+>>
+>>        |        Stem 1            Stem 2                 Stem 3         |
+>>
+>>        |                                                                |
+>>
+>>        +----------------------------------------------------------------+
+>>
+>>                                Stem 0
+>>
+>> Assume that we always have 4 stems (0 to 3), but that the length of
+>> letters
+>> before and after each of them can very.
+>>
+>> The output should be something like the following list structure:
+>>
+>>
+>>    list(
+>>     "Stem 0 opening" = "GCCTCGA",
+>>     "before Stem 1" = "TA",
+>>     "Stem 1" = list(opening = "GCTC",
+>>     inside = "AGTTGGGA",
+>>     closing = "GAGC"
+>>     ),
+>>     "between Stem 1 and 2" = "G",
+>>     "Stem 2" = list(opening = "TACGA",
+>>     inside = "CTGAAGA",
+>>     closing = "TCGTA"
+>>     ),
+>>     "between Stem 2 and 3" = "AGGtC",
+>>     "Stem 3" = list(opening = "ACCAG",
+>>     inside = "TTCGATC",
+>>     closing = "CTGGT"
+>>     ),
+>>     "After Stem 3" = "",
+>>     "Stem 0 closing" = "TCGGGGC"
+>>    )
+>>
+>>
+>> I don't have any experience with programming a parser, and would like
+>> advices as to what strategy to use when programming something like this
+>> (and
+>> any recommended R commands to use).
+>>
+>>
+>> What I was thinking of is to first get rid of the "Stem 0", then go
+>> through
+>> the inner string with a recursive function (let's call it "seperate.stem")
+>> that each time will split the string into:
+>> 1. before stem
+>> 2. opening stem
+>> 3. inside stem
+>> 4. closing stem
+>> 5. after stem
+>>
+>> Where the "after stem" will then be recursively entered into the same
+>> function ("seperate.stem")
+>>
+>> The thing is that I am not sure how to try and do this coding without
+>> using
+>> a loop.
+>>
+>> Any advices will be most welcomed.
+>>
+>>
+>> ----------------Contact
+>> Details:-------------------------------------------------------
+>> Contact me: Tal.Galili at gmail.com |  972-52-7275845
+>> Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+>> www.r-statistics.com (English)
+>>
+>> ----------------------------------------------------------------------------------------------
+>>
+>>        [[alternative HTML version deleted]]
+>>
+>>
+>> ______________________________________________
+>> R-help at r-project.org mailing list
+>> https://stat.ethz.ch/mailman/listinfo/r-help
+>> PLEASE do read the posting guide
+>> http://www.R-project.org/posting-guide.html<http://www.r-project.org/posting-guide.html>
+>> and provide commented, minimal, self-contained, reproducible code.
+>>
+>
+>
+>
+> --
+> Jim Holtman
+> Cincinnati, OH
+> +1 513 646 9390
+>
+> What is the problem that you are trying to solve?
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100316/39d1bbdf/attachment.htm 
+
+From tal.galili at gmail.com  Tue Mar 16 17:00:54 2010
+From: tal.galili at gmail.com (Tal Galili)
+Date: Tue, 16 Mar 2010 18:00:54 +0200
+Subject: [Seqinr-forum] [R] How to parse a string (by a "new" markup)
+	with R ?
+In-Reply-To: <971536df1003160724g42e2c28dxc8b2cb9e5ffd4d52@mail.gmail.com>
+References: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com> 
+	<971536df1003160724g42e2c28dxc8b2cb9e5ffd4d52@mail.gmail.com>
+Message-ID: <440d7af41003160900i7e0eceebr2f572427b7d163e5@mail.gmail.com>
+
+Gabor,
+Thank you very very much!
+Your code consists of so many commands I never played with, both helpful and
+educational.
+
+Thanks!
+Tal
+
+----------------Contact
+Details:-------------------------------------------------------
+Contact me: Tal.Galili at gmail.com |  972-52-7275845
+Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+www.r-statistics.com (English)
+----------------------------------------------------------------------------------------------
+
+
+
+
+On Tue, Mar 16, 2010 at 4:24 PM, Gabor Grothendieck <ggrothendieck at gmail.com
+> wrote:
+
+> We show how to use the gsubfn package to parse this.
+>
+> The rules are not entirely clear so we will assume the following:
+>
+> - there is a fixed template for the output which is the same as your
+> output but possibly with different character strings filled in.  This
+> implies, for example, that there are exactly Stem0, Stem1, Stem2 and
+> Stem3 and no fewer or more stems.
+>
+> - the sequence always starts with the open of Stem0, at least one dot
+> and the open of Stem1.  There are no dots prior to the open of Stem0.
+> This seems to be implicit in your sample output since there is no zero
+> length string in your sample output corresponding to dots prior to
+> Stem0.
+>
+> - Stem0 closes with the same number of < as there are > to open it
+>
+> You can modify this yourself to take into account the actual rules
+> whatever they are.
+>
+> We first calculate, k, the number of leading >'s using strapply.
+>
+> Then we replace the leading k >'s with }'s and the trailing k <'s with
+> {'s giving us Str3:
+>
+>
+>  "}}}}}}}..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<{{{{{{{."
+>
+> We again use strapply, this time to get the lengths of the runs.  Note that
+> zero length runs are possible so we cannot, for example, use rle for this.
+>  For
+> example there is a zero length run of dots between the last < and the first
+> {.
+> read.fwf is used to actually parse out the strings using the lengths we
+> just
+> calculated.
+>
+> Finally we fill in the template using relist.
+>
+> # inputs
+>
+> Seq <-
+> "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA"
+> Str <-
+> ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<."
+> template <-
+>  list(
+>    "Stem 0 opening" = "",
+>    "before Stem 1" = "",
+>    "Stem 1" = list(opening = "",
+>    inside = "",
+>    closing = ""
+>    ),
+>    "between Stem 1 and 2" = "",
+>    "Stem 2" = list(opening = "",
+>    inside = "",
+>    closing = ""
+>    ),
+>    "between Stem 2 and 3" = "",
+>    "Stem 3" = list(opening = "",
+>    inside = "",
+>    closing = ""
+>     ),
+>    "After Stem 3" = "",
+>    "Stem 0 closing" = ""
+>    )
+>
+> # processing
+>
+> # create string made by repeating string s k times followed by more
+> reps <- function(s, k, more = "") {
+>        paste(paste(rep(s, k), collapse = ""), more, sep = "")
+> }
+>
+> library(gsubfn)
+> k <- nchar(strapply(Str, "^>+", c)[[1]])
+> Str2 <- sub("^>+", reps("}", k), Str)
+> Str3 <- sub(reps("<", k, "([^<]*)$"), reps("{", k, "\\1"), Str2)
+>
+> pat <-
+>
+> "^(}*)([.]*)(>*)([.]*)(<*)([.]*)(>*)([.]*)(<*)([.]*)(>*)([.]*)(<*)([.]*)({*)([.]*)$"
+> lens <- sapply(strapply(Str3, pat, c)[[1]], nchar)
+> tokens <- unlist(read.fwf(textConnection(Seq), lens, as.is = TRUE))
+> closeAllConnections()
+> tokens[is.na(tokens)] <- ""
+> out <- relist(tokens, template)
+> out
+>
+>
+> Here is the str of the output for your sample input:
+>
+> > str(out)
+> List of 9
+>  $ Stem 0 opening      : chr "GCCTCGA"
+>  $ before Stem 1       : chr "TA"
+>  $ Stem 1              :List of 3
+>  ..$ opening: chr "GCTC"
+>  ..$ inside : chr "AGTTGGGA"
+>  ..$ closing: chr "GAGC"
+>  $ between Stem 1 and 2: chr "G"
+>  $ Stem 2              :List of 3
+>  ..$ opening: chr "TACGA"
+>  ..$ inside : chr "CTGAAGA"
+>  ..$ closing: chr "TCGTA"
+>  $ between Stem 2 and 3: chr "AGGtC"
+>  $ Stem 3              :List of 3
+>  ..$ opening: chr "ACCAG"
+>  ..$ inside : chr "TTCGATC"
+>  ..$ closing: chr "CTGGT"
+>  $ After Stem 3        : chr ""
+>  $ Stem 0 closing      : chr "TCGGGGC"
+>
+>
+>
+> On Tue, Mar 16, 2010 at 6:10 AM, Tal Galili <tal.galili at gmail.com> wrote:
+> > Hello all,
+> >
+> > For some work I am doing on RNA, I want to use R to do string parsing
+> that
+> > (I think) is like a simplistic HTML parsing.
+> >
+> >
+> > For example, let's say we have the following two variables:
+> >
+> >    Seq <-
+> >
+> "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA"
+> >    Str <-
+> >
+> ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<."
+> >
+> > Say that I want to parse "Seq" According to "Str", by using the legend
+> here
+> >
+> > Seq:
+> GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA
+> > Str:
+> >>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<.
+> >
+> >     |     |  |              | |               |     |               ||
+>   |
+> >
+> >     +-----+  +--------------+ +---------------+
+> +---------------++-----+
+> >
+> >        |        Stem 1            Stem 2                 Stem 3         |
+> >
+> >        |                                                                |
+> >
+> >        +----------------------------------------------------------------+
+> >
+> >                                Stem 0
+> >
+> > Assume that we always have 4 stems (0 to 3), but that the length of
+> letters
+> > before and after each of them can very.
+> >
+> > The output should be something like the following list structure:
+> >
+> >
+> >    list(
+> >     "Stem 0 opening" = "GCCTCGA",
+> >     "before Stem 1" = "TA",
+> >     "Stem 1" = list(opening = "GCTC",
+> >     inside = "AGTTGGGA",
+> >     closing = "GAGC"
+> >     ),
+> >     "between Stem 1 and 2" = "G",
+> >     "Stem 2" = list(opening = "TACGA",
+> >     inside = "CTGAAGA",
+> >     closing = "TCGTA"
+> >     ),
+> >     "between Stem 2 and 3" = "AGGtC",
+> >     "Stem 3" = list(opening = "ACCAG",
+> >     inside = "TTCGATC",
+> >     closing = "CTGGT"
+> >     ),
+> >     "After Stem 3" = "",
+> >     "Stem 0 closing" = "TCGGGGC"
+> >    )
+> >
+> >
+> > I don't have any experience with programming a parser, and would like
+> > advices as to what strategy to use when programming something like this
+> (and
+> > any recommended R commands to use).
+> >
+> >
+> > What I was thinking of is to first get rid of the "Stem 0", then go
+> through
+> > the inner string with a recursive function (let's call it
+> "seperate.stem")
+> > that each time will split the string into:
+> > 1. before stem
+> > 2. opening stem
+> > 3. inside stem
+> > 4. closing stem
+> > 5. after stem
+> >
+> > Where the "after stem" will then be recursively entered into the same
+> > function ("seperate.stem")
+> >
+> > The thing is that I am not sure how to try and do this coding without
+> using
+> > a loop.
+> >
+> > Any advices will be most welcomed.
+> >
+> >
+> > ----------------Contact
+> > Details:-------------------------------------------------------
+> > Contact me: Tal.Galili at gmail.com |  972-52-7275845
+> > Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+> > www.r-statistics.com (English)
+> >
+> ----------------------------------------------------------------------------------------------
+> >
+> >        [[alternative HTML version deleted]]
+> >
+> > ______________________________________________
+> > R-help at r-project.org mailing list
+> > https://stat.ethz.ch/mailman/listinfo/r-help
+> > PLEASE do read the posting guide
+> http://www.R-project.org/posting-guide.html
+> > and provide commented, minimal, self-contained, reproducible code.
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100316/b1f0e508/attachment-0001.htm 
+
+From jholtman at gmail.com  Tue Mar 16 12:59:06 2010
+From: jholtman at gmail.com (jim holtman)
+Date: Tue, 16 Mar 2010 07:59:06 -0400
+Subject: [Seqinr-forum] [R] How to parse a string (by a "new" markup)
+	with R ?
+In-Reply-To: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com>
+References: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com>
+Message-ID: <644e1f321003160459i37fbf5f0i1373c7d194f8bf13@mail.gmail.com>
+
+How are you supposed to interprete the string that is doing the parsing?
+Does each sequence have the same number of ">>>>" for the opening sequence
+as it does for "<<<<" on the ending sequence?  That what it appears to be
+looking at the way stem 3 is parsed.  You will have to provide a little more
+insight on how to interprete the  symbols.  Does the parsing always start
+with a partial stem 0 as your example shows?  Is there a way of making sure
+you have the right sequences when you start?  Is there a chance of error in
+the middle of the string that you have to restart from?  How long are these
+strings that you want to parse?  Is each one a self contained sequence like
+you show in your example, or do they go on for thousands of characters?  Is
+there always at least one '.' between stems?  A full set of rules as to how
+the parsing should be done would be useful.  Do you have the BNF syntax for
+parsing?
+
+On Tue, Mar 16, 2010 at 6:10 AM, Tal Galili <tal.galili at gmail.com> wrote:
+
+> Hello all,
+>
+> For some work I am doing on RNA, I want to use R to do string parsing that
+> (I think) is like a simplistic HTML parsing.
+>
+>
+> For example, let's say we have the following two variables:
+>
+>    Seq <-
+> "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA"
+>    Str <-
+> ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<."
+>
+> Say that I want to parse "Seq" According to "Str", by using the legend here
+>
+> Seq:
+> GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA
+> Str:
+> >>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<.
+>
+>     |     |  |              | |               |     |               ||
+> |
+>
+>     +-----+  +--------------+ +---------------+
+> +---------------++-----+
+>
+>        |        Stem 1            Stem 2                 Stem 3         |
+>
+>        |                                                                |
+>
+>        +----------------------------------------------------------------+
+>
+>                                Stem 0
+>
+> Assume that we always have 4 stems (0 to 3), but that the length of letters
+> before and after each of them can very.
+>
+> The output should be something like the following list structure:
+>
+>
+>    list(
+>     "Stem 0 opening" = "GCCTCGA",
+>     "before Stem 1" = "TA",
+>     "Stem 1" = list(opening = "GCTC",
+>     inside = "AGTTGGGA",
+>     closing = "GAGC"
+>     ),
+>     "between Stem 1 and 2" = "G",
+>     "Stem 2" = list(opening = "TACGA",
+>     inside = "CTGAAGA",
+>     closing = "TCGTA"
+>     ),
+>     "between Stem 2 and 3" = "AGGtC",
+>     "Stem 3" = list(opening = "ACCAG",
+>     inside = "TTCGATC",
+>     closing = "CTGGT"
+>     ),
+>     "After Stem 3" = "",
+>     "Stem 0 closing" = "TCGGGGC"
+>    )
+>
+>
+> I don't have any experience with programming a parser, and would like
+> advices as to what strategy to use when programming something like this
+> (and
+> any recommended R commands to use).
+>
+>
+> What I was thinking of is to first get rid of the "Stem 0", then go through
+> the inner string with a recursive function (let's call it "seperate.stem")
+> that each time will split the string into:
+> 1. before stem
+> 2. opening stem
+> 3. inside stem
+> 4. closing stem
+> 5. after stem
+>
+> Where the "after stem" will then be recursively entered into the same
+> function ("seperate.stem")
+>
+> The thing is that I am not sure how to try and do this coding without using
+> a loop.
+>
+> Any advices will be most welcomed.
+>
+>
+> ----------------Contact
+> Details:-------------------------------------------------------
+> Contact me: Tal.Galili at gmail.com |  972-52-7275845
+> Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+> www.r-statistics.com (English)
+>
+> ----------------------------------------------------------------------------------------------
+>
+>        [[alternative HTML version deleted]]
+>
+> ______________________________________________
+> R-help at r-project.org mailing list
+> https://stat.ethz.ch/mailman/listinfo/r-help
+> PLEASE do read the posting guide
+> http://www.R-project.org/posting-guide.html<http://www.r-project.org/posting-guide.html>
+> and provide commented, minimal, self-contained, reproducible code.
+>
+
+
+
+-- 
+Jim Holtman
+Cincinnati, OH
++1 513 646 9390
+
+What is the problem that you are trying to solve?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100316/005595db/attachment.htm 
+
+From ggrothendieck at gmail.com  Tue Mar 16 15:24:17 2010
+From: ggrothendieck at gmail.com (Gabor Grothendieck)
+Date: Tue, 16 Mar 2010 10:24:17 -0400
+Subject: [Seqinr-forum] [R] How to parse a string (by a "new" markup)
+	with R ?
+In-Reply-To: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com>
+References: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com>
+Message-ID: <971536df1003160724g42e2c28dxc8b2cb9e5ffd4d52@mail.gmail.com>
+
+We show how to use the gsubfn package to parse this.
+
+The rules are not entirely clear so we will assume the following:
+
+- there is a fixed template for the output which is the same as your
+output but possibly with different character strings filled in.  This
+implies, for example, that there are exactly Stem0, Stem1, Stem2 and
+Stem3 and no fewer or more stems.
+
+- the sequence always starts with the open of Stem0, at least one dot
+and the open of Stem1.  There are no dots prior to the open of Stem0.
+This seems to be implicit in your sample output since there is no zero
+length string in your sample output corresponding to dots prior to
+Stem0.
+
+- Stem0 closes with the same number of < as there are > to open it
+
+You can modify this yourself to take into account the actual rules
+whatever they are.
+
+We first calculate, k, the number of leading >'s using strapply.
+
+Then we replace the leading k >'s with }'s and the trailing k <'s with
+{'s giving us Str3:
+
+ "}}}}}}}..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<{{{{{{{."
+
+We again use strapply, this time to get the lengths of the runs.  Note that
+zero length runs are possible so we cannot, for example, use rle for this.  For
+example there is a zero length run of dots between the last < and the first {.
+read.fwf is used to actually parse out the strings using the lengths we just
+calculated.
+
+Finally we fill in the template using relist.
+
+# inputs
+
+Seq <-
+"GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA"
+Str <-
+">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<."
+template <-
+  list(
+    "Stem 0 opening" = "",
+    "before Stem 1" = "",
+    "Stem 1" = list(opening = "",
+    inside = "",
+    closing = ""
+    ),
+    "between Stem 1 and 2" = "",
+    "Stem 2" = list(opening = "",
+    inside = "",
+    closing = ""
+    ),
+    "between Stem 2 and 3" = "",
+    "Stem 3" = list(opening = "",
+    inside = "",
+    closing = ""
+    ),
+    "After Stem 3" = "",
+    "Stem 0 closing" = ""
+   )
+
+# processing
+
+# create string made by repeating string s k times followed by more
+reps <- function(s, k, more = "") {
+	paste(paste(rep(s, k), collapse = ""), more, sep = "")
+}
+
+library(gsubfn)
+k <- nchar(strapply(Str, "^>+", c)[[1]])
+Str2 <- sub("^>+", reps("}", k), Str)
+Str3 <- sub(reps("<", k, "([^<]*)$"), reps("{", k, "\\1"), Str2)
+
+pat <-
+"^(}*)([.]*)(>*)([.]*)(<*)([.]*)(>*)([.]*)(<*)([.]*)(>*)([.]*)(<*)([.]*)({*)([.]*)$"
+lens <- sapply(strapply(Str3, pat, c)[[1]], nchar)
+tokens <- unlist(read.fwf(textConnection(Seq), lens, as.is = TRUE))
+closeAllConnections()
+tokens[is.na(tokens)] <- ""
+out <- relist(tokens, template)
+out
+
+
+Here is the str of the output for your sample input:
+
+> str(out)
+List of 9
+ $ Stem 0 opening      : chr "GCCTCGA"
+ $ before Stem 1       : chr "TA"
+ $ Stem 1              :List of 3
+  ..$ opening: chr "GCTC"
+  ..$ inside : chr "AGTTGGGA"
+  ..$ closing: chr "GAGC"
+ $ between Stem 1 and 2: chr "G"
+ $ Stem 2              :List of 3
+  ..$ opening: chr "TACGA"
+  ..$ inside : chr "CTGAAGA"
+  ..$ closing: chr "TCGTA"
+ $ between Stem 2 and 3: chr "AGGtC"
+ $ Stem 3              :List of 3
+  ..$ opening: chr "ACCAG"
+  ..$ inside : chr "TTCGATC"
+  ..$ closing: chr "CTGGT"
+ $ After Stem 3        : chr ""
+ $ Stem 0 closing      : chr "TCGGGGC"
+
+
+
+On Tue, Mar 16, 2010 at 6:10 AM, Tal Galili <tal.galili at gmail.com> wrote:
+> Hello all,
+>
+> For some work I am doing on RNA, I want to use R to do string parsing that
+> (I think) is like a simplistic HTML parsing.
+>
+>
+> For example, let's say we have the following two variables:
+>
+> ? ?Seq <-
+> "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA"
+> ? ?Str <-
+> ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<."
+>
+> Say that I want to parse "Seq" According to "Str", by using the legend here
+>
+> Seq: GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGGCA
+> Str: >>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<<.
+>
+> ? ? | ? ? | ?| ? ? ? ? ? ? ?| | ? ? ? ? ? ? ? | ? ? | ? ? ? ? ? ? ? || ? ? |
+>
+> ? ? +-----+ ?+--------------+ +---------------+ ? ? +---------------++-----+
+>
+> ? ? ? ?| ? ? ? ?Stem 1 ? ? ? ? ? ?Stem 2 ? ? ? ? ? ? ? ? Stem 3 ? ? ? ? |
+>
+> ? ? ? ?| ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?|
+>
+> ? ? ? ?+----------------------------------------------------------------+
+>
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Stem 0
+>
+> Assume that we always have 4 stems (0 to 3), but that the length of letters
+> before and after each of them can very.
+>
+> The output should be something like the following list structure:
+>
+>
+> ? ?list(
+> ? ? "Stem 0 opening" = "GCCTCGA",
+> ? ? "before Stem 1" = "TA",
+> ? ? "Stem 1" = list(opening = "GCTC",
+> ? ? inside = "AGTTGGGA",
+> ? ? closing = "GAGC"
+> ? ? ),
+> ? ? "between Stem 1 and 2" = "G",
+> ? ? "Stem 2" = list(opening = "TACGA",
+> ? ? inside = "CTGAAGA",
+> ? ? closing = "TCGTA"
+> ? ? ),
+> ? ? "between Stem 2 and 3" = "AGGtC",
+> ? ? "Stem 3" = list(opening = "ACCAG",
+> ? ? inside = "TTCGATC",
+> ? ? closing = "CTGGT"
+> ? ? ),
+> ? ? "After Stem 3" = "",
+> ? ? "Stem 0 closing" = "TCGGGGC"
+> ? ?)
+>
+>
+> I don't have any experience with programming a parser, and would like
+> advices as to what strategy to use when programming something like this (and
+> any recommended R commands to use).
+>
+>
+> What I was thinking of is to first get rid of the "Stem 0", then go through
+> the inner string with a recursive function (let's call it "seperate.stem")
+> that each time will split the string into:
+> 1. before stem
+> 2. opening stem
+> 3. inside stem
+> 4. closing stem
+> 5. after stem
+>
+> Where the "after stem" will then be recursively entered into the same
+> function ("seperate.stem")
+>
+> The thing is that I am not sure how to try and do this coding without using
+> a loop.
+>
+> Any advices will be most welcomed.
+>
+>
+> ----------------Contact
+> Details:-------------------------------------------------------
+> Contact me: Tal.Galili at gmail.com | ?972-52-7275845
+> Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+> www.r-statistics.com (English)
+> ----------------------------------------------------------------------------------------------
+>
+> ? ? ? ?[[alternative HTML version deleted]]
+>
+> ______________________________________________
+> R-help at r-project.org mailing list
+> https://stat.ethz.ch/mailman/listinfo/r-help
+> PLEASE do read the posting guide http://www.R-project.org/posting-guide.html
+> and provide commented, minimal, self-contained, reproducible code.
+>
+
+From Andrej.Blejec at nib.si  Tue Mar 16 23:34:31 2010
+From: Andrej.Blejec at nib.si (Andrej Blejec)
+Date: Tue, 16 Mar 2010 23:34:31 +0100
+Subject: [Seqinr-forum] [R] How to parse a string (by a "new" markup)
+	with R ?
+In-Reply-To: <971536df1003160724g42e2c28dxc8b2cb9e5ffd4d52@mail.gmail.com>
+References: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com>
+	<971536df1003160724g42e2c28dxc8b2cb9e5ffd4d52@mail.gmail.com>
+Message-ID: <949B5DA4A23A044A98917931F2495BB901C9A61F@SRVLJ01.nib.sql>
+
+A version using regular expressions, lot of regexpr() and substr() functions is attached.
+Finally everything is packed into splitSeq() function
+ 
+Andrej
+
+--
+Andrej Blejec
+National Institute of Biology
+Vecna pot 111 POB 141
+SI-1000 Ljubljana
+SLOVENIA
+e-mail: andrej.blejec at nib.si
+URL: http://ablejec.nib.si 
+tel: + 386 (0)59 232 789
+fax: + 386 1 241 29 80
+--------------------------
+Local Organizer of ICOTS-8
+International Conference on Teaching Statistics 
+http://icots8.org
+
+
+
+> -----Original Message-----
+> From: r-help-bounces at r-project.org [mailto:r-help-bounces at r-
+> project.org] On Behalf Of Gabor Grothendieck
+> Sent: Tuesday, March 16, 2010 3:24 PM
+> To: Tal Galili
+> Cc: r-help at r-project.org; seqinr-forum at r-forge.wu-wien.ac.at
+> Subject: Re: [R] How to parse a string (by a "new" markup) with R ?
+> 
+> We show how to use the gsubfn package to parse this.
+> 
+> The rules are not entirely clear so we will assume the following:
+> 
+> - there is a fixed template for the output which is the same as your
+> output but possibly with different character strings filled in.  This
+> implies, for example, that there are exactly Stem0, Stem1, Stem2 and
+> Stem3 and no fewer or more stems.
+> 
+> - the sequence always starts with the open of Stem0, at least one dot
+> and the open of Stem1.  There are no dots prior to the open of Stem0.
+> This seems to be implicit in your sample output since there is no zero
+> length string in your sample output corresponding to dots prior to
+> Stem0.
+> 
+> - Stem0 closes with the same number of < as there are > to open it
+> 
+> You can modify this yourself to take into account the actual rules
+> whatever they are.
+> 
+> We first calculate, k, the number of leading >'s using strapply.
+> 
+> Then we replace the leading k >'s with }'s and the trailing k <'s with
+> {'s giving us Str3:
+> 
+> 
+> "}}}}}}}..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<{{{{{
+> {{."
+> 
+> We again use strapply, this time to get the lengths of the runs.  Note
+> that
+> zero length runs are possible so we cannot, for example, use rle for
+> this.  For
+> example there is a zero length run of dots between the last < and the
+> first {.
+> read.fwf is used to actually parse out the strings using the lengths we
+> just
+> calculated.
+> 
+> Finally we fill in the template using relist.
+> 
+> # inputs
+> 
+> Seq <-
+> "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGG
+> GCA"
+> Str <-
+> ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<
+> <<."
+> template <-
+>   list(
+>     "Stem 0 opening" = "",
+>     "before Stem 1" = "",
+>     "Stem 1" = list(opening = "",
+>     inside = "",
+>     closing = ""
+>     ),
+>     "between Stem 1 and 2" = "",
+>     "Stem 2" = list(opening = "",
+>     inside = "",
+>     closing = ""
+>     ),
+>     "between Stem 2 and 3" = "",
+>     "Stem 3" = list(opening = "",
+>     inside = "",
+>     closing = ""
+>     ),
+>     "After Stem 3" = "",
+>     "Stem 0 closing" = ""
+>    )
+> 
+> # processing
+> 
+> # create string made by repeating string s k times followed by more
+> reps <- function(s, k, more = "") {
+> 	paste(paste(rep(s, k), collapse = ""), more, sep = "")
+> }
+> 
+> library(gsubfn)
+> k <- nchar(strapply(Str, "^>+", c)[[1]])
+> Str2 <- sub("^>+", reps("}", k), Str)
+> Str3 <- sub(reps("<", k, "([^<]*)$"), reps("{", k, "\\1"), Str2)
+> 
+> pat <-
+> "^(}*)([.]*)(>*)([.]*)(<*)([.]*)(>*)([.]*)(<*)([.]*)(>*)([.]*)(<*)([.]*
+> )({*)([.]*)$"
+> lens <- sapply(strapply(Str3, pat, c)[[1]], nchar)
+> tokens <- unlist(read.fwf(textConnection(Seq), lens, as.is = TRUE))
+> closeAllConnections()
+> tokens[is.na(tokens)] <- ""
+> out <- relist(tokens, template)
+> out
+> 
+> 
+> Here is the str of the output for your sample input:
+> 
+> > str(out)
+> List of 9
+>  $ Stem 0 opening      : chr "GCCTCGA"
+>  $ before Stem 1       : chr "TA"
+>  $ Stem 1              :List of 3
+>   ..$ opening: chr "GCTC"
+>   ..$ inside : chr "AGTTGGGA"
+>   ..$ closing: chr "GAGC"
+>  $ between Stem 1 and 2: chr "G"
+>  $ Stem 2              :List of 3
+>   ..$ opening: chr "TACGA"
+>   ..$ inside : chr "CTGAAGA"
+>   ..$ closing: chr "TCGTA"
+>  $ between Stem 2 and 3: chr "AGGtC"
+>  $ Stem 3              :List of 3
+>   ..$ opening: chr "ACCAG"
+>   ..$ inside : chr "TTCGATC"
+>   ..$ closing: chr "CTGGT"
+>  $ After Stem 3        : chr ""
+>  $ Stem 0 closing      : chr "TCGGGGC"
+> 
+> 
+> 
+> On Tue, Mar 16, 2010 at 6:10 AM, Tal Galili <tal.galili at gmail.com>
+> wrote:
+> > Hello all,
+> >
+> > For some work I am doing on RNA, I want to use R to do string parsing
+> that
+> > (I think) is like a simplistic HTML parsing.
+> >
+> >
+> > For example, let's say we have the following two variables:
+> >
+> > ? ?Seq <-
+> >
+> "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGG
+> GCA"
+> > ? ?Str <-
+> >
+> ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<
+> <<."
+> >
+> > Say that I want to parse "Seq" According to "Str", by using the
+> legend here
+> >
+> > Seq:
+> GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGG
+> CA
+> > Str:
+> >>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<
+> <.
+> >
+> > ? ? | ? ? | ?| ? ? ? ? ? ? ?| | ? ? ? ? ? ? ? | ? ? |
+> || ? ? |
+> >
+> > ? ? +-----+ ?+--------------+ +---------------+ ? ? +---------------
+> ++-----+
+> >
+> > ? ? ? ?| ? ? ? ?Stem 1 ? ? ? ? ? ?Stem 2 ? ? ? ? ? ? ? ? Stem 3
+> ? |
+> >
+> > ? ? ? ?|
+> ? ?|
+> >
+> > ? ? ? ?+-------------------------------------------------------------
+> ---+
+> >
+> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Stem 0
+> >
+> > Assume that we always have 4 stems (0 to 3), but that the length of
+> letters
+> > before and after each of them can very.
+> >
+> > The output should be something like the following list structure:
+> >
+> >
+> > ? ?list(
+> > ? ? "Stem 0 opening" = "GCCTCGA",
+> > ? ? "before Stem 1" = "TA",
+> > ? ? "Stem 1" = list(opening = "GCTC",
+> > ? ? inside = "AGTTGGGA",
+> > ? ? closing = "GAGC"
+> > ? ? ),
+> > ? ? "between Stem 1 and 2" = "G",
+> > ? ? "Stem 2" = list(opening = "TACGA",
+> > ? ? inside = "CTGAAGA",
+> > ? ? closing = "TCGTA"
+> > ? ? ),
+> > ? ? "between Stem 2 and 3" = "AGGtC",
+> > ? ? "Stem 3" = list(opening = "ACCAG",
+> > ? ? inside = "TTCGATC",
+> > ? ? closing = "CTGGT"
+> > ? ? ),
+> > ? ? "After Stem 3" = "",
+> > ? ? "Stem 0 closing" = "TCGGGGC"
+> > ? ?)
+> >
+> >
+> > I don't have any experience with programming a parser, and would like
+> > advices as to what strategy to use when programming something like
+> this (and
+> > any recommended R commands to use).
+> >
+> >
+> > What I was thinking of is to first get rid of the "Stem 0", then go
+> through
+> > the inner string with a recursive function (let's call it
+> "seperate.stem")
+> > that each time will split the string into:
+> > 1. before stem
+> > 2. opening stem
+> > 3. inside stem
+> > 4. closing stem
+> > 5. after stem
+> >
+> > Where the "after stem" will then be recursively entered into the same
+> > function ("seperate.stem")
+> >
+> > The thing is that I am not sure how to try and do this coding without
+> using
+> > a loop.
+> >
+> > Any advices will be most welcomed.
+> >
+> >
+> > ----------------Contact
+> > Details:-------------------------------------------------------
+> > Contact me: Tal.Galili at gmail.com | ?972-52-7275845
+> > Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il
+> (Hebrew) |
+> > www.r-statistics.com (English)
+> > ---------------------------------------------------------------------
+> -------------------------
+> >
+> > ? ? ? ?[[alternative HTML version deleted]]
+> >
+> > ______________________________________________
+> > R-help at r-project.org mailing list
+> > https://stat.ethz.ch/mailman/listinfo/r-help
+> > PLEASE do read the posting guide http://www.R-project.org/posting-
+> guide.html
+> > and provide commented, minimal, self-contained, reproducible code.
+> >
+> 
+> ______________________________________________
+> R-help at r-project.org mailing list
+> https://stat.ethz.ch/mailman/listinfo/r-help
+> PLEASE do read the posting guide http://www.R-project.org/posting-
+> guide.html
+> and provide commented, minimal, self-contained, reproducible code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: parsingRNA.pdf
+Type: application/octet-stream
+Size: 115065 bytes
+Desc: parsingRNA.pdf
+Url : http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100316/2d7c77a7/attachment-0002.obj 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: parsingRNA.R
+Type: application/octet-stream
+Size: 6847 bytes
+Desc: parsingRNA.R
+Url : http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100316/2d7c77a7/attachment-0003.obj 
+
+From lsviriato at gmail.com  Wed Mar 17 09:53:42 2010
+From: lsviriato at gmail.com (luis viriato)
+Date: Wed, 17 Mar 2010 08:53:42 +0000
+Subject: [Seqinr-forum] Using abif files
+Message-ID: <90bbbefc1003170153v407b72a1w854818bb378f8bb3@mail.gmail.com>
+
+When using the package, functions like "read.abif" or "jlo" aren?t
+recognized and they do not existe in the help file but they are presente in
+the package reference manual.
+Anyone can help?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100317/17c79ebe/attachment.htm 
+
+From tal.galili at gmail.com  Wed Mar 17 10:31:44 2010
+From: tal.galili at gmail.com (Tal Galili)
+Date: Wed, 17 Mar 2010 11:31:44 +0200
+Subject: [Seqinr-forum] [R] How to parse a string (by a "new" markup)
+	with R ?
+In-Reply-To: <949B5DA4A23A044A98917931F2495BB901C9A61F@SRVLJ01.nib.sql>
+References: <440d7af41003160310n2a7b722t1f942b6c263ca8a6@mail.gmail.com> 
+	<971536df1003160724g42e2c28dxc8b2cb9e5ffd4d52@mail.gmail.com> 
+	<949B5DA4A23A044A98917931F2495BB901C9A61F@SRVLJ01.nib.sql>
+Message-ID: <440d7af41003170231u6c3e845cu59b107baea786ac3@mail.gmail.com>
+
+Wow, Thank you very much Andrej!
+
+Tal
+
+----------------Contact
+Details:-------------------------------------------------------
+Contact me: Tal.Galili at gmail.com |  972-52-7275845
+Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il (Hebrew) |
+www.r-statistics.com (English)
+----------------------------------------------------------------------------------------------
+
+
+
+
+2010/3/17 Andrej Blejec <Andrej.Blejec at nib.si>
+
+> A version using regular expressions, lot of regexpr() and substr()
+> functions is attached.
+> Finally everything is packed into splitSeq() function
+>
+> Andrej
+>
+> --
+> Andrej Blejec
+> National Institute of Biology
+> Vecna pot 111 POB 141
+> SI-1000 Ljubljana
+> SLOVENIA
+> e-mail: andrej.blejec at nib.si
+> URL: http://ablejec.nib.si
+> tel: + 386 (0)59 232 789
+> fax: + 386 1 241 29 80
+> --------------------------
+> Local Organizer of ICOTS-8
+> International Conference on Teaching Statistics
+> http://icots8.org
+>
+>
+>
+> > -----Original Message-----
+> > From: r-help-bounces at r-project.org [mailto:r-help-bounces at r-
+> > project.org] On Behalf Of Gabor Grothendieck
+> > Sent: Tuesday, March 16, 2010 3:24 PM
+> > To: Tal Galili
+> > Cc: r-help at r-project.org; seqinr-forum at r-forge.wu-wien.ac.at
+> > Subject: Re: [R] How to parse a string (by a "new" markup) with R ?
+> >
+> > We show how to use the gsubfn package to parse this.
+> >
+> > The rules are not entirely clear so we will assume the following:
+> >
+> > - there is a fixed template for the output which is the same as your
+> > output but possibly with different character strings filled in.  This
+> > implies, for example, that there are exactly Stem0, Stem1, Stem2 and
+> > Stem3 and no fewer or more stems.
+> >
+> > - the sequence always starts with the open of Stem0, at least one dot
+> > and the open of Stem1.  There are no dots prior to the open of Stem0.
+> > This seems to be implicit in your sample output since there is no zero
+> > length string in your sample output corresponding to dots prior to
+> > Stem0.
+> >
+> > - Stem0 closes with the same number of < as there are > to open it
+> >
+> > You can modify this yourself to take into account the actual rules
+> > whatever they are.
+> >
+> > We first calculate, k, the number of leading >'s using strapply.
+> >
+> > Then we replace the leading k >'s with }'s and the trailing k <'s with
+> > {'s giving us Str3:
+> >
+> >
+> > "}}}}}}}..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<{{{{{
+> > {{."
+> >
+> > We again use strapply, this time to get the lengths of the runs.  Note
+> > that
+> > zero length runs are possible so we cannot, for example, use rle for
+> > this.  For
+> > example there is a zero length run of dots between the last < and the
+> > first {.
+> > read.fwf is used to actually parse out the strings using the lengths we
+> > just
+> > calculated.
+> >
+> > Finally we fill in the template using relist.
+> >
+> > # inputs
+> >
+> > Seq <-
+> > "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGG
+> > GCA"
+> > Str <-
+> > ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<
+> > <<."
+> > template <-
+> >   list(
+> >     "Stem 0 opening" = "",
+> >     "before Stem 1" = "",
+> >     "Stem 1" = list(opening = "",
+> >     inside = "",
+> >     closing = ""
+> >     ),
+> >     "between Stem 1 and 2" = "",
+> >     "Stem 2" = list(opening = "",
+> >     inside = "",
+> >     closing = ""
+> >     ),
+> >     "between Stem 2 and 3" = "",
+> >     "Stem 3" = list(opening = "",
+> >     inside = "",
+> >     closing = ""
+> >     ),
+> >     "After Stem 3" = "",
+> >     "Stem 0 closing" = ""
+> >    )
+> >
+> > # processing
+> >
+> > # create string made by repeating string s k times followed by more
+> > reps <- function(s, k, more = "") {
+> >       paste(paste(rep(s, k), collapse = ""), more, sep = "")
+> > }
+> >
+> > library(gsubfn)
+> > k <- nchar(strapply(Str, "^>+", c)[[1]])
+> > Str2 <- sub("^>+", reps("}", k), Str)
+> > Str3 <- sub(reps("<", k, "([^<]*)$"), reps("{", k, "\\1"), Str2)
+> >
+> > pat <-
+> > "^(}*)([.]*)(>*)([.]*)(<*)([.]*)(>*)([.]*)(<*)([.]*)(>*)([.]*)(<*)([.]*
+> > )({*)([.]*)$"
+> > lens <- sapply(strapply(Str3, pat, c)[[1]], nchar)
+> > tokens <- unlist(read.fwf(textConnection(Seq), lens, as.is = TRUE))
+> > closeAllConnections()
+> > tokens[is.na(tokens)] <- ""
+> > out <- relist(tokens, template)
+> > out
+> >
+> >
+> > Here is the str of the output for your sample input:
+> >
+> > > str(out)
+> > List of 9
+> >  $ Stem 0 opening      : chr "GCCTCGA"
+> >  $ before Stem 1       : chr "TA"
+> >  $ Stem 1              :List of 3
+> >   ..$ opening: chr "GCTC"
+> >   ..$ inside : chr "AGTTGGGA"
+> >   ..$ closing: chr "GAGC"
+> >  $ between Stem 1 and 2: chr "G"
+> >  $ Stem 2              :List of 3
+> >   ..$ opening: chr "TACGA"
+> >   ..$ inside : chr "CTGAAGA"
+> >   ..$ closing: chr "TCGTA"
+> >  $ between Stem 2 and 3: chr "AGGtC"
+> >  $ Stem 3              :List of 3
+> >   ..$ opening: chr "ACCAG"
+> >   ..$ inside : chr "TTCGATC"
+> >   ..$ closing: chr "CTGGT"
+> >  $ After Stem 3        : chr ""
+> >  $ Stem 0 closing      : chr "TCGGGGC"
+> >
+> >
+> >
+> > On Tue, Mar 16, 2010 at 6:10 AM, Tal Galili <tal.galili at gmail.com>
+> > wrote:
+> > > Hello all,
+> > >
+> > > For some work I am doing on RNA, I want to use R to do string parsing
+> > that
+> > > (I think) is like a simplistic HTML parsing.
+> > >
+> > >
+> > > For example, let's say we have the following two variables:
+> > >
+> > >    Seq <-
+> > >
+> > "GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGG
+> > GCA"
+> > >    Str <-
+> > >
+> > ">>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<
+> > <<."
+> > >
+> > > Say that I want to parse "Seq" According to "Str", by using the
+> > legend here
+> > >
+> > > Seq:
+> > GCCTCGATAGCTCAGTTGGGAGAGCGTACGACTGAAGATCGTAAGGtCACCAGTTCGATCCTGGTTCGGGG
+> > CA
+> > > Str:
+> > >>>>>>>..>>>>........<<<<.>>>>>.......<<<<<.....>>>>>.......<<<<<<<<<<<
+> > <.
+> > >
+> > >     |     |  |              | |               |     |
+> > ||     |
+> > >
+> > >     +-----+  +--------------+ +---------------+     +---------------
+> > ++-----+
+> > >
+> > >        |        Stem 1            Stem 2                 Stem 3
+> >   |
+> > >
+> > >        |
+> >    |
+> > >
+> > >        +-------------------------------------------------------------
+> > ---+
+> > >
+> > >                                Stem 0
+> > >
+> > > Assume that we always have 4 stems (0 to 3), but that the length of
+> > letters
+> > > before and after each of them can very.
+> > >
+> > > The output should be something like the following list structure:
+> > >
+> > >
+> > >    list(
+> > >     "Stem 0 opening" = "GCCTCGA",
+> > >     "before Stem 1" = "TA",
+> > >     "Stem 1" = list(opening = "GCTC",
+> > >     inside = "AGTTGGGA",
+> > >     closing = "GAGC"
+> > >     ),
+> > >     "between Stem 1 and 2" = "G",
+> > >     "Stem 2" = list(opening = "TACGA",
+> > >     inside = "CTGAAGA",
+> > >     closing = "TCGTA"
+> > >     ),
+> > >     "between Stem 2 and 3" = "AGGtC",
+> > >     "Stem 3" = list(opening = "ACCAG",
+> > >     inside = "TTCGATC",
+> > >     closing = "CTGGT"
+> > >     ),
+> > >     "After Stem 3" = "",
+> > >     "Stem 0 closing" = "TCGGGGC"
+> > >    )
+> > >
+> > >
+> > > I don't have any experience with programming a parser, and would like
+> > > advices as to what strategy to use when programming something like
+> > this (and
+> > > any recommended R commands to use).
+> > >
+> > >
+> > > What I was thinking of is to first get rid of the "Stem 0", then go
+> > through
+> > > the inner string with a recursive function (let's call it
+> > "seperate.stem")
+> > > that each time will split the string into:
+> > > 1. before stem
+> > > 2. opening stem
+> > > 3. inside stem
+> > > 4. closing stem
+> > > 5. after stem
+> > >
+> > > Where the "after stem" will then be recursively entered into the same
+> > > function ("seperate.stem")
+> > >
+> > > The thing is that I am not sure how to try and do this coding without
+> > using
+> > > a loop.
+> > >
+> > > Any advices will be most welcomed.
+> > >
+> > >
+> > > ----------------Contact
+> > > Details:-------------------------------------------------------
+> > > Contact me: Tal.Galili at gmail.com |  972-52-7275845
+> > > Read me: www.talgalili.com (Hebrew) | www.biostatistics.co.il
+> > (Hebrew) |
+> > > www.r-statistics.com (English)
+> > > ---------------------------------------------------------------------
+> > -------------------------
+> > >
+> > >        [[alternative HTML version deleted]]
+> > >
+> > > ______________________________________________
+> > > R-help at r-project.org mailing list
+> > > https://stat.ethz.ch/mailman/listinfo/r-help
+> > > PLEASE do read the posting guide http://www.R-project.org/posting-
+> > guide.html
+> > > and provide commented, minimal, self-contained, reproducible code.
+> > >
+> >
+> > ______________________________________________
+> > R-help at r-project.org mailing list
+> > https://stat.ethz.ch/mailman/listinfo/r-help
+> > PLEASE do read the posting guide http://www.R-project.org/posting-
+> > guide.html
+> > and provide commented, minimal, self-contained, reproducible code.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/seqinr-forum/attachments/20100317/ecc1dbce/attachment.htm 
+
+From A.Coghlan at ucc.ie  Wed Mar 17 18:25:00 2010
+From: A.Coghlan at ucc.ie (Coghlan, Avril)
+Date: Wed, 17 Mar 2010 17:25:00 -0000
+Subject: [Seqinr-forum] inconsistent behaviour of the getAnnot() function
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+	<4B9A7F9B.2030901@biomserv.univ-lyon1.fr> 
+Message-ID: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B62A1B@EXCH1.central.ad.ucc.ie>
+
+Dear all,
+
+I've been using the getAnnot() function to retrieve annotations for
+UniProt sequences.
+
+For each query, I've been asking for a set of UniProt sequences. I've
+then been retrieving the annotations for each set of sequences using
+getAnnot().
+
+I noticed that usually getAnnot() returns the annotations for a set of
+sequences in the form of a list variable, where each element of the list
+variable is a vector containing the annotations for a particular
+sequence.
+
+However, sometimes getAnnot() returns the annotations for a set of
+sequences in the form of a matrix variable, where each column of the
+matrix variable contains the annotations for one sequence.  
+
+I've included the R code for two examples below, one where getAnnot()
+returns the annotations in a matrix variable (Example 1 below), and one
+where getAnnot() returns the annotations in a list variable (Example 2
+below). 
+
+I am a bit confused why getAnnot() does not always return the
+annotations in the same sort of data structure (eg. always as a list
+variable).
+I'm wondering could this possibly be due to a bug in getAnnot()?
+
+Kind regards,
+Avril
+
+Avril Coghlan
+University College Cork
+Ireland
+
+
+EXAMPLE 1 - RETURNS ANNOTATIONS AS A MATRIX
+
+> query = paste("K=@MotA@ AND TID=479436") # Veillonella parvula (strain
+ATCC 10790 / DSM 2008 / JCM 12972 / Te3)
+> query("myquery",`query`)
+> myquery$nelem 
+[1] 4 
+> myannot <- getAnnot(myquery)
+> dim(myannot)
+[1] 40 4
+> length(myannot[[1]])
+[1] 1
+> length(myannot) 
+[1] 160 # A matrix with all 4 sequences' annotations glued together, one
+sequence's annotations per matrix column
+> myannot[,1] # The first sequence's annotations
+> myannot[,2] # The second sequence's annotations
+> myannot[,3] # The thirs sequence's annotations
+> myannot[,4] # The fourth sequence's annotations
+> is.list(myannot)
+[1] FALSE
+> is.matrix(myannot)
+[1] TRUE
+
+
+EXAMPLE 2 - RETURNS ANNOTATIONS AS A LIST
+
+> query = paste("K=@MotA@ AND TID=405535") # Bacillus cereus strain
+AH820
+> query("myquery",`query`)
+> myquery$nelem 
+[1] 20
+> myannot <- getAnnot(myquery)
+> dim(myannot)
+NULL
+> length(myannot[[1]])
+[1] 47
+> length(myannot) # A list with all 20 sequences, one sequence's
+annotations per list element 
+20
+> myannot[[1]] # The first sequence's annotations
+> myannot[[2]] # The second sequence's annotations 
+> is.list(myannot) 
+[1] TRUE
+
+
+
+
+
+
+
+From lobry at biomserv.univ-lyon1.fr  Wed Mar 17 19:31:16 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Wed, 17 Mar 2010 19:31:16 +0100
+Subject: [Seqinr-forum] Using abif files
+In-Reply-To: <90bbbefc1003170153v407b72a1w854818bb378f8bb3@mail.gmail.com>
+References: <90bbbefc1003170153v407b72a1w854818bb378f8bb3@mail.gmail.com>
+Message-ID: <p06002003c7c6ceea403a@[192.168.1.13]>
+
+At 8:53 +0000 17/03/10, luis viriato wrote:
+When using the package, functions like "read.abif" or "jlo" aren?t 
+recognized and they do not existe in the help file but they are 
+presente in the package reference manual.
+Anyone can help?
+
+Hi Luis,
+
+The read.abif() function and the JLO dataset were introduced in
+seqinR release 2.0-1 and 2.0-2, respectively. The most plausible
+explanation is that you have an older version intalled. You can
+check this at your R prompt with:
+
+>  sessionInfo()
+
+Best,
+
+Z.
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientifique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From lobry at biomserv.univ-lyon1.fr  Wed Mar 17 20:12:27 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Wed, 17 Mar 2010 20:12:27 +0100
+Subject: [Seqinr-forum] inconsistent behaviour of the getAnnot() function
+In-Reply-To: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B62A1B@EXCH1.central.ad.ucc.ie>
+References: <1B7A6C35CDB2BD4DBABBC6FF4275FF14B622C8@EXCH1.central.ad.ucc.ie>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B62866@EXCH1.central.ad.ucc.ie>
+	<4B9A7F9B.2030901@biomserv.univ-lyon1.fr>
+	<1B7A6C35CDB2BD4DBABBC6FF4275FF14B62A1B@EXCH1.central.ad.ucc.ie>
+Message-ID: <p06002004c7c6d8d5935e@[192.168.1.13]>
+
+At 17:25 +0000 17/03/10, Coghlan, Avril wrote:
+>Dear all,
+>
+>I've been using the getAnnot() function to retrieve annotations for
+>UniProt sequences.
+>
+>For each query, I've been asking for a set of UniProt sequences. I've
+>then been retrieving the annotations for each set of sequences using
+>getAnnot().
+>
+>I noticed that usually getAnnot() returns the annotations for a set of
+>sequences in the form of a list variable, where each element of the list
+>variable is a vector containing the annotations for a particular
+>sequence.
+>
+>However, sometimes getAnnot() returns the annotations for a set of
+>sequences in the form of a matrix variable, where each column of the
+>matrix variable contains the annotations for one sequence.
+>
+>I've included the R code for two examples below, one where getAnnot()
+>returns the annotations in a matrix variable (Example 1 below), and one
+>where getAnnot() returns the annotations in a list variable (Example 2
+>below).
+>
+>I am a bit confused why getAnnot() does not always return the
+>annotations in the same sort of data structure (eg. always as a list
+>variable).
+>I'm wondering could this possibly be due to a bug in getAnnot()?
+>
+>Kind regards,
+>Avril
+>
+>Avril Coghlan
+>University College Cork
+>Ireland
+>
+
+Hi Avril,
+
+thanks for the nice bug repport. I have just commited a fix, will
+be available on R-forge (revision >= 1742) in a day or two and
+then in release 2.0-9 (not yet schedulded but this clearly desserves
+a new release).
+
+Best,
+
+Z.
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientifique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+
+From lobry at biomserv.univ-lyon1.fr  Sat Mar 20 12:26:35 2010
+From: lobry at biomserv.univ-lyon1.fr (Jean lobry)
+Date: Sat, 20 Mar 2010 12:26:35 +0100
+Subject: [Seqinr-forum] release 2.0-9
+Message-ID: <p06002009c7ca5fb62c36@[192.168.1.13]>
+
+Dear seqinR,
+
+release 2.0-9 is on its way to CRAN. Should be available
+in a day or two.
+
+Best,
+
+Z.
+
+
+Release Notes for version 2.0-9
+-------------------------------
+
+o  As pointed out by Avril Coghlan on the seqinR diffusion list on
+    17-MAR-2010 there was a bug in the getAnnot() function.
+    This is now fixed.
+
+o  As suggested by Avril Coghlan on the seqinR diffusion list on
+    02-MAR-2010 the function rho() has gained a wordsize
+    argument.
+
+o  The argument word in function count() is
+    now more explicitely called wordsize.
+
+o  The example section in file read.alignment.Rd has gained
+    a new quality control sanity check.
+
+o  The File argument that was deprecated since seqinR
+    release 1.1-3 in function read.alignment() is no more valid.
+    Just use file instead.
+
+o  As pointed by Darren Obbard on the seqinr diffusion list on
+    05-MAR-2010 there was a memory leak problem when calling the
+    read.alignment() function with the fasta format. This
+    is now fixed for the fasta format, but the remaining formats have
+    not been checked for this problem.
+
+
+-- 
+Pr. Jean R. Lobry (Dr. phil. hab.)
+Head of Laboratoire de Police Scientifique de Lyon
+Institut National de Police Scientifique
+31 av. F. Roosevelt, F-69134 ECULLY CEDEX
+Allo: +33 (0)4 72 86 89 60
+e-mail: jean.lobry at interieur.gouv.fr
+
+
+

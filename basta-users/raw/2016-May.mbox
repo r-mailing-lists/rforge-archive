@@ -1,0 +1,321 @@
+From dries.vandeloock at ugent.be  Tue May 24 12:04:21 2016
+From: dries.vandeloock at ugent.be (Dries Van de Loock)
+Date: Tue, 24 May 2016 12:04:21 +0200
+Subject: [Basta-users] Calculating daily mortality rates for models with
+ cont. covariates using estimates
+In-Reply-To: <59260307308b439d866abd3c1d1a7466@xmail102.UGent.be>
+References: <CADQtkd+LzTMs24-tNkANydw_makRD1dueugYfFet_F789o1GAQ@mail.gmail.com>
+ <8edf8eba720047829c2d0c4abf74d270@xmail102.UGent.be>
+ <CADQtkdJHXebEnSc8R0RRQ7JjXYXma9MQG==FS9tj4LmYy88P-A@mail.gmail.com>
+ <59260307308b439d866abd3c1d1a7466@xmail102.UGent.be>
+Message-ID: <CADQtkdLHCKrFPLOga-PuO3vquyT89sxaPTZAGWTDBzjsvaJMcQ@mail.gmail.com>
+
+Dear Fernando,
+
+Things have been dormant for a while, so apologies for not replying earlier
+with this problem.
+
+A short recap :
+
+I have been trying to calculate daily mortality rates of models with a
+varying number of continuous and categorical covariates using the model
+estimates produced by BaSTA.
+
+Thanks to your feedback, I managed to calculate daily mortality rates for
+different values of continuous covariates added to the model, by defining
+the mortality function with proportional hazards.
+
+The problem :
+
+When a categorical covariate is added to the model, I do not manage to
+calculate correct "averaged" daily mortality rates over all levels of that
+covariate.
+
+As a mortality parameter is estimated for each level of the covariate, I
+have tried taken the *mean* and the *weighted mean* (using the sample sizes
+of each level) of each parameter (weibull and makeham shape : c, b0, b1)
+over all levels, but both yielded far to high daily mortality rates when
+defining the mortality function with these estimates.
+
+This is visualised when comparing plots. The plot produced by the plot()
+function
+<https://www.dropbox.com/s/7d60b7vsgoesxsx/plot%28%29_moratlity%20for%20all%20levels.png?dl=0>
+indicates the mortality trajectory for each level. On average, the daily
+mortality rate ?(x) converges to a value between 0 and 0.1 for each level.
+In contrast, the average daily mortality rates, calculated using the mean
+<https://www.dropbox.com/s/u0qztpuwxhci42t/calculated%20mean%20mortality.png?dl=0>
+and weighted mean
+<https://www.dropbox.com/s/4m2omgdt6j2vzh9/calculated%20weighted%20mean%20mortality.png?dl=0>of
+the mortality estimates (and previously noted R-script), show that ?(x)
+converges to a value between 0.1 and 0.2.
+
+Can you advise me on how I can correctly use the model estimates to
+calculate averaged daily mortality rates ?
+
+Many thanks,
+
+Best whishes,
+
+Dries
+
+
+
+2016-03-29 10:22 GMT+02:00 Fernando Colchero <colchero at imada.sdu.dk>:
+
+> Hi Dries,
+>
+>    Definitely, that will be correct, add the other parameters and take a
+> fixed value for the covariates that you are not showing. I agree that
+> taking the mean would make more sense and it would make it clearer to
+> explain. Your updated mortality is correct.
+>
+> Best,
+>
+>    Fernando
+>
+> *Fernando Colchero*
+> Assistant Professor
+> Department of Mathematics and Computer Science
+> Max-Planck Odense Center on the Biodemography of Aging
+>
+> Tlf.               +45 65 50 23 24
+> Email           colchero at imada.sdu.dk
+> Web             www.sdu.dk/staff/colchero
+> Pers. web   www.colchero.com <http://www.sdu.dk/staff/colchero>
+> Adr.              Campusvej 55, 5230, Odense, Dk
+>
+> *University of Southern Denmark*
+>
+> On 28 Mar 2016, at 15:22, Dries Van de Loock <dries.vandeloock at ugent.be>
+> wrote:
+>
+> Dear Fernando,
+>
+> many, many thanks for this. It was *exactly* what I was looking for and
+> will greatly improve our manuscript.
+>
+> I have one questions remaining.
+>
+> How should I approach this method when wanting to visualise the effect of
+> one continuous variable from a multivariate model both including continuous
+> and one categorical variable with 5 levels ?
+>
+> - Could I use the weighted average (=average c, b1 and b0 based on cohorts
+> sample sizes) of the mortality estimates ? When just averaging, I have
+> found that the mort rates were far too high as one cohort with just one
+> case had high estimates.
+> - Could I just add another term ** exp(g * z) *to the model for each
+> continuous variable and use the averaged predictor (z) value for the
+> variable I'm not interested in ?
+>
+>
+> For example, we have a model : mort ~ LOC + SMI + GS
+>
+> GS = groupsize (continuous)
+> SMI = mass (continuous, like above example)
+> LOC = location (5 levels, sample sizes differ hugely between cohorts)
+>
+> When I want to visualise the effect of SMI solely, would this approach be
+> correct :
+>
+> #define function
+> mort <- function(x, z1, z2, b, g) {
+>   exp(g[1] * z1) * exp(g[2] * z2) * (b[1] + b[2] * b[3]^(b[2]) * x^(b[2] -
+> 1))
+> }
+>
+> # define values
+> x <- seq(1, 55, 1)
+> z1 <- c(min(covariates$SMI),max(covariates$SMI)) # min and max value of
+> the continuous variable of interest
+> z2 <- mean(covariates$GS) # mean of the continuous variable not interested
+> in to visualise
+>    c <- mean(out$coefficients[c(1:5),1]) # average of the c values of each
+> LOC (c.LOC1, c.LOC2, etc.) (in this example not yet weighted)
+>    b0 <- mean(out$coefficients[c(6:10),1]) # average of the b0 values of
+> each LOC (b0.LOC1, b0.LOC2, etc.) (in this example not yet weighted)
+>    b1 <- mean(out$coefficients[c(11:15),1])
+> b <- c(c,b0,b1)
+> g <- out.SMI$coefficients[c(16:17), 1] # g parameters
+>
+> # calculate
+> mumin <- mort(x, z1[1], z2, b, g)
+> mumax <- mort(x, z1[2], z2, b, g)
+>
+>
+> I hope the example and my question are clear.
+>
+> Again, many thanks for your time invested in this and I'm looking forward
+> to your reply !
+>
+> Dries
+>
+>
+> 2016-03-26 8:25 GMT+01:00 Fernando Colchero <colchero at imada.sdu.dk>:
+>
+>> Dear Dries,
+>>
+>>    Sorry for the late reply. This is certainly an issue we have not yet
+>> addressed with the package. Alternatively, you could produce a plot by
+>> extracting the information from the coefficients table in the BaSTA output.
+>> Here?s an option based on your results:
+>>
+>> # Define the Weibull mortality with proportional hazards as:
+>> mort <- function(x, z, b, g) {
+>> exp(g * z) * (b[1] + b[2] * b[3]^(b[2]) * x^(b[2] - 1))
+>> }
+>>
+>> where x is age, z is the SMI value, b is the vector of mortality
+>> parameters and g is the vector of proportional hazards parameters.
+>>
+>> # Define x (I?m making up this range of ages?):
+>> x <- seq(0.1, 5, 0.1)
+>>
+>> # Define the lower and upper bounds of z (these are also made up?):
+>> z <- c(3, 6)
+>>
+>> # Extract the b and g parameters:
+>> b <- out$coefficients[1:3, 1]
+>> g <- out$coefficients[4, 1]
+>>
+>> # Calculate the corresponding mortalities:
+>> mulow <- mort(x, z[1], b, g)
+>> muup <- mort(x, z[2], b, g)
+>>
+>> # Define the range for the y-axis:
+>> ylim <- c(0, max(c(mulow, muup)))
+>>
+>> # Plot the results:
+>> plot(x, mulow, col = 1, type = 'l', ylim = ylim)
+>> lines(x, muup, col = 2)
+>> legend('topright', c("Low SMI", "High SMI"), col = c(1, 2),
+>> lwd = 2)
+>>
+>>   Let me know if this is of any help.
+>>
+>> Best,
+>>
+>> Fernando
+>>
+>> *Fernando Colchero*
+>> Assistant Professor
+>> Department of Mathematics and Computer Science
+>> Max-Planck Odense Center on the Biodemography of Aging
+>>
+>> Tlf.               +45 65 50 23 24
+>> Email           colchero at imada.sdu.dk
+>> Web             www.sdu.dk/staff/colchero
+>> Pers. web   www.colchero.com <http://www.sdu.dk/staff/colchero>
+>> Adr.              Campusvej 55, 5230, Odense, Dk
+>>
+>> *University of Southern Denmark*
+>>
+>> On 22 Mar 2016, at 11:32, Dries Van de Loock <dries.vandeloock at ugent.be>
+>> wrote:
+>>
+>> Dear BaSTA community,
+>>
+>>
+>> Thanks to your help and BaSTA, we could statistically confirm some of our
+>> expectations on post-fledging survival in a afrotropical passerine
+>> <http://lists.r-forge.r-project.org/pipermail/basta-users/2015-October/000131.html>.
+>>
+>>
+>>
+>> While *plotfancybasta()* and *plot() *produce nice graphs for
+>> categorical variables, we are looking for a way to visualise the impact of *continues
+>> covariates* on survival of the fledglings.
+>>
+>>
+>> More specifically, we fitted a weibull survival curve with makeham shape
+>> + mass at fledging (SMI) as a covariate (base model + 1 covariate) and find
+>> a negative relation with mortality (CI does not include zero).
+>>
+>>
+>> Coefficients:
+>>
+>>           Estimate  StdErr Lower95%CI Upper95%CI SerAutocor UpdateRate PotScaleReduc
+>>
+>> c          0.02704 0.01595   0.009527   0.066033    0.56051     0.2223         1.017
+>>
+>> b0         0.06541 0.06751   0.001576   0.252938    0.38508     0.2605         1.002
+>>
+>> b1         0.90422 0.63824   0.043231   2.358846    0.06547     0.2501         1.001
+>>
+>> gamma.SMI -0.03971 0.01978  -0.083632  -0.006801    0.55284     0.2526         1.003
+>>
+>> pi.1       0.14211 0.01089   0.121642   0.163994    0.03578     1.0000         1.001
+>>
+>>
+>>
+>> We see two ways to visualise this
+>>
+>>
+>> 1. Daily mortality rates over a two month period (y-axis) plotted against
+>> time (x-axis) for a discrete number of SMI values. As such, you visualise
+>> the mortality shape for a number of SMI values over a two month period.
+>>
+>>
+>> 2. The cumulative mortality probabilities (y-axis) after a two month
+>> period plotted against SMI (x-axis). We then expect that cumulative
+>> mortality probabilities will decrease with increasing SMI.
+>>
+>>
+>> To do this, we could use the estimates to calculate (i) the daily
+>> mortality rates over a two month period and use these to calculate (ii) the
+>> cumulative mortality probabilities after a two month period for a discrete
+>> number of SMI values within the measured range (for example : 20,
+>> 25,30,35).
+>>
+>>
+>>
+>>
+>> While we successfully calculate daily mortality rates fitting the
+>> estimates in the function (b0 * b1 * ((b1 * k)^(b0 - 1))) + c) when no
+>> covariates were added to the model, we failed to find a method on how to
+>> include the gamma estimate in the function.
+>>
+>>
+>>
+>>
+>> Any help on how we can calculate daily mortality rates for a specific
+>> value of the covariate and be able to produce these graphs is highly
+>> appreciated.
+>>
+>>
+>> Best wishes,
+>>
+>>
+>> Dries Van de Loock
+>>
+>> PhD student
+>>
+>> Terrestrial Ecology Unit
+>>
+>> Department of Biology
+>>
+>> Ghent University
+>>
+>> KL Ledeganckstraat 35
+>>
+>> B-9000 Ghent, Belgium
+>>
+>> Phone: +32 (0)9 265 50 39
+>>
+>> http://www.ecology.ugent.be/terec/
+>>
+>>
+>>
+>> _______________________________________________
+>> Basta-users mailing list
+>> Basta-users at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/basta-users
+>>
+>>
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/basta-users/attachments/20160524/d5e2f534/attachment-0001.html>
+

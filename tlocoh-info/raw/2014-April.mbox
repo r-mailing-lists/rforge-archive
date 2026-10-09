@@ -1,0 +1,616 @@
+From Laurie.Baker at Dal.Ca  Sun Apr 13 16:00:55 2014
+From: Laurie.Baker at Dal.Ca (Laurie Baker)
+Date: Sun, 13 Apr 2014 14:00:55 +0000
+Subject: [tlocoh-info] tlocoh area covered and metrics
+Message-ID: <3726F24B-73CA-48A7-B4CF-28EB03AD5A9F@dal.ca>
+
+Hello List,
+
+I am using T-LoCoH to study the area surveyed by grey seals carrying acoustic tags and am interested in looking at this effort in space and time. I am looking at individual effort and also the area covered by multiple seals at the same time. 
+
+My questions are two-fold: 
+1. How to extract the total area and hull area for these tracks?
+
+2. How you might be able to illustrate and quantify the area overlapped by individual seals in space, and in time (i.e. area covered by seals at the same time) using this tool?
+
+Question 1:
+
+I think I have identified where I can find this information from the object generated in the toni example, toni.lhs.k15:
+
+names(toni.lhs.k15[[1]])
+#[1] "id"        "pts"       "anv"       "rw.params" "mode"      "k"         "r"        
+#[8] "a"         "auto.a"    "s"         "kmin"      "dups"      "desc"      "hulls"    
+#[15] "hm"        "enc.pts"   "hm.params" "gen.date"  "isos"
+
+Is the information stored in "hulls" or "isos"?  Is there a way to extract this information one hull at a time? The command toni.lhs.k15[[1]]$hulls floods the console and I am not able to view it in its entirety.
+
+Question 2:
+
+I tried analyzing all tracks and not including seal id to distinguish different tracks, but this is a problem given that certain time stamps are the same. Is there a way to overlay the area covered by individuals and match this to time?
+
+
+Cheers,
+
+
+Laurie
+
+
+
+
+
+
+
+
+From lyons.andy at gmail.com  Fri Apr 18 10:21:28 2014
+From: lyons.andy at gmail.com (Andy Lyons)
+Date: Fri, 18 Apr 2014 01:21:28 -0700
+Subject: [tlocoh-info] tlocoh area covered and metrics
+In-Reply-To: <3726F24B-73CA-48A7-B4CF-28EB03AD5A9F@dal.ca>
+References: <3726F24B-73CA-48A7-B4CF-28EB03AD5A9F@dal.ca>
+Message-ID: <5350E088.9090203@gmail.com>
+
+Hi Laurie,
+
+Thanks for your question, and sorry for the delay getting back to you, I 
+was traveling. Below are some answers to your questions. If you have any 
+other questions or problems please let me know.
+
+Best,
+
+Andy
+
+
+On 4/13/2014 7:00 AM, Laurie Baker wrote:
+> Hello List,
+>
+> I am using T-LoCoH to study the area surveyed by grey seals carrying acoustic tags and am interested in looking at this effort in space and time. I am looking at individual effort and also the area covered by multiple seals at the same time.
+>
+> My questions are two-fold:
+> 1. How to extract the total area and hull area for these tracks?
+
+I presume by 'tracks' you mean the locations for different individuals. 
+To begin with remember that T-LoCoH generates two types of geometric 
+objects - little hulls around each and every point, and isopleths which 
+are constructed by unioning the little hulls together. By convention, 
+the 95% isopleth is commonly labeled the 'home range', and the 50% 
+isopleth is labeled the 'core'.
+
+Hulls and isopleths are both saved in a Locoh-hullset object as 
+SpatialPolygonDataFrames (a common R data class for polygons objects). 
+The hulls are saved in the $hulls element of a Locoh-hullset, and the 
+isopleths are saved in the $isos element. A full description of these 
+data classes was added to the tlocoh R package as a vignette (pdf) in 
+version 1.15.
+
+You can dig down in the data structure to get the areas, or you can use 
+the hulls() function to 'extract' just the hulls from a Locoh-hullset 
+object. More specifically, hulls() will return a list of 
+SpatialPolygonDataFrame objects, with one element for each set of hulls 
+in the Locoh-hullset object. There is a column in the SPDF attribute 
+table for hull area (as well as all the other hull metrics). You can get 
+the attribute table of a SpatialPolygonsDataFrame object by referencing 
+the data slot with the @ character.
+
+ > x <- hulls(lhs_ag214)
+ > class(x)
+[1] "list"
+ > head(x[[1]]@data)
+    ptid pts.idx nnn     area    perim tspan  nep scg.enc.mean 
+scg.enc.sd scg.nn.mean scg.nn.sd nsv.86400 mnlv.86400
+1 65072       1   4  63247.5 2959.663     6  154 0.07744    0.07843     
+0.11870   0.07976        45   3.422222
+2 65073       2   6 118709.0 3395.027    34  992 0.04382    0.05369     
+0.08671   0.07203        30  33.066667
+3 65074       3   6 118709.0 3395.027    34  992 0.04382    0.05369     
+0.08671   0.07203        30  33.066667
+4 65075       4   7 101100.5 1908.537    30 1868 0.03930    0.05101     
+0.06450   0.07096        33  56.606061
+5 65076       5   8 116363.0 1732.254    20  376 0.04819    0.07690     
+0.06205   0.05860        44   8.545455
+6 65077       6   9 146726.5 1914.184    18  204 0.06352    0.09957     
+0.05694   0.05586        31   6.580645
+
+
+The attribute table for the isopleths SpatialPolygonstDataFrame also 
+stores isopleth area (in map units). The isopleths() function operates 
+similarly to the hulls() function - it returns a list of 
+SpatialPolygonDataFrames, with one element for each set of isopleths.
+
+ > x <- isopleths(lhs_ag214)
+ > length(x)
+[1] 1
+ > x[[1]]@data
+   iso.level       area  edge.len   nep       ptp hm.val num.hulls
+1      0.15   686474.0  3431.878  3448 0.3221828 3448         1
+2      0.25   686474.0  3431.878  3448 0.3221828 3448         1
+3      0.35   779772.5  3877.031  4053 0.3787143 2776         6
+4      0.45  1209995.2  5700.026  4880 0.4559895 2438        22
+5      0.55  1774914.3  8034.811  5908 0.5520463 1123      1634
+6      0.65  3478783.5 11015.241  6957 0.6500654 501      3248
+7      0.75  5766729.3 15549.578  8067 0.7537843 285      4353
+8      0.85  9178557.4 27815.017  9160 0.8559148 92      6750
+9      0.95 18612464.6 49049.453 10167 0.9500093 26      9360
+ >
+
+You can also view the area of each isopleth in R by using the 
+iso.details=T argument in the summary function:
+
+ > summary(lhs_ag214, *iso.details=T*)
+Loading required package: sp
+Summary of LoCoH-hullset object: lhs_ag214
+T-LoCoH version: 1.0.3
+[1] ag214.pts10702.a3700.s0.01.kmin0
+       id: ag214
+      pts: 10702
+    dates: 2009-09-02 13:00:00 GMT to 2010-04-14 13:00:00 GMT
+movement: tau=1800 (30min), vmax=1.160352, d.bar=57.34979
+    hulls: 10702
+     dups: 205 (offset by 1 map unit)
+     mode: a=3700, kmin=0, s=0.01
+  metrics: area, mnlv.86400, nep, nnn, nsv.86400, perim, scg.enc.mean, 
+scg.enc.sd, scg.nn.mean,
+           scg.nn.sd, tspan
+     hmap: ivg (86400)
+     isos: [1] iso.srt-nep.iso-q.h10702.i9
+*iso.level       area  edge.len nep       ptp hm.val num.hulls**
+**                   0.15   686474.0  3431.878  3448 0.3221828   
+3448         1**
+**                   0.25   686474.0  3431.878  3448 0.3221828   
+3448         1**
+**                   0.35   779772.5  3877.031  4053 0.3787143   
+2776         6**
+**                   0.45  1209995.2  5700.026  4880 0.4559895   
+2438        22**
+**                   0.55  1774914.3  8034.811  5908 0.5520463   
+1123      1634**
+**                   0.65  3478783.5 11015.241  6957 0.6500654    
+501      3248**
+**                   0.75  5766729.3 15549.578  8067 0.7537843    
+285      4353**
+**                   0.85  9178557.4 27815.017  9160 0.8559148     
+92      6750**
+**                   0.95 18612464.6 49049.453 10167 0.9500093     
+26      9360*
+    other: -none-
+
+
+
+> 2. How you might be able to illustrate and quantify the area overlapped by individual seals in space, and in time (i.e. area covered by seals at the same time) using this tool?
+
+One way you can do this would involve:
+
+1) Decide which isopleth you want to use to represent the area of used 
+by an individual. As noted earlier, the 95% and 50% are common 
+standards, but there are others.
+
+2) Pull out those isopleths for each individual
+
+3) Take the intersection of pairs of isopleths using a function from the 
+rgeos package, and compute the area.
+
+There are other more nuanced ways to measure the overlap in space use in 
+two individuals, but the above process should get you started. A script 
+that illustrates how do to the above can be found at:
+
+http://nature.berkeley.edu/~ajlyons/tlocoh/isopleth_overlap_exericse.txt
+<http://nature.berkeley.edu/%7Eajlyons/tlocoh/isopleth_overlap_exericse.txt>or
+http://tlocoh.r-forge.r-project.org/isopleth_overlap_exericse.txt 
+<http://tlocoh.r-forge.r-project.org/isopleth_overlap_exericse.R>
+
+If you want to quantify the area of overlap between seals at the exact 
+same time, or for example within the same 24 hour period, we should talk 
+some more about that. There are some association hull metrics that are 
+still under development that do something similar to that.
+
+> Question 1:
+>
+> I think I have identified where I can find this information from the object generated in the toni example, toni.lhs.k15:
+>
+> names(toni.lhs.k15[[1]])
+> #[1] "id"        "pts"       "anv"       "rw.params" "mode"      "k"         "r"
+> #[8] "a"         "auto.a"    "s"         "kmin"      "dups"      "desc"      "hulls"
+> #[15] "hm"        "enc.pts"   "hm.params" "gen.date"  "isos"
+>
+> Is the information stored in "hulls" or "isos"?  Is there a way to extract this information one hull at a time? The command toni.lhs.k15[[1]]$hulls floods the console and I am not able to view it in its entirety.
+>
+> Question 2:
+>
+> I tried analyzing all tracks and not including seal id to distinguish different tracks, but this is a problem given that certain time stamps are the same. Is there a way to overlay the area covered by individuals and match this to time?
+
+I don't fully understand this question. Could you provide some more detail?
+
+>
+>
+> Cheers,
+>
+>
+> Laurie
+>
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> Tlocoh-info mailing list
+> Tlocoh-info at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tlocoh-info
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/tlocoh-info/attachments/20140418/976721a0/attachment.html>
+
+From lyons.andy at gmail.com  Fri Apr 18 10:54:09 2014
+From: lyons.andy at gmail.com (Andy Lyons)
+Date: Fri, 18 Apr 2014 01:54:09 -0700
+Subject: [tlocoh-info] tlocoh area covered and metrics
+In-Reply-To: <3726F24B-73CA-48A7-B4CF-28EB03AD5A9F@dal.ca>
+References: <3726F24B-73CA-48A7-B4CF-28EB03AD5A9F@dal.ca>
+Message-ID: <5350E831.8030105@gmail.com>
+
+Hi Laurie,
+
+Thanks for your question, and sorry for the delay getting back to you, I 
+was traveling. Below are some answers to your questions. If you have any 
+other questions or problems please let me know.
+
+Best,
+
+Andy
+
+
+On 4/13/2014 7:00 AM, Laurie Baker wrote:
+> Hello List,
+>
+> I am using T-LoCoH to study the area surveyed by grey seals carrying acoustic tags and am interested in looking at this effort in space and time. I am looking at individual effort and also the area covered by multiple seals at the same time.
+>
+> My questions are two-fold:
+> 1. How to extract the total area and hull area for these tracks?
+
+I presume by 'tracks' you mean the locations for different individuals. 
+To begin with remember that T-LoCoH generates two types of geometric 
+objects - little hulls around each and every point, and isopleths which 
+are constructed by unioning the little hulls together. By convention, 
+the 95% isopleth is commonly labeled the 'home range', and the 50% 
+isopleth is labeled the 'core'.
+
+Hulls and isopleths are both saved in a Locoh-hullset object as 
+SpatialPolygonDataFrames (a common R data class for polygons objects). 
+The hulls are saved in the $hulls element of a Locoh-hullset, and the 
+isopleths are saved in the $isos element. A full description of these 
+data classes was added to the tlocoh R package as a vignette (pdf) in 
+version 1.15.
+
+You can dig down in the data structure to get the areas, or you can use 
+the hulls() function to 'extract' just the hulls from a Locoh-hullset 
+object. More specifically, hulls() will return a list of 
+SpatialPolygonDataFrame objects, with one element for each set of hulls 
+in the Locoh-hullset object. There is a column in the SPDF attribute 
+table for hull area (as well as all the other hull metrics). You can get 
+the attribute table of a SpatialPolygonsDataFrame object by referencing 
+the data slot with the @ character.
+
+ > x <- hulls(lhs_ag214)
+ > class(x)
+[1] "list"
+ > head(x[[1]]@data)
+    ptid pts.idx nnn     area    perim tspan  nep scg.enc.mean 
+scg.enc.sd scg.nn.mean scg.nn.sd nsv.86400 mnlv.86400
+1 65072       1   4  63247.5 2959.663     6  154 0.07744    0.07843     
+0.11870   0.07976        45   3.422222
+2 65073       2   6 118709.0 3395.027    34  992 0.04382    0.05369     
+0.08671   0.07203        30  33.066667
+3 65074       3   6 118709.0 3395.027    34  992 0.04382    0.05369     
+0.08671   0.07203        30  33.066667
+4 65075       4   7 101100.5 1908.537    30 1868 0.03930    0.05101     
+0.06450   0.07096        33  56.606061
+5 65076       5   8 116363.0 1732.254    20  376 0.04819    0.07690     
+0.06205   0.05860        44   8.545455
+6 65077       6   9 146726.5 1914.184    18  204 0.06352    0.09957     
+0.05694   0.05586        31   6.580645
+
+
+The attribute table for the isopleths SpatialPolygonstDataFrame also 
+stores isopleth area (in map units). The isopleths() function operates 
+similarly to the hulls() function - it returns a list of 
+SpatialPolygonDataFrames, with one element for each set of isopleths.
+
+ > x <- isopleths(lhs_ag214)
+ > length(x)
+[1] 1
+ > x[[1]]@data
+   iso.level       area  edge.len   nep       ptp hm.val num.hulls
+1      0.15   686474.0  3431.878  3448 0.3221828 3448         1
+2      0.25   686474.0  3431.878  3448 0.3221828 3448         1
+3      0.35   779772.5  3877.031  4053 0.3787143 2776         6
+4      0.45  1209995.2  5700.026  4880 0.4559895 2438        22
+5      0.55  1774914.3  8034.811  5908 0.5520463 1123      1634
+6      0.65  3478783.5 11015.241  6957 0.6500654 501      3248
+7      0.75  5766729.3 15549.578  8067 0.7537843 285      4353
+8      0.85  9178557.4 27815.017  9160 0.8559148 92      6750
+9      0.95 18612464.6 49049.453 10167 0.9500093 26      9360
+ >
+
+You can also view the area of each isopleth in R by using the 
+iso.details=T argument in the summary function:
+
+ > summary(lhs_ag214, *iso.details=T*)
+Loading required package: sp
+Summary of LoCoH-hullset object: lhs_ag214
+T-LoCoH version: 1.0.3
+[1] ag214.pts10702.a3700.s0.01.kmin0
+       id: ag214
+      pts: 10702
+    dates: 2009-09-02 13:00:00 GMT to 2010-04-14 13:00:00 GMT
+movement: tau=1800 (30min), vmax=1.160352, d.bar=57.34979
+    hulls: 10702
+     dups: 205 (offset by 1 map unit)
+     mode: a=3700, kmin=0, s=0.01
+  metrics: area, mnlv.86400, nep, nnn, nsv.86400, perim, scg.enc.mean, 
+scg.enc.sd, scg.nn.mean,
+           scg.nn.sd, tspan
+     hmap: ivg (86400)
+     isos: [1] iso.srt-nep.iso-q.h10702.i9
+*iso.level       area  edge.len nep       ptp hm.val num.hulls**
+**                   0.15   686474.0  3431.878  3448 0.3221828   
+3448         1**
+**                   0.25   686474.0  3431.878  3448 0.3221828   
+3448         1**
+**                   0.35   779772.5  3877.031  4053 0.3787143   
+2776         6**
+**                   0.45  1209995.2  5700.026  4880 0.4559895   
+2438        22**
+**                   0.55  1774914.3  8034.811  5908 0.5520463   
+1123      1634**
+**                   0.65  3478783.5 11015.241  6957 0.6500654    
+501      3248**
+**                   0.75  5766729.3 15549.578  8067 0.7537843    
+285      4353**
+**                   0.85  9178557.4 27815.017  9160 0.8559148     
+92      6750**
+**                   0.95 18612464.6 49049.453 10167 0.9500093     
+26      9360*
+    other: -none-
+
+
+
+> 2. How you might be able to illustrate and quantify the area overlapped by individual seals in space, and in time (i.e. area covered by seals at the same time) using this tool?
+
+One way you can do this would involve:
+
+1) Decide which isopleth you want to use to represent the area of used 
+by an individual. As noted earlier, the 95% and 50% are common 
+standards, but there are others.
+
+2) Pull out those isopleths for each individual
+
+3) Take the intersection of pairs of isopleths using a function from the 
+rgeos package, and compute the area.
+
+There are other more nuanced ways to measure the overlap in space use in 
+two individuals, but the above process should get you started. A script 
+that illustrates how do to the above can be found at:
+
+http://nature.berkeley.edu/~ajlyons/tlocoh/isopleth_overlap_exericse.txt
+<http://nature.berkeley.edu/%7Eajlyons/tlocoh/isopleth_overlap_exericse.txt>or
+http://tlocoh.r-forge.r-project.org/isopleth_overlap_exericse.txt 
+<http://tlocoh.r-forge.r-project.org/isopleth_overlap_exericse.R>
+
+If you want to quantify the area of overlap between seals at the exact 
+same time, or for example within the same 24 hour period, we should talk 
+some more about that. There are some association hull metrics that are 
+still under development that do something similar to that.
+
+> Question 1:
+>
+> I think I have identified where I can find this information from the object generated in the toni example, toni.lhs.k15:
+>
+> names(toni.lhs.k15[[1]])
+> #[1] "id"        "pts"       "anv"       "rw.params" "mode"      "k"         "r"
+> #[8] "a"         "auto.a"    "s"         "kmin"      "dups"      "desc"      "hulls"
+> #[15] "hm"        "enc.pts"   "hm.params" "gen.date"  "isos"
+>
+> Is the information stored in "hulls" or "isos"?  Is there a way to extract this information one hull at a time? The command toni.lhs.k15[[1]]$hulls floods the console and I am not able to view it in its entirety.
+>
+> Question 2:
+>
+> I tried analyzing all tracks and not including seal id to distinguish different tracks, but this is a problem given that certain time stamps are the same. Is there a way to overlay the area covered by individuals and match this to time?
+
+I don't fully understand this question. Could you provide some more detail?
+
+>
+> Cheers,
+>
+>
+> Laurie
+>
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> Tlocoh-info mailing list
+> Tlocoh-info at lists.r-forge.r-project.org
+> http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tlocoh-info
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/tlocoh-info/attachments/20140418/cfcccd8b/attachment-0001.html>
+
+From Laurie.Baker at Dal.Ca  Thu Apr 24 00:00:51 2014
+From: Laurie.Baker at Dal.Ca (Laurie Baker)
+Date: Wed, 23 Apr 2014 22:00:51 +0000
+Subject: [tlocoh-info] tlocoh area covered and metrics
+In-Reply-To: <5350E831.8030105@gmail.com>
+References: <3726F24B-73CA-48A7-B4CF-28EB03AD5A9F@dal.ca>,
+ <5350E831.8030105@gmail.com>
+Message-ID: <72c9d3ba63b8486db4f77ffc5275805c@BLUPR03MB067.namprd03.prod.outlook.com>
+
+Thank you Wayne and Andy! Your tips helped a lot!
+
+
+Cheers,
+
+
+Laurie
+
+________________________________
+From: Andy Lyons <lyons.andy at gmail.com>
+Sent: 18 April 2014 08:54
+To: Laurie Baker
+Cc: tlocoh-info at lists.r-forge.r-project.org
+Subject: Re: [tlocoh-info] tlocoh area covered and metrics
+
+Hi Laurie,
+
+Thanks for your question, and sorry for the delay getting back to you, I was traveling. Below are some answers to your questions. If you have any other questions or problems please let me know.
+
+Best,
+
+Andy
+
+
+On 4/13/2014 7:00 AM, Laurie Baker wrote:
+
+Hello List,
+
+I am using T-LoCoH to study the area surveyed by grey seals carrying acoustic tags and am interested in looking at this effort in space and time. I am looking at individual effort and also the area covered by multiple seals at the same time.
+
+My questions are two-fold:
+1. How to extract the total area and hull area for these tracks?
+
+I presume by 'tracks' you mean the locations for different individuals. To begin with remember that T-LoCoH generates two types of geometric objects - little hulls around each and every point, and isopleths which are constructed by unioning the little hulls together. By convention, the 95% isopleth is commonly labeled the 'home range', and the 50% isopleth is labeled the 'core'.
+
+Hulls and isopleths are both saved in a Locoh-hullset object as SpatialPolygonDataFrames (a common R data class for polygons objects). The hulls are saved in the $hulls element of a Locoh-hullset, and the isopleths are saved in the $isos element. A full description of these data classes was added to the tlocoh R package as a vignette (pdf) in version 1.15.
+
+You can dig down in the data structure to get the areas, or you can use the hulls() function to 'extract' just the hulls from a Locoh-hullset object. More specifically, hulls() will return a list of SpatialPolygonDataFrame objects, with one element for each set of hulls in the Locoh-hullset object. There is a column in the SPDF attribute table for hull area (as well as all the other hull metrics). You can get the attribute table of a SpatialPolygonsDataFrame object by referencing the data slot with the @ character.
+
+> x <- hulls(lhs_ag214)
+> class(x)
+[1] "list"
+> head(x[[1]]@data)
+   ptid pts.idx nnn     area    perim tspan  nep scg.enc.mean scg.enc.sd scg.nn.mean scg.nn.sd nsv.86400 mnlv.86400
+1 65072       1   4  63247.5 2959.663     6  154      0.07744    0.07843     0.11870   0.07976        45   3.422222
+2 65073       2   6 118709.0 3395.027    34  992      0.04382    0.05369     0.08671   0.07203        30  33.066667
+3 65074       3   6 118709.0 3395.027    34  992      0.04382    0.05369     0.08671   0.07203        30  33.066667
+4 65075       4   7 101100.5 1908.537    30 1868      0.03930    0.05101     0.06450   0.07096        33  56.606061
+5 65076       5   8 116363.0 1732.254    20  376      0.04819    0.07690     0.06205   0.05860        44   8.545455
+6 65077       6   9 146726.5 1914.184    18  204      0.06352    0.09957     0.05694   0.05586        31   6.580645
+
+
+The attribute table for the isopleths SpatialPolygonstDataFrame also stores isopleth area (in map units). The isopleths() function operates similarly to the hulls() function - it returns a list of SpatialPolygonDataFrames, with one element for each set of isopleths.
+
+> x <- isopleths(lhs_ag214)
+> length(x)
+[1] 1
+> x[[1]]@data
+  iso.level       area  edge.len   nep       ptp hm.val num.hulls
+1      0.15   686474.0  3431.878  3448 0.3221828   3448         1
+2      0.25   686474.0  3431.878  3448 0.3221828   3448         1
+3      0.35   779772.5  3877.031  4053 0.3787143   2776         6
+4      0.45  1209995.2  5700.026  4880 0.4559895   2438        22
+5      0.55  1774914.3  8034.811  5908 0.5520463   1123      1634
+6      0.65  3478783.5 11015.241  6957 0.6500654    501      3248
+7      0.75  5766729.3 15549.578  8067 0.7537843    285      4353
+8      0.85  9178557.4 27815.017  9160 0.8559148     92      6750
+9      0.95 18612464.6 49049.453 10167 0.9500093     26      9360
+>
+
+You can also view the area of each isopleth in R by using the iso.details=T argument in the summary function:
+
+> summary(lhs_ag214, iso.details=T)
+Loading required package: sp
+Summary of LoCoH-hullset object: lhs_ag214
+T-LoCoH version: 1.0.3
+[1] ag214.pts10702.a3700.s0.01.kmin0
+      id: ag214
+     pts: 10702
+   dates: 2009-09-02 13:00:00 GMT to 2010-04-14 13:00:00 GMT
+movement: tau=1800 (30min), vmax=1.160352, d.bar=57.34979
+   hulls: 10702
+    dups: 205 (offset by 1 map unit)
+    mode: a=3700, kmin=0, s=0.01
+ metrics: area, mnlv.86400, nep, nnn, nsv.86400, perim, scg.enc.mean, scg.enc.sd, scg.nn.mean,
+          scg.nn.sd, tspan
+    hmap: ivg (86400)
+    isos: [1] iso.srt-nep.iso-q.h10702.i9
+              iso.level       area  edge.len   nep       ptp hm.val num.hulls
+                   0.15   686474.0  3431.878  3448 0.3221828   3448         1
+                   0.25   686474.0  3431.878  3448 0.3221828   3448         1
+                   0.35   779772.5  3877.031  4053 0.3787143   2776         6
+                   0.45  1209995.2  5700.026  4880 0.4559895   2438        22
+                   0.55  1774914.3  8034.811  5908 0.5520463   1123      1634
+                   0.65  3478783.5 11015.241  6957 0.6500654    501      3248
+                   0.75  5766729.3 15549.578  8067 0.7537843    285      4353
+                   0.85  9178557.4 27815.017  9160 0.8559148     92      6750
+                   0.95 18612464.6 49049.453 10167 0.9500093     26      9360
+   other: -none-
+
+
+
+
+2. How you might be able to illustrate and quantify the area overlapped by individual seals in space, and in time (i.e. area covered by seals at the same time) using this tool?
+
+
+One way you can do this would involve:
+
+1) Decide which isopleth you want to use to represent the area of used by an individual. As noted earlier, the 95% and 50% are common standards, but there are others.
+
+2) Pull out those isopleths for each individual
+
+3) Take the intersection of pairs of isopleths using a function from the rgeos package, and compute the area.
+
+There are other more nuanced ways to measure the overlap in space use in two individuals, but the above process should get you started. A script that illustrates how do to the above can be found at:
+
+http://nature.berkeley.edu/~ajlyons/tlocoh/isopleth_overlap_exericse.txt
+<http://nature.berkeley.edu/%7Eajlyons/tlocoh/isopleth_overlap_exericse.txt>or
+http://tlocoh.r-forge.r-project.org/isopleth_overlap_exericse.txt<http://tlocoh.r-forge.r-project.org/isopleth_overlap_exericse.R>
+
+If you want to quantify the area of overlap between seals at the exact same time, or for example within the same 24 hour period, we should talk some more about that. There are some association hull metrics that are still under development that do something similar to that.
+
+
+Question 1:
+
+I think I have identified where I can find this information from the object generated in the toni example, toni.lhs.k15:
+
+names(toni.lhs.k15[[1]])
+#[1] "id"        "pts"       "anv"       "rw.params" "mode"      "k"         "r"
+#[8] "a"         "auto.a"    "s"         "kmin"      "dups"      "desc"      "hulls"
+#[15] "hm"        "enc.pts"   "hm.params" "gen.date"  "isos"
+
+Is the information stored in "hulls" or "isos"?  Is there a way to extract this information one hull at a time? The command toni.lhs.k15[[1]]$hulls floods the console and I am not able to view it in its entirety.
+
+Question 2:
+
+I tried analyzing all tracks and not including seal id to distinguish different tracks, but this is a problem given that certain time stamps are the same. Is there a way to overlay the area covered by individuals and match this to time?
+
+I don't fully understand this question. Could you provide some more detail?
+
+
+Cheers,
+
+
+Laurie
+
+
+
+
+
+
+
+_______________________________________________
+Tlocoh-info mailing list
+Tlocoh-info at lists.r-forge.r-project.org<mailto:Tlocoh-info at lists.r-forge.r-project.org>
+http://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/tlocoh-info
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/tlocoh-info/attachments/20140423/066455df/attachment.html>
+

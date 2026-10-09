@@ -1,0 +1,197 @@
+From Hannes.Muehleisen at cwi.nl  Fri Oct  3 16:27:00 2014
+From: Hannes.Muehleisen at cwi.nl (=?utf-8?Q?Hannes_M=C3=BChleisen?=)
+Date: Fri, 3 Oct 2014 16:27:00 +0200
+Subject: [MonetDB.R] MonetDB.R 0.9.5 pre-release
+Message-ID: <B7A5B08C-A497-4A95-900B-AFCCA049943C@cwi.nl>
+
+Hello MonetDB.R users,
+
+I am almost ready to upload a new version of MonetDB.R to CRAN. The main changes are
+
+- DBI 0.3 compatibility (isValid etc.)
+- dplyr integration moved to MonetDB.R package (from dplyr 0.3, to be released soon)
+- Back to R socket code (can be switched back to old code with monetdb.clib option)
+- deprecated dbTransaction() (DBI now has standardized dbBegin())
+
+Preliminary versions are available at [1]. If you have some time, it would be great if you could try out the new version and report back before Tuesday (2014-10-07).
+
+Best,
+
+Hannes
+
+[1] http://homepages.cwi.nl/~hannes/R/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 4154 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20141003/a63346ff/attachment.bin>
+
+From kislenok.roman at gmail.com  Mon Oct 20 02:30:43 2014
+From: kislenok.roman at gmail.com (=?UTF-8?B?0KDQvtC80LDQvSDQmtC40YHQu9C10L3QvtC6?=)
+Date: Mon, 20 Oct 2014 11:30:43 +1100
+Subject: [MonetDB.R] Cyrillic symbol problems with MonetDB.R 0.9.5
+Message-ID: <CAEo1rGuwCdi1ooa+Bs1Vg9PEgHh6Aujcma5SWbiJnCUncYe_QA@mail.gmail.com>
+
+Hello,
+
+I recently updated my DBI driver for MonetDB from 0.9.4 to 0.9.5 and got a
+problem with Cyrilic symbols (UTF-8). Now I downgraded to 0.9.4 and
+everything is OK.
+
+To reproduce:
+> # create connection
+> conn <- dbConnect(MonetDB.R(), "monetdb://localhost:50000/db")
+> # create table
+> dbSendUpdate(conn, "create table t1 (col1 clob)")
+> # try to insert something
+> dbSendUpdate(conn, "insert into t1 (col1) values (?)", "Some data with
+cyrillic - ?")
+Error in .local(conn, statement, ...) :
+  Unable to execute statement 'insert into t1 (col1) values (''Some data
+with cyrillic - ?')'.
+Server says 'syntax error, unexpected $end, expecting SCOLON in: "insert
+into t1 (col1) values (''Some data with cyrillic - ?')"' [#42000].
+> # try another operation:
+> dbGetQuery(conn, "select * from t1")
+Error in .mapiRead(conObj at socket) :
+Empty response from MonetDB server, probably a timeout. You can increase
+the time to wait for responses with the 'timeout' parameter to
+'dbConnect()'.
+
+
+-- 
+Roman
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20141020/f3b4e7cc/attachment.html>
+
+From Hannes.Muehleisen at cwi.nl  Mon Oct 20 11:38:05 2014
+From: Hannes.Muehleisen at cwi.nl (=?utf-8?Q?Hannes_M=C3=BChleisen?=)
+Date: Mon, 20 Oct 2014 11:38:05 +0200
+Subject: [MonetDB.R] Cyrillic symbol problems with MonetDB.R 0.9.5
+In-Reply-To: <CAEo1rGuwCdi1ooa+Bs1Vg9PEgHh6Aujcma5SWbiJnCUncYe_QA@mail.gmail.com>
+References: <CAEo1rGuwCdi1ooa+Bs1Vg9PEgHh6Aujcma5SWbiJnCUncYe_QA@mail.gmail.com>
+Message-ID: <882CFE67-6649-47E0-85AA-A46E2FED7D6C@cwi.nl>
+
+Hi ?????
+> 
+> On 20.10.2014, at 02:30, ????? ???????? <kislenok.roman at gmail.com> wrote:
+> 
+> dbSendUpdate(conn, "insert into t1 (col1) values (?)", "Some data with cyrillic - ?")
+
+Confirmed. Sorry for this, will investigate?
+
+Best,
+
+Hannes
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 4154 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20141020/3b872178/attachment.bin>
+
+From Hannes.Muehleisen at cwi.nl  Mon Oct 20 14:23:14 2014
+From: Hannes.Muehleisen at cwi.nl (=?utf-8?Q?Hannes_M=C3=BChleisen?=)
+Date: Mon, 20 Oct 2014 14:23:14 +0200
+Subject: [MonetDB.R] Cyrillic symbol problems with MonetDB.R 0.9.5
+In-Reply-To: <882CFE67-6649-47E0-85AA-A46E2FED7D6C@cwi.nl>
+References: <CAEo1rGuwCdi1ooa+Bs1Vg9PEgHh6Aujcma5SWbiJnCUncYe_QA@mail.gmail.com>
+ <882CFE67-6649-47E0-85AA-A46E2FED7D6C@cwi.nl>
+Message-ID: <CE0BC3B3-3385-4F2B-A6F9-E278530588E5@cwi.nl>
+
+Hi again,
+
+> On 20.10.2014, at 11:38, Hannes M?hleisen <Hannes.Muehleisen at cwi.nl> wrote:
+> 
+> Hi ?????
+>> 
+>> On 20.10.2014, at 02:30, ????? ???????? <kislenok.roman at gmail.com> wrote:
+>> 
+>> dbSendUpdate(conn, "insert into t1 (col1) values (?)", "Some data with cyrillic - ?")
+> 
+> Confirmed. Sorry for this, will investigate?
+
+Could you please try MonetDB.R v0.9.6 from http://homepages.cwi.nl/~hannes/R/ ? I believe this should be working now?
+
+Best,
+
+Hannes
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 4154 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20141020/2e36635d/attachment.bin>
+
+From Hannes.Muehleisen at cwi.nl  Mon Oct 20 14:34:24 2014
+From: Hannes.Muehleisen at cwi.nl (=?utf-8?Q?Hannes_M=C3=BChleisen?=)
+Date: Mon, 20 Oct 2014 14:34:24 +0200
+Subject: [MonetDB.R] Cyrillic symbol problems with MonetDB.R 0.9.5
+In-Reply-To: <CE0BC3B3-3385-4F2B-A6F9-E278530588E5@cwi.nl>
+References: <CAEo1rGuwCdi1ooa+Bs1Vg9PEgHh6Aujcma5SWbiJnCUncYe_QA@mail.gmail.com>
+ <882CFE67-6649-47E0-85AA-A46E2FED7D6C@cwi.nl>
+ <CE0BC3B3-3385-4F2B-A6F9-E278530588E5@cwi.nl>
+Message-ID: <08A8543D-0157-43EF-AD9B-2B599A776D27@cwi.nl>
+
+
+> On 20.10.2014, at 14:23, Hannes M?hleisen <Hannes.Muehleisen at cwi.nl> wrote:
+> 
+> Hi again,
+> 
+>> On 20.10.2014, at 11:38, Hannes M?hleisen <Hannes.Muehleisen at cwi.nl> wrote:
+>> 
+>> Hi ?????
+>>> 
+>>> On 20.10.2014, at 02:30, ????? ???????? <kislenok.roman at gmail.com> wrote:
+>>> 
+>>> dbSendUpdate(conn, "insert into t1 (col1) values (?)", "Some data with cyrillic - ?")
+>> 
+>> Confirmed. Sorry for this, will investigate?
+> 
+> Could you please try MonetDB.R v0.9.6 from http://homepages.cwi.nl/~hannes/R/ ? I believe this should be working now?
+
+Found another bug, please stand by with testing for some more time?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 4154 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20141020/df8ef92c/attachment.bin>
+
+From Hannes.Muehleisen at cwi.nl  Mon Oct 20 15:00:48 2014
+From: Hannes.Muehleisen at cwi.nl (=?utf-8?Q?Hannes_M=C3=BChleisen?=)
+Date: Mon, 20 Oct 2014 15:00:48 +0200
+Subject: [MonetDB.R] Cyrillic symbol problems with MonetDB.R 0.9.5
+In-Reply-To: <08A8543D-0157-43EF-AD9B-2B599A776D27@cwi.nl>
+References: <CAEo1rGuwCdi1ooa+Bs1Vg9PEgHh6Aujcma5SWbiJnCUncYe_QA@mail.gmail.com>
+ <882CFE67-6649-47E0-85AA-A46E2FED7D6C@cwi.nl>
+ <CE0BC3B3-3385-4F2B-A6F9-E278530588E5@cwi.nl>
+ <08A8543D-0157-43EF-AD9B-2B599A776D27@cwi.nl>
+Message-ID: <4A30CE88-3D54-44BB-A78C-87F39B9C7B01@cwi.nl>
+
+All right, good for some testing?
+
+> On 20.10.2014, at 14:34, Hannes M?hleisen <Hannes.Muehleisen at cwi.nl> wrote:
+> 
+>> Could you please try MonetDB.R v0.9.6 from http://homepages.cwi.nl/~hannes/R/ ? I believe this should be working now?
+
+Sorry for the confusion,
+
+Hannes
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 4154 bytes
+Desc: not available
+URL: <http://lists.r-forge.r-project.org/pipermail/monetr-users/attachments/20141020/207ec3e3/attachment.bin>
+

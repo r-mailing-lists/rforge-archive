@@ -1,0 +1,3956 @@
+From dkulp at dizz.org  Thu Aug  2 00:04:43 2012
+From: dkulp at dizz.org (David Kulp)
+Date: Wed, 1 Aug 2012 18:04:43 -0400
+Subject: [datatable-help] Adding a column in place and join surprises
+Message-ID: <04FCBEE1-13A6-4AAE-8386-B8EFD7133E13@dizz.org>
+
+Suppose I have a data.table with a unique identifier and value and another data.table with a cross-reference to that identifier and lots of other measurement data.  E.g. suppose my lookup table is "locs" and my measurement data is "obsv" as follows:
+
+obsv=data.table(id=1:7, loc=c(10,20,10,10,30,10,20), mvar=rnorm(7), key='id')
+locs=data.table(loc=c(30,20,10),name=c("foo","bar","baz"), other=letters[1:3], key='loc')
+
+I simply want to add the 'name' column from locs to the obsv table using :=.  But this quickly becomes really complicated because (1) the keys for the two data.tables differ (appropriately), (2) the key for locs is an integer, and (3) the return columns of a join always include the matching columns.
+
+First of all, the gotcha is that locs[obsv[,loc]] doesn't work.  This is because obsv[,loc] returns a numeric column, which is treated as indexing the row numbers.  Surprise!  
+
+> locs[obsv[,loc]] 
+     loc name other
+[1,]  NA <NA>  <NA>
+[2,]  NA <NA>  <NA>
+[3,]  NA <NA>  <NA>
+[4,]  NA <NA>  <NA>
+[5,]  NA <NA>  <NA>
+[6,]  NA <NA>  <NA>
+[7,]  NA <NA>  <NA>
+
+This unexpected and silent behavior could easily cause very bad results.  (When I first did this test I used 1,2 and 3 instead of 10,20 and 30 and everything seemed to work!)  I think this inconsistency should be addressed.  For example, consider modifying joins so that they only happen when the i argument is a data.table or a list.  If it is a character, then it should fail.  Part of the problem here is the inconsistency that A[,col1] returns a vector of characters, but A[,list(col1,col2)] returns a data.table.  If instead, data.tables were always returned unless, say, a simplify=TRUE argument was provided, then we'd be in better shape because locs[obsv[,loc]] would always be a join and locs[obsv[,loc,simplify=TRUE]] would be a row retrieval as for data.frame.
+
+Anyway, the solution to the above seems to be to create a list object for i:
+
+> locs[list(obsv[,loc])]
+Error in `[.data.table`(locs, list(obsv[, loc])) : 
+  typeof x.loc (integer) != typeof i.V1 (double)
+
+but that doesn't work because obsv$loc is class numeric and locs$loc is class integer.  This is because locs$loc is silently changed to integer when the key is set.  So, to perform a lookup we need to coerce to integer as follows:
+
+> locs[list(as.integer(obsv[,loc]))]
+     loc name other
+[1,]   1  baz     c
+[2,]   2  bar     b
+[3,]   1  baz     c
+[4,]   1  baz     c
+[5,]   3  foo     a
+[6,]   1  baz     c
+[7,]   2  bar     b
+
+But if I want a right-hand-side value for assignment, then I need just a single column.  However, there is an inconsistency: a join adds the extra join column names even if I specify only the column I want.
+
+> locs[list(as.integer(obsv[,loc])),name]
+     loc name
+[1,]   1  baz
+[2,]   2  bar
+[3,]   1  baz
+[4,]   1  baz
+[5,]   3  foo
+[6,]   1  baz
+[7,]   2  bar
+
+In my opinion, the j column should always return only the columns that the user requested.  If the user wants additional columns (possibly from the join) then they can be requested explicitly.  Anyway, the workaround for this is to make a chain statement:
+
+> locs[list(as.integer(obsv[,loc]))][,name]
+[1] "baz" "bar" "baz" "baz" "foo" "baz" "bar"
+
+That looks good!  Now to assign using := I write
+
+> obsv[,locname:=locs[list(as.integer(obsv[,loc]))][,name]]
+     id loc       mvar locname
+[1,]  1   1 -1.8721465     baz
+[2,]  2   2 -0.5341284     bar
+[3,]  3   1 -2.2243473     baz
+[4,]  4   1 -0.3093871     baz
+[5,]  5   3 -0.7879228     foo
+[6,]  6   1 -0.5672113     baz
+[7,]  7   2  1.0390285     bar
+
+I would argue that this is surprisingly obtuse and not intuitive.  Things would get even more complicated if locs had a 2-column key!  
+
+I suppose one reply is that I should just temporarily set the key for obsv and then reassign the entire obsv data.table.  I.e.,
+
+> setkey(obsv,loc)
+> obsv=locs[obsv]
+> setkey(obsv,id)
+
+This works, but is somehow to my eyes particularly dissatisfying.  Keys must be reset twice.  Potentially large datasets must be reassigned in their entirety.  Another solution that performs in-place assignment is similar:
+
+> setkey(obsv,loc)
+> obsv[,locname:=locs[obsv][,name]]
+     id loc       mvar locname
+[1,]  1   1 -0.6648842     baz
+[2,]  3   1 -0.4477593     baz
+[3,]  4   1 -1.1300506     baz
+[4,]  6   1 -0.3041305     baz
+[5,]  2   2 -0.8239177     bar
+[6,]  7   2 -0.3416380     bar
+[7,]  5   3  1.2745693     foo
+> setkey(obsv,id)
+
+This is not so bad, but it would be a lot nicer to not have to set keys and to simply say:
+
+> obsv[,locname := locs[obsv,name]]
+
+This could be achieved if (1) joins were performed by matching commonly named columns (like an SQL natural join) if the the two tables did not share keys of the same cardinality and types and (2) only explicitly listed columns were returned.  In my opinion, this idea of "natural joins" based on column names would simplify joins a lot, while making them more generally useful and intuitive.  If column names differed, then you might specify a list instead, e.g.
+
+> A[list(id=B$a_id), val]
+
+or maybe specify the mapping as an optional parameter that could be used if A and B did not have common columns and if A and B's keys differed, e.g.
+
+> A[B, val, map=c("id=a_id")]
+
+If joins matched by name, then the implementation could check if the key was sufficiently satisfied to be used and otherwise it would just perform a more conventional non-key'd join.
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120801/10aeae22/attachment.html>
+
+From yikelu.home at gmail.com  Thu Aug  2 19:13:25 2012
+From: yikelu.home at gmail.com (Yike Lu)
+Date: Thu, 2 Aug 2012 13:13:25 -0400
+Subject: [datatable-help] datatable-help Digest, Vol 30, Issue 1
+In-Reply-To: <mailman.3.1343901603.20987.datatable-help@lists.r-forge.r-project.org>
+References: <mailman.3.1343901603.20987.datatable-help@lists.r-forge.r-project.org>
+Message-ID: <CAO=aP+cczn4QGdfgzocbUbkG9zLFVtt=HUsSAA8fOSMXizT-mg@mail.gmail.com>
+
+>
+>
+>
+> Suppose I have a data.table with a unique identifier and value and another
+> data.table with a cross-reference to that identifier and lots of other
+> measurement data.  E.g. suppose my lookup table is "locs" and my
+> measurement data is "obsv" as follows:
+>
+> obsv=data.table(id=1:7, loc=c(10,20,10,10,30,10,20), mvar=rnorm(7),
+> key='id')
+> locs=data.table(loc=c(30,20,10),name=c("foo","bar","baz"),
+> other=letters[1:3], key='loc')
+>
+> I simply want to add the 'name' column from locs to the obsv table using
+> :=.  But this quickly becomes really complicated because (1) the keys for
+> the two data.tables differ (appropriately), (2) the key for locs is an
+> integer, and (3) the return columns of a join always include the matching
+> columns.
+>
+> First of all, the gotcha is that locs[obsv[,loc]] doesn't work.  This is
+> because obsv[,loc] returns a numeric column, which is treated as indexing
+> the row numbers.  Surprise!
+>
+> > locs[obsv[,loc]]
+>      loc name other
+> [1,]  NA <NA>  <NA>
+> [2,]  NA <NA>  <NA>
+> [3,]  NA <NA>  <NA>
+> [4,]  NA <NA>  <NA>
+> [5,]  NA <NA>  <NA>
+> [6,]  NA <NA>  <NA>
+> [7,]  NA <NA>  <NA>
+>
+
+Actually the standard way to do this would be
+
+> setkey(locs, loc)[setkey(obsv, loc)]
+
+It would look nicer as 3 separate lines, but you catch my drift. This
+explicitly tells data.table which keys to join on.
+
+If you really want to filter down and only add name...
+
+> setkey(locs[, list(loc, names)], loc)[setkey(obsv loc)]
+
+For the record, I personally define infix operators to make this look
+nicer::
+
+`%lj%`=function(x,y) y[x]
+`%rj%`=function(x,y) x[y]
+`%oj%`=function(x,y) merge(x,y)
+`%ij%`=function(x,y) x[y, nomatch=0]
+
+I should probably do some type checking, but I preferred the one liners.
+The above then becomes:
+
+> setkey(locs[, list(loc, name)], loc) %rj% setkey(obsv, loc)
+
+
+>
+> This unexpected and silent behavior could easily cause very bad results.
+>  (When I first did this test I used 1,2 and 3 instead of 10,20 and 30 and
+> everything seemed to work!)  I think this inconsistency should be
+> addressed.  For example, consider modifying joins so that they only happen
+> when the i argument is a data.table or a list.  If it is a character, then
+> it should fail.  Part of the problem here is the inconsistency that
+> A[,col1] returns a vector of characters, but A[,list(col1,col2)] returns a
+> data.table.  If instead, data.tables were always returned unless, say, a
+> simplify=TRUE argument was provided, then we'd be in better shape because
+> locs[obsv[,loc]] would always be a join and locs[obsv[,loc,simplify=TRUE]]
+> would be a row retrieval as for data.frame.
+>
+
+I personally prefer the return of vector when using locs[, loc] as it's
+more consistent with the rest of the language. I agree that having DT[,
+list(col1, col2)] return a DT is kind of confusing, would be more
+consistent to have it return a list and then just have DT[,
+data.table(col1, col2)]
+
+
+
+>
+> Anyway, the solution to the above seems to be to create a list object for
+> i:
+>
+> > locs[list(obsv[,loc])]
+> Error in `[.data.table`(locs, list(obsv[, loc])) :
+>   typeof x.loc (integer) != typeof i.V1 (double)
+>
+> but that doesn't work because obsv$loc is class numeric and locs$loc is
+> class integer.  This is because locs$loc is silently changed to integer
+> when the key is set.  So, to perform a lookup we need to coerce to integer
+> as follows:
+>
+>
+Get the latest version, doubles are allowed in keys - no coercion to int.
+
+
+
+> I suppose one reply is that I should just temporarily set the key for obsv
+> and then reassign the entire obsv data.table.  I.e.,
+>
+> > setkey(obsv,loc)
+> > obsv=locs[obsv]
+> > setkey(obsv,id)
+>
+> This works, but is somehow to my eyes particularly dissatisfying.  Keys
+> must be reset twice.  Potentially large datasets must be reassigned in
+> their entirety.  Another solution that performs in-place assignment is
+> similar:
+>
+
+I see what you are saying here. What I typically would have done is
+reassign obsv to the joined version. I typically don't find that setting
+key is the bottleneck, and I never profiled the reassignment...
+
+> obsv <- setkey(locs[, list(loc, name)], loc) %rj% setkey(obsv, loc)
+
+But I get the feeling that this reassign is done efficiently, as there are
+lots of things that data.table warns you are inefficient. Maybe Matt can
+chime in here.
+
+As for the rest of your comments, I do agree that having foreign keys (that
+seems to be what you are asking for) would be more efficient. Not sure how
+easy or hard it would be, both implementation wise and syntactically. Also
+natural join would be nice to reduce frictions - maybe use it as a default
+in the case where there are no keys.
+
+
+>
+> > setkey(obsv,loc)
+> > obsv[,locname:=locs[obsv][,name]]
+>      id loc       mvar locname
+> [1,]  1   1 -0.6648842     baz
+> [2,]  3   1 -0.4477593     baz
+> [3,]  4   1 -1.1300506     baz
+> [4,]  6   1 -0.3041305     baz
+> [5,]  2   2 -0.8239177     bar
+> [6,]  7   2 -0.3416380     bar
+> [7,]  5   3  1.2745693     foo
+> > setkey(obsv,id)
+>
+> This is not so bad, but it would be a lot nicer to not have to set keys
+> and to simply say:
+>
+> > obsv[,locname := locs[obsv,name]]
+>
+> This could be achieved if (1) joins were performed by matching commonly
+> named columns (like an SQL natural join) if the the two tables did not
+> share keys of the same cardinality and types and (2) only explicitly listed
+> columns were returned.  In my opinion, this idea of "natural joins" based
+> on column names would simplify joins a lot, while making them more
+> generally useful and intuitive.  If column names differed, then you might
+> specify a list instead, e.g.
+>
+> > A[list(id=B$a_id), val]
+>
+> or maybe specify the mapping as an optional parameter that could be used
+> if A and B did not have common columns and if A and B's keys differed, e.g.
+>
+> > A[B, val, map=c("id=a_id")]
+>
+> If joins matched by name, then the implementation could check if the key
+> was sufficiently satisfied to be used and otherwise it would just perform a
+> more conventional non-key'd join.
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120802/43291bc0/attachment.html>
+
+From chudon at planora.com  Fri Aug  3 17:34:44 2012
+From: chudon at planora.com (Christian Hudon)
+Date: Fri, 3 Aug 2012 11:34:44 -0400
+Subject: [datatable-help] Odd behavior with [.data.table and J
+Message-ID: <CAA4YFjNz1GPAfL04nMjvwr87b-82D6grinhZCH8L_6GDT+vgJw@mail.gmail.com>
+
+Hello,
+
+I'm running into an odd behavior with data.table. Given the following
+variables:
+
+> tbl = data.table(foo=c(1,2,3), bar=c(1.1, 2.2, 3.3))
+> setkey(tbl, foo)
+> i = data.frame(foo=1)
+
+... I would expect the following three ways of indexing "tbl" using "i" to
+give the same result, but they don't:
+
+> tbl[i]
+   foo bar
+1:   1 1.1
+> tbl[J(i)]
+Error in `[.data.table`(tbl, J(i)) :
+  typeof x.foo (double) != typeof i.V1 (list)
+> tbl[data.table(i)]
+   foo bar
+1:   1 1.1
+
+Anything I'm missing on why tbl[J(i)] wouldn't work like the other two? Or
+have I hit a bug? I'm running R 2.15.1 64bit on Windows 7, with data.table
+1.8.2.
+
+Thanks,
+
+  Christian
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120803/60d487fc/attachment.html>
+
+From mscherme at google.com  Fri Aug  3 21:54:02 2012
+From: mscherme at google.com (Michael Schermerhorn)
+Date: Fri, 3 Aug 2012 12:54:02 -0700
+Subject: [datatable-help] data.table 1.8.2: Problem using by= and a key that
+ doesn't match any rows in the table
+Message-ID: <CADBm8toZBj5nYM4an8tz69SFyaeQ90t-iXVwmeZS-3Ks7Ys3dA@mail.gmail.com>
+
+I recently updated from data.table 1.7.1 to 1.8.2 and found that my old
+code using data.table
+no longer works.  I'm not sure if this is being caused by a bug in the new
+version of data.table
+or an intentional change to the way data.table works.
+
+In 1.7.1, I could do the following:
+> DT <- data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9)
+> setkey(DT, x)
+> DT[J(c("a", "b", "d")), sum(v), by=x]
+        x V1
+[1,]    a  6
+[2,]    b 15
+[3,] <NA> NA
+
+
+In 1.8.2, however, I get an error message:
+> DT <- data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9)
+> setkey(DT, x)
+> DT[J(c("a", "b", "d")), sum(v), by=x]
+Error in if (any(irows < 1L | irows > nrow(x))) stop("Internal error: some
+irows<1 or >nrow(x)") :
+  missing value where TRUE/FALSE needed
+
+
+Looking through the NEWS file I don't see any mention of this change (It's
+possible that I just missed it).
+If this an intentional change, I would ask that you consider reverting it.
+ It seems inconsistent that
+DT[J(c("a", "b", "d"))] adds a new row to the table, but DT[J(c("a", "b",
+"d")), sum(v), by=x]
+causes an error.
+
+Personally I think the following makes the most sense.  But just reverting
+back to what it did in 1.7.1
+seems better than having an error.
+> DT[J(c("a", "b", "d")), sum(v), by=x]
+     x V1
+[1,] a  6
+[2,] b 15
+[3,] d NA
+
+
+Thank you,
+Mike
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120803/008cbae8/attachment.html>
+
+From dkulp at dizz.org  Sat Aug  4 17:08:52 2012
+From: dkulp at dizz.org (David Kulp)
+Date: Sat, 4 Aug 2012 11:08:52 -0400
+Subject: [datatable-help] datatable-help Digest, Vol 30, Issue 1
+In-Reply-To: <CAO=aP+cczn4QGdfgzocbUbkG9zLFVtt=HUsSAA8fOSMXizT-mg@mail.gmail.com>
+References: <mailman.3.1343901603.20987.datatable-help@lists.r-forge.r-project.org>
+ <CAO=aP+cczn4QGdfgzocbUbkG9zLFVtt=HUsSAA8fOSMXizT-mg@mail.gmail.com>
+Message-ID: <DEB6BD46-CB0B-4D50-8327-716598BB9EB4@dizz.org>
+
+
+On Aug 2, 2012, at 1:13 PM, Yike Lu wrote:
+
+> 
+> 
+> Suppose I have a data.table with a unique identifier and value and another data.table with a cross-reference to that identifier and lots of other measurement data.  E.g. suppose my lookup table is "locs" and my measurement data is "obsv" as follows:
+> 
+> obsv=data.table(id=1:7, loc=c(10,20,10,10,30,10,20), mvar=rnorm(7), key='id')
+> locs=data.table(loc=c(30,20,10),name=c("foo","bar","baz"), other=letters[1:3], key='loc')
+> 
+> I simply want to add the 'name' column from locs to the obsv table using :=.  But this quickly becomes really complicated because (1) the keys for the two data.tables differ (appropriately), (2) the key for locs is an integer, and (3) the return columns of a join always include the matching columns.
+> 
+> First of all, the gotcha is that locs[obsv[,loc]] doesn't work.  This is because obsv[,loc] returns a numeric column, which is treated as indexing the row numbers.  Surprise!
+> 
+> > locs[obsv[,loc]]
+>      loc name other
+> [1,]  NA <NA>  <NA>
+> [2,]  NA <NA>  <NA>
+> [3,]  NA <NA>  <NA>
+> [4,]  NA <NA>  <NA>
+> [5,]  NA <NA>  <NA>
+> [6,]  NA <NA>  <NA>
+> [7,]  NA <NA>  <NA>
+> 
+> Actually the standard way to do this would be
+> 
+> > setkey(locs, loc)[setkey(obsv, loc)]
+
+Thanks for this followup.  I didn't realize that setkey returned the data.table.  This makes for an interesting idiom!.
+
+At least now I know what to do, but I stumbled a lot in the process.  From a design philosophy perspective, I see data.table as designed around specific ways of doing things (e.g. assuming that keys are set for joins, assuming that the first columns of Y match the key of X or that Y has a key, etc.).  If your needs don't match these design assumptions, then you have to make modifications.  An alternative approach is to write the syntax for the general case, but implement important optimizations.  For example, always perform a natural join (matching corresponding names in X and Y) for any X[Y], add something like X[Y, by=(Xcol1=Ycol1, ...)] and if the matching uses the key for X, then all the better. 
+
+> 
+> It would look nicer as 3 separate lines, but you catch my drift. This explicitly tells data.table which keys to join on.
+> 
+> If you really want to filter down and only add name...
+> 
+> > setkey(locs[, list(loc, names)], loc)[setkey(obsv loc)]
+> 
+> For the record, I personally define infix operators to make this look nicer::
+> 
+> `%lj%`=function(x,y) y[x]
+> `%rj%`=function(x,y) x[y]
+> `%oj%`=function(x,y) merge(x,y)
+> `%ij%`=function(x,y) x[y, nomatch=0]
+> 
+> I should probably do some type checking, but I preferred the one liners. The above then becomes:
+> 
+> > setkey(locs[, list(loc, name)], loc) %rj% setkey(obsv, loc)
+>  
+> 
+> This unexpected and silent behavior could easily cause very bad results.  (When I first did this test I used 1,2 and 3 instead of 10,20 and 30 and everything seemed to work!)  I think this inconsistency should be addressed.  For example, consider modifying joins so that they only happen when the i argument is a data.table or a list.  If it is a character, then it should fail.  Part of the problem here is the inconsistency that A[,col1] returns a vector of characters, but A[,list(col1,col2)] returns a data.table.  If instead, data.tables were always returned unless, say, a simplify=TRUE argument was provided, then we'd be in better shape because locs[obsv[,loc]] would always be a join and locs[obsv[,loc,simplify=TRUE]] would be a row retrieval as for data.frame.
+> 
+> I personally prefer the return of vector when using locs[, loc] as it's more consistent with the rest of the language. I agree that having DT[, list(col1, col2)] return a DT is kind of confusing, would be more consistent to have it return a list and then just have DT[, data.table(col1, col2)]
+> 
+>  
+> 
+> Anyway, the solution to the above seems to be to create a list object for i:
+> 
+> > locs[list(obsv[,loc])]
+> Error in `[.data.table`(locs, list(obsv[, loc])) :
+>   typeof x.loc (integer) != typeof i.V1 (double)
+> 
+> but that doesn't work because obsv$loc is class numeric and locs$loc is class integer.  This is because locs$loc is silently changed to integer when the key is set.  So, to perform a lookup we need to coerce to integer as follows:
+> 
+> 
+> Get the latest version, doubles are allowed in keys - no coercion to int.
+
+Thank you!
+
+> 
+>  
+> I suppose one reply is that I should just temporarily set the key for obsv and then reassign the entire obsv data.table.  I.e.,
+> 
+> > setkey(obsv,loc)
+> > obsv=locs[obsv]
+> > setkey(obsv,id)
+> 
+> This works, but is somehow to my eyes particularly dissatisfying.  Keys must be reset twice.  Potentially large datasets must be reassigned in their entirety.  Another solution that performs in-place assignment is similar:
+> 
+> I see what you are saying here. What I typically would have done is reassign obsv to the joined version. I typically don't find that setting key is the bottleneck, and I never profiled the reassignment...
+> 
+> > obsv <- setkey(locs[, list(loc, name)], loc) %rj% setkey(obsv, loc)
+> 
+> But I get the feeling that this reassign is done efficiently, as there are lots of things that data.table warns you are inefficient. Maybe Matt can chime in here.
+> 
+> As for the rest of your comments, I do agree that having foreign keys (that seems to be what you are asking for) would be more efficient. Not sure how easy or hard it would be, both implementation wise and syntactically. Also natural join would be nice to reduce frictions - maybe use it as a default in the case where there are no keys.
+>  
+> 
+> > setkey(obsv,loc)
+> > obsv[,locname:=locs[obsv][,name]]
+>      id loc       mvar locname
+> [1,]  1   1 -0.6648842     baz
+> [2,]  3   1 -0.4477593     baz
+> [3,]  4   1 -1.1300506     baz
+> [4,]  6   1 -0.3041305     baz
+> [5,]  2   2 -0.8239177     bar
+> [6,]  7   2 -0.3416380     bar
+> [7,]  5   3  1.2745693     foo
+> > setkey(obsv,id)
+> 
+> This is not so bad, but it would be a lot nicer to not have to set keys and to simply say:
+> 
+> > obsv[,locname := locs[obsv,name]]
+> 
+> This could be achieved if (1) joins were performed by matching commonly named columns (like an SQL natural join) if the the two tables did not share keys of the same cardinality and types and (2) only explicitly listed columns were returned.  In my opinion, this idea of "natural joins" based on column names would simplify joins a lot, while making them more generally useful and intuitive.  If column names differed, then you might specify a list instead, e.g.
+> 
+> > A[list(id=B$a_id), val]
+> 
+> or maybe specify the mapping as an optional parameter that could be used if A and B did not have common columns and if A and B's keys differed, e.g.
+> 
+> > A[B, val, map=c("id=a_id")]
+> 
+> If joins matched by name, then the implementation could check if the key was sufficiently satisfied to be used and otherwise it would just perform a more conventional non-key'd join.
+> 
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120804/e3804a89/attachment.html>
+
+From mdowle at mdowle.plus.com  Mon Aug  6 18:53:36 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 6 Aug 2012 17:53:36 +0100
+Subject: [datatable-help] datatable-help Digest, Vol 30, Issue 1
+In-Reply-To: <DEB6BD46-CB0B-4D50-8327-716598BB9EB4@dizz.org>
+References: <mailman.3.1343901603.20987.datatable-help@lists.r-forge.r-project.org>
+ <CAO=aP+cczn4QGdfgzocbUbkG9zLFVtt=HUsSAA8fOSMXizT-mg@mail.gmail.com>
+ <DEB6BD46-CB0B-4D50-8327-716598BB9EB4@dizz.org>
+Message-ID: <5f9c3a9f1ca43874e471e4803595e3fc.squirrel@webmail.plus.net>
+
+
+> On Aug 2, 2012, at 1:13 PM, Yike Lu wrote:
+>>
+>> David Kulp wrote :
+>>
+>> Suppose I have a data.table with a unique identifier and value and
+>> another data.table with a cross-reference to that identifier and lots of
+>> other measurement data.  E.g. suppose my lookup table is "locs" and my
+>> measurement data is "obsv" as follows:
+>>
+>> obsv=data.table(id=1:7, loc=c(10,20,10,10,30,10,20), mvar=rnorm(7),
+>> key='id')
+>> locs=data.table(loc=c(30,20,10),name=c("foo","bar","baz"),
+>> other=letters[1:3], key='loc')
+>>
+>> I simply want to add the 'name' column from locs to the obsv table using
+>> :=.  But this quickly becomes really complicated because (1) the keys
+>> for the two data.tables differ (appropriately), (2) the key for locs is
+>> an integer, and (3) the return columns of a join always include the
+>> matching columns.
+>>
+>> First of all, the gotcha is that locs[obsv[,loc]] doesn't work.  This is
+>> because obsv[,loc] returns a numeric column, which is treated as
+>> indexing the row numbers.  Surprise!
+
+See FAQ 1.3:
+ Q: Why does DT[,region] return a vector? I'd like a 1-column data.table.
+There is no drop argument like I'm used to in data.frame.
+ A: Try DT[,list(region)] instead.
+
+Also ?data.table has this when describing j :
+
+  "[...] A single column or single expression returns that type, usually a
+vector. See the examples."
+
+where the examples include :
+
+   DT[,v]        # v column (as vector)
+   DT[,list(v)]  # v column (as data.table)
+
+When a numeric vector is then passed as i, that's row lookup by row
+number, so intended behaviour.
+
+>>
+>> > locs[obsv[,loc]]
+>>      loc name other
+>> [1,]  NA <NA>  <NA>
+>> [2,]  NA <NA>  <NA>
+>> [3,]  NA <NA>  <NA>
+>> [4,]  NA <NA>  <NA>
+>> [5,]  NA <NA>  <NA>
+>> [6,]  NA <NA>  <NA>
+>> [7,]  NA <NA>  <NA>
+>>
+>> Actually the standard way to do this would be
+>>
+>> > setkey(locs, loc)[setkey(obsv, loc)]
+
+Yes that's one way. Another is merge.data.table, which does that, but
+without modifying the keys of the objects.
+
+merge.data.table has always had it's own help page but as from 1.8.2,
+typing ?merge brings up a choice of which merge (base or data.table) to
+look at.
+
+To see how merge.data.table does the change in keys (it's a fairly short
+function), type
+
+   data.table:::merge.data.table
+
+
+> Thanks for this followup.  I didn't realize that setkey returned the
+> data.table.  This makes for an interesting idiom!.
+>
+> At least now I know what to do, but I stumbled a lot in the process.  From
+> a design philosophy perspective, I see data.table as designed around
+> specific ways of doing things (e.g. assuming that keys are set for joins,
+> assuming that the first columns of Y match the key of X or that Y has a
+> key, etc.).  If your needs don't match these design assumptions, then you
+> have to make modifications.  An alternative approach is to write the
+> syntax for the general case, but implement important optimizations.  For
+> example, always perform a natural join (matching corresponding names in X
+> and Y) for any X[Y], add something like X[Y, by=(Xcol1=Ycol1, ...)] and if
+> the matching uses the key for X, then all the better.
+>
+
+True and agreed. But merge() may be that general case. This is why merge's
+performance has been improved in recent versions, so its speed is
+comparable to X[Y] but with more flexible capabilities.
+
+Also see FAQ 1.12 "What is the difference between X[Y] and merge(X,Y)?"
+
+>>
+>> It would look nicer as 3 separate lines, but you catch my drift. This
+>> explicitly tells data.table which keys to join on.
+>>
+>> If you really want to filter down and only add name...
+>>
+>> > setkey(locs[, list(loc, names)], loc)[setkey(obsv loc)]
+>>
+>> For the record, I personally define infix operators to make this look
+>> nicer::
+>>
+>> `%lj%`=function(x,y) y[x]
+>> `%rj%`=function(x,y) x[y]
+>> `%oj%`=function(x,y) merge(x,y)
+>> `%ij%`=function(x,y) x[y, nomatch=0]
+>>
+>> I should probably do some type checking, but I preferred the one liners.
+>> The above then becomes:
+>>
+>> > setkey(locs[, list(loc, name)], loc) %rj% setkey(obsv, loc)
+>>
+>>
+>> This unexpected and silent behavior could easily cause very bad results.
+>>  (When I first did this test I used 1,2 and 3 instead of 10,20 and 30
+>> and everything seemed to work!)  I think this inconsistency should be
+>> addressed.  For example, consider modifying joins so that they only
+>> happen when the i argument is a data.table or a list.
+
+>> If it is a character, then it should fail.
+
+That's interesting idea. I'm now so used to passing character vectors as i
+that I wouldn't like to lose that. There isn't any ambiguity, so what else
+could it mean (is the thinking)? An option could be added to turn that off
+and make it work the way you want, though. How about new option
+datatable.nocharacteri=TRUE? By default this would be FALSE, since code
+depends on that feature. When TRUE, i would generate an error whenever
+type 'character'.
+
+>> Part of the problem here is the
+>> inconsistency that A[,col1] returns a vector of characters, but
+>> A[,list(col1,col2)] returns a data.table.  If instead, data.tables were
+>> always returned unless, say, a simplify=TRUE argument was provided, then
+>> we'd be in better shape because locs[obsv[,loc]] would always be a join
+>> and locs[obsv[,loc,simplify=TRUE]] would be a row retrieval as for
+>> data.frame.
+
+That would be one approach. But then there would be 4 cases :
+
+    obsv[,loc,simplify=TRUE]
+    obsv[,list(loc),simplify=TRUE]
+    obsv[,loc,simplify=FALSE]
+    obsv[,list(loc),simplify=FALSE]
+
+and I'm getting confused what each should do (let alone having to remember
+what the default for simplify might be). So there isn't a simplify
+argument, and we just have 2 cases :
+
+    obsv[,loc]        # returns vector
+    obsv[,list(loc)]  # returns data.table
+
+which is a little simpler. In the rare cases you really want a list and
+not a data.table, then wrap the result with as.list() :
+
+    as.list(obsv[,list(loc)])
+
+When 'by' is used too, it's very important for speed that (the iterated) j
+is a (primitive) list. Knowing that, it's easier to see why the following
+might rarely be done (if a raw list result is required rather than
+data.table) :
+
+    as.list(obsv[,list(loc),by=grp])
+
+
+>>
+>> I personally prefer the return of vector when using locs[, loc] as it's
+>> more consistent with the rest of the language. I agree that having DT[,
+>> list(col1, col2)] return a DT is kind of confusing, would be more
+>> consistent to have it return a list and then just have DT[,
+>> data.table(col1, col2)]
+
+Perhaps, but this design decision is for speed, and it makes a big
+difference: list() is primitive. FAQ 2.6 mentions it.
+
+FAQ 2.6 :
+ Q: Why has the DT() alias been removed?
+ A: DT() was introduced originally as a wrapper for a list of j
+expressions. Since DT was an alias for data.table, this was a convenient
+way to take care of silent recycling in cases where each item of the j
+list evaluated to different lengths. The alias was one reason grouping
+was slow, though. As of v1.3, list() should be passed instead to the j
+argument. list() is a primitive and is much faster, especially when there
+are many groups. [Snip...]
+
+>>
+>> Anyway, the solution to the above seems to be to create a list object
+>> for i:
+>>
+>> > locs[list(obsv[,loc])]
+>> Error in `[.data.table`(locs, list(obsv[, loc])) :
+>>   typeof x.loc (integer) != typeof i.V1 (double)
+
+That's one way, but I usually use J() so it's clear I mean to join :
+
+   locs[J(obsv$loc)]
+
+or
+
+   locs[J(obsv[,loc])]
+
+>>
+>> but that doesn't work because obsv$loc is class numeric and locs$loc is
+>> class integer.  This is because locs$loc is silently changed to integer
+>> when the key is set.  So, to perform a lookup we need to coerce to
+>> integer as follows:
+>>
+>>
+>> Get the latest version, doubles are allowed in keys - no coercion to
+>> int.
+>
+> Thank you!
+>
+>>
+>>
+>> I suppose one reply is that I should just temporarily set the key for
+>> obsv and then reassign the entire obsv data.table.  I.e.,
+>>
+>> > setkey(obsv,loc)
+>> > obsv=locs[obsv]
+>> > setkey(obsv,id)
+>>
+>> This works, but is somehow to my eyes particularly dissatisfying.  Keys
+>> must be reset twice.  Potentially large datasets must be reassigned in
+>> their entirety.  Another solution that performs in-place assignment is
+>> similar:
+>>
+>> I see what you are saying here. What I typically would have done is
+>> reassign obsv to the joined version. I typically don't find that setting
+>> key is the bottleneck, and I never profiled the reassignment...
+>>
+>> > obsv <- setkey(locs[, list(loc, name)], loc) %rj% setkey(obsv, loc)
+>>
+>> But I get the feeling that this reassign is done efficiently, as there
+>> are lots of things that data.table warns you are inefficient. Maybe Matt
+>> can chime in here.
+
+Essentially David seems to be looking for secondary keys. Secondary keys
+can be done manually now without too much difficulty (search
+datatable-help archive for "secondary key").  There is a feature request
+(#1007) to build secondary keys into the syntax :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+
+
+>>
+>> As for the rest of your comments, I do agree that having foreign keys
+>> (that seems to be what you are asking for) would be more efficient. Not
+>> sure how easy or hard it would be, both implementation wise and
+>> syntactically. Also natural join would be nice to reduce frictions -
+>> maybe use it as a default in the case where there are no keys.
+>>
+>>
+>> > setkey(obsv,loc)
+>> > obsv[,locname:=locs[obsv][,name]]
+>>      id loc       mvar locname
+>> [1,]  1   1 -0.6648842     baz
+>> [2,]  3   1 -0.4477593     baz
+>> [3,]  4   1 -1.1300506     baz
+>> [4,]  6   1 -0.3041305     baz
+>> [5,]  2   2 -0.8239177     bar
+>> [6,]  7   2 -0.3416380     bar
+>> [7,]  5   3  1.2745693     foo
+>> > setkey(obsv,id)
+>>
+>> This is not so bad, but it would be a lot nicer to not have to set keys
+>> and to simply say:
+>>
+>> > obsv[,locname := locs[obsv,name]]
+>>
+>> This could be achieved if (1) joins were performed by matching commonly
+>> named columns (like an SQL natural join) if the the two tables did not
+>> share keys of the same cardinality and types and (2) only explicitly
+>> listed columns were returned.  In my opinion, this idea of "natural
+>> joins" based on column names would simplify joins a lot, while making
+>> them more generally useful and intuitive.  If column names differed,
+>> then you might specify a list instead, e.g.
+>>
+>> > A[list(id=B$a_id), val]
+>>
+>> or maybe specify the mapping as an optional parameter that could be used
+>> if A and B did not have common columns and if A and B's keys differed,
+>> e.g.
+>>
+>> > A[B, val, map=c("id=a_id")]
+
+This is what merge.data.table already does, iiuc. Albeit with feature
+request #2033 "Add by.x and by.y to merge.data.table" :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=2033&group_id=240&atid=978
+
+With secondary keys we may be heading for a new argument to [.data.table
+just like that, yes.
+
+
+>>
+>> If joins matched by name, then the implementation could check if the key
+>> was sufficiently satisfied to be used and otherwise it would just
+>> perform a more conventional non-key'd join.
+
+Just to check here you know that i doesn't have to be keyed. Just x. It's
+not a match by column name, but by position, though (which I prefer since
+I find it onerous to make sure column names match). Note this from
+?data.table :
+
+   " When i is a data.table, x must have a key. i is joined to x using x's
+key and the rows in x that match are returned. An equi-join is
+performed between each column in i to each column in x's key; i.e.,
+column 1 of i is matched to the 1st column of x's key, column 2 to the
+second, etc. "
+
+Note that "If i also has a key" comes later in that paragraph; i.e., i
+doesn't have to be keyed.
+
+However, #2175 now added ("Add natural joins i.e. X[Y] when X has no key
+could use common column names"), thanks. I think it might be covered by
+merge() though as that's what that does. Maybe not in combination with j
+(that's the efficiency limitiation of merge) :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=2175&group_id=240&atid=978
+
+Finally, there is a feature request #1757 "Add drop to [.data.table", for
+the case you mentioned somewhere to avoid all join columns (or by columns)
+being returned, indeed useful with := and other cases.  Strictly speaking
+drop is already an argument but deliberately doesn't do anything. The
+reason it's there is documented in ?data.table.  So this feature request
+would start to use it, rather than add it.
+
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1757&group_id=240&atid=978
+
+
+In summary, hope that adds some colour to existing and deliberate
+behaviour that is unlikely to change, whilst also pointing to
+merge.data.table, manual secondary keys and other feature requests on the
+agenda.
+
+Matthew
+
+>>
+>>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Mon Aug  6 18:58:11 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 6 Aug 2012 17:58:11 +0100
+Subject: [datatable-help] Adding a column in place and join surprises
+In-Reply-To: <04FCBEE1-13A6-4AAE-8386-B8EFD7133E13@dizz.org>
+References: <04FCBEE1-13A6-4AAE-8386-B8EFD7133E13@dizz.org>
+Message-ID: <43f5d6ec680c080360ea767b7f4aea37.squirrel@webmail.plus.net>
+
+
+For the archives, this post was answer in a different thread :
+
+http://r.789695.n4.nabble.com/Re-datatable-help-Digest-Vol-30-Issue-1-tp4638913.html
+
+> Suppose I have a data.table with a unique identifier and value and another
+> data.table with a cross-reference to that identifier and lots of other
+> measurement data.  E.g. suppose my lookup table is "locs" and my
+> measurement data is "obsv" as follows:
+>
+> obsv=data.table(id=1:7, loc=c(10,20,10,10,30,10,20), mvar=rnorm(7),
+> key='id')
+> locs=data.table(loc=c(30,20,10),name=c("foo","bar","baz"),
+> other=letters[1:3], key='loc')
+>
+> I simply want to add the 'name' column from locs to the obsv table using
+> :=.  But this quickly becomes really complicated because (1) the keys for
+> the two data.tables differ (appropriately), (2) the key for locs is an
+> integer, and (3) the return columns of a join always include the matching
+> columns.
+>
+> First of all, the gotcha is that locs[obsv[,loc]] doesn't work.  This is
+> because obsv[,loc] returns a numeric column, which is treated as indexing
+> the row numbers.  Surprise!
+>
+>> locs[obsv[,loc]]
+>      loc name other
+> [1,]  NA <NA>  <NA>
+> [2,]  NA <NA>  <NA>
+> [3,]  NA <NA>  <NA>
+> [4,]  NA <NA>  <NA>
+> [5,]  NA <NA>  <NA>
+> [6,]  NA <NA>  <NA>
+> [7,]  NA <NA>  <NA>
+>
+> This unexpected and silent behavior could easily cause very bad results.
+> (When I first did this test I used 1,2 and 3 instead of 10,20 and 30 and
+> everything seemed to work!)  I think this inconsistency should be
+> addressed.  For example, consider modifying joins so that they only happen
+> when the i argument is a data.table or a list.  If it is a character, then
+> it should fail.  Part of the problem here is the inconsistency that
+> A[,col1] returns a vector of characters, but A[,list(col1,col2)] returns a
+> data.table.  If instead, data.tables were always returned unless, say, a
+> simplify=TRUE argument was provided, then we'd be in better shape because
+> locs[obsv[,loc]] would always be a join and locs[obsv[,loc,simplify=TRUE]]
+> would be a row retrieval as for data.frame.
+>
+> Anyway, the solution to the above seems to be to create a list object for
+> i:
+>
+>> locs[list(obsv[,loc])]
+> Error in `[.data.table`(locs, list(obsv[, loc])) :
+>   typeof x.loc (integer) != typeof i.V1 (double)
+>
+> but that doesn't work because obsv$loc is class numeric and locs$loc is
+> class integer.  This is because locs$loc is silently changed to integer
+> when the key is set.  So, to perform a lookup we need to coerce to integer
+> as follows:
+>
+>> locs[list(as.integer(obsv[,loc]))]
+>      loc name other
+> [1,]   1  baz     c
+> [2,]   2  bar     b
+> [3,]   1  baz     c
+> [4,]   1  baz     c
+> [5,]   3  foo     a
+> [6,]   1  baz     c
+> [7,]   2  bar     b
+>
+> But if I want a right-hand-side value for assignment, then I need just a
+> single column.  However, there is an inconsistency: a join adds the extra
+> join column names even if I specify only the column I want.
+>
+>> locs[list(as.integer(obsv[,loc])),name]
+>      loc name
+> [1,]   1  baz
+> [2,]   2  bar
+> [3,]   1  baz
+> [4,]   1  baz
+> [5,]   3  foo
+> [6,]   1  baz
+> [7,]   2  bar
+>
+> In my opinion, the j column should always return only the columns that the
+> user requested.  If the user wants additional columns (possibly from the
+> join) then they can be requested explicitly.  Anyway, the workaround for
+> this is to make a chain statement:
+>
+>> locs[list(as.integer(obsv[,loc]))][,name]
+> [1] "baz" "bar" "baz" "baz" "foo" "baz" "bar"
+>
+> That looks good!  Now to assign using := I write
+>
+>> obsv[,locname:=locs[list(as.integer(obsv[,loc]))][,name]]
+>      id loc       mvar locname
+> [1,]  1   1 -1.8721465     baz
+> [2,]  2   2 -0.5341284     bar
+> [3,]  3   1 -2.2243473     baz
+> [4,]  4   1 -0.3093871     baz
+> [5,]  5   3 -0.7879228     foo
+> [6,]  6   1 -0.5672113     baz
+> [7,]  7   2  1.0390285     bar
+>
+> I would argue that this is surprisingly obtuse and not intuitive.  Things
+> would get even more complicated if locs had a 2-column key!
+>
+> I suppose one reply is that I should just temporarily set the key for obsv
+> and then reassign the entire obsv data.table.  I.e.,
+>
+>> setkey(obsv,loc)
+>> obsv=locs[obsv]
+>> setkey(obsv,id)
+>
+> This works, but is somehow to my eyes particularly dissatisfying.  Keys
+> must be reset twice.  Potentially large datasets must be reassigned in
+> their entirety.  Another solution that performs in-place assignment is
+> similar:
+>
+>> setkey(obsv,loc)
+>> obsv[,locname:=locs[obsv][,name]]
+>      id loc       mvar locname
+> [1,]  1   1 -0.6648842     baz
+> [2,]  3   1 -0.4477593     baz
+> [3,]  4   1 -1.1300506     baz
+> [4,]  6   1 -0.3041305     baz
+> [5,]  2   2 -0.8239177     bar
+> [6,]  7   2 -0.3416380     bar
+> [7,]  5   3  1.2745693     foo
+>> setkey(obsv,id)
+>
+> This is not so bad, but it would be a lot nicer to not have to set keys
+> and to simply say:
+>
+>> obsv[,locname := locs[obsv,name]]
+>
+> This could be achieved if (1) joins were performed by matching commonly
+> named columns (like an SQL natural join) if the the two tables did not
+> share keys of the same cardinality and types and (2) only explicitly
+> listed columns were returned.  In my opinion, this idea of "natural joins"
+> based on column names would simplify joins a lot, while making them more
+> generally useful and intuitive.  If column names differed, then you might
+> specify a list instead, e.g.
+>
+>> A[list(id=B$a_id), val]
+>
+> or maybe specify the mapping as an optional parameter that could be used
+> if A and B did not have common columns and if A and B's keys differed,
+> e.g.
+>
+>> A[B, val, map=c("id=a_id")]
+>
+> If joins matched by name, then the implementation could check if the key
+> was sufficiently satisfied to be used and otherwise it would just perform
+> a more conventional non-key'd join.
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Mon Aug  6 19:05:16 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 6 Aug 2012 18:05:16 +0100
+Subject: [datatable-help] data.table 1.8.2: Problem using by= and a key
+ that doesn't match any rows in the table
+In-Reply-To: <CADBm8toZBj5nYM4an8tz69SFyaeQ90t-iXVwmeZS-3Ks7Ys3dA@mail.gmail.com>
+References: <CADBm8toZBj5nYM4an8tz69SFyaeQ90t-iXVwmeZS-3Ks7Ys3dA@mail.gmail.com>
+Message-ID: <6442c4a6ba3e564256c88def740083c2.squirrel@webmail.plus.net>
+
+
+Yes this is a bug, already reported:  #2162 "Internal error with
+simultanous join (with missing groups) and group by in 1.8.2"
+
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=2162&group_id=240&atid=975
+
+Will fix and add tests.  Thanks for reporting.  Have added link to your
+example to the report.
+
+Matthew
+
+> I recently updated from data.table 1.7.1 to 1.8.2 and found that my old
+> code using data.table
+> no longer works.  I'm not sure if this is being caused by a bug in the new
+> version of data.table
+> or an intentional change to the way data.table works.
+>
+> In 1.7.1, I could do the following:
+>> DT <- data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9)
+>> setkey(DT, x)
+>> DT[J(c("a", "b", "d")), sum(v), by=x]
+>         x V1
+> [1,]    a  6
+> [2,]    b 15
+> [3,] <NA> NA
+>
+>
+> In 1.8.2, however, I get an error message:
+>> DT <- data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9)
+>> setkey(DT, x)
+>> DT[J(c("a", "b", "d")), sum(v), by=x]
+> Error in if (any(irows < 1L | irows > nrow(x))) stop("Internal error: some
+> irows<1 or >nrow(x)") :
+>   missing value where TRUE/FALSE needed
+>
+>
+> Looking through the NEWS file I don't see any mention of this change (It's
+> possible that I just missed it).
+> If this an intentional change, I would ask that you consider reverting it.
+>  It seems inconsistent that
+> DT[J(c("a", "b", "d"))] adds a new row to the table, but DT[J(c("a", "b",
+> "d")), sum(v), by=x]
+> causes an error.
+>
+> Personally I think the following makes the most sense.  But just reverting
+> back to what it did in 1.7.1
+> seems better than having an error.
+>> DT[J(c("a", "b", "d")), sum(v), by=x]
+>      x V1
+> [1,] a  6
+> [2,] b 15
+> [3,] d NA
+>
+>
+> Thank you,
+> Mike
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mscherme at google.com  Mon Aug  6 19:13:53 2012
+From: mscherme at google.com (Michael Schermerhorn)
+Date: Mon, 6 Aug 2012 10:13:53 -0700
+Subject: [datatable-help] data.table 1.8.2: Problem using by= and a key
+ that doesn't match any rows in the table
+In-Reply-To: <6442c4a6ba3e564256c88def740083c2.squirrel@webmail.plus.net>
+References: <CADBm8toZBj5nYM4an8tz69SFyaeQ90t-iXVwmeZS-3Ks7Ys3dA@mail.gmail.com>
+ <6442c4a6ba3e564256c88def740083c2.squirrel@webmail.plus.net>
+Message-ID: <CADBm8toi7+fznfe0LwahSRqgf_2P6NTH=stWD8zV=vJUMW65aw@mail.gmail.com>
+
+Thank you.
+
+On Mon, Aug 6, 2012 at 10:05 AM, Matthew Dowle <mdowle at mdowle.plus.com>wrote:
+
+>
+> Yes this is a bug, already reported:  #2162 "Internal error with
+> simultanous join (with missing groups) and group by in 1.8.2"
+>
+>
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=2162&group_id=240&atid=975
+>
+> Will fix and add tests.  Thanks for reporting.  Have added link to your
+> example to the report.
+>
+> Matthew
+>
+> > I recently updated from data.table 1.7.1 to 1.8.2 and found that my old
+> > code using data.table
+> > no longer works.  I'm not sure if this is being caused by a bug in the
+> new
+> > version of data.table
+> > or an intentional change to the way data.table works.
+> >
+> > In 1.7.1, I could do the following:
+> >> DT <- data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9)
+> >> setkey(DT, x)
+> >> DT[J(c("a", "b", "d")), sum(v), by=x]
+> >         x V1
+> > [1,]    a  6
+> > [2,]    b 15
+> > [3,] <NA> NA
+> >
+> >
+> > In 1.8.2, however, I get an error message:
+> >> DT <- data.table(x=rep(c("a","b","c"),each=3), y=c(1,3,6), v=1:9)
+> >> setkey(DT, x)
+> >> DT[J(c("a", "b", "d")), sum(v), by=x]
+> > Error in if (any(irows < 1L | irows > nrow(x))) stop("Internal error:
+> some
+> > irows<1 or >nrow(x)") :
+> >   missing value where TRUE/FALSE needed
+> >
+> >
+> > Looking through the NEWS file I don't see any mention of this change
+> (It's
+> > possible that I just missed it).
+> > If this an intentional change, I would ask that you consider reverting
+> it.
+> >  It seems inconsistent that
+> > DT[J(c("a", "b", "d"))] adds a new row to the table, but DT[J(c("a", "b",
+> > "d")), sum(v), by=x]
+> > causes an error.
+> >
+> > Personally I think the following makes the most sense.  But just
+> reverting
+> > back to what it did in 1.7.1
+> > seems better than having an error.
+> >> DT[J(c("a", "b", "d")), sum(v), by=x]
+> >      x V1
+> > [1,] a  6
+> > [2,] b 15
+> > [3,] d NA
+> >
+> >
+> > Thank you,
+> > Mike
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120806/32e1ffea/attachment-0001.html>
+
+From mdowle at mdowle.plus.com  Mon Aug  6 19:31:32 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 6 Aug 2012 18:31:32 +0100
+Subject: [datatable-help] Odd behavior with [.data.table and J
+In-Reply-To: <CAA4YFjNz1GPAfL04nMjvwr87b-82D6grinhZCH8L_6GDT+vgJw@mail.gmail.com>
+References: <CAA4YFjNz1GPAfL04nMjvwr87b-82D6grinhZCH8L_6GDT+vgJw@mail.gmail.com>
+Message-ID: <6663f69c3c17ff770ee91ff567a20aee.squirrel@webmail.plus.net>
+
+> Hello,
+>
+> I'm running into an odd behavior with data.table. Given the following
+> variables:
+>
+>> tbl = data.table(foo=c(1,2,3), bar=c(1.1, 2.2, 3.3))
+>> setkey(tbl, foo)
+>> i = data.frame(foo=1)
+
+And
+   i = data.table(foo=1)
+gives the same results below, so it doesn't seem related to whether i is a
+data.table -vs- a data.frame.
+
+>
+> ... I would expect the following three ways of indexing "tbl" using "i" to
+> give the same result, but they don't:
+>
+>> tbl[i]
+>    foo bar
+> 1:   1 1.1
+>> tbl[J(i)]
+> Error in `[.data.table`(tbl, J(i)) :
+>   typeof x.foo (double) != typeof i.V1 (list)
+>> tbl[data.table(i)]
+>    foo bar
+> 1:   1 1.1
+>
+> Anything I'm missing on why tbl[J(i)] wouldn't work like the other two? Or
+> have I hit a bug? I'm running R 2.15.1 64bit on Windows 7, with data.table
+> 1.8.2.
+
+J inside [] is an alias for list(), not data.table(). I don't think this
+changed in 1.8.2 but might be wrong. data.table() is much heavier than
+list() checking argument types up front and recycling vectors to ensure
+each item of the data.table has the same length, for instance.
+data.table() also unpacks data.frame and data.table arguments like a cbind
+would. Whereas list() treats data.table and data.frame arguments as though
+they are list columns.
+
+So it's doing something sensible and is correct behaviour on first glance.
+Please confirm this makes sense, and if so I'll add as as FR to improve
+error message and documentation.
+
+A simple case where a list column in i will in future validly match to an
+atomic column in x's key is FR#203 "Allow 2 column to specify range in i
+instead of %between%", which contains some links to other discussions :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=203&group_id=240&atid=978
+
+Allowing list columns in a key is something different, and again not yet
+implemented, but that might be a future feature request.
+
+Matthew
+
+>
+> Thanks,
+>
+>   Christian
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Tue Aug  7 13:43:57 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 7 Aug 2012 12:43:57 +0100
+Subject: [datatable-help] datatable-help Digest, Vol 30, Issue 1
+In-Reply-To: <5f9c3a9f1ca43874e471e4803595e3fc.squirrel@webmail.plus.net>
+References: <mailman.3.1343901603.20987.datatable-help@lists.r-forge.r-project.org>
+ <CAO=aP+cczn4QGdfgzocbUbkG9zLFVtt=HUsSAA8fOSMXizT-mg@mail.gmail.com>
+ <DEB6BD46-CB0B-4D50-8327-716598BB9EB4@dizz.org>
+ <5f9c3a9f1ca43874e471e4803595e3fc.squirrel@webmail.plus.net>
+Message-ID: <bc22d1a7f6b5b5a08260133f4abcd6f3.squirrel@webmail.plus.net>
+
+
+David,
+
+Another point on this ...
+
+>> From a design philosophy perspective, I see data.table as designed around
+>> specific ways of doing things (e.g. assuming that keys are set for
+>> joins,
+>> assuming that the first columns of Y match the key of X or that Y has a
+>> key, etc.).  If your needs don't match these design assumptions, then
+>> you
+>> have to make modifications.  An alternative approach is to write the
+>> syntax for the general case, but implement important optimizations.  For
+>> example, always perform a natural join (matching corresponding names in
+>> X
+>> and Y) for any X[Y], add something like X[Y, by=(Xcol1=Ycol1, ...)] and
+>> if
+>> the matching uses the key for X, then all the better.
+>>
+>
+> True and agreed. But merge() may be that general case. This is why merge's
+> performance has been improved in recent versions, so its speed is
+> comparable to X[Y] but with more flexible capabilities.
+>
+> Also see FAQ 1.12 "What is the difference between X[Y] and merge(X,Y)?"
+>
+
+and this ...
+
+>>> If joins matched by name, then the implementation could check if the
+>>> key
+>>> was sufficiently satisfied to be used and otherwise it would just
+>>> perform a more conventional non-key'd join.
+>
+> Just to check here you know that i doesn't have to be keyed. Just x. It's
+> not a match by column name, but by position, though (which I prefer since
+> I find it onerous to make sure column names match). Note this from
+> ?data.table :
+>
+>    " When i is a data.table, x must have a key. i is joined to x using x's
+> key and the rows in x that match are returned. An equi-join is
+> performed between each column in i to each column in x's key; i.e.,
+> column 1 of i is matched to the 1st column of x's key, column 2 to the
+> second, etc. "
+>
+> Note that "If i also has a key" comes later in that paragraph; i.e., i
+> doesn't have to be keyed.
+>
+> However, #2175 now added ("Add natural joins i.e. X[Y] when X has no key
+> could use common column names"), thanks. I think it might be covered by
+> merge() though as that's what that does. Maybe not in combination with j
+> (that's the efficiency limitiation of merge) :
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=2175&group_id=240&atid=978
+>
+
+is that the following idom :
+
+    X[Y[,list(c,d,e)]]
+
+matches Y$c to key(X)[1], Y$d to key(X)[2] and Y$e to key(X)[3], and
+
+    X[Y[,list(d,c,e)]]
+
+matches Y$d to key(X)[1], Y$c to key(X)[2] and Y$e to key(X)[3].
+
+So it isn't necessary to change the key of Y just to get X[Y] to join on
+different columns from Y.
+
+It's only necessary to change the key of X to join to different columns of
+X, and that's where Yike's idiom using setkey() comes in,
+merge.data.table, or manual secondary keys. When secondary keys are built
+into the syntax, you'd be able to set2key(X,...) and then have some way to
+join to that key of X rather than the primary key of X.
+
+True, Y[,list(c,d,e)] currently does copy each column, but i) that copy is
+faster than base R's copy because memcpy hasn't been implemented in
+duplicate.c yet (see FAQ 1.8), ii) it's intended to change that to a
+shallow copy in future which will not even take a memcpy (data.table would
+then keep track and copy the columns on change, if needed), and iii) Y
+often has fewer rows than X so copying Y's columns isn't so much of an
+issue in many but not all cases.
+
+Finally, an aside. Note that in the example above if key(X) was length 2,
+then just c and d of Y are used in the join. Then e is available to X's j
+via 'join inherited scope'. Join inherited scope saves allocating and
+recycling each item in each row of Y to match the length of items in each
+group of X matched to.
+
+Matthew
+
+
+
+
+From George.Kaupas at spansion.com  Tue Aug  7 23:39:42 2012
+From: George.Kaupas at spansion.com (Kaupas, George)
+Date: Tue, 7 Aug 2012 14:39:42 -0700
+Subject: [datatable-help] can I count on data.table supporting syntactically
+ invalid column names?
+Message-ID: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2BCD@US2K7EXMBPF1.spansion.com>
+
+I'm taking advantage of a feature in data.table which lets me get away with naming columns with characters that would not survive a call to make.names(), e.g.:
+
+> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+> DT1
+   a Illegal(name%)
+1: a              1
+2: b              2
+3: c              3
+4: d              4
+5: e              5
+
+(The the dcast function from the reshape2 package will also create columns named "illegally".)
+
+But when using merge.data.table, I get two side-effects; either the merge works, but the column names appear to be run through make.names(), or the merge fails in setcolorder():
+
+> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+
+> merge(DT1,DT2)
+   a Illegal.name.. b
+1: a              1 6
+2: b              2 6
+3: c              3 6
+4: d              4 6
+5: e              5 6
+
+> merge(DT2,DT1)
+Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+  neworder is length 4 but x has 3 columns.
+
+I can't get to datatable.r-forge.r-project.org - getting a 504.
+
+So... should I NOT rely on being able to use special characters in column names?
+
+Thanks
+George
+
+> sessionInfo()
+R version 2.15.0 (2012-03-30)
+Platform: x86_64-unknown-linux-gnu (64-bit)
+[1] data.table_1.8.2
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120807/4846ab88/attachment.html>
+
+From mdowle at mdowle.plus.com  Wed Aug  8 11:44:16 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 8 Aug 2012 10:44:16 +0100
+Subject: [datatable-help] can I count on data.table supporting
+ syntactically invalid column names?
+In-Reply-To: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2BCD@US2K7EXMBPF1.spansion.com>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2BCD@US2K7EXMBPF1.spansion.com>
+Message-ID: <543371881666ddcc8ffe12475fa2706f.squirrel@webmail.plus.net>
+
+
+Hi. Yes you should be able to rely on that. It's useful to have special
+characters in column names for latex formatting, and spaces are allowed
+too. There are tests for these things. If you need to refer to such column
+names as variables, then it's up to you to wrap with ``; e.g.,
+by=`Illegal(name%)`+1.
+
+If you find problems please report as bugs, and suggest where the
+documentation needs improving would be great.
+
+I seem to remember a bug fix in this regard, and in particular in merge
+(so my first thought is to ask you if you've recently upgraded to 1.8.2
+and if test.data.table returns 717), but as you say R-Forge is currently
+down for maintenance...
+
+That neworder error looks familiar too. Are you sure you have 1.8.2
+running in memory? (Run test.data.table() to see if it returns 717).
+
+Matthew
+
+> I'm taking advantage of a feature in data.table which lets me get away
+> with naming columns with characters that would not survive a call to
+> make.names(), e.g.:
+>
+>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>> DT1
+>    a Illegal(name%)
+> 1: a              1
+> 2: b              2
+> 3: c              3
+> 4: d              4
+> 5: e              5
+>
+> (The the dcast function from the reshape2 package will also create columns
+> named "illegally".)
+>
+> But when using merge.data.table, I get two side-effects; either the merge
+> works, but the column names appear to be run through make.names(), or the
+> merge fails in setcolorder():
+>
+>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+>
+>> merge(DT1,DT2)
+>    a Illegal.name.. b
+> 1: a              1 6
+> 2: b              2 6
+> 3: c              3 6
+> 4: d              4 6
+> 5: e              5 6
+>
+>> merge(DT2,DT1)
+> Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+>   neworder is length 4 but x has 3 columns.
+>
+> I can't get to datatable.r-forge.r-project.org - getting a 504.
+>
+> So... should I NOT rely on being able to use special characters in column
+> names?
+>
+> Thanks
+> George
+>
+>> sessionInfo()
+> R version 2.15.0 (2012-03-30)
+> Platform: x86_64-unknown-linux-gnu (64-bit)
+> [1] data.table_1.8.2
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Wed Aug  8 11:49:15 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 8 Aug 2012 10:49:15 +0100
+Subject: [datatable-help] can I count on data.table supporting
+ syntactically invalid column names?
+In-Reply-To: <543371881666ddcc8ffe12475fa2706f.squirrel@webmail.plus.net>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2BCD@US2K7EXMBPF1.spansion.com>
+ <543371881666ddcc8ffe12475fa2706f.squirrel@webmail.plus.net>
+Message-ID: <28505716aa7dd87387b453890fcd8790.squirrel@webmail.plus.net>
+
+
+Meant to write 2nd paragraph as follows :
+
+>
+> Hi. Yes you should be able to rely on that. It's useful to have special
+> characters in column names for latex formatting, and spaces are allowed
+> too. There are tests for these things. If you need to refer to such column
+> names as variables, then it's up to you to wrap with ``; e.g.,
+> by=`Illegal(name%)`+1.
+>
+> So yes, if you find problems with special characters, please report as
+> bugs, and suggest where the documentation needs improving would be great.
+>
+> I seem to remember a bug fix in this regard, and in particular in merge
+> (so my first thought is to ask you if you've recently upgraded to 1.8.2
+> and if test.data.table returns 717), but as you say R-Forge is currently
+> down for maintenance...
+>
+> That neworder error looks familiar too. Are you sure you have 1.8.2
+> running in memory? (Run test.data.table() to see if it returns 717).
+>
+> Matthew
+>
+>> I'm taking advantage of a feature in data.table which lets me get away
+>> with naming columns with characters that would not survive a call to
+>> make.names(), e.g.:
+>>
+>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>> DT1
+>>    a Illegal(name%)
+>> 1: a              1
+>> 2: b              2
+>> 3: c              3
+>> 4: d              4
+>> 5: e              5
+>>
+>> (The the dcast function from the reshape2 package will also create
+>> columns
+>> named "illegally".)
+>>
+>> But when using merge.data.table, I get two side-effects; either the
+>> merge
+>> works, but the column names appear to be run through make.names(), or
+>> the
+>> merge fails in setcolorder():
+>>
+>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+>>
+>>> merge(DT1,DT2)
+>>    a Illegal.name.. b
+>> 1: a              1 6
+>> 2: b              2 6
+>> 3: c              3 6
+>> 4: d              4 6
+>> 5: e              5 6
+>>
+>>> merge(DT2,DT1)
+>> Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+>>   neworder is length 4 but x has 3 columns.
+>>
+>> I can't get to datatable.r-forge.r-project.org - getting a 504.
+>>
+>> So... should I NOT rely on being able to use special characters in
+>> column
+>> names?
+>>
+>> Thanks
+>> George
+>>
+>>> sessionInfo()
+>> R version 2.15.0 (2012-03-30)
+>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>> [1] data.table_1.8.2
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From George.Kaupas at spansion.com  Tue Aug  7 22:24:56 2012
+From: George.Kaupas at spansion.com (Kaupas, George)
+Date: Tue, 7 Aug 2012 13:24:56 -0700
+Subject: [datatable-help] dancing with alloc.col
+Message-ID: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2B05@US2K7EXMBPF1.spansion.com>
+
+I'm running into this "truelength is greater than 1000 items over-allocated" warning/error as I use := to add columns to a data.frame, e.g.:
+
+tl (1346) is greater than 1000 items over-allocated (ncol = 308). If you didn't set the datatable.alloccol option very large, please report this to datatable-help including the result of sessionInfo().
+
+The long preamble to this is a stackoverflow thread (http://stackoverflow.com/questions/10015544) in which I needed to update the contents of one data.table with the contents of another.
+
+The solution required the columns of both data.tables to match, hence my pre-processing loop to add columns to each data.table to satisfy the identical(names(dt1),names(dt2)) criteria. I may have to re-architect this depending on what is going on with this allocation business.
+
+If, for example, dt1 has 200 columns, and dt2 has 2000, and together they have 2100 unique columns, I'm going to add 1900 columns to dt1. If I set alloc.col to 2100 before my column-adding loop, I'll get slapped because 2100 is more than 1000 greater than the 200 columns present in dt1.
+
+So do I need to spoon-feed alloc.col? Every iteration through the loop set it to length(dt1)+1 before adding a column? That seems rather brutal. Alternatively checking for the delta between truelength and length, and how close that is to the magic 1000 number, and then only adjusting the setting seems fragile.
+
+I did try to make sense of the help for alloc.col. Regarding the bit about "if two or more variables are bound to the same data.table"; the column addition is within a function, and only one variable references the data.table, at least in the scope of the function. The function calling that function has a variable for the data.table too, so I don't know if that counts. Then there is mention of using copy (not sure how that helps, and BTW the hyperlink for copy goes to the page for setkey, which does mention copy, but suggests "See ?copy" which just conjures up the setkey page again), setting alloc.col, or changing datatable.alloccol (doesn't seem to help).
+
+The warning asked for sessionInfo; FWIW, here it is:
+
+R version 2.15.0 (2012-03-30)
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+locale:
+[1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+[3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+[5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+[7] LC_PAPER=C                 LC_NAME=C
+[9] LC_ADDRESS=C               LC_TELEPHONE=C
+[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods
+[7] base
+
+other attached packages:
+[1] data.table_1.8.2
+
+Thanks
+George
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120807/deaa7466/attachment-0001.html>
+
+From mdowle at mdowle.plus.com  Wed Aug  8 12:42:27 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 8 Aug 2012 11:42:27 +0100
+Subject: [datatable-help] dancing with alloc.col
+In-Reply-To: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2B05@US2K7EXMBPF1.spansion.com>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2B05@US2K7EXMBPF1.spansion.com>
+Message-ID: <eeaa72088d7d0dc5e8db4104bbb756c2.squirrel@webmail.plus.net>
+
+
+:)
+
+When the column allocation is full, there's a formula to decide how much
+to grow the allocation by. The check is there (iirc) to make sure that's
+not growing the table too much. If you have 1 million columns, you
+probably don't want to double that to 2 million, just to add 1 column. But
+if you do, then use alloc.col first. That was the thinking. But that
+thinking is biting in your case.
+
+Simplest might be to downgrade the warning to a message when verbosity is
+on, then.
+
+In the meantime, does wrapping with suppressWarning() work around it for
+now? Since in your case you know that over-allocating by more than 1000 is
+appropriate.
+
+    suppressWarnings(DT[,newcol:=])
+
+Thanks for reporting. Interesting use case.
+
+Matthew
+
+> I'm running into this "truelength is greater than 1000 items
+> over-allocated" warning/error as I use := to add columns to a data.frame,
+> e.g.:
+>
+> tl (1346) is greater than 1000 items over-allocated (ncol = 308). If you
+> didn't set the datatable.alloccol option very large, please report this to
+> datatable-help including the result of sessionInfo().
+>
+> The long preamble to this is a stackoverflow thread
+> (http://stackoverflow.com/questions/10015544) in which I needed to update
+> the contents of one data.table with the contents of another.
+>
+> The solution required the columns of both data.tables to match, hence my
+> pre-processing loop to add columns to each data.table to satisfy the
+> identical(names(dt1),names(dt2)) criteria. I may have to re-architect this
+> depending on what is going on with this allocation business.
+>
+> If, for example, dt1 has 200 columns, and dt2 has 2000, and together they
+> have 2100 unique columns, I'm going to add 1900 columns to dt1. If I set
+> alloc.col to 2100 before my column-adding loop, I'll get slapped because
+> 2100 is more than 1000 greater than the 200 columns present in dt1.
+>
+> So do I need to spoon-feed alloc.col? Every iteration through the loop set
+> it to length(dt1)+1 before adding a column? That seems rather brutal.
+> Alternatively checking for the delta between truelength and length, and
+> how close that is to the magic 1000 number, and then only adjusting the
+> setting seems fragile.
+>
+> I did try to make sense of the help for alloc.col. Regarding the bit about
+> "if two or more variables are bound to the same data.table"; the column
+> addition is within a function, and only one variable references the
+> data.table, at least in the scope of the function. The function calling
+> that function has a variable for the data.table too, so I don't know if
+> that counts. Then there is mention of using copy (not sure how that helps,
+> and BTW the hyperlink for copy goes to the page for setkey, which does
+> mention copy, but suggests "See ?copy" which just conjures up the setkey
+> page again), setting alloc.col, or changing datatable.alloccol (doesn't
+> seem to help).
+>
+> The warning asked for sessionInfo; FWIW, here it is:
+>
+> R version 2.15.0 (2012-03-30)
+> Platform: x86_64-unknown-linux-gnu (64-bit)
+>
+> locale:
+> [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+> [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+> [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+> [7] LC_PAPER=C                 LC_NAME=C
+> [9] LC_ADDRESS=C               LC_TELEPHONE=C
+> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>
+> attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods
+> [7] base
+>
+> other attached packages:
+> [1] data.table_1.8.2
+>
+> Thanks
+> George
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From mdowle at mdowle.plus.com  Wed Aug  8 12:45:11 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 8 Aug 2012 11:45:11 +0100
+Subject: [datatable-help] dancing with alloc.col
+In-Reply-To: <eeaa72088d7d0dc5e8db4104bbb756c2.squirrel@webmail.plus.net>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2B05@US2K7EXMBPF1.spansion.com>
+ <eeaa72088d7d0dc5e8db4104bbb756c2.squirrel@webmail.plus.net>
+Message-ID: <28d213f1c09543765a1da2b9381f771d.squirrel@webmail.plus.net>
+
+
+Oh and since you're looping the := or set(), then options(warn=0) before
+the loop is probably faster than repeated calls to suppressWarnings().
+
+>
+> :)
+>
+> When the column allocation is full, there's a formula to decide how much
+> to grow the allocation by. The check is there (iirc) to make sure that's
+> not growing the table too much. If you have 1 million columns, you
+> probably don't want to double that to 2 million, just to add 1 column. But
+> if you do, then use alloc.col first. That was the thinking. But that
+> thinking is biting in your case.
+>
+> Simplest might be to downgrade the warning to a message when verbosity is
+> on, then.
+>
+> In the meantime, does wrapping with suppressWarning() work around it for
+> now? Since in your case you know that over-allocating by more than 1000 is
+> appropriate.
+>
+>     suppressWarnings(DT[,newcol:=])
+>
+> Thanks for reporting. Interesting use case.
+>
+> Matthew
+>
+>> I'm running into this "truelength is greater than 1000 items
+>> over-allocated" warning/error as I use := to add columns to a
+>> data.frame,
+>> e.g.:
+>>
+>> tl (1346) is greater than 1000 items over-allocated (ncol = 308). If you
+>> didn't set the datatable.alloccol option very large, please report this
+>> to
+>> datatable-help including the result of sessionInfo().
+>>
+>> The long preamble to this is a stackoverflow thread
+>> (http://stackoverflow.com/questions/10015544) in which I needed to
+>> update
+>> the contents of one data.table with the contents of another.
+>>
+>> The solution required the columns of both data.tables to match, hence my
+>> pre-processing loop to add columns to each data.table to satisfy the
+>> identical(names(dt1),names(dt2)) criteria. I may have to re-architect
+>> this
+>> depending on what is going on with this allocation business.
+>>
+>> If, for example, dt1 has 200 columns, and dt2 has 2000, and together
+>> they
+>> have 2100 unique columns, I'm going to add 1900 columns to dt1. If I set
+>> alloc.col to 2100 before my column-adding loop, I'll get slapped because
+>> 2100 is more than 1000 greater than the 200 columns present in dt1.
+>>
+>> So do I need to spoon-feed alloc.col? Every iteration through the loop
+>> set
+>> it to length(dt1)+1 before adding a column? That seems rather brutal.
+>> Alternatively checking for the delta between truelength and length, and
+>> how close that is to the magic 1000 number, and then only adjusting the
+>> setting seems fragile.
+>>
+>> I did try to make sense of the help for alloc.col. Regarding the bit
+>> about
+>> "if two or more variables are bound to the same data.table"; the column
+>> addition is within a function, and only one variable references the
+>> data.table, at least in the scope of the function. The function calling
+>> that function has a variable for the data.table too, so I don't know if
+>> that counts. Then there is mention of using copy (not sure how that
+>> helps,
+>> and BTW the hyperlink for copy goes to the page for setkey, which does
+>> mention copy, but suggests "See ?copy" which just conjures up the setkey
+>> page again), setting alloc.col, or changing datatable.alloccol (doesn't
+>> seem to help).
+>>
+>> The warning asked for sessionInfo; FWIW, here it is:
+>>
+>> R version 2.15.0 (2012-03-30)
+>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>
+>> locale:
+>> [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+>> [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+>> [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+>> [7] LC_PAPER=C                 LC_NAME=C
+>> [9] LC_ADDRESS=C               LC_TELEPHONE=C
+>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>>
+>> attached base packages:
+>> [1] stats     graphics  grDevices utils     datasets  methods
+>> [7] base
+>>
+>> other attached packages:
+>> [1] data.table_1.8.2
+>>
+>> Thanks
+>> George
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+
+
+
+From George.Kaupas at spansion.com  Wed Aug  8 20:17:39 2012
+From: George.Kaupas at spansion.com (Kaupas, George)
+Date: Wed, 8 Aug 2012 11:17:39 -0700
+Subject: [datatable-help] dancing with alloc.col
+In-Reply-To: <28d213f1c09543765a1da2b9381f771d.squirrel@webmail.plus.net>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2B05@US2K7EXMBPF1.spansion.com>
+ <eeaa72088d7d0dc5e8db4104bbb756c2.squirrel@webmail.plus.net>
+ <28d213f1c09543765a1da2b9381f771d.squirrel@webmail.plus.net>
+Message-ID: <4638FCC8C3C4D543B4C53024563E5C4C0241BC3290@US2K7EXMBPF1.spansion.com>
+
+Thanks for the quick and patient response, as it was indeed my own fault.
+
+In the interest of debugging I had set options(warn=3) as well as options(datatable.verbose=TRUE); setting warn=0 does indeed allow my code to run to satisfactory completion.
+
+I have to stop ignoring the subtle (to me) messages R throws; in this case, "Error in ... (converted from warning)".
+
+So a followup general R question is, if I use options(warn=0), my .Rout contains a line like "There were 46 warnings (use warnings() to see them)". If instead I wrap the := statements with suppressWarnings(), I don't get that. Is there a way to suppress the "There were n warnings" message?
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowle at mdowle.plus.com] 
+Sent: Wednesday, August 08, 2012 5:45 AM
+To: Kaupas, George
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] dancing with alloc.col
+
+
+Oh and since you're looping the := or set(), then options(warn=0) before the loop is probably faster than repeated calls to suppressWarnings().
+
+>
+> :)
+>
+> When the column allocation is full, there's a formula to decide how 
+> much to grow the allocation by. The check is there (iirc) to make sure 
+> that's not growing the table too much. If you have 1 million columns, 
+> you probably don't want to double that to 2 million, just to add 1 
+> column. But if you do, then use alloc.col first. That was the 
+> thinking. But that thinking is biting in your case.
+>
+> Simplest might be to downgrade the warning to a message when verbosity 
+> is on, then.
+>
+> In the meantime, does wrapping with suppressWarning() work around it 
+> for now? Since in your case you know that over-allocating by more than 
+> 1000 is appropriate.
+>
+>     suppressWarnings(DT[,newcol:=])
+>
+> Thanks for reporting. Interesting use case.
+>
+> Matthew
+>
+>> I'm running into this "truelength is greater than 1000 items 
+>> over-allocated" warning/error as I use := to add columns to a 
+>> data.frame,
+>> e.g.:
+>>
+>> tl (1346) is greater than 1000 items over-allocated (ncol = 308). If 
+>> you didn't set the datatable.alloccol option very large, please 
+>> report this to datatable-help including the result of sessionInfo().
+>>
+>> The long preamble to this is a stackoverflow thread
+>> (http://stackoverflow.com/questions/10015544) in which I needed to 
+>> update the contents of one data.table with the contents of another.
+>>
+>> The solution required the columns of both data.tables to match, hence 
+>> my pre-processing loop to add columns to each data.table to satisfy 
+>> the
+>> identical(names(dt1),names(dt2)) criteria. I may have to re-architect 
+>> this depending on what is going on with this allocation business.
+>>
+>> If, for example, dt1 has 200 columns, and dt2 has 2000, and together 
+>> they have 2100 unique columns, I'm going to add 1900 columns to dt1. 
+>> If I set alloc.col to 2100 before my column-adding loop, I'll get 
+>> slapped because
+>> 2100 is more than 1000 greater than the 200 columns present in dt1.
+>>
+>> So do I need to spoon-feed alloc.col? Every iteration through the 
+>> loop set it to length(dt1)+1 before adding a column? That seems 
+>> rather brutal.
+>> Alternatively checking for the delta between truelength and length, 
+>> and how close that is to the magic 1000 number, and then only 
+>> adjusting the setting seems fragile.
+>>
+>> I did try to make sense of the help for alloc.col. Regarding the bit 
+>> about "if two or more variables are bound to the same data.table"; 
+>> the column addition is within a function, and only one variable 
+>> references the data.table, at least in the scope of the function. The 
+>> function calling that function has a variable for the data.table too, 
+>> so I don't know if that counts. Then there is mention of using copy 
+>> (not sure how that helps, and BTW the hyperlink for copy goes to the 
+>> page for setkey, which does mention copy, but suggests "See ?copy" 
+>> which just conjures up the setkey page again), setting alloc.col, or 
+>> changing datatable.alloccol (doesn't seem to help).
+>>
+>> The warning asked for sessionInfo; FWIW, here it is:
+>>
+>> R version 2.15.0 (2012-03-30)
+>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>
+>> locale:
+>> [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+>> [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+>> [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+>> [7] LC_PAPER=C                 LC_NAME=C
+>> [9] LC_ADDRESS=C               LC_TELEPHONE=C
+>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>>
+>> attached base packages:
+>> [1] stats     graphics  grDevices utils     datasets  methods
+>> [7] base
+>>
+>> other attached packages:
+>> [1] data.table_1.8.2
+>>
+>> Thanks
+>> George
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl
+>> e-help
+>
+>
+
+
+
+From George.Kaupas at spansion.com  Wed Aug  8 20:39:32 2012
+From: George.Kaupas at spansion.com (Kaupas, George)
+Date: Wed, 8 Aug 2012 11:39:32 -0700
+Subject: [datatable-help] can I count on data.table supporting
+ syntactically invalid column names?
+In-Reply-To: <28505716aa7dd87387b453890fcd8790.squirrel@webmail.plus.net>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2BCD@US2K7EXMBPF1.spansion.com>
+ <543371881666ddcc8ffe12475fa2706f.squirrel@webmail.plus.net>
+ <28505716aa7dd87387b453890fcd8790.squirrel@webmail.plus.net>
+Message-ID: <4638FCC8C3C4D543B4C53024563E5C4C0241BC32D3@US2K7EXMBPF1.spansion.com>
+
+The test.data.table() routine returns 714, not 717.
+
+I'm running data.table 1.8.2.
+
+The only thing not bleeding edge (I think) is R itself which is at 2.15.0.
+
+A search for "merge" on r-forge gets two hits, neither are related; a search for setcolorder gets no hits. Should I file a bug report (or two)?
+
+Here's my output from test.data.table() and sessionInfo():
+
+> test.data.table()
+Running .../tests.Rraw
+Loading required package: hexbin
+Loading required package: grid
+Loading required package: lattice
+x =  10,000 sample from 100 strings (quick test to save load on CRAN servers where tests run every day. In dev we increase n and m a lot for meaningful times.
+0.002 : f=factor(x) [high up front cost, plus storage and maintenance of levels]
+0.000 : sort.list(,'radix') on f
+0.000 : u=unique(x)
+0.000 : .Internal(order(u))
+0.000 : sort.list(,'radix') on fsorted
+-vs-
+0.000 : char group on x (ad hoc by)  [slower than radix on f but without up front cost]
+0.000 : char sort on x (setkey)  [lower up front cost than factor(x)]
+0.000 : char group on xsorted (keyed by)  [faster than sort.list(,'radix') on fsorted, same result]
+All 714 tests in test.data.table() completed ok in 15.272sec
+
+> sessionInfo()
+R version 2.15.0 (2012-03-30)
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+ [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+ [7] LC_PAPER=C                 LC_NAME=C
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C
+[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+
+attached base packages:
+[1] grid      stats     graphics  grDevices utils     datasets  methods
+[8] base
+
+other attached packages:
+[1] hexbin_1.26.0    lattice_0.20-6   nlme_3.1-103     ggplot2_0.9.1
+[5] reshape_0.8.4    plyr_1.7.1       data.table_1.8.2
+
+loaded via a namespace (and not attached):
+ [1] colorspace_1.1-1   dichromat_1.2-4    digest_0.5.2       labeling_0.1
+ [5] MASS_7.3-17        memoise_0.1        munsell_0.3        proto_0.3-9.2
+ [9] RColorBrewer_1.0-5 reshape2_1.2.1     scales_0.2.1       stringr_0.6.1
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowle at mdowle.plus.com] 
+Sent: Wednesday, August 08, 2012 4:49 AM
+To: Kaupas, George
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: Re: [datatable-help] can I count on data.table supporting syntactically invalid column names?
+
+
+Meant to write 2nd paragraph as follows :
+
+>
+> Hi. Yes you should be able to rely on that. It's useful to have 
+> special characters in column names for latex formatting, and spaces 
+> are allowed too. There are tests for these things. If you need to 
+> refer to such column names as variables, then it's up to you to wrap 
+> with ``; e.g., by=`Illegal(name%)`+1.
+>
+> So yes, if you find problems with special characters, please report as 
+> bugs, and suggest where the documentation needs improving would be great.
+>
+> I seem to remember a bug fix in this regard, and in particular in 
+> merge (so my first thought is to ask you if you've recently upgraded 
+> to 1.8.2 and if test.data.table returns 717), but as you say R-Forge 
+> is currently down for maintenance...
+>
+> That neworder error looks familiar too. Are you sure you have 1.8.2 
+> running in memory? (Run test.data.table() to see if it returns 717).
+>
+> Matthew
+>
+>> I'm taking advantage of a feature in data.table which lets me get 
+>> away with naming columns with characters that would not survive a 
+>> call to make.names(), e.g.:
+>>
+>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>> DT1
+>>    a Illegal(name%)
+>> 1: a              1
+>> 2: b              2
+>> 3: c              3
+>> 4: d              4
+>> 5: e              5
+>>
+>> (The the dcast function from the reshape2 package will also create 
+>> columns named "illegally".)
+>>
+>> But when using merge.data.table, I get two side-effects; either the 
+>> merge works, but the column names appear to be run through 
+>> make.names(), or the merge fails in setcolorder():
+>>
+>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+>>
+>>> merge(DT1,DT2)
+>>    a Illegal.name.. b
+>> 1: a              1 6
+>> 2: b              2 6
+>> 3: c              3 6
+>> 4: d              4 6
+>> 5: e              5 6
+>>
+>>> merge(DT2,DT1)
+>> Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+>>   neworder is length 4 but x has 3 columns.
+>>
+>> I can't get to datatable.r-forge.r-project.org - getting a 504.
+>>
+>> So... should I NOT rely on being able to use special characters in 
+>> column names?
+>>
+>> Thanks
+>> George
+>>
+>>> sessionInfo()
+>> R version 2.15.0 (2012-03-30)
+>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>> [1] data.table_1.8.2 
+
+
+From mdowle at mdowle.plus.com  Thu Aug  9 00:57:36 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 8 Aug 2012 23:57:36 +0100
+Subject: [datatable-help] dancing with alloc.col
+In-Reply-To: <4638FCC8C3C4D543B4C53024563E5C4C0241BC3290@US2K7EXMBPF1.spansion.com>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2B05@US2K7EXMBPF1.spansion.com>
+ <eeaa72088d7d0dc5e8db4104bbb756c2.squirrel@webmail.plus.net>
+ <28d213f1c09543765a1da2b9381f771d.squirrel@webmail.plus.net>
+ <4638FCC8C3C4D543B4C53024563E5C4C0241BC3290@US2K7EXMBPF1.spansion.com>
+Message-ID: <57a0165383d4ef1304f1b3e711da32ed.squirrel@webmail.plus.net>
+
+
+> Thanks for the quick and patient response, as it was indeed my own fault.
+
+Hardly your fault. The 1000 over-allocation check hasn't come up before
+and it isn't documented.
+
+> In the interest of debugging I had set options(warn=3)
+
+Ah, that makes sense. Although 3 is the same as 2 afaik; i.e., 2 or larger
+means warnings are turned into errors.
+
+> as well as
+> options(datatable.verbose=TRUE); setting warn=0 does indeed allow my code
+> to run to satisfactory completion.
+
+Great, glad the workaround works. I'll still look at downgrading or
+removing that warning.
+
+>
+> I have to stop ignoring the subtle (to me) messages R throws; in this
+> case, "Error in ... (converted from warning)".
+>
+> So a followup general R question is, if I use options(warn=0), my .Rout
+> contains a line like "There were 46 warnings (use warnings() to see
+> them)". If instead I wrap the := statements with suppressWarnings(), I
+> don't get that. Is there a way to suppress the "There were n warnings"
+> message?
+
+Oops, I meant oldwarn=options(warn=-1) (or any negative value according to
+?options) before the loop, to ignore the warnings. Then after the loop
+setback to the old value: options(warn=oldwarn).
+
+>
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowle at mdowle.plus.com]
+> Sent: Wednesday, August 08, 2012 5:45 AM
+> To: Kaupas, George
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] dancing with alloc.col
+>
+>
+> Oh and since you're looping the := or set(), then options(warn=0) before
+> the loop is probably faster than repeated calls to suppressWarnings().
+>
+>>
+>> :)
+>>
+>> When the column allocation is full, there's a formula to decide how
+>> much to grow the allocation by. The check is there (iirc) to make sure
+>> that's not growing the table too much. If you have 1 million columns,
+>> you probably don't want to double that to 2 million, just to add 1
+>> column. But if you do, then use alloc.col first. That was the
+>> thinking. But that thinking is biting in your case.
+>>
+>> Simplest might be to downgrade the warning to a message when verbosity
+>> is on, then.
+>>
+>> In the meantime, does wrapping with suppressWarning() work around it
+>> for now? Since in your case you know that over-allocating by more than
+>> 1000 is appropriate.
+>>
+>>     suppressWarnings(DT[,newcol:=])
+>>
+>> Thanks for reporting. Interesting use case.
+>>
+>> Matthew
+>>
+>>> I'm running into this "truelength is greater than 1000 items
+>>> over-allocated" warning/error as I use := to add columns to a
+>>> data.frame,
+>>> e.g.:
+>>>
+>>> tl (1346) is greater than 1000 items over-allocated (ncol = 308). If
+>>> you didn't set the datatable.alloccol option very large, please
+>>> report this to datatable-help including the result of sessionInfo().
+>>>
+>>> The long preamble to this is a stackoverflow thread
+>>> (http://stackoverflow.com/questions/10015544) in which I needed to
+>>> update the contents of one data.table with the contents of another.
+>>>
+>>> The solution required the columns of both data.tables to match, hence
+>>> my pre-processing loop to add columns to each data.table to satisfy
+>>> the
+>>> identical(names(dt1),names(dt2)) criteria. I may have to re-architect
+>>> this depending on what is going on with this allocation business.
+>>>
+>>> If, for example, dt1 has 200 columns, and dt2 has 2000, and together
+>>> they have 2100 unique columns, I'm going to add 1900 columns to dt1.
+>>> If I set alloc.col to 2100 before my column-adding loop, I'll get
+>>> slapped because
+>>> 2100 is more than 1000 greater than the 200 columns present in dt1.
+>>>
+>>> So do I need to spoon-feed alloc.col? Every iteration through the
+>>> loop set it to length(dt1)+1 before adding a column? That seems
+>>> rather brutal.
+>>> Alternatively checking for the delta between truelength and length,
+>>> and how close that is to the magic 1000 number, and then only
+>>> adjusting the setting seems fragile.
+>>>
+>>> I did try to make sense of the help for alloc.col. Regarding the bit
+>>> about "if two or more variables are bound to the same data.table";
+>>> the column addition is within a function, and only one variable
+>>> references the data.table, at least in the scope of the function. The
+>>> function calling that function has a variable for the data.table too,
+>>> so I don't know if that counts. Then there is mention of using copy
+>>> (not sure how that helps, and BTW the hyperlink for copy goes to the
+>>> page for setkey, which does mention copy, but suggests "See ?copy"
+>>> which just conjures up the setkey page again), setting alloc.col, or
+>>> changing datatable.alloccol (doesn't seem to help).
+>>>
+>>> The warning asked for sessionInfo; FWIW, here it is:
+>>>
+>>> R version 2.15.0 (2012-03-30)
+>>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>>
+>>> locale:
+>>> [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+>>> [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+>>> [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+>>> [7] LC_PAPER=C                 LC_NAME=C
+>>> [9] LC_ADDRESS=C               LC_TELEPHONE=C
+>>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>>>
+>>> attached base packages:
+>>> [1] stats     graphics  grDevices utils     datasets  methods
+>>> [7] base
+>>>
+>>> other attached packages:
+>>> [1] data.table_1.8.2
+>>>
+>>> Thanks
+>>> George
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatabl
+>>> e-help
+>>
+>>
+>
+>
+>
+
+
+
+From mdowle at mdowle.plus.com  Thu Aug  9 01:16:35 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 9 Aug 2012 00:16:35 +0100
+Subject: [datatable-help] can I count on data.table supporting
+ syntactically invalid column names?
+In-Reply-To: <4638FCC8C3C4D543B4C53024563E5C4C0241BC32D3@US2K7EXMBPF1.spansion.com>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2BCD@US2K7EXMBPF1.spansion.com>
+ <543371881666ddcc8ffe12475fa2706f.squirrel@webmail.plus.net>
+ <28505716aa7dd87387b453890fcd8790.squirrel@webmail.plus.net>
+ <4638FCC8C3C4D543B4C53024563E5C4C0241BC32D3@US2K7EXMBPF1.spansion.com>
+Message-ID: <cfb35b4ea4c7819f08a7b98e8eb55131.squirrel@webmail.plus.net>
+
+
+Then somehow you don't have the CRAN version of v1.8.2 installed. By any
+chance did you install 1.8.2 from R-Forge in the few days a slightly
+earlier version of 1.8.2 existed on R-Forge?  R-Forge also happened to be
+stale in that time window. The first submission of 1.8.2 to CRAN was
+reverted due to some difficulties, so it needed a 2nd attempt and took
+longer than usual.
+
+Please uninstall data.table and reinstall from any CRAN mirror (not
+R-Forge) to make sure. A difference between 714 and 717 indicates an
+installation problem of data.table, not R itself. test.data.table() v1.8.2
+must return 717 precisely.
+
+Another way would be to include the SVN rev number in the package version.
+But I haven't found a way to do that for packages yet. R itself does that
+of course, but I don't know how for packages. Since all changes in
+data.table are accompanied by new tests, the current approach is using the
+number of tests. And actually running all the tests on your hardware etc
+is a stronger test everything is working as intended.
+
+
+> The test.data.table() routine returns 714, not 717.
+>
+> I'm running data.table 1.8.2.
+>
+> The only thing not bleeding edge (I think) is R itself which is at 2.15.0.
+>
+> A search for "merge" on r-forge gets two hits, neither are related; a
+> search for setcolorder gets no hits. Should I file a bug report (or two)?
+>
+> Here's my output from test.data.table() and sessionInfo():
+>
+>> test.data.table()
+> Running .../tests.Rraw
+> Loading required package: hexbin
+> Loading required package: grid
+> Loading required package: lattice
+> x =  10,000 sample from 100 strings (quick test to save load on CRAN
+> servers where tests run every day. In dev we increase n and m a lot for
+> meaningful times.
+> 0.002 : f=factor(x) [high up front cost, plus storage and maintenance of
+> levels]
+> 0.000 : sort.list(,'radix') on f
+> 0.000 : u=unique(x)
+> 0.000 : .Internal(order(u))
+> 0.000 : sort.list(,'radix') on fsorted
+> -vs-
+> 0.000 : char group on x (ad hoc by)  [slower than radix on f but without
+> up front cost]
+> 0.000 : char sort on x (setkey)  [lower up front cost than factor(x)]
+> 0.000 : char group on xsorted (keyed by)  [faster than sort.list(,'radix')
+> on fsorted, same result]
+> All 714 tests in test.data.table() completed ok in 15.272sec
+>
+>> sessionInfo()
+> R version 2.15.0 (2012-03-30)
+> Platform: x86_64-unknown-linux-gnu (64-bit)
+>
+> locale:
+>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+>  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+>  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+>  [7] LC_PAPER=C                 LC_NAME=C
+>  [9] LC_ADDRESS=C               LC_TELEPHONE=C
+> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>
+> attached base packages:
+> [1] grid      stats     graphics  grDevices utils     datasets  methods
+> [8] base
+>
+> other attached packages:
+> [1] hexbin_1.26.0    lattice_0.20-6   nlme_3.1-103     ggplot2_0.9.1
+> [5] reshape_0.8.4    plyr_1.7.1       data.table_1.8.2
+>
+> loaded via a namespace (and not attached):
+>  [1] colorspace_1.1-1   dichromat_1.2-4    digest_0.5.2       labeling_0.1
+>  [5] MASS_7.3-17        memoise_0.1        munsell_0.3
+> proto_0.3-9.2
+>  [9] RColorBrewer_1.0-5 reshape2_1.2.1     scales_0.2.1
+> stringr_0.6.1
+>
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowle at mdowle.plus.com]
+> Sent: Wednesday, August 08, 2012 4:49 AM
+> To: Kaupas, George
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] can I count on data.table supporting
+> syntactically invalid column names?
+>
+>
+> Meant to write 2nd paragraph as follows :
+>
+>>
+>> Hi. Yes you should be able to rely on that. It's useful to have
+>> special characters in column names for latex formatting, and spaces
+>> are allowed too. There are tests for these things. If you need to
+>> refer to such column names as variables, then it's up to you to wrap
+>> with ``; e.g., by=`Illegal(name%)`+1.
+>>
+>> So yes, if you find problems with special characters, please report as
+>> bugs, and suggest where the documentation needs improving would be
+>> great.
+>>
+>> I seem to remember a bug fix in this regard, and in particular in
+>> merge (so my first thought is to ask you if you've recently upgraded
+>> to 1.8.2 and if test.data.table returns 717), but as you say R-Forge
+>> is currently down for maintenance...
+>>
+>> That neworder error looks familiar too. Are you sure you have 1.8.2
+>> running in memory? (Run test.data.table() to see if it returns 717).
+>>
+>> Matthew
+>>
+>>> I'm taking advantage of a feature in data.table which lets me get
+>>> away with naming columns with characters that would not survive a
+>>> call to make.names(), e.g.:
+>>>
+>>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>>> DT1
+>>>    a Illegal(name%)
+>>> 1: a              1
+>>> 2: b              2
+>>> 3: c              3
+>>> 4: d              4
+>>> 5: e              5
+>>>
+>>> (The the dcast function from the reshape2 package will also create
+>>> columns named "illegally".)
+>>>
+>>> But when using merge.data.table, I get two side-effects; either the
+>>> merge works, but the column names appear to be run through
+>>> make.names(), or the merge fails in setcolorder():
+>>>
+>>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>>> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+>>>
+>>>> merge(DT1,DT2)
+>>>    a Illegal.name.. b
+>>> 1: a              1 6
+>>> 2: b              2 6
+>>> 3: c              3 6
+>>> 4: d              4 6
+>>> 5: e              5 6
+>>>
+>>>> merge(DT2,DT1)
+>>> Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+>>>   neworder is length 4 but x has 3 columns.
+>>>
+>>> I can't get to datatable.r-forge.r-project.org - getting a 504.
+>>>
+>>> So... should I NOT rely on being able to use special characters in
+>>> column names?
+>>>
+>>> Thanks
+>>> George
+>>>
+>>>> sessionInfo()
+>>> R version 2.15.0 (2012-03-30)
+>>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>> [1] data.table_1.8.2
+>
+>
+
+
+
+From George.Kaupas at spansion.com  Thu Aug  9 21:45:31 2012
+From: George.Kaupas at spansion.com (Kaupas, George)
+Date: Thu, 9 Aug 2012 12:45:31 -0700
+Subject: [datatable-help] can I count on data.table supporting
+ syntactically invalid column names?
+In-Reply-To: <cfb35b4ea4c7819f08a7b98e8eb55131.squirrel@webmail.plus.net>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2BCD@US2K7EXMBPF1.spansion.com>
+ <543371881666ddcc8ffe12475fa2706f.squirrel@webmail.plus.net>
+ <28505716aa7dd87387b453890fcd8790.squirrel@webmail.plus.net>
+ <4638FCC8C3C4D543B4C53024563E5C4C0241BC32D3@US2K7EXMBPF1.spansion.com>
+ <cfb35b4ea4c7819f08a7b98e8eb55131.squirrel@webmail.plus.net>
+Message-ID: <4638FCC8C3C4D543B4C53024563E5C4C0241C42FAE@US2K7EXMBPF1.spansion.com>
+
+Good catch; I did indeed snag 1.8.2 from R-Forge because I needed something in that version but didn't see it on CRAN at the time; never occurred to me the version would change.
+
+I uninstalled and installed the CRAN version. I get 717 from the tests. However the merge behavior is the same; in one direction it succeeds but changes the column names; in the other direction it fails in setcolorder.
+
+So I should open bug reports, then, eh?
+
+> test.data.table()
+Running .../tests.Rraw
+x =  10,000 sample from 100 strings (quick test to save load on CRAN servers where tests run every day. In dev we increase n and m a lot for meaningful times.
+0.001 : f=factor(x) [high up front cost, plus storage and maintenance of levels]
+0.000 : sort.list(,'radix') on f
+0.000 : u=unique(x)
+0.000 : .Internal(order(u))
+0.001 : sort.list(,'radix') on fsorted
+-vs-
+0.000 : char group on x (ad hoc by)  [slower than radix on f but without up front cost]
+0.000 : char sort on x (setkey)  [lower up front cost than factor(x)]
+0.000 : char group on xsorted (keyed by)  [faster than sort.list(,'radix') on fsorted, same result]
+All 717 tests in test.data.table() completed ok in 15.697sec
+
+> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+> merge(DT1,DT2)
+   a Illegal.name.. b
+1: a              1 6
+2: b              2 6
+3: c              3 6
+4: d              4 6
+5: e              5 6
+> merge(DT2,DT1)
+Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+  neworder is length 4 but x has 3 columns.
+
+-----Original Message-----
+From: Matthew Dowle [mailto:mdowle at mdowle.plus.com] 
+Sent: Wednesday, August 08, 2012 6:17 PM
+To: Kaupas, George
+Cc: datatable-help at lists.r-forge.r-project.org
+Subject: RE: [datatable-help] can I count on data.table supporting syntactically invalid column names?
+
+
+Then somehow you don't have the CRAN version of v1.8.2 installed. By any chance did you install 1.8.2 from R-Forge in the few days a slightly earlier version of 1.8.2 existed on R-Forge?  R-Forge also happened to be stale in that time window. The first submission of 1.8.2 to CRAN was reverted due to some difficulties, so it needed a 2nd attempt and took longer than usual.
+
+Please uninstall data.table and reinstall from any CRAN mirror (not
+R-Forge) to make sure. A difference between 714 and 717 indicates an installation problem of data.table, not R itself. test.data.table() v1.8.2 must return 717 precisely.
+
+Another way would be to include the SVN rev number in the package version.
+But I haven't found a way to do that for packages yet. R itself does that of course, but I don't know how for packages. Since all changes in data.table are accompanied by new tests, the current approach is using the number of tests. And actually running all the tests on your hardware etc is a stronger test everything is working as intended.
+
+
+> The test.data.table() routine returns 714, not 717.
+>
+> I'm running data.table 1.8.2.
+>
+> The only thing not bleeding edge (I think) is R itself which is at 2.15.0.
+>
+> A search for "merge" on r-forge gets two hits, neither are related; a 
+> search for setcolorder gets no hits. Should I file a bug report (or two)?
+>
+> Here's my output from test.data.table() and sessionInfo():
+>
+>> test.data.table()
+> Running .../tests.Rraw
+> Loading required package: hexbin
+> Loading required package: grid
+> Loading required package: lattice
+> x =  10,000 sample from 100 strings (quick test to save load on CRAN 
+> servers where tests run every day. In dev we increase n and m a lot 
+> for meaningful times.
+> 0.002 : f=factor(x) [high up front cost, plus storage and maintenance 
+> of levels]
+> 0.000 : sort.list(,'radix') on f
+> 0.000 : u=unique(x)
+> 0.000 : .Internal(order(u))
+> 0.000 : sort.list(,'radix') on fsorted
+> -vs-
+> 0.000 : char group on x (ad hoc by)  [slower than radix on f but 
+> without up front cost]
+> 0.000 : char sort on x (setkey)  [lower up front cost than factor(x)]
+> 0.000 : char group on xsorted (keyed by)  [faster than 
+> sort.list(,'radix') on fsorted, same result] All 714 tests in 
+> test.data.table() completed ok in 15.272sec
+>
+>> sessionInfo()
+> R version 2.15.0 (2012-03-30)
+> Platform: x86_64-unknown-linux-gnu (64-bit)
+>
+> locale:
+>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+>  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+>  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+>  [7] LC_PAPER=C                 LC_NAME=C
+>  [9] LC_ADDRESS=C               LC_TELEPHONE=C
+> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>
+> attached base packages:
+> [1] grid      stats     graphics  grDevices utils     datasets  methods
+> [8] base
+>
+> other attached packages:
+> [1] hexbin_1.26.0    lattice_0.20-6   nlme_3.1-103     ggplot2_0.9.1
+> [5] reshape_0.8.4    plyr_1.7.1       data.table_1.8.2
+>
+> loaded via a namespace (and not attached):
+>  [1] colorspace_1.1-1   dichromat_1.2-4    digest_0.5.2       labeling_0.1
+>  [5] MASS_7.3-17        memoise_0.1        munsell_0.3
+> proto_0.3-9.2
+>  [9] RColorBrewer_1.0-5 reshape2_1.2.1     scales_0.2.1
+> stringr_0.6.1
+>
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowle at mdowle.plus.com]
+> Sent: Wednesday, August 08, 2012 4:49 AM
+> To: Kaupas, George
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: Re: [datatable-help] can I count on data.table supporting 
+> syntactically invalid column names?
+>
+>
+> Meant to write 2nd paragraph as follows :
+>
+>>
+>> Hi. Yes you should be able to rely on that. It's useful to have 
+>> special characters in column names for latex formatting, and spaces 
+>> are allowed too. There are tests for these things. If you need to 
+>> refer to such column names as variables, then it's up to you to wrap 
+>> with ``; e.g., by=`Illegal(name%)`+1.
+>>
+>> So yes, if you find problems with special characters, please report 
+>> as bugs, and suggest where the documentation needs improving would be 
+>> great.
+>>
+>> I seem to remember a bug fix in this regard, and in particular in 
+>> merge (so my first thought is to ask you if you've recently upgraded 
+>> to 1.8.2 and if test.data.table returns 717), but as you say R-Forge 
+>> is currently down for maintenance...
+>>
+>> That neworder error looks familiar too. Are you sure you have 1.8.2 
+>> running in memory? (Run test.data.table() to see if it returns 717).
+>>
+>> Matthew
+>>
+>>> I'm taking advantage of a feature in data.table which lets me get 
+>>> away with naming columns with characters that would not survive a 
+>>> call to make.names(), e.g.:
+>>>
+>>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>>> DT1
+>>>    a Illegal(name%)
+>>> 1: a              1
+>>> 2: b              2
+>>> 3: c              3
+>>> 4: d              4
+>>> 5: e              5
+>>>
+>>> (The the dcast function from the reshape2 package will also create 
+>>> columns named "illegally".)
+>>>
+>>> But when using merge.data.table, I get two side-effects; either the 
+>>> merge works, but the column names appear to be run through 
+>>> make.names(), or the merge fails in setcolorder():
+>>>
+>>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>>> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+>>>
+>>>> merge(DT1,DT2)
+>>>    a Illegal.name.. b
+>>> 1: a              1 6
+>>> 2: b              2 6
+>>> 3: c              3 6
+>>> 4: d              4 6
+>>> 5: e              5 6
+>>>
+>>>> merge(DT2,DT1)
+>>> Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+>>>   neworder is length 4 but x has 3 columns.
+>>>
+>>> I can't get to datatable.r-forge.r-project.org - getting a 504.
+>>>
+>>> So... should I NOT rely on being able to use special characters in 
+>>> column names?
+>>>
+>>> Thanks
+>>> George
+>>>
+>>>> sessionInfo()
+>>> R version 2.15.0 (2012-03-30)
+>>> Platform: x86_64-unknown-linux-gnu (64-bit) [1] data.table_1.8.2
+>
+>
+
+
+
+From mdowle at mdowle.plus.com  Thu Aug  9 22:42:49 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 9 Aug 2012 21:42:49 +0100
+Subject: [datatable-help] can I count on data.table supporting
+ syntactically invalid column names?
+In-Reply-To: <4638FCC8C3C4D543B4C53024563E5C4C0241C42FAE@US2K7EXMBPF1.spansion.com>
+References: <4638FCC8C3C4D543B4C53024563E5C4C0241BC2BCD@US2K7EXMBPF1.spansion.com>
+ <543371881666ddcc8ffe12475fa2706f.squirrel@webmail.plus.net>
+ <28505716aa7dd87387b453890fcd8790.squirrel@webmail.plus.net>
+ <4638FCC8C3C4D543B4C53024563E5C4C0241BC32D3@US2K7EXMBPF1.spansion.com>
+ <cfb35b4ea4c7819f08a7b98e8eb55131.squirrel@webmail.plus.net>
+ <4638FCC8C3C4D543B4C53024563E5C4C0241C42FAE@US2K7EXMBPF1.spansion.com>
+Message-ID: <d7a9e1aa591011ec0d3b6d8c2819e03f.squirrel@webmail.plus.net>
+
+Great.  Yes, bug.report(package="data.table") please. R-Forge is back
+online now.
+Thanks.
+
+> Good catch; I did indeed snag 1.8.2 from R-Forge because I needed
+> something in that version but didn't see it on CRAN at the time; never
+> occurred to me the version would change.
+>
+> I uninstalled and installed the CRAN version. I get 717 from the tests.
+> However the merge behavior is the same; in one direction it succeeds but
+> changes the column names; in the other direction it fails in setcolorder.
+>
+> So I should open bug reports, then, eh?
+>
+>> test.data.table()
+> Running .../tests.Rraw
+> x =  10,000 sample from 100 strings (quick test to save load on CRAN
+> servers where tests run every day. In dev we increase n and m a lot for
+> meaningful times.
+> 0.001 : f=factor(x) [high up front cost, plus storage and maintenance of
+> levels]
+> 0.000 : sort.list(,'radix') on f
+> 0.000 : u=unique(x)
+> 0.000 : .Internal(order(u))
+> 0.001 : sort.list(,'radix') on fsorted
+> -vs-
+> 0.000 : char group on x (ad hoc by)  [slower than radix on f but without
+> up front cost]
+> 0.000 : char sort on x (setkey)  [lower up front cost than factor(x)]
+> 0.000 : char group on xsorted (keyed by)  [faster than sort.list(,'radix')
+> on fsorted, same result]
+> All 717 tests in test.data.table() completed ok in 15.697sec
+>
+>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+>> merge(DT1,DT2)
+>    a Illegal.name.. b
+> 1: a              1 6
+> 2: b              2 6
+> 3: c              3 6
+> 4: d              4 6
+> 5: e              5 6
+>> merge(DT2,DT1)
+> Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+>   neworder is length 4 but x has 3 columns.
+>
+> -----Original Message-----
+> From: Matthew Dowle [mailto:mdowle at mdowle.plus.com]
+> Sent: Wednesday, August 08, 2012 6:17 PM
+> To: Kaupas, George
+> Cc: datatable-help at lists.r-forge.r-project.org
+> Subject: RE: [datatable-help] can I count on data.table supporting
+> syntactically invalid column names?
+>
+>
+> Then somehow you don't have the CRAN version of v1.8.2 installed. By any
+> chance did you install 1.8.2 from R-Forge in the few days a slightly
+> earlier version of 1.8.2 existed on R-Forge?  R-Forge also happened to be
+> stale in that time window. The first submission of 1.8.2 to CRAN was
+> reverted due to some difficulties, so it needed a 2nd attempt and took
+> longer than usual.
+>
+> Please uninstall data.table and reinstall from any CRAN mirror (not
+> R-Forge) to make sure. A difference between 714 and 717 indicates an
+> installation problem of data.table, not R itself. test.data.table() v1.8.2
+> must return 717 precisely.
+>
+> Another way would be to include the SVN rev number in the package version.
+> But I haven't found a way to do that for packages yet. R itself does that
+> of course, but I don't know how for packages. Since all changes in
+> data.table are accompanied by new tests, the current approach is using the
+> number of tests. And actually running all the tests on your hardware etc
+> is a stronger test everything is working as intended.
+>
+>
+>> The test.data.table() routine returns 714, not 717.
+>>
+>> I'm running data.table 1.8.2.
+>>
+>> The only thing not bleeding edge (I think) is R itself which is at
+>> 2.15.0.
+>>
+>> A search for "merge" on r-forge gets two hits, neither are related; a
+>> search for setcolorder gets no hits. Should I file a bug report (or
+>> two)?
+>>
+>> Here's my output from test.data.table() and sessionInfo():
+>>
+>>> test.data.table()
+>> Running .../tests.Rraw
+>> Loading required package: hexbin
+>> Loading required package: grid
+>> Loading required package: lattice
+>> x =  10,000 sample from 100 strings (quick test to save load on CRAN
+>> servers where tests run every day. In dev we increase n and m a lot
+>> for meaningful times.
+>> 0.002 : f=factor(x) [high up front cost, plus storage and maintenance
+>> of levels]
+>> 0.000 : sort.list(,'radix') on f
+>> 0.000 : u=unique(x)
+>> 0.000 : .Internal(order(u))
+>> 0.000 : sort.list(,'radix') on fsorted
+>> -vs-
+>> 0.000 : char group on x (ad hoc by)  [slower than radix on f but
+>> without up front cost]
+>> 0.000 : char sort on x (setkey)  [lower up front cost than factor(x)]
+>> 0.000 : char group on xsorted (keyed by)  [faster than
+>> sort.list(,'radix') on fsorted, same result] All 714 tests in
+>> test.data.table() completed ok in 15.272sec
+>>
+>>> sessionInfo()
+>> R version 2.15.0 (2012-03-30)
+>> Platform: x86_64-unknown-linux-gnu (64-bit)
+>>
+>> locale:
+>>  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+>>  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+>>  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+>>  [7] LC_PAPER=C                 LC_NAME=C
+>>  [9] LC_ADDRESS=C               LC_TELEPHONE=C
+>> [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+>>
+>> attached base packages:
+>> [1] grid      stats     graphics  grDevices utils     datasets  methods
+>> [8] base
+>>
+>> other attached packages:
+>> [1] hexbin_1.26.0    lattice_0.20-6   nlme_3.1-103     ggplot2_0.9.1
+>> [5] reshape_0.8.4    plyr_1.7.1       data.table_1.8.2
+>>
+>> loaded via a namespace (and not attached):
+>>  [1] colorspace_1.1-1   dichromat_1.2-4    digest_0.5.2
+>> labeling_0.1
+>>  [5] MASS_7.3-17        memoise_0.1        munsell_0.3
+>> proto_0.3-9.2
+>>  [9] RColorBrewer_1.0-5 reshape2_1.2.1     scales_0.2.1
+>> stringr_0.6.1
+>>
+>> -----Original Message-----
+>> From: Matthew Dowle [mailto:mdowle at mdowle.plus.com]
+>> Sent: Wednesday, August 08, 2012 4:49 AM
+>> To: Kaupas, George
+>> Cc: datatable-help at lists.r-forge.r-project.org
+>> Subject: Re: [datatable-help] can I count on data.table supporting
+>> syntactically invalid column names?
+>>
+>>
+>> Meant to write 2nd paragraph as follows :
+>>
+>>>
+>>> Hi. Yes you should be able to rely on that. It's useful to have
+>>> special characters in column names for latex formatting, and spaces
+>>> are allowed too. There are tests for these things. If you need to
+>>> refer to such column names as variables, then it's up to you to wrap
+>>> with ``; e.g., by=`Illegal(name%)`+1.
+>>>
+>>> So yes, if you find problems with special characters, please report
+>>> as bugs, and suggest where the documentation needs improving would be
+>>> great.
+>>>
+>>> I seem to remember a bug fix in this regard, and in particular in
+>>> merge (so my first thought is to ask you if you've recently upgraded
+>>> to 1.8.2 and if test.data.table returns 717), but as you say R-Forge
+>>> is currently down for maintenance...
+>>>
+>>> That neworder error looks familiar too. Are you sure you have 1.8.2
+>>> running in memory? (Run test.data.table() to see if it returns 717).
+>>>
+>>> Matthew
+>>>
+>>>> I'm taking advantage of a feature in data.table which lets me get
+>>>> away with naming columns with characters that would not survive a
+>>>> call to make.names(), e.g.:
+>>>>
+>>>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>>>> DT1
+>>>>    a Illegal(name%)
+>>>> 1: a              1
+>>>> 2: b              2
+>>>> 3: c              3
+>>>> 4: d              4
+>>>> 5: e              5
+>>>>
+>>>> (The the dcast function from the reshape2 package will also create
+>>>> columns named "illegally".)
+>>>>
+>>>> But when using merge.data.table, I get two side-effects; either the
+>>>> merge works, but the column names appear to be run through
+>>>> make.names(), or the merge fails in setcolorder():
+>>>>
+>>>>> DT1 = data.table(a=letters[1:5], "Illegal(name%)"=1:5, key="a")
+>>>>> DT2 = data.table(a=letters[1:5], b=6L, key="a")
+>>>>
+>>>>> merge(DT1,DT2)
+>>>>    a Illegal.name.. b
+>>>> 1: a              1 6
+>>>> 2: b              2 6
+>>>> 3: c              3 6
+>>>> 4: d              4 6
+>>>> 5: e              5 6
+>>>>
+>>>>> merge(DT2,DT1)
+>>>> Error in setcolorder(dt, c(setdiff(names(dt), end), end)) :
+>>>>   neworder is length 4 but x has 3 columns.
+>>>>
+>>>> I can't get to datatable.r-forge.r-project.org - getting a 504.
+>>>>
+>>>> So... should I NOT rely on being able to use special characters in
+>>>> column names?
+>>>>
+>>>> Thanks
+>>>> George
+>>>>
+>>>>> sessionInfo()
+>>>> R version 2.15.0 (2012-03-30)
+>>>> Platform: x86_64-unknown-linux-gnu (64-bit) [1] data.table_1.8.2
+>>
+>>
+>
+>
+>
+
+
+
+From mel at mbacou.com  Wed Aug 15 06:48:19 2012
+From: mel at mbacou.com (Bacou, Melanie)
+Date: Wed, 15 Aug 2012 00:48:19 -0400
+Subject: [datatable-help] := construct doesn't seem to work in lists of
+	data.tables
+Message-ID: <502B2A13.9010808@mbacou.com>
+
+Hello,
+
+I just noticed an odd behavior with lists of data.tables:
+
+dt1 <- data.table(a=1:3, b=4:6, c=7:9)
+dt2 <- data.table(a=10:12, b=13:15, c=16:18)
+
+# Combine in a list
+myList <- list(dt1, dt2)
+
+# Adding a new column to first data.table -- this doesn't work
+myList[[1]][, d := 4:6]
+#    a b c d
+# 1: 1 4 7 4
+# 2: 2 5 8 5
+# 3: 3 6 9 6
+# Warning message:
+# In `[.data.table`(myList[[1]], , `:=`(d, 4:6)) :
+#   Invalid .internal.selfref detected and fixed by taking a copy of the whole table, 
+so that := can add this new column by reference. At an earlier point, this data.table 
+has been copied by R. Avoid key<-, names<- and attr<- which in R currently (and oddly) 
+all copy the whole data.table. Use set* syntax instead to avoid copying: setkey(), 
+setnames() and setattr(). If this message doesn't help, please report to 
+datatable-help so the root cause can be fixed.
+
+myList[[1]]
+#    a b c
+# 1: 1 4 7
+# 2: 2 5 8
+# 3: 3 6 9
+
+# I need to reassign -- this works
+myList[[1]] <- myList[[1]][, d := 4:6]
+
+myList[[1]]
+#    a b c d
+# 1: 1 4 7 4
+# 2: 2 5 8 5
+# 3: 3 6 9 6
+
+# But on the other hand this works no problem
+setcolorder(myList[[1]], 4:1)
+myList[[1]]
+#    d c b a
+# 1: 4 7 4 1
+# 2: 5 8 5 2
+# 3: 6 9 6 3
+
+Is this normal behavior, seems a bit odd to me?
+
+Here is my session:
+
+ > sessionInfo()
+R version 2.15.1 (2012-06-22)
+Platform: x86_64-redhat-linux-gnu (64-bit)
+
+locale:
+[1] C
+
+attached base packages:
+[1] stats     graphics  utils     datasets  grDevices methods base
+
+other attached packages:
+[1] foreign_0.8-50      RJDBC_0.2-0         DBI_0.2-5
+[4] XLConnect_0.2-0     XLConnectJars_0.2-0 rJava_0.9-3
+[7] data.table_1.8.2    rj_1.1.0-4
+
+loaded via a namespace (and not attached):
+[1] rj.gd_1.1.0-1 tools_2.15.1
+
+
+Thanks very much for this fantastic package!
+
+--Mel.
+
+Melanie BACOU
+International Food Policy Research Institute
+Agricultural Economist, HarvestChoice
+E-mail mel at mbacou.com <mailto:mel at mbacou.com>
+Visit harvestchoice.org <http://www.harvestchoice.org/>
+
+
+From mdowle at mdowle.plus.com  Wed Aug 15 10:30:16 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Wed, 15 Aug 2012 09:30:16 +0100
+Subject: [datatable-help] := construct doesn't seem to work in lists of
+ data.tables
+In-Reply-To: <502B2A13.9010808@mbacou.com>
+References: <502B2A13.9010808@mbacou.com>
+Message-ID: <f6727a2b15befa65dd4dda732d1aef45.squirrel@webmail.plus.net>
+
+
+Hi,
+
+That's interesting, thanks. I'm delighted the warning came up and that no
+crash happened. This is just what .internal.selfref was designed to catch.
+
+list() itself appears to be copying its NAM(2)-ed inputs. If you run the
+following, you should see the pointer addresses show that.
+
+    X=data.table(a=1:3)
+    .Internal(inspect(X))
+    .Internal(inspect(list(X)))   # list() copies X
+
+The problem isn't just the copy, but that when R does that copy it
+collapses the over-allocated vector of column vector pointers (that
+data.table carefully created) down to just the columns used. Causing := a
+problem if it's then asked to add a column by reference (no free slots).
+
+Three possible dev solutions spring to mind :
+
+1. Try again to return data.table as NAM(0) not NAM(2) [there's already a
+FR for that]. Assuming that list() only copies NAM(2) inputs.
+
+2. Add a new function to data.table (reflist()?) that doesn't copy
+data.table inputs but works the same as base::list otherwise.
+
+3. Get even more fancy inside [.data.table to inspect its caller. If
+that's L[[i]] then update L's pointer to the (new) re-over-allocated
+column pointer vector. The copy by list() would still happen but at least
+the column would be added. The next add column by reference after that
+would then work without warning.
+
+Please file a bug report, with a link to this thread. That way you'll get
+automatic updates when the status changes. Option 2 is most likely.
+
+Is list() of data.table really needed? Could it be one data.table with an
+extra first column, or an environment of data.table's perhaps?
+
+The more significant problem is that a list column containing data.tables
+is likely copying all those data.tables, then. Regardless of whether or
+not := is then used to add a column by reference to those embedded tables.
+
+Matthew
+
+
+> Hello,
+>
+> I just noticed an odd behavior with lists of data.tables:
+>
+> dt1 <- data.table(a=1:3, b=4:6, c=7:9)
+> dt2 <- data.table(a=10:12, b=13:15, c=16:18)
+>
+> # Combine in a list
+> myList <- list(dt1, dt2)
+>
+> # Adding a new column to first data.table -- this doesn't work
+> myList[[1]][, d := 4:6]
+> #    a b c d
+> # 1: 1 4 7 4
+> # 2: 2 5 8 5
+> # 3: 3 6 9 6
+> # Warning message:
+> # In `[.data.table`(myList[[1]], , `:=`(d, 4:6)) :
+> #   Invalid .internal.selfref detected and fixed by taking a copy of the
+> whole table,
+> so that := can add this new column by reference. At an earlier point, this
+> data.table
+> has been copied by R. Avoid key<-, names<- and attr<- which in R currently
+> (and oddly)
+> all copy the whole data.table. Use set* syntax instead to avoid copying:
+> setkey(),
+> setnames() and setattr(). If this message doesn't help, please report to
+> datatable-help so the root cause can be fixed.
+>
+> myList[[1]]
+> #    a b c
+> # 1: 1 4 7
+> # 2: 2 5 8
+> # 3: 3 6 9
+>
+> # I need to reassign -- this works
+> myList[[1]] <- myList[[1]][, d := 4:6]
+>
+> myList[[1]]
+> #    a b c d
+> # 1: 1 4 7 4
+> # 2: 2 5 8 5
+> # 3: 3 6 9 6
+>
+> # But on the other hand this works no problem
+> setcolorder(myList[[1]], 4:1)
+> myList[[1]]
+> #    d c b a
+> # 1: 4 7 4 1
+> # 2: 5 8 5 2
+> # 3: 6 9 6 3
+>
+> Is this normal behavior, seems a bit odd to me?
+>
+> Here is my session:
+>
+>  > sessionInfo()
+> R version 2.15.1 (2012-06-22)
+> Platform: x86_64-redhat-linux-gnu (64-bit)
+>
+> locale:
+> [1] C
+>
+> attached base packages:
+> [1] stats     graphics  utils     datasets  grDevices methods base
+>
+> other attached packages:
+> [1] foreign_0.8-50      RJDBC_0.2-0         DBI_0.2-5
+> [4] XLConnect_0.2-0     XLConnectJars_0.2-0 rJava_0.9-3
+> [7] data.table_1.8.2    rj_1.1.0-4
+>
+> loaded via a namespace (and not attached):
+> [1] rj.gd_1.1.0-1 tools_2.15.1
+>
+>
+> Thanks very much for this fantastic package!
+>
+> --Mel.
+>
+> Melanie BACOU
+> International Food Policy Research Institute
+> Agricultural Economist, HarvestChoice
+> E-mail mel at mbacou.com <mailto:mel at mbacou.com>
+> Visit harvestchoice.org <http://www.harvestchoice.org/>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From mel at mbacou.com  Thu Aug 16 15:48:43 2012
+From: mel at mbacou.com (Bacou, Melanie)
+Date: Thu, 16 Aug 2012 09:48:43 -0400
+Subject: [datatable-help] := construct doesn't seem to work in lists of
+ data.tables
+In-Reply-To: <f6727a2b15befa65dd4dda732d1aef45.squirrel@webmail.plus.net>
+References: <502B2A13.9010808@mbacou.com>
+ <f6727a2b15befa65dd4dda732d1aef45.squirrel@webmail.plus.net>
+Message-ID: <502CFA3B.10301@mbacou.com>
+
+Hi Matthew,
+
+Sorry for not filing earlier -- the behavior is not a major annoyance as my 
+data.tables are rather small this time around.
+
+The reason I'm using data.tables in a list, though that might seem odd, is I'm 
+harvesting quantities of external data files that I eventually want to combine into 
+one data.table, but before I can rbind() everything, I'm running lots of validation 
+and cleaning tasks on the harvested files using lapply() and some indexing magic. The 
+combination of data.table() and lapply() makes the syntax /really /efficient.
+
+I'm afraid I can't provide further input into a possible workaround as the 
+alternatives you listed below sound all good to me! Hopefully others on the list can 
+contribute.
+
+Best, --Mel.
+
+
+On 8/15/2012 4:30 AM, Matthew Dowle wrote:
+> Hi,
+>
+> That's interesting, thanks. I'm delighted the warning came up and that no
+> crash happened. This is just what .internal.selfref was designed to catch.
+>
+> list() itself appears to be copying its NAM(2)-ed inputs. If you run the
+> following, you should see the pointer addresses show that.
+>
+>      X=data.table(a=1:3)
+>      .Internal(inspect(X))
+>      .Internal(inspect(list(X)))   # list() copies X
+>
+> The problem isn't just the copy, but that when R does that copy it
+> collapses the over-allocated vector of column vector pointers (that
+> data.table carefully created) down to just the columns used. Causing := a
+> problem if it's then asked to add a column by reference (no free slots).
+>
+> Three possible dev solutions spring to mind :
+>
+> 1. Try again to return data.table as NAM(0) not NAM(2) [there's already a
+> FR for that]. Assuming that list() only copies NAM(2) inputs.
+>
+> 2. Add a new function to data.table (reflist()?) that doesn't copy
+> data.table inputs but works the same as base::list otherwise.
+>
+> 3. Get even more fancy inside [.data.table to inspect its caller. If
+> that's L[[i]] then update L's pointer to the (new) re-over-allocated
+> column pointer vector. The copy by list() would still happen but at least
+> the column would be added. The next add column by reference after that
+> would then work without warning.
+>
+> Please file a bug report, with a link to this thread. That way you'll get
+> automatic updates when the status changes. Option 2 is most likely.
+>
+> Is list() of data.table really needed? Could it be one data.table with an
+> extra first column, or an environment of data.table's perhaps?
+>
+> The more significant problem is that a list column containing data.tables
+> is likely copying all those data.tables, then. Regardless of whether or
+> not := is then used to add a column by reference to those embedded tables.
+>
+> Matthew
+>
+>
+>> Hello,
+>>
+>> I just noticed an odd behavior with lists of data.tables:
+>>
+>> dt1 <- data.table(a=1:3, b=4:6, c=7:9)
+>> dt2 <- data.table(a=10:12, b=13:15, c=16:18)
+>>
+>> # Combine in a list
+>> myList <- list(dt1, dt2)
+>>
+>> # Adding a new column to first data.table -- this doesn't work
+>> myList[[1]][, d := 4:6]
+>> #    a b c d
+>> # 1: 1 4 7 4
+>> # 2: 2 5 8 5
+>> # 3: 3 6 9 6
+>> # Warning message:
+>> # In `[.data.table`(myList[[1]], , `:=`(d, 4:6)) :
+>> #   Invalid .internal.selfref detected and fixed by taking a copy of the
+>> whole table,
+>> so that := can add this new column by reference. At an earlier point, this
+>> data.table
+>> has been copied by R. Avoid key<-, names<- and attr<- which in R currently
+>> (and oddly)
+>> all copy the whole data.table. Use set* syntax instead to avoid copying:
+>> setkey(),
+>> setnames() and setattr(). If this message doesn't help, please report to
+>> datatable-help so the root cause can be fixed.
+>>
+>> myList[[1]]
+>> #    a b c
+>> # 1: 1 4 7
+>> # 2: 2 5 8
+>> # 3: 3 6 9
+>>
+>> # I need to reassign -- this works
+>> myList[[1]] <- myList[[1]][, d := 4:6]
+>>
+>> myList[[1]]
+>> #    a b c d
+>> # 1: 1 4 7 4
+>> # 2: 2 5 8 5
+>> # 3: 3 6 9 6
+>>
+>> # But on the other hand this works no problem
+>> setcolorder(myList[[1]], 4:1)
+>> myList[[1]]
+>> #    d c b a
+>> # 1: 4 7 4 1
+>> # 2: 5 8 5 2
+>> # 3: 6 9 6 3
+>>
+>> Is this normal behavior, seems a bit odd to me?
+>>
+>> Here is my session:
+>>
+>>   > sessionInfo()
+>> R version 2.15.1 (2012-06-22)
+>> Platform: x86_64-redhat-linux-gnu (64-bit)
+>>
+>> locale:
+>> [1] C
+>>
+>> attached base packages:
+>> [1] stats     graphics  utils     datasets  grDevices methods base
+>>
+>> other attached packages:
+>> [1] foreign_0.8-50      RJDBC_0.2-0         DBI_0.2-5
+>> [4] XLConnect_0.2-0     XLConnectJars_0.2-0 rJava_0.9-3
+>> [7] data.table_1.8.2    rj_1.1.0-4
+>>
+>> loaded via a namespace (and not attached):
+>> [1] rj.gd_1.1.0-1 tools_2.15.1
+>>
+>>
+>> Thanks very much for this fantastic package!
+>>
+>> --Mel.
+>>
+>> Melanie BACOU
+>> International Food Policy Research Institute
+>> Agricultural Economist, HarvestChoice
+>> E-mail mel at mbacou.com <mailto:mel at mbacou.com>
+>> Visit harvestchoice.org <http://www.harvestchoice.org/>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120816/19e821ee/attachment.html>
+
+From mdowle at mdowle.plus.com  Thu Aug 16 17:13:58 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 16 Aug 2012 16:13:58 +0100
+Subject: [datatable-help] := construct doesn't seem to work in lists of
+ data.tables
+In-Reply-To: <502CFA3B.10301@mbacou.com>
+References: <502B2A13.9010808@mbacou.com>
+ <f6727a2b15befa65dd4dda732d1aef45.squirrel@webmail.plus.net>
+ <502CFA3B.10301@mbacou.com>
+Message-ID: <7432e166369805a2924a54bff0defea7.squirrel@webmail.plus.net>
+
+
+Hi. Ok, thanks. Btw, just to check you saw the new rbindlist() function then.
+
+
+> Hi Matthew,
+>
+> Sorry for not filing earlier -- the behavior is not a major annoyance as
+> my
+> data.tables are rather small this time around.
+>
+> The reason I'm using data.tables in a list, though that might seem odd, is
+> I'm
+> harvesting quantities of external data files that I eventually want to
+> combine into
+> one data.table, but before I can rbind() everything, I'm running lots of
+> validation
+> and cleaning tasks on the harvested files using lapply() and some indexing
+> magic. The
+> combination of data.table() and lapply() makes the syntax /really
+> /efficient.
+>
+> I'm afraid I can't provide further input into a possible workaround as the
+> alternatives you listed below sound all good to me! Hopefully others on
+> the list can
+> contribute.
+>
+> Best, --Mel.
+>
+>
+> On 8/15/2012 4:30 AM, Matthew Dowle wrote:
+>> Hi,
+>>
+>> That's interesting, thanks. I'm delighted the warning came up and that
+>> no
+>> crash happened. This is just what .internal.selfref was designed to
+>> catch.
+>>
+>> list() itself appears to be copying its NAM(2)-ed inputs. If you run the
+>> following, you should see the pointer addresses show that.
+>>
+>>      X=data.table(a=1:3)
+>>      .Internal(inspect(X))
+>>      .Internal(inspect(list(X)))   # list() copies X
+>>
+>> The problem isn't just the copy, but that when R does that copy it
+>> collapses the over-allocated vector of column vector pointers (that
+>> data.table carefully created) down to just the columns used. Causing :=
+>> a
+>> problem if it's then asked to add a column by reference (no free slots).
+>>
+>> Three possible dev solutions spring to mind :
+>>
+>> 1. Try again to return data.table as NAM(0) not NAM(2) [there's already
+>> a
+>> FR for that]. Assuming that list() only copies NAM(2) inputs.
+>>
+>> 2. Add a new function to data.table (reflist()?) that doesn't copy
+>> data.table inputs but works the same as base::list otherwise.
+>>
+>> 3. Get even more fancy inside [.data.table to inspect its caller. If
+>> that's L[[i]] then update L's pointer to the (new) re-over-allocated
+>> column pointer vector. The copy by list() would still happen but at
+>> least
+>> the column would be added. The next add column by reference after that
+>> would then work without warning.
+>>
+>> Please file a bug report, with a link to this thread. That way you'll
+>> get
+>> automatic updates when the status changes. Option 2 is most likely.
+>>
+>> Is list() of data.table really needed? Could it be one data.table with
+>> an
+>> extra first column, or an environment of data.table's perhaps?
+>>
+>> The more significant problem is that a list column containing
+>> data.tables
+>> is likely copying all those data.tables, then. Regardless of whether or
+>> not := is then used to add a column by reference to those embedded
+>> tables.
+>>
+>> Matthew
+>>
+>>
+>>> Hello,
+>>>
+>>> I just noticed an odd behavior with lists of data.tables:
+>>>
+>>> dt1 <- data.table(a=1:3, b=4:6, c=7:9)
+>>> dt2 <- data.table(a=10:12, b=13:15, c=16:18)
+>>>
+>>> # Combine in a list
+>>> myList <- list(dt1, dt2)
+>>>
+>>> # Adding a new column to first data.table -- this doesn't work
+>>> myList[[1]][, d := 4:6]
+>>> #    a b c d
+>>> # 1: 1 4 7 4
+>>> # 2: 2 5 8 5
+>>> # 3: 3 6 9 6
+>>> # Warning message:
+>>> # In `[.data.table`(myList[[1]], , `:=`(d, 4:6)) :
+>>> #   Invalid .internal.selfref detected and fixed by taking a copy of
+>>> the
+>>> whole table,
+>>> so that := can add this new column by reference. At an earlier point,
+>>> this
+>>> data.table
+>>> has been copied by R. Avoid key<-, names<- and attr<- which in R
+>>> currently
+>>> (and oddly)
+>>> all copy the whole data.table. Use set* syntax instead to avoid
+>>> copying:
+>>> setkey(),
+>>> setnames() and setattr(). If this message doesn't help, please report
+>>> to
+>>> datatable-help so the root cause can be fixed.
+>>>
+>>> myList[[1]]
+>>> #    a b c
+>>> # 1: 1 4 7
+>>> # 2: 2 5 8
+>>> # 3: 3 6 9
+>>>
+>>> # I need to reassign -- this works
+>>> myList[[1]] <- myList[[1]][, d := 4:6]
+>>>
+>>> myList[[1]]
+>>> #    a b c d
+>>> # 1: 1 4 7 4
+>>> # 2: 2 5 8 5
+>>> # 3: 3 6 9 6
+>>>
+>>> # But on the other hand this works no problem
+>>> setcolorder(myList[[1]], 4:1)
+>>> myList[[1]]
+>>> #    d c b a
+>>> # 1: 4 7 4 1
+>>> # 2: 5 8 5 2
+>>> # 3: 6 9 6 3
+>>>
+>>> Is this normal behavior, seems a bit odd to me?
+>>>
+>>> Here is my session:
+>>>
+>>>   > sessionInfo()
+>>> R version 2.15.1 (2012-06-22)
+>>> Platform: x86_64-redhat-linux-gnu (64-bit)
+>>>
+>>> locale:
+>>> [1] C
+>>>
+>>> attached base packages:
+>>> [1] stats     graphics  utils     datasets  grDevices methods base
+>>>
+>>> other attached packages:
+>>> [1] foreign_0.8-50      RJDBC_0.2-0         DBI_0.2-5
+>>> [4] XLConnect_0.2-0     XLConnectJars_0.2-0 rJava_0.9-3
+>>> [7] data.table_1.8.2    rj_1.1.0-4
+>>>
+>>> loaded via a namespace (and not attached):
+>>> [1] rj.gd_1.1.0-1 tools_2.15.1
+>>>
+>>>
+>>> Thanks very much for this fantastic package!
+>>>
+>>> --Mel.
+>>>
+>>> Melanie BACOU
+>>> International Food Policy Research Institute
+>>> Agricultural Economist, HarvestChoice
+>>> E-mail mel at mbacou.com <mailto:mel at mbacou.com>
+>>> Visit harvestchoice.org <http://www.harvestchoice.org/>
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>
+>
+
+
+
+From michael.nelson at sydney.edu.au  Mon Aug 20 02:06:01 2012
+From: michael.nelson at sydney.edu.au (Michael Nelson)
+Date: Mon, 20 Aug 2012 00:06:01 +0000
+Subject: [datatable-help] using lapply(.SD...) with base operators
+Message-ID: <6FB5193A6CDCDF499486A833B7AFBDCD374F191A@EX-MBX-PRO-02.mcs.usyd.edu.au>
+
+I have just noticed (while answering this SO question
+http://stackoverflow.com/questions/12024098/return-type-for-j-parameter-in-data-table/12030867#12030867
+
+a quirk in referencing operators within a call to lapply(.SD,...)
+
+In base r,
+
+lapply(1:4,'+',1)
+
+will work
+
+however
+
+DT <- data.table(id=rep(1:5,20), a=1:100, b=sample(1:100, 100), c=sample(1:100, 100))
+
+DT[,lapply(.SD, '+', 1), by = id]
+
+returns 'attempt to apply non-function'
+
+Ensuring that the base operator is called works
+
+DT[,lapply(.SD, base::'+', 1), by = id]
+
+as does
+
+DT[,lapply(.SD, Primitive('+'),1), by = id]
+
+which is quicker
+
+Would it be worth noting this in one of the vignettes?
+
+Regards
+
+Michael
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120820/16f60deb/attachment.html>
+
+From mdowle at mdowle.plus.com  Mon Aug 20 13:47:04 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 20 Aug 2012 12:47:04 +0100
+Subject: [datatable-help] using lapply(.SD...) with base operators
+In-Reply-To: <6FB5193A6CDCDF499486A833B7AFBDCD374F191A@EX-MBX-PRO-02.mcs.usyd.edu.au>
+References: <6FB5193A6CDCDF499486A833B7AFBDCD374F191A@EX-MBX-PRO-02.mcs.usyd.edu.au>
+Message-ID: <25be6464c4813c9df2f8ff28031bfae2.squirrel@webmail.plus.net>
+
+
+Interesting. Thanks for posting about this.
+
+The reason is optimization in v1.8.2. Turning on verbosity reveals what
+has happened :
+
+> DT[,lapply(.SD, '+', 1), by = id,verbose=TRUE]
+..snip..
+Optimized j from 'lapply(.SD, "+", 1)' to 'list("+"(a, 1), "+"(b, 1),
+"+"(c, 1))'
+..snip..
+  attempt to apply non-function
+
+Using `` instead of '' works :
+
+    DT[,lapply(.SD, `+`, 1), by = id]
+
+or turning off optimization also works :
+
+    options(datatable.optimize=0)
+    DT[,lapply(.SD, '+', 1), by = id]
+
+Should be able to fix this. Have raised bug report #2212 :
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=2212&group_id=240&atid=975
+
+Matthew
+
+
+> I have just noticed (while answering this SO question
+> http://stackoverflow.com/questions/12024098/return-type-for-j-parameter-in-data-table/12030867#12030867
+>
+> a quirk in referencing operators within a call to lapply(.SD,...)
+>
+> In base r,
+>
+> lapply(1:4,'+',1)
+>
+> will work
+>
+> however
+>
+> DT <- data.table(id=rep(1:5,20), a=1:100, b=sample(1:100, 100),
+> c=sample(1:100, 100))
+>
+> DT[,lapply(.SD, '+', 1), by = id]
+>
+> returns 'attempt to apply non-function'
+>
+> Ensuring that the base operator is called works
+>
+> DT[,lapply(.SD, base::'+', 1), by = id]
+>
+> as does
+>
+> DT[,lapply(.SD, Primitive('+'),1), by = id]
+>
+> which is quicker
+>
+> Would it be worth noting this in one of the vignettes?
+>
+> Regards
+>
+> Michael
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From alexander.chernyakov at gmail.com  Mon Aug 20 17:04:57 2012
+From: alexander.chernyakov at gmail.com (Alexander Chernyakov)
+Date: Mon, 20 Aug 2012 11:04:57 -0400
+Subject: [datatable-help] understanding joins in data.table
+In-Reply-To: <CAP=rYLUuu3rtW-d5rE3AgMbjkk+NBHOeLr-rvwtaTLu-0de9kg@mail.gmail.com>
+References: <CAP=rYLUuu3rtW-d5rE3AgMbjkk+NBHOeLr-rvwtaTLu-0de9kg@mail.gmail.com>
+Message-ID: <CAP=rYLWgTPv2Vt0shDG_Q068YxUeoUGF7Nta-UWUNBixOz0j-g@mail.gmail.com>
+
+>
+> I have posted this on SO as well:
+>
+> I am trying to understand a little more about the way rolling joins work
+> and am having some confusion, I was hoping somebody could clarify this for
+> me.  To take a concrete example:
+>
+>     dt1 <- data.table(id=rep(1:5, 10), t=1:50, val1=1:50, key=list(id, t))
+>     dt2 <- data.table(id=rep(1:5, 2), t=1:10, val2=1:10, key=list(id, t))
+>
+> I expected this to produce a long `data.table` where the values in `dt2`
+> are rolled:
+>
+>     dt1[dt2,roll=TRUE]
+>
+> Instead, the correct way to do this seems to be:
+>
+>     dt2[dt1,roll=TRUE]
+>
+> Could someone explain to me more about how joining in `data.table` works
+> as I am clearly not understanding it correctly.  I thought that
+> `dt1[dt2,roll=TRUE]` corresponded to the sql equivalent of `select * from
+> dt1 right join dt2 on (dt1.id = dt2.id and dt1.t = dt2.t)`, except with
+> the added functionality locf.
+>
+> Additionally the documentation says:
+>
+>     X[Y] is a join, looking up X's rows using Y (or Y's key if it has one)
+>     as an index.
+>
+> This makes it seem that only rows in X should be returned and the join
+> being done is an inner join, not outer.  What about in the case when
+> `roll=T` but that particular `id` does not exist in `dt1`? Playing around a
+> bit more I can't understand what value is being placed into the column when
+> there is only 1 key in dt2.. this might be inappropriate usage.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120820/fc778e8b/attachment.html>
+
+From mdowle at mdowle.plus.com  Mon Aug 20 17:39:02 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Mon, 20 Aug 2012 16:39:02 +0100
+Subject: [datatable-help] understanding joins in data.table
+In-Reply-To: <CAP=rYLWgTPv2Vt0shDG_Q068YxUeoUGF7Nta-UWUNBixOz0j-g@mail.gmail.com>
+References: <CAP=rYLUuu3rtW-d5rE3AgMbjkk+NBHOeLr-rvwtaTLu-0de9kg@mail.gmail.com>
+ <CAP=rYLWgTPv2Vt0shDG_Q068YxUeoUGF7Nta-UWUNBixOz0j-g@mail.gmail.com>
+Message-ID: <204f86f618acc89515b20f29fa3f7fab.squirrel@webmail.plus.net>
+
+
+Sure, have answered on SO :
+
+http://stackoverflow.com/questions/12030932/rolling-joins-data-table-in-r
+
+>>
+>> I have posted this on SO as well:
+>>
+>> I am trying to understand a little more about the way rolling joins work
+>> and am having some confusion, I was hoping somebody could clarify this
+>> for
+>> me.  To take a concrete example:
+>>
+>>     dt1 <- data.table(id=rep(1:5, 10), t=1:50, val1=1:50, key=list(id,
+>> t))
+>>     dt2 <- data.table(id=rep(1:5, 2), t=1:10, val2=1:10, key=list(id,
+>> t))
+>>
+>> I expected this to produce a long `data.table` where the values in `dt2`
+>> are rolled:
+>>
+>>     dt1[dt2,roll=TRUE]
+>>
+>> Instead, the correct way to do this seems to be:
+>>
+>>     dt2[dt1,roll=TRUE]
+>>
+>> Could someone explain to me more about how joining in `data.table` works
+>> as I am clearly not understanding it correctly.  I thought that
+>> `dt1[dt2,roll=TRUE]` corresponded to the sql equivalent of `select *
+>> from
+>> dt1 right join dt2 on (dt1.id = dt2.id and dt1.t = dt2.t)`, except with
+>> the added functionality locf.
+>>
+>> Additionally the documentation says:
+>>
+>>     X[Y] is a join, looking up X's rows using Y (or Y's key if it has
+>> one)
+>>     as an index.
+>>
+>> This makes it seem that only rows in X should be returned and the join
+>> being done is an inner join, not outer.  What about in the case when
+>> `roll=T` but that particular `id` does not exist in `dt1`? Playing
+>> around a
+>> bit more I can't understand what value is being placed into the column
+>> when
+>> there is only 1 key in dt2.. this might be inappropriate usage.
+>>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+
+From hideyoshi.maeda at gmail.com  Mon Aug 27 11:31:20 2012
+From: hideyoshi.maeda at gmail.com (Hideyoshi Maeda)
+Date: Mon, 27 Aug 2012 19:31:20 +1000
+Subject: [datatable-help] rolling quantiles using data.table
+Message-ID: <197FBD67-2928-415C-BB75-FCAC04F6229F@gmail.com>
+
+Hello,
+
+I am new to data.tables so apologies if this is a very basic question.
+
+I have heard that data.tables significantly improves computational times when working with large amounts  data, and so would like to see if data.table is able to help in speeding up the rollapply function.
+
+if we have some univariate data
+
+xts.obj <- xts(rnorm(1e6), order.by=as.POSIXct(Sys.time()-1e6:1), tz="GMT")
+colnames(xts.obj) <- "rtns"
+
+a simple rolling quantile with width of 100 and a p of 0.75 takes a surprisingly long time...
+
+i.e. the line of code
+
+xts.obj$quant.75 <- rollapply(xts.obj$rtns,width=100, FUN='quantile', p=0.75)
+
+seems to take forever...
+
+is there anything that data.table can do to speed things up? i.e. is there a generic roll function that can be applied?
+
+perhaps a routine to convert an xts object to a data.table object to carry out the function in a speeded up manner and then reconvert back to xts at the end?
+
+thanks in advance
+
+hlm
+
+From mdowle at mdowle.plus.com  Tue Aug 28 11:49:16 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 28 Aug 2012 10:49:16 +0100
+Subject: [datatable-help] rolling quantiles using data.table
+In-Reply-To: <197FBD67-2928-415C-BB75-FCAC04F6229F@gmail.com>
+References: <197FBD67-2928-415C-BB75-FCAC04F6229F@gmail.com>
+Message-ID: <ab676191311dfad60449e8aabd7e4316.squirrel@webmail.plus.net>
+
+
+Hi. Welcome.
+
+I'm not aware of anything in R for fully efficient rolling
+median/quantile; it's an interesting case. If it find it, or build it,
+please let us know.
+
+http://stackoverflow.com/questions/11676476/r-data-table-sliding-window
+
+in which my comment links to :
+
+http://stackoverflow.com/questions/1309263/rolling-median-algorithm-in-c
+
+Matthew
+
+
+> Hello,
+>
+> I am new to data.tables so apologies if this is a very basic question.
+>
+> I have heard that data.tables significantly improves computational times
+> when working with large amounts  data, and so would like to see if
+> data.table is able to help in speeding up the rollapply function.
+>
+> if we have some univariate data
+>
+> xts.obj <- xts(rnorm(1e6), order.by=as.POSIXct(Sys.time()-1e6:1),
+> tz="GMT")
+> colnames(xts.obj) <- "rtns"
+>
+> a simple rolling quantile with width of 100 and a p of 0.75 takes a
+> surprisingly long time...
+>
+> i.e. the line of code
+>
+> xts.obj$quant.75 <- rollapply(xts.obj$rtns,width=100, FUN='quantile',
+> p=0.75)
+>
+> seems to take forever...
+>
+> is there anything that data.table can do to speed things up? i.e. is there
+> a generic roll function that can be applied?
+>
+> perhaps a routine to convert an xts object to a data.table object to carry
+> out the function in a speeded up manner and then reconvert back to xts at
+> the end?
+>
+> thanks in advance
+>
+> hlm
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+From matt_pocernich at hotmail.com  Fri Aug 31 00:29:10 2012
+From: matt_pocernich at hotmail.com (Matt Pocernich)
+Date: Thu, 30 Aug 2012 22:29:10 +0000
+Subject: [datatable-help] using functions which return a vector
+Message-ID: <COL123-W72D80BCF57B4BCF8BB2C3FBA70@phx.gbl>
+
+
+Hello,
+
+Sorry for the simple question, but how do I use a function, such as quantile, which returns multiple values.
+
+For example,
+
+data(iris)
+IRIS  <- as.data.table(iris)
+IRIS[, quantile(Sepal.Length), by = Species]
+
+## returns the following.
+       Species    V1
+ 1:     setosa 4.300
+ 2:     setosa 4.800
+ 3:     setosa 5.000
+ 4:     setosa 5.200
+ 5:     setosa 5.800
+ 6: versicolor 4.900
+ 7: versicolor 5.600
+ 8: versicolor 5.900
+....
+
+I would like the values returned as columns or a vector with the column names returned by the quantile function.
+
+Thanks,
+
+Matt
+ 		 	   		  
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20120830/19234f69/attachment.html>
+
+From mdowle at mdowle.plus.com  Fri Aug 31 00:47:21 2012
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Thu, 30 Aug 2012 23:47:21 +0100
+Subject: [datatable-help] using functions which return a vector
+In-Reply-To: <COL123-W72D80BCF57B4BCF8BB2C3FBA70@phx.gbl>
+References: <COL123-W72D80BCF57B4BCF8BB2C3FBA70@phx.gbl>
+Message-ID: <381539cd8152e7322b079324cc138158.squirrel@webmail.plus.net>
+
+
+Hi,
+
+> IRIS[, as.list(quantile(Sepal.Length)), by = Species]
+      Species  0%   25% 50% 75% 100%
+1:     setosa 4.3 4.800 5.0 5.2  5.8
+2: versicolor 4.9 5.600 5.9 6.3  7.0
+3:  virginica 4.9 6.225 6.5 6.9  7.9
+
+Matthew
+
+>
+> Hello,
+>
+> Sorry for the simple question, but how do I use a function, such as
+> quantile, which returns multiple values.
+>
+> For example,
+>
+> data(iris)
+> IRIS  <- as.data.table(iris)
+> IRIS[, quantile(Sepal.Length), by = Species]
+>
+> ## returns the following.
+>        Species    V1
+>  1:     setosa 4.300
+>  2:     setosa 4.800
+>  3:     setosa 5.000
+>  4:     setosa 5.200
+>  5:     setosa 5.800
+>  6: versicolor 4.900
+>  7: versicolor 5.600
+>  8: versicolor 5.900
+> ....
+>
+> I would like the values returned as columns or a vector with the column
+> names returned by the quantile function.
+>
+> Thanks,
+>
+> Matt
+>  		 	   		  _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+

@@ -1,0 +1,282 @@
+From julien.moeys at mark.slu.se  Tue Nov  9 16:49:20 2010
+From: julien.moeys at mark.slu.se (Julien Moeys)
+Date: Tue, 9 Nov 2010 16:49:20 +0100
+Subject: [inlinedocs] strange problem when using  package.skeleton.dx()
+Message-ID: <3C29B01F5820534E9FAE1EFD7F3F2C31330D332DBE@exmbx2.ad.slu.se>
+
+Dear inlinedocs developer team
+
+First of all, many thanks for developing this very useful package. It saves me a lot of time.
+
+I have a bug occurring when trying to use package.skeleton.dx() on the code described here
+http://pastebin.com/hwWxhJ7g
+
+I saved this code in an R file thisisonlyatest.R, placed it into an "R" folder in my working directory, and then type the following R command:
+> package.skeleton.dx(
++     pkgdir      = getwd(),
++     namespace   = TRUE,
++     verbose     = TRUE
++ )   #
+extra.code.docs prefixed.lines Error in if (is.arg()) { : missing value where TRUE/FALSE needed
+
+If I remove the "(i" in line 3 "### bla bla bla (i" below the function( line
+It works (no more error message)
+
+What I don't understand is why it does not work with it (I would like to write "(i.e. bla bla bla)" in my help file). I can remove all the "(i" in the doc, but it would be good to understand (to make sure that this is the source of the problem).
+
+I think that error was not occurring with version 1.3 (from r forge). But I don't have the binaries any more, so I can't test.
+I am now running this with version 1.5 from r-forge (rev 158)
+
+Any help is welcome!
+
+Generally speaking, any improvement that would allow inlinedocs to point on which part of the parsed code it fails would be of a great benefit, I think (in addition to the error message). Because finding the faulty code is a challenge (and the package is so useful that it will soon be irreplaceable too). But I guess such changes are all but easy to implement (given the number of things that can fail).
+
+All the best
+
+Julien
+
+Here is my R.version() (shortened a bit). I work on Windows XP.
+$platform
+[1] "i386-pc-mingw32"
+
+$status
+[1] ""
+
+$major
+[1] "2"
+
+$minor
+[1] "12.0"
+
+$`svn rev`
+[1] "53317"
+
+$language
+[1] "R"
+
+$version.string
+[1] "R version 2.12.0 (2010-10-15)"
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/inlinedocs-support/attachments/20101109/6ff99df2/attachment.htm>
+
+From Toby.Hocking at inria.fr  Tue Nov  9 18:07:30 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Tue, 09 Nov 2010 18:07:30 +0100 (CET)
+Subject: [inlinedocs] strange problem when using package.skeleton.dx()
+In-Reply-To: <3C29B01F5820534E9FAE1EFD7F3F2C31330D332DBE@exmbx2.ad.slu.se>
+References: <3C29B01F5820534E9FAE1EFD7F3F2C31330D332DBE@exmbx2.ad.slu.se>
+Message-ID: <20101109.180730.433001250965345659.Toby.Hocking@inria.fr>
+
+Hi Julien, thanks for your interest in inlinedocs. I took a look at
+the problem you are having, and I figured out what was wrong pretty
+quickly.
+
+
+From bogus@does.not.exist.com  Mon Nov  8 18:27:08 2010
+From: bogus@does.not.exist.com ()
+Date: Mon, 08 Nov 2010 17:27:08 -0000
+Subject: No subject
+Message-ID: <mailman.0.1289322453.1384.inlinedocs-support@lists.r-forge.r-project.org>
+
+prefixed.lines Parser Function (in inlinedocs/R/parsers.R), and
+furthermore I could tell this was occuring when is.arg() was being
+called within prefixed.lines. In fact the problem was related to an
+algorithm that matches open and close parentheses to detemine the
+start of the body of the function.
+
+Sorry that the piece of your code that was causing the error wasn't
+more clearly indicated. I don't really know how I would implement
+something like this in inlinedocs, since it doesn't necessarily parse
+the input line-by-line.
+
+Anyways, the bugfix is just checked into inlinedocs SVN on R-Forge, so
+you can check out the new version and get back to work with
+
+svn checkout svn://svn.r-forge.r-project.org/svnroot/inlinedocs
+
+From Toby.Hocking at inria.fr  Wed Nov 10 10:31:20 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Wed, 10 Nov 2010 10:31:20 +0100 (CET)
+Subject: [inlinedocs] strange problem when using package.skeleton.dx()
+In-Reply-To: <3C29B01F5820534E9FAE1EFD7F3F2C31330C1781FF@exmbx2.ad.slu.se>
+References: <3C29B01F5820534E9FAE1EFD7F3F2C31330D332DBE@exmbx2.ad.slu.se>
+	<20101109.180730.433001250965345659.Toby.Hocking@inria.fr>
+	<3C29B01F5820534E9FAE1EFD7F3F2C31330C1781FF@exmbx2.ad.slu.se>
+Message-ID: <20101110.103120.468378202351683851.Toby.Hocking@inria.fr>
+
+Hi Julien, and thanks for the idea and the code contribution. If you
+svn update, you'll see that I implemented the idea you suggested in
+forall(). My implementation uses on.exit() and thus only adds 2 lines
+of code to the existing code base. In general I try to write code
+using whichever style is the clearest to read, when speed is not an
+issue. So this is why I don't currently use so many calls to lapply,
+as I find that it is sometimes overly verbose and unclear.
+
+In any case, I welcome future code contributions to inlinedocs, so I
+added you to the R-Forge project. Feel free to discuss possible new
+features on the list, and then directly contribute to the SVN if you
+like. The only thing I ask is that you run R CMD check on the package
+before checking code in, so you can re-run all the unit tests and
+verify that your code contributions don't break any existing examples.
+
+Happy coding...
+
+From julien.moeys at mark.slu.se  Wed Nov 10 17:05:50 2010
+From: julien.moeys at mark.slu.se (Julien Moeys)
+Date: Wed, 10 Nov 2010 17:05:50 +0100
+Subject: [inlinedocs] slow package.skeleton.dx(),
+	probably because of extract.file.parse()
+In-Reply-To: <20101110.103120.468378202351683851.Toby.Hocking@inria.fr>
+References: <3C29B01F5820534E9FAE1EFD7F3F2C31330D332DBE@exmbx2.ad.slu.se>
+	<20101109.180730.433001250965345659.Toby.Hocking@inria.fr>
+	<3C29B01F5820534E9FAE1EFD7F3F2C31330C1781FF@exmbx2.ad.slu.se>
+	<20101110.103120.468378202351683851.Toby.Hocking@inria.fr>
+Message-ID: <3C29B01F5820534E9FAE1EFD7F3F2C31330D333141@exmbx2.ad.slu.se>
+
+Hi all inlinedocs developers
+
+I tested the latest inlinedocs code on another package of mine (54 functions), and it appears that the execution of package.skeleton.dx() is really slow (nearly 6 minutes), and much slower than it was before (with version 1.3) on the same code.
+
+It seems that 90% of the time is spend on extract.file.parse() in extra.code.docs() and it seems that this time is spread homogeneously between the different functions in the package. So I don't think that one of my function in the code is causing any slow down.
+
+I tried to see if there was some potential speedup in extract.file.parse() (like getting rid of the for loop), but it seems that the part concerning "setS3Method" needs to be able to look into previous results in the loop, so it will not work with lapply (or it would require to split the loop in to pieces, a first round, and then a second). I am not sure of the best way it could be accelerated (and I am not sure I have correctly identified the problem!).
+
+Any suggestion?
+
+All the best
+
+Julien 
+PS: I am using the latest inlinedocs commit, 162, compiled on with computer (Win XP, R 2.12)
+PS2: I can send an output from Rprof() if that can help.
+PS3: The problem is not critical, so I am not in a hurry...
+
+
+
+
+
+
+
+
+From Toby.Hocking at inria.fr  Fri Nov 12 10:22:27 2010
+From: Toby.Hocking at inria.fr (Toby Dylan Hocking)
+Date: Fri, 12 Nov 2010 10:22:27 +0100 (CET)
+Subject: [inlinedocs] slow package.skeleton.dx(),
+ probably because of extract.file.parse()
+In-Reply-To: <3C29B01F5820534E9FAE1EFD7F3F2C31330D333141@exmbx2.ad.slu.se>
+References: <3C29B01F5820534E9FAE1EFD7F3F2C31330C1781FF@exmbx2.ad.slu.se>
+	<20101110.103120.468378202351683851.Toby.Hocking@inria.fr>
+	<3C29B01F5820534E9FAE1EFD7F3F2C31330D333141@exmbx2.ad.slu.se>
+Message-ID: <20101112.102227.200754749227046788.Toby.Hocking@inria.fr>
+
+an idea: do you need the extra.code.code Parser Function for that
+package? If not, you can disable it by putting something like this in
+pkgdir/R/.inlinedocs.R
+
+parsers <- default.parsers[names(default.parsers)!="extra.code.docs"]
+
+if you do need that Parser Function, then the only solution is to
+speed up the code. maybe so we can test different implementations and
+possible speedups, could you upload your package code to
+inlinedocs/pkg/inlinedocs/etc/ 
+
+Also another idea is to use SVN to go back to a version that is
+sufficiently fast, then try to figure out what has happened since then
+that makes it slow.
+
+In any case if you end up getting an implementation that speeds up the
+package (and it still passes all the tests when you run R CMD check),
+please commit to SVN.
+
+From julien.moeys at mark.slu.se  Fri Nov 12 18:14:35 2010
+From: julien.moeys at mark.slu.se (Julien Moeys)
+Date: Fri, 12 Nov 2010 18:14:35 +0100
+Subject: [inlinedocs] slow package.skeleton.dx(),
+ probably because of extract.file.parse()
+In-Reply-To: <20101112.102227.200754749227046788.Toby.Hocking@inria.fr>
+References: <3C29B01F5820534E9FAE1EFD7F3F2C31330C1781FF@exmbx2.ad.slu.se>
+	<20101110.103120.468378202351683851.Toby.Hocking@inria.fr>
+	<3C29B01F5820534E9FAE1EFD7F3F2C31330D333141@exmbx2.ad.slu.se>
+	<20101112.102227.200754749227046788.Toby.Hocking@inria.fr>
+Message-ID: <3C29B01F5820534E9FAE1EFD7F3F2C31330D333865@exmbx2.ad.slu.se>
+
+Hi Toby & inlinedocs team
+
+The parser extra.code.code is unfortunately needed in my package (the doc is not extracted without it!)
+
+And I unfortunately I can't put the package code on r-forge (not that it is strategic, but it is not public)
+
+I tried to see a bit more what could be wrong
+- Rprof() shows that textConnection takes most of the time (I guess it is used by parse or something like that)
+- memoryRprof() does not show any overuse of memory
+- I tested old versions of inlindocs, and it is slow too! (down to 1.2). So I was wrong to think that some recent changes made it slower (recompiled on R 2.12.0).
+- tried to speedup the code (lapply). Almost no changes.
+- when removing some functions, it does not get especially faster (I removed functions added lately in my packages, + S3 and S4 methods)
+
+So I finally re-installed R 2.11.1, and recompiled the latest inlinedocs (on a lighter version of my package)
+===> and it is faster! (~70  seconds instead of ~270 seconds)
+
+I wonder if it could be that textConnexion is slower on R 2.12.0???
+I found this issue, related to textConnexion in R 2.11 and 2.12 devel
+https://bugs.r-project.org/bugzilla3/show_bug.cgi?id=14286
+
+
+Finally, I tested package.skeleton.dx on the latest rforge commit of the code and 
+
+- on R 2.12.0 it takes 3.38 seconds, and Rprof report on textConnexion is 
+$by.self
+                 self.time self.pct total.time total.pct
+textConnection        2.52    74.56       2.52     74.56
+grep                  0.18     5.33       0.18      5.33
+gsub                  0.10     2.96       0.10      2.96
+cat                   0.08     2.37       0.10      2.96
+
+- On R 2.11.1 it takes 1.54 seconds (2 times less), , and Rprof report on textConnexion is
+$by.self
+                          self.time self.pct total.time total.pct
+textConnection                 0.66     42.9       0.66      42.9
+grep                           0.18     11.7       0.18      11.7
+file                           0.10      6.5       0.10       6.5
+gsub                           0.10      6.5       0.10       6.5
+
+so it is a bit the same problem (except that in my case 270 seconds becomes enough to get a coffee every time I compile the package :o)
+
+Well, that is all for the moment.
+If that inspire you some idea on possible cause of the slow down...
+
+All the best
+
+Julien
+PS: Again, this is not critical. Inlinedocs is still saving me much more time than this strange slow down.
+And now I know I can run inlinedocs from R 2.11.1.
+
+
+
+-----Original Message-----
+From: Toby Dylan Hocking [mailto:Toby.Hocking at inria.fr] 
+Sent: 12 November 2010 10:22
+To: Julien Moeys
+Cc: inlinedocs-support at r-forge.wu-wien.ac.at
+Subject: Re: [inlinedocs] slow package.skeleton.dx(), probably because of extract.file.parse()
+
+an idea: do you need the extra.code.code Parser Function for that
+package? If not, you can disable it by putting something like this in
+pkgdir/R/.inlinedocs.R
+
+parsers <- default.parsers[names(default.parsers)!="extra.code.docs"]
+
+if you do need that Parser Function, then the only solution is to
+speed up the code. maybe so we can test different implementations and
+possible speedups, could you upload your package code to
+inlinedocs/pkg/inlinedocs/etc/ 
+
+Also another idea is to use SVN to go back to a version that is
+sufficiently fast, then try to figure out what has happened since then
+that makes it slow.
+
+In any case if you end up getting an implementation that speeds up the
+package (and it still passes all the tests when you run R CMD check),
+please commit to SVN.
+

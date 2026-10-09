@@ -1,0 +1,151 @@
+From murray at stokely.org  Fri Jul 12 22:46:25 2013
+From: murray at stokely.org (Murray Stokely)
+Date: Fri, 12 Jul 2013 13:46:25 -0700
+Subject: [Rprotobuf-yada] Autoconf help
+Message-ID: <CAECWziJeFyMVK5_N-f6qtUL7XxcG8ogh6KqHcY0Qy0B=h8RSCw@mail.gmail.com>
+
+RProtoBuf on FreeBSD doesn't find the protobuf headers even from the
+standard system location /usr/local/include without setting an environment
+variable or command-line flag.
+
+I'm completely ignorant of autoconf.  Does anyone know how best to add
+something to configure.in to tell it to check /usr/local/include in
+addition to wherever it is currently checking that seems to work on
+Debian/Ubuntu?
+
+            - Murray
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rprotobuf-yada/attachments/20130712/b6191ef7/attachment.html>
+
+From edd at debian.org  Sat Jul 13 02:45:36 2013
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Fri, 12 Jul 2013 19:45:36 -0500
+Subject: [Rprotobuf-yada] Autoconf help
+In-Reply-To: <CAECWziJeFyMVK5_N-f6qtUL7XxcG8ogh6KqHcY0Qy0B=h8RSCw@mail.gmail.com>
+References: <CAECWziJeFyMVK5_N-f6qtUL7XxcG8ogh6KqHcY0Qy0B=h8RSCw@mail.gmail.com>
+Message-ID: <20960.41776.493171.924407@max.nulle.part>
+
+
+On 12 July 2013 at 13:46, Murray Stokely wrote:
+| RProtoBuf on FreeBSD doesn't find the protobuf headers even from the standard
+| system location /usr/local/include without setting an environment variable or
+| command-line flag.
+| 
+| I'm completely ignorant of autoconf. ?Does anyone know how best to add
+| something to configure.in to tell it to check /usr/local/include in addition to
+| wherever it is currently checking that seems to work on Debian/Ubuntu?
+
+I can definitely help you with that.
+
+For approaches uses pkg-config, check RcppGSL or RQuantLib.  For simpler /
+mechanical approaches see RPostgreSQL or Rmpi which essentially shell-script
+loop over 'suspected' locations.  We can certainly hack that.
+
+More once I'm back in Chicago.
+
+Dirk, still at SFO
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+
+From mstokely at google.com  Sat Jul 13 05:52:56 2013
+From: mstokely at google.com (Murray Stokely)
+Date: Fri, 12 Jul 2013 20:52:56 -0700
+Subject: [Rprotobuf-yada] Autoconf help
+In-Reply-To: <20960.41776.493171.924407@max.nulle.part>
+References: <CAECWziJeFyMVK5_N-f6qtUL7XxcG8ogh6KqHcY0Qy0B=h8RSCw@mail.gmail.com>
+ <20960.41776.493171.924407@max.nulle.part>
+Message-ID: <CADiBzwQjGc1PqBCvBWZmDrNXh4JqRJZqo81ZZtwx2AgbTZEQXg@mail.gmail.com>
+
+I see thanks.  Taking another look, I see that FreeBSD -CURRENT does
+provide correct information returned from pkg-config -cflags protobuf as is
+checked at the top of configure :
+
+protobuf_cxxflags=`pkg-config --cflags protobuf`
+protobuf_libs=`pkg-config --libs protobuf`
+
+And these values are added to src/Makevars so that the compile can use them
+if it gets that far, but the subsequent configure checks that look for the
+protobuf headers aren't using these new cxxflags.
+
+I added these 3 lines and now it works in FreeBSD and doesn't break Ubuntu
+12 LTS either, so I submitted it:
+
+## And make sure these flags are used for the tests below.
+CPPFLAGS="${protobuf_cxxflags} ${CPPFLAGS}"
+CXXFLAGS="${protobuf_cxxflags} ${CXXFLAGS}"
+
+Thanks for the pointers.
+
+          - Murray
+
+
+
+On Fri, Jul 12, 2013 at 5:45 PM, Dirk Eddelbuettel <edd at debian.org> wrote:
+
+>
+> On 12 July 2013 at 13:46, Murray Stokely wrote:
+> | RProtoBuf on FreeBSD doesn't find the protobuf headers even from the
+> standard
+> | system location /usr/local/include without setting an environment
+> variable or
+> | command-line flag.
+> |
+> | I'm completely ignorant of autoconf.  Does anyone know how best to add
+> | something to configure.in to tell it to check /usr/local/include in
+> addition to
+> | wherever it is currently checking that seems to work on Debian/Ubuntu?
+>
+> I can definitely help you with that.
+>
+> For approaches uses pkg-config, check RcppGSL or RQuantLib.  For simpler /
+> mechanical approaches see RPostgreSQL or Rmpi which essentially
+> shell-script
+> loop over 'suspected' locations.  We can certainly hack that.
+>
+> More once I'm back in Chicago.
+>
+> Dirk, still at SFO
+>
+> --
+> Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+> _______________________________________________
+> Rprotobuf-yada mailing list
+> Rprotobuf-yada at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/rprotobuf-yada
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/rprotobuf-yada/attachments/20130712/c55a1f7f/attachment.html>
+
+From edd at debian.org  Sat Jul 13 18:48:46 2013
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Sat, 13 Jul 2013 11:48:46 -0500
+Subject: [Rprotobuf-yada] Autoconf help
+In-Reply-To: <CADiBzwQjGc1PqBCvBWZmDrNXh4JqRJZqo81ZZtwx2AgbTZEQXg@mail.gmail.com>
+References: <CAECWziJeFyMVK5_N-f6qtUL7XxcG8ogh6KqHcY0Qy0B=h8RSCw@mail.gmail.com>
+ <20960.41776.493171.924407@max.nulle.part>
+ <CADiBzwQjGc1PqBCvBWZmDrNXh4JqRJZqo81ZZtwx2AgbTZEQXg@mail.gmail.com>
+Message-ID: <20961.34030.756718.992919@max.nulle.part>
+
+
+On 12 July 2013 at 20:52, Murray Stokely wrote:
+| I added these 3 lines and now it works in FreeBSD and doesn't break Ubuntu 12
+| LTS either, so I submitted it:
+
+All good on Ubuntu 13.04 too, of course.
+
+I made another small commit to suppress a nag from R CMD check re
+documentation, and to do away with the check for minimal Protocol Buffers
+version from the R / package loading side as we do this in configure too (and
+the test was against a jurassic version anyway).
+
+Thanks so much for all your work on this.  As fas as I am concerned, we can
+release anytime -- as a 0.3.0, or 0.2.7, or any number greater than 0.2.6 :)
+
+Dirk
+
+-- 
+Dirk Eddelbuettel | edd at debian.org | http://dirk.eddelbuettel.com
+

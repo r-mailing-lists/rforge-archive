@@ -1,0 +1,1395 @@
+From deepayan.sarkar at gmail.com  Sat Jan 16 16:33:24 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Sat, 16 Jan 2010 07:33:24 -0800
+Subject: [RQt-devel] recent smoke update
+Message-ID: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+
+Hi (mostly MIchael),
+
+r206 (2010-01-14, Update to latest smoke) caused a regression in my
+setup because these lines were removed (they had been added following
+Justin's suggestion because I need the -fPIC flag):
+
+----
+if( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+  set_target_properties(smokeqt PROPERTIES COMPILE_FLAGS "-fPIC")
+endif( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+----
+
+Not a big deal, I just added them back, but I was wondering if there's
+anything we might do to prevent repeat occurrences. Was the file
+copied verbatim from the new smoke release?
+
+-Deepayan
+
+From lawrence.michael at gene.com  Sat Jan 16 17:27:58 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sat, 16 Jan 2010 08:27:58 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+Message-ID: <acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+
+On Sat, Jan 16, 2010 at 7:33 AM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> Hi (mostly MIchael),
+>
+> r206 (2010-01-14, Update to latest smoke) caused a regression in my
+> setup because these lines were removed (they had been added following
+> Justin's suggestion because I need the -fPIC flag):
+>
+> ----
+> if( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+>  set_target_properties(smokeqt PROPERTIES COMPILE_FLAGS "-fPIC")
+> endif( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+> ----
+>
+> Not a big deal, I just added them back, but I was wondering if there's
+> anything we might do to prevent repeat occurrences. Was the file
+> copied verbatim from the new smoke release?
+>
+>
+Yes, those files are copied verbatim with the sync. We need to get these
+changes into upstream. But the uptake seems pretty slow. There is this fix,
+as well as the fixes for OS X. We probably need to create our own branch of
+the kdebindings stuff or at least maintain a set of patches. The latter is
+probably a better idea.
+
+Michael
+
+
+> -Deepayan
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100116/d02e420e/attachment.htm 
+
+From deepayan.sarkar at gmail.com  Sun Jan 17 09:00:48 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Sun, 17 Jan 2010 00:00:48 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+Message-ID: <eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+
+On Sat, Jan 16, 2010 at 8:27 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+>
+>
+> On Sat, Jan 16, 2010 at 7:33 AM, Deepayan Sarkar <deepayan.sarkar at gmail.com>
+> wrote:
+>>
+>> Hi (mostly MIchael),
+>>
+>> r206 (2010-01-14, Update to latest smoke) caused a regression in my
+>> setup because these lines were removed (they had been added following
+>> Justin's suggestion because I need the -fPIC flag):
+>>
+>> ----
+>> if( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+>> ?set_target_properties(smokeqt PROPERTIES COMPILE_FLAGS "-fPIC")
+>> endif( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+>> ----
+>>
+>> Not a big deal, I just added them back, but I was wondering if there's
+>> anything we might do to prevent repeat occurrences. Was the file
+>> copied verbatim from the new smoke release?
+>>
+>
+> Yes, those files are copied verbatim with the sync. We need to get these
+> changes into upstream. But the uptake seems pretty slow. There is this fix,
+> as well as the fixes for OS X. We probably need to create our own branch of
+> the kdebindings stuff or at least maintain a set of patches. The latter is
+> probably a better idea.
+
+Yes, maintaining patches is fairly common practice, although I'm not
+sure how it's actually done in practice.
+
+Anyway, have either of you noticed more instability than there used to
+be? It's not very reproducible, but something always seems to go wrong
+after a while. In one case, the result of calling Qt$QPen() was
+reported as being of class "QGraphicsItem" (and there were some of
+those around), which may give a hint about what might be happening.
+
+Here's a small attempt at reproducing the bug (it's an infinite loop,
+so be ready to interrupt if nothing goes wrong). Notice how sometimes
+there is a segfault, and other times an error.
+
+--------
+dsarkar at sphulinga:tmp$ cat qbug.R
+library(qtbase)
+i <- 1L
+while (TRUE) {
+    i <- i + 1L
+    if ((i %% 100) == 0) message(i)
+    pen <- try(Qt$QPen(Qt$QColor(10L, 20L, 10L)), silent = TRUE)
+    if (is(pen, "try-error"))
+    {
+        message(i, ":", as.character(pen))
+        break
+    }
+}
+
+dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+100
+200
+300
+400
+
+ *** caught segfault ***
+address (nil), cause 'unknown'
+aborting ...
+Segmentation fault
+dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+100
+200
+300
+400
+
+ *** caught segfault ***
+address (nil), cause 'unknown'
+aborting ...
+Segmentation fault
+dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+100
+200
+300
+400
+
+ *** caught segfault ***
+address (nil), cause 'unknown'
+aborting ...
+Segmentation fault
+dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+2:Error in assign(enum, structure(enums[enum], class = "QtEnum"), env) :
+  attempt to use zero-length variable name
+
+dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+100
+200
+300
+400
+
+ *** caught segfault ***
+address (nil), cause 'unknown'
+aborting ...
+Segmentation fault
+dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+2:Error in assign(enum, structure(enums[enum], class = "QtEnum"), env) :
+  attempt to use zero-length variable name
+
+dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+100
+200
+300
+400
+
+ *** caught segfault ***
+address (nil), cause 'unknown'
+aborting ...
+Segmentation fault
+
+--------
+
+-Deepayan
+
+From lawrence.michael at gene.com  Sun Jan 17 16:32:21 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sun, 17 Jan 2010 07:32:21 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+Message-ID: <acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+
+Unfortunately, I can't seem to reproduce the error, only the segfault. Btw,
+your test code is off by 1 (so the error is happening on the first
+iteration). It's also weird how the segfault is so predictable (it crashes
+somewhere between 400 and 500 on my machine too).
+
+Are you saying that this is a regression? I can't install the old version,
+because it's broken for Qt 4.6.
+
+Michael
+
+On Sun, Jan 17, 2010 at 12:00 AM, Deepayan Sarkar <deepayan.sarkar at gmail.com
+> wrote:
+
+> On Sat, Jan 16, 2010 at 8:27 AM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> >
+> >
+> > On Sat, Jan 16, 2010 at 7:33 AM, Deepayan Sarkar <
+> deepayan.sarkar at gmail.com>
+> > wrote:
+> >>
+> >> Hi (mostly MIchael),
+> >>
+> >> r206 (2010-01-14, Update to latest smoke) caused a regression in my
+> >> setup because these lines were removed (they had been added following
+> >> Justin's suggestion because I need the -fPIC flag):
+> >>
+> >> ----
+> >> if( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+> >>  set_target_properties(smokeqt PROPERTIES COMPILE_FLAGS "-fPIC")
+> >> endif( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+> >> ----
+> >>
+> >> Not a big deal, I just added them back, but I was wondering if there's
+> >> anything we might do to prevent repeat occurrences. Was the file
+> >> copied verbatim from the new smoke release?
+> >>
+> >
+> > Yes, those files are copied verbatim with the sync. We need to get these
+> > changes into upstream. But the uptake seems pretty slow. There is this
+> fix,
+> > as well as the fixes for OS X. We probably need to create our own branch
+> of
+> > the kdebindings stuff or at least maintain a set of patches. The latter
+> is
+> > probably a better idea.
+>
+> Yes, maintaining patches is fairly common practice, although I'm not
+> sure how it's actually done in practice.
+>
+> Anyway, have either of you noticed more instability than there used to
+> be? It's not very reproducible, but something always seems to go wrong
+> after a while. In one case, the result of calling Qt$QPen() was
+> reported as being of class "QGraphicsItem" (and there were some of
+> those around), which may give a hint about what might be happening.
+>
+> Here's a small attempt at reproducing the bug (it's an infinite loop,
+> so be ready to interrupt if nothing goes wrong). Notice how sometimes
+> there is a segfault, and other times an error.
+>
+> --------
+> dsarkar at sphulinga:tmp$ cat qbug.R
+> library(qtbase)
+> i <- 1L
+> while (TRUE) {
+>    i <- i + 1L
+>    if ((i %% 100) == 0) message(i)
+>    pen <- try(Qt$QPen(Qt$QColor(10L, 20L, 10L)), silent = TRUE)
+>    if (is(pen, "try-error"))
+>    {
+>        message(i, ":", as.character(pen))
+>        break
+>    }
+> }
+>
+> dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+> 100
+> 200
+> 300
+> 400
+>
+>  *** caught segfault ***
+> address (nil), cause 'unknown'
+> aborting ...
+> Segmentation fault
+> dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+> 100
+> 200
+> 300
+> 400
+>
+>  *** caught segfault ***
+> address (nil), cause 'unknown'
+> aborting ...
+> Segmentation fault
+> dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+> 100
+> 200
+> 300
+> 400
+>
+>  *** caught segfault ***
+> address (nil), cause 'unknown'
+> aborting ...
+> Segmentation fault
+> dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+> 2:Error in assign(enum, structure(enums[enum], class = "QtEnum"), env) :
+>  attempt to use zero-length variable name
+>
+> dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+> 100
+> 200
+> 300
+> 400
+>
+>  *** caught segfault ***
+> address (nil), cause 'unknown'
+> aborting ...
+> Segmentation fault
+> dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+> 2:Error in assign(enum, structure(enums[enum], class = "QtEnum"), env) :
+>  attempt to use zero-length variable name
+>
+> dsarkar at sphulinga:tmp$ R-devel --vanilla --slave < qbug.R
+> 100
+> 200
+> 300
+> 400
+>
+>  *** caught segfault ***
+> address (nil), cause 'unknown'
+> aborting ...
+> Segmentation fault
+>
+> --------
+>
+> -Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100117/adf77300/attachment.htm 
+
+From deepayan.sarkar at gmail.com  Sun Jan 17 19:24:14 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Sun, 17 Jan 2010 10:24:14 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+Message-ID: <eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+
+On Sun, Jan 17, 2010 at 7:32 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Unfortunately, I can't seem to reproduce the error, only the segfault. Btw,
+> your test code is off by 1 (so the error is happening on the first
+> iteration). It's also weird how the segfault is so predictable (it crashes
+> somewhere between 400 and 500 on my machine too).
+
+Yes, the segfault is quite predictable (although not quite 100%), and
+happens much earlier if I include a gc() call. Here's a variation:
+
+----Code:
+library(qtbase)
+i <- 1L
+while (TRUE) {
+    gc()
+    pen <- Qt$QPen(Qt$QColor(10L, 20L, 10L))
+    message(i, "\t", capture.output(print(pen))[1], "\t", class(pen)[1])
+    i <- i + 1L
+}
+----Typical output:
+1       <environment: 0x141e530>        QPen
+2       <environment: 0x1f75788>        QColor
+3       <environment: 0x1f758d8>        QPen
+4       <environment: 0x1f75868>        QColor
+5       <environment: 0x1f757f8>        QColor
+6       <environment: 0x1f75868>        QColor
+7       <environment: 0x1f757f8>        QColor
+
+ *** caught segfault ***
+address (nil), cause 'unknown'
+aborting ...
+Segmentation fault
+----
+Note the wrongly reported QColor. Taking the diff() of the pointer
+addresses is interesting:
+
+> diff(c(0x141e530, 0x1f75788, 0x1f758d8, 0x1f75868, 0x1f757f8, 0x1f75868, 0x1f757f8))
+[1] 11891288      336     -112     -112      112     -112
+
+The numbers 336 and 112 recur.
+
+> Are you saying that this is a regression? I can't install the old version,
+> because it's broken for Qt 4.6.
+
+I had thought so, but it's not. I get similar behavior with an older version.
+
+Somehow the QColor seems important. If I just use
+
+pen <- Qt$QPen()
+
+then things seem stabler (it doesn't segfault, though it sometimes
+gives an error).
+
+-Deepayan
+
+From lawrence.michael at gene.com  Sun Jan 17 19:41:22 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Sun, 17 Jan 2010 10:41:22 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+Message-ID: <acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+
+On Sun, Jan 17, 2010 at 10:24 AM, Deepayan Sarkar <deepayan.sarkar at gmail.com
+> wrote:
+
+> On Sun, Jan 17, 2010 at 7:32 AM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > Unfortunately, I can't seem to reproduce the error, only the segfault.
+> Btw,
+> > your test code is off by 1 (so the error is happening on the first
+> > iteration). It's also weird how the segfault is so predictable (it
+> crashes
+> > somewhere between 400 and 500 on my machine too).
+>
+> Yes, the segfault is quite predictable (although not quite 100%), and
+> happens much earlier if I include a gc() call. Here's a variation:
+>
+> ----Code:
+> library(qtbase)
+> i <- 1L
+> while (TRUE) {
+>     gc()
+>    pen <- Qt$QPen(Qt$QColor(10L, 20L, 10L))
+>    message(i, "\t", capture.output(print(pen))[1], "\t", class(pen)[1])
+>    i <- i + 1L
+> }
+> ----Typical output:
+> 1       <environment: 0x141e530>        QPen
+> 2       <environment: 0x1f75788>        QColor
+> 3       <environment: 0x1f758d8>        QPen
+> 4       <environment: 0x1f75868>        QColor
+> 5       <environment: 0x1f757f8>        QColor
+> 6       <environment: 0x1f75868>        QColor
+> 7       <environment: 0x1f757f8>        QColor
+>
+>
+Ok, this looks interesting. After we fix this bug though, I think we need to
+make qtbase convert QColor to the high-level integer matrix as returned by
+qcolor(). And QPen might belong as an R list, as I think you were doing
+before. In general, I think the value types like QColor, QMatrix, etc,
+should be converted to native R structures, instead of opaque external
+pointers. The functions already exist for this; they just need to integrated
+better into the smoke stuff.
+
+Michael
+
+ *** caught segfault ***
+> address (nil), cause 'unknown'
+> aborting ...
+> Segmentation fault
+> ----
+> Note the wrongly reported QColor. Taking the diff() of the pointer
+> addresses is interesting:
+>
+> > diff(c(0x141e530, 0x1f75788, 0x1f758d8, 0x1f75868, 0x1f757f8, 0x1f75868,
+> 0x1f757f8))
+> [1] 11891288      336     -112     -112      112     -112
+>
+> The numbers 336 and 112 recur.
+>
+> > Are you saying that this is a regression? I can't install the old
+> version,
+> > because it's broken for Qt 4.6.
+>
+> I had thought so, but it's not. I get similar behavior with an older
+> version.
+>
+> Somehow the QColor seems important. If I just use
+>
+> pen <- Qt$QPen()
+>
+> then things seem stabler (it doesn't segfault, though it sometimes
+> gives an error).
+>
+> -Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100117/a8a1768a/attachment.htm 
+
+From romain.francois at dbmail.com  Tue Jan 19 10:50:57 2010
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Tue, 19 Jan 2010 10:50:57 +0100
+Subject: [RQt-devel] Rcpp
+Message-ID: <4B558081.4080105@dbmail.com>
+
+Hello,
+
+I just wanted to draw your attention to the new version of Rcpp, that I 
+think might be useful for qtinterfaces (maybe not).
+
+Rcpp has been completely redesigned over the holidays (while keeping the 
+existing interface). Now we have many C++ classes that basically act as 
+proxy classes for the SEXP they encapsulate. So that the object takes 
+care of protection/release to the garbage collection.
+
+We cover just about every (useful) SEXP type. For example, manipulating 
+a character vector can look like this :
+
+/* creating a character vector of two elements */
+Rcpp::CharacterVector x(2);
+x[0] = "foo" ;
+x[1] = "bar" ;
+
+Romain
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/KfKn : Rcpp 0.7.2
+|- http://tr.im/JOlc : External pointers with Rcpp
+`- http://tr.im/JFqa : R Journal, Volume 1/2, December 2009
+
+
+From lawrence.michael at gene.com  Tue Jan 19 15:34:47 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Tue, 19 Jan 2010 06:34:47 -0800
+Subject: [RQt-devel] Rcpp
+In-Reply-To: <4B558081.4080105@dbmail.com>
+References: <4B558081.4080105@dbmail.com>
+Message-ID: <acbd1aed1001190634l62f9db3du7dbc82dcf94378cf@mail.gmail.com>
+
+Thanks for passing this along. Rcpp has come a long way. It could be very
+useful as we add more type conversions. The inline compilation is also cool
+for experimentation.
+
+Michael
+
+On Tue, Jan 19, 2010 at 1:50 AM, Romain Francois <romain.francois at dbmail.com
+> wrote:
+
+> Hello,
+>
+> I just wanted to draw your attention to the new version of Rcpp, that I
+> think might be useful for qtinterfaces (maybe not).
+>
+> Rcpp has been completely redesigned over the holidays (while keeping the
+> existing interface). Now we have many C++ classes that basically act as
+> proxy classes for the SEXP they encapsulate. So that the object takes
+> care of protection/release to the garbage collection.
+>
+> We cover just about every (useful) SEXP type. For example, manipulating
+> a character vector can look like this :
+>
+> /* creating a character vector of two elements */
+> Rcpp::CharacterVector x(2);
+> x[0] = "foo" ;
+> x[1] = "bar" ;
+>
+> Romain
+>
+> --
+> Romain Francois
+> Professional R Enthusiast
+> +33(0) 6 28 91 30 30
+> http://romainfrancois.blog.free.fr
+> |- http://tr.im/KfKn : Rcpp 0.7.2
+> |- http://tr.im/JOlc : External pointers with Rcpp
+> `- http://tr.im/JFqa : R Journal, Volume 1/2, December 2009
+>
+> _______________________________________________
+> Qtinterfaces-devel mailing list
+> Qtinterfaces-devel at lists.r-forge.r-project.org
+>
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/qtinterfaces-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100119/3af1b7e4/attachment.htm 
+
+From deepayan.sarkar at gmail.com  Wed Jan 20 10:39:02 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Wed, 20 Jan 2010 15:09:02 +0530
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+Message-ID: <eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+
+On Mon, Jan 18, 2010 at 12:11 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+
+> Ok, this looks interesting. After we fix this bug though, I think we need to
+> make qtbase convert QColor to the high-level integer matrix as returned by
+> qcolor(). And QPen might belong as an R list, as I think you were doing
+> before. In general, I think the value types like QColor, QMatrix, etc,
+> should be converted to native R structures, instead of opaque external
+> pointers. The functions already exist for this; they just need to integrated
+> better into the smoke stuff.
+
+Sure, but could you outline the advantages? What I mean is that even
+for things with obvious analogs, the Qt pointer representation may
+give some useful freebies; let's say QImage::invertPixels(). I see the
+point in making it into a native R structure, but wouldn't it be
+better to have access to both at the user level? So I'm thinking of
+
+im <- Qt$QImage("foo.png")
+
+returning a "QImage", and have user-level as.raster() and as.QImage()
+methods for conversion.
+
+Is there a technical advantage (like more stability) to not allowing
+something like this for the value types? What about things that don't
+have an obvious analog?
+
+-Deepayan
+
+From romain.francois at dbmail.com  Wed Jan 20 11:05:13 2010
+From: romain.francois at dbmail.com (Romain Francois)
+Date: Wed, 20 Jan 2010 11:05:13 +0100
+Subject: [RQt-devel] Rcpp
+In-Reply-To: <acbd1aed1001190634l62f9db3du7dbc82dcf94378cf@mail.gmail.com>
+References: <4B558081.4080105@dbmail.com>
+	<acbd1aed1001190634l62f9db3du7dbc82dcf94378cf@mail.gmail.com>
+Message-ID: <4B56D559.1090204@dbmail.com>
+
+
+On 01/19/2010 03:34 PM, Michael Lawrence wrote:
+> Thanks for passing this along. Rcpp has come a long way. It could be
+> very useful as we add more type conversions. The inline compilation is
+> also cool for experimentation.
+
+Hi,
+
+Possibly. For type conversion, we have the magic "as" :
+
+template <typename T> T as( SEXP m_sexp)
+
+so that we do things like :
+
+SEXP foo ;
+int x = as<int>( foo ) ;
+
+the templateness gives the possibility to add other converters, so that
+
+Whatever y = as<Whatever>( foo ) ;
+
+
+.. and since all our RObject's implement the operator SEXP() for 
+implicit conversion to SEXP, we can do this for free :
+
+CharacterVector x(1) ; x[0] = "foo" ;
+std::string y = as< std::string >( x ) ;
+
+
+One other thing I thought that could help (although I have not poked 
+deeply into your code yet), is the templated external pointer class.
+
+SEXP x = ... ; /* an external pointer holding a Foo object */
+XPtr<Foo> p(x) ;
+p->bar() ;     /* where bar is a method of Foo */
+
+see 
+http://romainfrancois.blog.free.fr/index.php?post/2010/01/08/External-pointers-with-Rcpp 
+for details.
+
+Romain
+
+> Michael
+>
+> On Tue, Jan 19, 2010 at 1:50 AM, Romain Francois
+> <romain.francois at dbmail.com <mailto:romain.francois at dbmail.com>> wrote:
+>
+>     Hello,
+>
+>     I just wanted to draw your attention to the new version of Rcpp, that I
+>     think might be useful for qtinterfaces (maybe not).
+>
+>     Rcpp has been completely redesigned over the holidays (while keeping the
+>     existing interface). Now we have many C++ classes that basically act as
+>     proxy classes for the SEXP they encapsulate. So that the object takes
+>     care of protection/release to the garbage collection.
+>
+>     We cover just about every (useful) SEXP type. For example, manipulating
+>     a character vector can look like this :
+>
+>     /* creating a character vector of two elements */
+>     Rcpp::CharacterVector x(2);
+>     x[0] = "foo" ;
+>     x[1] = "bar" ;
+>
+>     Romain
+
+
+
+-- 
+Romain Francois
+Professional R Enthusiast
++33(0) 6 28 91 30 30
+http://romainfrancois.blog.free.fr
+|- http://tr.im/KfKn : Rcpp 0.7.2
+|- http://tr.im/JOlc : External pointers with Rcpp
+`- http://tr.im/JFqa : R Journal, Volume 1/2, December 2009
+
+
+From lawrence.michael at gene.com  Wed Jan 20 15:46:53 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Jan 2010 06:46:53 -0800
+Subject: [RQt-devel] Rcpp
+In-Reply-To: <4B56D559.1090204@dbmail.com>
+References: <4B558081.4080105@dbmail.com>
+	<acbd1aed1001190634l62f9db3du7dbc82dcf94378cf@mail.gmail.com>
+	<4B56D559.1090204@dbmail.com>
+Message-ID: <acbd1aed1001200646o221aa387k48bd7c2843fa4bf8@mail.gmail.com>
+
+Cool. Yes, Rcpp could make many of the routine tasks easier, thus allowing
+us to focus on the tough stuff.
+
+Thanks for the info,
+Michael
+
+On Wed, Jan 20, 2010 at 2:05 AM, Romain Francois <romain.francois at dbmail.com
+> wrote:
+
+>
+> On 01/19/2010 03:34 PM, Michael Lawrence wrote:
+>
+>> Thanks for passing this along. Rcpp has come a long way. It could be
+>> very useful as we add more type conversions. The inline compilation is
+>> also cool for experimentation.
+>>
+>
+> Hi,
+>
+> Possibly. For type conversion, we have the magic "as" :
+>
+> template <typename T> T as( SEXP m_sexp)
+>
+> so that we do things like :
+>
+> SEXP foo ;
+> int x = as<int>( foo ) ;
+>
+> the templateness gives the possibility to add other converters, so that
+>
+> Whatever y = as<Whatever>( foo ) ;
+>
+>
+> .. and since all our RObject's implement the operator SEXP() for implicit
+> conversion to SEXP, we can do this for free :
+>
+> CharacterVector x(1) ; x[0] = "foo" ;
+> std::string y = as< std::string >( x ) ;
+>
+>
+> One other thing I thought that could help (although I have not poked deeply
+> into your code yet), is the templated external pointer class.
+>
+> SEXP x = ... ; /* an external pointer holding a Foo object */
+> XPtr<Foo> p(x) ;
+> p->bar() ;     /* where bar is a method of Foo */
+>
+> see
+> http://romainfrancois.blog.free.fr/index.php?post/2010/01/08/External-pointers-with-Rcppfor details.
+>
+> Romain
+>
+>  Michael
+>>
+>> On Tue, Jan 19, 2010 at 1:50 AM, Romain Francois
+>> <romain.francois at dbmail.com <mailto:romain.francois at dbmail.com>> wrote:
+>>
+>>    Hello,
+>>
+>>    I just wanted to draw your attention to the new version of Rcpp, that I
+>>    think might be useful for qtinterfaces (maybe not).
+>>
+>>    Rcpp has been completely redesigned over the holidays (while keeping
+>> the
+>>    existing interface). Now we have many C++ classes that basically act as
+>>    proxy classes for the SEXP they encapsulate. So that the object takes
+>>    care of protection/release to the garbage collection.
+>>
+>>    We cover just about every (useful) SEXP type. For example, manipulating
+>>    a character vector can look like this :
+>>
+>>    /* creating a character vector of two elements */
+>>    Rcpp::CharacterVector x(2);
+>>    x[0] = "foo" ;
+>>    x[1] = "bar" ;
+>>
+>>    Romain
+>>
+>
+>
+>
+> --
+> Romain Francois
+> Professional R Enthusiast
+> +33(0) 6 28 91 30 30
+> http://romainfrancois.blog.free.fr
+> |- http://tr.im/KfKn : Rcpp 0.7.2
+> |- http://tr.im/JOlc : External pointers with Rcpp
+> `- http://tr.im/JFqa : R Journal, Volume 1/2, December 2009
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100120/d5ab9d68/attachment.htm 
+
+From lawrence.michael at gene.com  Wed Jan 20 15:54:51 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Jan 2010 06:54:51 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+	<eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+Message-ID: <acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+
+On Wed, Jan 20, 2010 at 1:39 AM, Deepayan Sarkar
+<deepayan.sarkar at gmail.com>wrote:
+
+> On Mon, Jan 18, 2010 at 12:11 AM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+>
+> > Ok, this looks interesting. After we fix this bug though, I think we need
+> to
+> > make qtbase convert QColor to the high-level integer matrix as returned
+> by
+> > qcolor(). And QPen might belong as an R list, as I think you were doing
+> > before. In general, I think the value types like QColor, QMatrix, etc,
+> > should be converted to native R structures, instead of opaque external
+> > pointers. The functions already exist for this; they just need to
+> integrated
+> > better into the smoke stuff.
+>
+> Sure, but could you outline the advantages? What I mean is that even
+> for things with obvious analogs, the Qt pointer representation may
+> give some useful freebies; let's say QImage::invertPixels(). I see the
+> point in making it into a native R structure, but wouldn't it be
+> better to have access to both at the user level? So I'm thinking of
+>
+> im <- Qt$QImage("foo.png")
+>
+> returning a "QImage", and have user-level as.raster() and as.QImage()
+> methods for conversion.
+>
+>
+There's nothing preventing us in general from calling Qt methods on R-level
+structures. Take QMatrix for example. It maps to a 3x2 R matrix with a
+special class c("QMatrix", "RQtValue", "RQtObject"). Then the code will be
+smart enough to allow:
+
+mat <- QMatrix()
+mat[1,2] <- 2
+mat <- mat$invert()
+
+Where 'invert' is implemented by Qt.
+
+
+> Is there a technical advantage (like more stability) to not allowing
+> something like this for the value types? What about things that don't
+> have an obvious analog?
+>
+>
+Well, there are certainly cases like QImage that should probably remain
+external. There's too much data there to be copied around. Basically, except
+for QString and maybe QByteArray, any class that uses the shared pointers
+should probably remain as a pointer.
+
+
+> -Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100120/5665a348/attachment.htm 
+
+From edd at debian.org  Wed Jan 20 16:38:57 2010
+From: edd at debian.org (Dirk Eddelbuettel)
+Date: Wed, 20 Jan 2010 09:38:57 -0600
+Subject: [RQt-devel] Rcpp
+In-Reply-To: <acbd1aed1001200646o221aa387k48bd7c2843fa4bf8@mail.gmail.com>
+References: <4B558081.4080105@dbmail.com>
+	<acbd1aed1001190634l62f9db3du7dbc82dcf94378cf@mail.gmail.com>
+	<4B56D559.1090204@dbmail.com>
+	<acbd1aed1001200646o221aa387k48bd7c2843fa4bf8@mail.gmail.com>
+Message-ID: <19287.9105.723797.556932@ron.nulle.part>
+
+
+On 20 January 2010 at 06:46, Michael Lawrence wrote:
+| Cool. Yes, Rcpp could make many of the routine tasks easier, thus allowing
+| us to focus on the tough stuff.
+
+We would be more than happy to help and see about accomodating other use
+cases you may have. Romain has worked incredibly hard and added support for
+just about every useful SEXP type out there as well as for lots and lots of
+accessors. We may still miss some, of course.
+
+Dirk
+
+PS I am trying really hard to ignore the existence of yet another mailing
+list I'd be too tempted to subscribe to....
+
+PPS I am overdue another 'svn up' for qtinterfaces to see where you're at
+now. I think I may have to do another little bit ot Qt coding for a monitor
+at work, but not direct R connection. 
+
+-- 
+Three out of two people have difficulties with fractions.
+
+From lawrence.michael at gene.com  Wed Jan 20 16:43:14 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Jan 2010 07:43:14 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+	<eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+	<acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+Message-ID: <acbd1aed1001200743u3802121ave08f2175cd59aa24@mail.gmail.com>
+
+Potentially interesting paper attached. Haven't read it yet.
+
+On Wed, Jan 20, 2010 at 6:54 AM, Michael Lawrence <michafla at gene.com> wrote:
+
+>
+>
+> On Wed, Jan 20, 2010 at 1:39 AM, Deepayan Sarkar <
+> deepayan.sarkar at gmail.com> wrote:
+>
+>> On Mon, Jan 18, 2010 at 12:11 AM, Michael Lawrence
+>> <lawrence.michael at gene.com> wrote:
+>>
+>> > Ok, this looks interesting. After we fix this bug though, I think we
+>> need to
+>> > make qtbase convert QColor to the high-level integer matrix as returned
+>> by
+>> > qcolor(). And QPen might belong as an R list, as I think you were doing
+>> > before. In general, I think the value types like QColor, QMatrix, etc,
+>> > should be converted to native R structures, instead of opaque external
+>> > pointers. The functions already exist for this; they just need to
+>> integrated
+>> > better into the smoke stuff.
+>>
+>> Sure, but could you outline the advantages? What I mean is that even
+>> for things with obvious analogs, the Qt pointer representation may
+>> give some useful freebies; let's say QImage::invertPixels(). I see the
+>> point in making it into a native R structure, but wouldn't it be
+>> better to have access to both at the user level? So I'm thinking of
+>>
+>> im <- Qt$QImage("foo.png")
+>>
+>> returning a "QImage", and have user-level as.raster() and as.QImage()
+>> methods for conversion.
+>>
+>>
+> There's nothing preventing us in general from calling Qt methods on R-level
+> structures. Take QMatrix for example. It maps to a 3x2 R matrix with a
+> special class c("QMatrix", "RQtValue", "RQtObject"). Then the code will be
+> smart enough to allow:
+>
+> mat <- QMatrix()
+> mat[1,2] <- 2
+> mat <- mat$invert()
+>
+> Where 'invert' is implemented by Qt.
+>
+>
+>> Is there a technical advantage (like more stability) to not allowing
+>> something like this for the value types? What about things that don't
+>> have an obvious analog?
+>>
+>>
+> Well, there are certainly cases like QImage that should probably remain
+> external. There's too much data there to be copied around. Basically, except
+> for QString and maybe QByteArray, any class that uses the shared pointers
+> should probably remain as a pointer.
+>
+>
+>> -Deepayan
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100120/1220df59/attachment-0001.htm 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: a12-matthews.pdf
+Type: application/pdf
+Size: 945257 bytes
+Desc: not available
+Url : http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100120/1220df59/attachment-0001.pdf 
+
+From lawrence.michael at gene.com  Wed Jan 20 20:11:16 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Jan 2010 11:11:16 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <acbd1aed1001200743u3802121ave08f2175cd59aa24@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+	<eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+	<acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+	<acbd1aed1001200743u3802121ave08f2175cd59aa24@mail.gmail.com>
+Message-ID: <acbd1aed1001201111l79e3efdas65f46c15001ffd5c@mail.gmail.com>
+
+Well, the paper was a little tough for me to grok. But anyway, I think we
+need a consistent type conversion policy. When Qt always treats a class as a
+pointer (e.g. QObjects), it's pretty clear that we need to do the same. For
+value types, it's more complicated. Qt uses values to avoid the
+complications of memory management (as with QImage) or to avoid memory
+allocation overhead for small types (like QPen).
+
+
+From deepayan.sarkar at gmail.com  Wed Jan 20 20:35:48 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Wed, 20 Jan 2010 11:35:48 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <acbd1aed1001201111l79e3efdas65f46c15001ffd5c@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001160827x4a5ad549u4cd2e46c5898b425@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+	<eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+	<acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+	<acbd1aed1001200743u3802121ave08f2175cd59aa24@mail.gmail.com>
+	<acbd1aed1001201111l79e3efdas65f46c15001ffd5c@mail.gmail.com>
+Message-ID: <eb555e661001201135k3c7a1c93rdb971dbf135f6fe@mail.gmail.com>
+
+On Wed, Jan 20, 2010 at 11:11 AM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> Well, the paper was a little tough for me to grok. But anyway, I think we
+> need a consistent type conversion policy. When Qt always treats a class as a
+> pointer (e.g. QObjects), it's pretty clear that we need to do the same. For
+> value types, it's more complicated. Qt uses values to avoid the
+> complications of memory management (as with QImage) or to avoid memory
+> allocation overhead for small types (like QPen).
+>
+> From the R user's perspective, memory management is largely irrelevant. But
+> given the choice of an opaque pointer or a native R type, I think the user
+> would choose the latter. However, I agree with you that there is not always
+> such an obvious mapping. QImage is a good example. Would the user really
+> expect a huge matrix of pixels? The primary use of a QImage is to display
+> it, not to manipulate its pixels, but the same is not true for a QMatrix, or
+> QRect, etc. For those classes, the primary interest is in the values (the
+> parameters of QMatrix, the coordinates of the rectangle). There it may be
+> convenient to perform the conversion up-front, and thus making the interface
+> tighter between R and Qt.
+>
+> That said, there may be cases where one does not want to perform the
+> conversion. The collection types (QMap, QList, QVector, etc) have fairly
+> obvious analogs in R vectors. The problem is that there is overhead to the
+> conversions. If the collection is large, the user may wish to pass opaque
+> pointers.
+>
+> In theory, it's possible to make this optional. That is, the user could as
+> part of a MethodCall request that high-level conversion be avoided. This
+> would not be that hard to implement. The qinvoke() function could take an
+> extra parameter (.convert or something) that would tell the MethodCall
+> object to avoid special type handlers for the return value.
+>
+> I will say that I've never encountered a case with RGtk2 where the
+> collections are too large to convert. But this Qt interface is more general
+> and so it might come up more often. I think I'll wait for a use-case.
+
+Sounds good.
+
+Just to be clear, when you convert to a native R object, would they
+still have a class indicating that they represent something from Qt?
+So Qt$QFont() would be a R list, but with class "QFont"?
+
+-Deepayan
+
+From lawrence.michael at gene.com  Wed Jan 20 21:53:53 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Wed, 20 Jan 2010 12:53:53 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <eb555e661001201135k3c7a1c93rdb971dbf135f6fe@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<eb555e661001170000p31263a2cl46fbd1281c4c452b@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+	<eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+	<acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+	<acbd1aed1001200743u3802121ave08f2175cd59aa24@mail.gmail.com>
+	<acbd1aed1001201111l79e3efdas65f46c15001ffd5c@mail.gmail.com>
+	<eb555e661001201135k3c7a1c93rdb971dbf135f6fe@mail.gmail.com>
+Message-ID: <acbd1aed1001201253v577491c7g91ef1302e129efab@mail.gmail.com>
+
+On Wed, Jan 20, 2010 at 11:35 AM, Deepayan Sarkar <deepayan.sarkar at gmail.com
+> wrote:
+
+> On Wed, Jan 20, 2010 at 11:11 AM, Michael Lawrence
+> <lawrence.michael at gene.com> wrote:
+> > Well, the paper was a little tough for me to grok. But anyway, I think we
+> > need a consistent type conversion policy. When Qt always treats a class
+> as a
+> > pointer (e.g. QObjects), it's pretty clear that we need to do the same.
+> For
+> > value types, it's more complicated. Qt uses values to avoid the
+> > complications of memory management (as with QImage) or to avoid memory
+> > allocation overhead for small types (like QPen).
+> >
+> > From the R user's perspective, memory management is largely irrelevant.
+> But
+> > given the choice of an opaque pointer or a native R type, I think the
+> user
+> > would choose the latter. However, I agree with you that there is not
+> always
+> > such an obvious mapping. QImage is a good example. Would the user really
+> > expect a huge matrix of pixels? The primary use of a QImage is to display
+> > it, not to manipulate its pixels, but the same is not true for a QMatrix,
+> or
+> > QRect, etc. For those classes, the primary interest is in the values (the
+> > parameters of QMatrix, the coordinates of the rectangle). There it may be
+> > convenient to perform the conversion up-front, and thus making the
+> interface
+> > tighter between R and Qt.
+> >
+> > That said, there may be cases where one does not want to perform the
+> > conversion. The collection types (QMap, QList, QVector, etc) have fairly
+> > obvious analogs in R vectors. The problem is that there is overhead to
+> the
+> > conversions. If the collection is large, the user may wish to pass opaque
+> > pointers.
+> >
+> > In theory, it's possible to make this optional. That is, the user could
+> as
+> > part of a MethodCall request that high-level conversion be avoided. This
+> > would not be that hard to implement. The qinvoke() function could take an
+> > extra parameter (.convert or something) that would tell the MethodCall
+> > object to avoid special type handlers for the return value.
+> >
+> > I will say that I've never encountered a case with RGtk2 where the
+> > collections are too large to convert. But this Qt interface is more
+> general
+> > and so it might come up more often. I think I'll wait for a use-case.
+>
+> Sounds good.
+>
+> Just to be clear, when you convert to a native R object, would they
+> still have a class indicating that they represent something from Qt?
+> So Qt$QFont() would be a R list, but with class "QFont"?
+>
+>
+This is correct. The classes would be QFont, RQtValue (for the $ method),
+and RQtObject for the Ops method, %<<% and other operators.
+
+Michael
+
+
+> -Deepayan
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100120/9cf475c5/attachment.htm 
+
+From lawrence.michael at gene.com  Thu Jan 21 21:51:12 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Thu, 21 Jan 2010 12:51:12 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <acbd1aed1001201253v577491c7g91ef1302e129efab@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001170732k7f936cc3x26c328fbc02cdb21@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+	<eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+	<acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+	<acbd1aed1001200743u3802121ave08f2175cd59aa24@mail.gmail.com>
+	<acbd1aed1001201111l79e3efdas65f46c15001ffd5c@mail.gmail.com>
+	<eb555e661001201135k3c7a1c93rdb971dbf135f6fe@mail.gmail.com>
+	<acbd1aed1001201253v577491c7g91ef1302e129efab@mail.gmail.com>
+Message-ID: <acbd1aed1001211251m3f6e370ct3a0f6fbc58575999@mail.gmail.com>
+
+I'm now thinking we're better off drinking the kool-aid and moving to S4 for
+representing these objects. At least the complex ones that would need to
+become a list. Validation would be much easier. And it would be
+self-documenting, to an extent.
+
+If we did that though, we'd want to be pretty consistent, so even QMatrix
+would become an S4 class that I guess would extend matrix. With a formal
+validity method that verifies the dimensions.
+
+I think QString and QByteArray should just go to plain old character vectors
+though. I kind of see a string as a primitive.
+
+On Wed, Jan 20, 2010 at 12:53 PM, Michael Lawrence <michafla at gene.com>wrote:
+
+>
+>
+> On Wed, Jan 20, 2010 at 11:35 AM, Deepayan Sarkar <
+> deepayan.sarkar at gmail.com> wrote:
+>
+>> On Wed, Jan 20, 2010 at 11:11 AM, Michael Lawrence
+>> <lawrence.michael at gene.com> wrote:
+>> > Well, the paper was a little tough for me to grok. But anyway, I think
+>> we
+>> > need a consistent type conversion policy. When Qt always treats a class
+>> as a
+>> > pointer (e.g. QObjects), it's pretty clear that we need to do the same.
+>> For
+>> > value types, it's more complicated. Qt uses values to avoid the
+>> > complications of memory management (as with QImage) or to avoid memory
+>> > allocation overhead for small types (like QPen).
+>> >
+>> > From the R user's perspective, memory management is largely irrelevant.
+>> But
+>> > given the choice of an opaque pointer or a native R type, I think the
+>> user
+>> > would choose the latter. However, I agree with you that there is not
+>> always
+>> > such an obvious mapping. QImage is a good example. Would the user really
+>> > expect a huge matrix of pixels? The primary use of a QImage is to
+>> display
+>> > it, not to manipulate its pixels, but the same is not true for a
+>> QMatrix, or
+>> > QRect, etc. For those classes, the primary interest is in the values
+>> (the
+>> > parameters of QMatrix, the coordinates of the rectangle). There it may
+>> be
+>> > convenient to perform the conversion up-front, and thus making the
+>> interface
+>> > tighter between R and Qt.
+>> >
+>> > That said, there may be cases where one does not want to perform the
+>> > conversion. The collection types (QMap, QList, QVector, etc) have fairly
+>> > obvious analogs in R vectors. The problem is that there is overhead to
+>> the
+>> > conversions. If the collection is large, the user may wish to pass
+>> opaque
+>> > pointers.
+>> >
+>> > In theory, it's possible to make this optional. That is, the user could
+>> as
+>> > part of a MethodCall request that high-level conversion be avoided. This
+>> > would not be that hard to implement. The qinvoke() function could take
+>> an
+>> > extra parameter (.convert or something) that would tell the MethodCall
+>> > object to avoid special type handlers for the return value.
+>> >
+>> > I will say that I've never encountered a case with RGtk2 where the
+>> > collections are too large to convert. But this Qt interface is more
+>> general
+>> > and so it might come up more often. I think I'll wait for a use-case.
+>>
+>> Sounds good.
+>>
+>> Just to be clear, when you convert to a native R object, would they
+>> still have a class indicating that they represent something from Qt?
+>> So Qt$QFont() would be a R list, but with class "QFont"?
+>>
+>>
+> This is correct. The classes would be QFont, RQtValue (for the $ method),
+> and RQtObject for the Ops method, %<<% and other operators.
+>
+> Michael
+>
+>
+>> -Deepayan
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100121/53764195/attachment.htm 
+
+From deepayan.sarkar at gmail.com  Sat Jan 23 01:28:42 2010
+From: deepayan.sarkar at gmail.com (Deepayan Sarkar)
+Date: Fri, 22 Jan 2010 16:28:42 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <acbd1aed1001211251m3f6e370ct3a0f6fbc58575999@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<eb555e661001171024i28b70503k14700ca2d0ad210d@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+	<eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+	<acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+	<acbd1aed1001200743u3802121ave08f2175cd59aa24@mail.gmail.com>
+	<acbd1aed1001201111l79e3efdas65f46c15001ffd5c@mail.gmail.com>
+	<eb555e661001201135k3c7a1c93rdb971dbf135f6fe@mail.gmail.com>
+	<acbd1aed1001201253v577491c7g91ef1302e129efab@mail.gmail.com>
+	<acbd1aed1001211251m3f6e370ct3a0f6fbc58575999@mail.gmail.com>
+Message-ID: <eb555e661001221628t5e93ac3avdece8af719d93d57@mail.gmail.com>
+
+On Thu, Jan 21, 2010 at 12:51 PM, Michael Lawrence
+<lawrence.michael at gene.com> wrote:
+> I'm now thinking we're better off drinking the kool-aid and moving to S4 for
+> representing these objects. At least the complex ones that would need to
+> become a list. Validation would be much easier. And it would be
+> self-documenting, to an extent.
+
+Hmm...no strong opinions, so I'll go with whatever you decide. I
+assume this only applies for the classes we would want natively
+represented, as it would be too much work defining S4 classes for all
+smoke-supported Qt classes? (Or maybe that can be done by
+automatically generated code.)
+
+Anyway, let me know if I can help with this. I'm off on a short break
+(without internet access), but back on Tuesday.
+
+-Deepayan
+
+> If we did that though, we'd want to be pretty consistent, so even QMatrix
+> would become an S4 class that I guess would extend matrix. With a formal
+> validity method that verifies the dimensions.
+>
+> I think QString and QByteArray should just go to plain old character vectors
+> though. I kind of see a string as a primitive.
+
+From lawrence.michael at gene.com  Sat Jan 23 01:55:38 2010
+From: lawrence.michael at gene.com (Michael Lawrence)
+Date: Fri, 22 Jan 2010 16:55:38 -0800
+Subject: [RQt-devel] recent smoke update
+In-Reply-To: <eb555e661001221628t5e93ac3avdece8af719d93d57@mail.gmail.com>
+References: <eb555e661001160733i2e01bcalc79eae8e72d5ff64@mail.gmail.com>
+	<acbd1aed1001171041i34a1408ay8dc1de60b24353f7@mail.gmail.com>
+	<eb555e661001200139p3232b1e0h5ea1387e8c52cb38@mail.gmail.com>
+	<acbd1aed1001200654r37605fcer9bbbf7fbeaaae37f@mail.gmail.com>
+	<acbd1aed1001200743u3802121ave08f2175cd59aa24@mail.gmail.com>
+	<acbd1aed1001201111l79e3efdas65f46c15001ffd5c@mail.gmail.com>
+	<eb555e661001201135k3c7a1c93rdb971dbf135f6fe@mail.gmail.com>
+	<acbd1aed1001201253v577491c7g91ef1302e129efab@mail.gmail.com>
+	<acbd1aed1001211251m3f6e370ct3a0f6fbc58575999@mail.gmail.com>
+	<eb555e661001221628t5e93ac3avdece8af719d93d57@mail.gmail.com>
+Message-ID: <acbd1aed1001221655s215fb779j7c67a56eb572f466@mail.gmail.com>
+
+Just the native types.
+
+On Jan 22, 2010 4:28 PM, "Deepayan Sarkar" <deepayan.sarkar at gmail.com>
+wrote:
+
+On Thu, Jan 21, 2010 at 12:51 PM, Michael Lawrence
+
+<lawrence.michael at gene.com> wrote:
+
+> I'm now thinking we're better off drinking the kool-aid and moving to S4
+for > representing these ...
+Hmm...no strong opinions, so I'll go with whatever you decide. I
+assume this only applies for the classes we would want natively
+represented, as it would be too much work defining S4 classes for all
+smoke-supported Qt classes? (Or maybe that can be done by
+automatically generated code.)
+
+Anyway, let me know if I can help with this. I'm off on a short break
+(without internet access), but back on Tuesday.
+
+-Deepayan
+
+> If we did that though, we'd want to be pretty consistent, so even QMatrix
+> would become an S4 cl...
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: http://lists.r-forge.r-project.org/pipermail/qtinterfaces-devel/attachments/20100122/4406f194/attachment.htm 
+

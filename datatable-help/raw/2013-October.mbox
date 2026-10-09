@@ -1,0 +1,3484 @@
+From mdowle at mdowle.plus.com  Tue Oct  1 12:23:51 2013
+From: mdowle at mdowle.plus.com (Matthew Dowle)
+Date: Tue, 01 Oct 2013 11:23:51 +0100
+Subject: [datatable-help] rbind empty data tables
+In-Reply-To: <etPan.5249d9c8.238e1f29.7e54@MacBook-Pro-de-Alexandre-Sieira.local>
+References: <etPan.5249d8ab.74b0dc51.7e54@MacBook-Pro-de-Alexandre-Sieira.local>
+ <etPan.5249d9c8.238e1f29.7e54@MacBook-Pro-de-Alexandre-Sieira.local>
+Message-ID: <524AA2B7.8090806@mdowle.plus.com>
+
+Interesting, thanks for reporting. I've filed as bug #4959
+
+https://r-forge.r-project.org/tracker/?group_id=240&atid=975&func=detail&aid=4959
+
+Matt
+
+On 30/09/13 21:06, Alexandre Sieira wrote:
+> By the way, this works as I would expect with data.frame on the same 
+> environment:
+>
+> > df1 = data.frame(a=character())
+> > df2 = data.frame(a=character())
+> > df1
+> [1] a
+> <0 rows> (or row.names with length 0)
+> > df2
+> [1] a
+> <0 rows> (or row.names with length 0)
+> > rbind(df1, df2)
+> [1] a
+> <0 rows> (or row.names with length 0)
+>
+> -- 
+> Alexandre Sieira
+> CISA, CISSP, ISO 27001 Lead Auditor
+>
+> "The truth is rarely pure and never simple."
+> Oscar Wilde, The Importance of Being Earnest, 1895, Act I
+>
+> On 30 de setembro de 2013 at 13:01:47, Alexandre Sieira 
+> (alexandre.sieira at gmail.com) wrote:
+>
+>> I encountered the following behavior with data.table 1.8.10 on R 
+>> 3.0.2 on Mac OS X and was wondering if that is expected:
+>>
+>> > dt1 = data.table(a=character())
+>> > dt2 = data.table(a=character())
+>> > dt1
+>> Empty data.table (0 rows) of 1 col: a
+>> > colnames(dt1)
+>> [1] "a"
+>> > dt2
+>> Empty data.table (0 rows) of 1 col: a
+>> > colnames(dt2)
+>> [1] "a"
+>> > rbind(dt1, dt2)
+>> Error in setnames(ret, nm.original) : x has no column names
+>>
+>> Enter a frame number, or 0 to exit
+>>
+>> 1: rbind(dt1, dt2)
+>> 2: rbind(deparse.level, ...)
+>> 3: data.table::.rbind.data.table(...)
+>> 4: setnames(ret, nm.original)
+>>
+>> If I rbind two zero-row data.table objects with matching column 
+>> names, I would have expected to get a zero-row data.table back (0 + 0 
+>> = 0, after all).
+>>
+>> -- 
+>> Alexandre Sieira
+>> CISA, CISSP, ISO 27001 Lead Auditor
+>>
+>> "The truth is rarely pure and never simple."
+>> Oscar Wilde, The Importance of Being Earnest, 1895, Act I
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131001/afd9d0a2/attachment.html>
+
+From saporta at scarletmail.rutgers.edu  Tue Oct  1 21:51:05 2013
+From: saporta at scarletmail.rutgers.edu (Ricardo Saporta)
+Date: Tue, 1 Oct 2013 15:51:05 -0400
+Subject: [datatable-help] setnames on a non-data.table object
+Message-ID: <CAE7Aa4QB-eZiM1YTkYE2TN8feZ6dW92v8cP66=k_wuFPVD2fyw@mail.gmail.com>
+
+Hi All,
+
+I'm wondering if there are any potential problems or unforseen pitfalls
+with having
+
+  setnames(x, nms)
+
+call
+   setattr(x, "names", nms)
+
+when x is not a data.table.
+
+Thoughts?
+
+Rick
+
+Ricardo Saporta
+Graduate Student, Data Analytics
+Rutgers University, New Jersey
+e: saporta at rutgers.edu
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131001/63065b1e/attachment.html>
+
+From mdowle at mdowle.plus.com  Wed Oct  2 08:39:55 2013
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Wed, 02 Oct 2013 07:39:55 +0100
+Subject: [datatable-help] setnames on a non-data.table object
+In-Reply-To: <CAE7Aa4QB-eZiM1YTkYE2TN8feZ6dW92v8cP66=k_wuFPVD2fyw@mail.gmail.com>
+References: <CAE7Aa4QB-eZiM1YTkYE2TN8feZ6dW92v8cP66=k_wuFPVD2fyw@mail.gmail.com>
+Message-ID: <524BBFBB.3060905@mdowle.plus.com>
+
+Hi,
+
+There's no technical reason.  I guess enough people realise now that the 
+set* functions change the object by reference. So if setnames worked on 
+data.frame :
+
+    DF1 = data.frame(a=1:3, b=4:6)
+    DF2 = DF1
+    setnames(DF2, "b", "B")
+
+This would change both DF1 and DF2.  There might be someone who throws 
+up their hands in horror and says this breaks everything they've known 
+about data.frame, too. Isn't it enough that data.table breaks everything 
+already?
+
+We'd have to take a deep breath and calmly explain copy() is needed :
+
+    DF1 = data.frame(a=1:3, b=4:6)
+    DF2 = copy(DF1)
+    setnames(DF2, "b", "B")
+
+So the reason setnames() hasn't so far been enabled for data.frame is 
+just for safety (using it on a data.frame accidentally) and to avoid 
+complaints and negative Twitterers.   On the other hand setnames 
+(different from setNames) is a data.table function so it's not like 
+we're overloading <- or anything.
+
+I suppose setnames() could copy the whole DF2 just like base.  But that 
+defeats it's purpose, set* functions work by reference. setnames() is a 
+little different in that it's more convenient and safer than base 
+syntax, too, though; e.g., changing a column name by name.  So I can see 
+someone might want to use it for that reason alone and not mind it 
+copies the whole DF when passed a DF.
+
+Matt
+
+
+On 01/10/13 20:51, Ricardo Saporta wrote:
+> Hi All,
+>
+> I'm wondering if there are any potential problems or unforseen 
+> pitfalls with having
+>
+>   setnames(x, nms)
+>
+> call
+>    setattr(x, "names", nms)
+>
+> when x is not a data.table.
+>
+> Thoughts?
+>
+> Rick
+>
+> Ricardo Saporta
+> Graduate Student, Data Analytics
+> Rutgers University, New Jersey
+> e: saporta at rutgers.edu <mailto:saporta at rutgers.edu>
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131002/af22c655/attachment.html>
+
+From mdowle at mdowle.plus.com  Wed Oct  2 16:13:09 2013
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Wed, 02 Oct 2013 15:13:09 +0100
+Subject: [datatable-help] setnames on a non-data.table object
+In-Reply-To: <085806D7-2265-4EDE-B47E-5822BD73E3BB@scarletmail.rutgers.edu>
+References: <CAE7Aa4QB-eZiM1YTkYE2TN8feZ6dW92v8cP66=k_wuFPVD2fyw@mail.gmail.com>
+ <524BBFBB.3060905@mdowle.plus.com>
+ <085806D7-2265-4EDE-B47E-5822BD73E3BB@scarletmail.rutgers.edu>
+Message-ID: <524C29F5.5030207@mdowle.plus.com>
+
+On 02/10/13 12:50, Ricky Saporta wrote:
+>
+> This might be a topic to raise in a separate email:
+> What do you think of adapting a naming convention where the name of 
+> the function indicates when a function will modify an object by 
+> reference?  In my personal work, I have been trying to end such 
+> functions with an underscore.  Putting aside for the moment all 
+> obvious and not so obvious issues with changing the names of existing 
+> functions & backwards compatibility, is the idea itself worth 
+> considering?
+
+Maybe.  But the convention was already that any function started "set" 
+indicates it will change the object by reference. The documentation uses 
+"set*" in several places with this in mind.
+
+ > objects("package:data.table", pattern="^set")
+[1] "set"         "setattr"     "setcolorder" "setkey" "setkeyv"
+[6] "setnames"
+ >
+
+If the functions insert() and delete() are added, they'll add and remove 
+rows by reference.  Those verbs don't start with set, but it's clear (in 
+my mind) that they'd change the data.table by reference; e.g. insert(DT, 
+row number | "end", some data).
+
+Looking at base etc for functions starting "set*" there's some 
+side-effect meaning intended there too (setwd, setTimeLimit, set.seed).  
+setdiff and setequal are about sets in the collection sense.  So it's 
+just setNames as a one off really.   And we don't use camelCase in 
+data.table, so that's how to remember that.
+
+ > objects("package:base", pattern="^set")
+[1] "setdiff"             "setequal"            "setHook"
+[4] "setNamespaceInfo"    "set.seed" "setSessionTimeLimit"
+[7] "setTimeLimit"        "setwd"
+ > objects("package:stats", pattern="^set")
+[1] "setNames"
+ > objects("package:utils", pattern="^set")
+[1] "setBreakpoint"     "setRepositories"   "setTxtProgressBar"
+
+Since other set* functions work on data.frame  (set() for example!), 
+setnames should too.  I was forgetting that. Let's change it then.
+
+Matt
+
+>
+> Rick
+>
+>
+>>
+>> Matt
+>>
+>>
+>> On 01/10/13 20:51, Ricardo Saporta wrote:
+>>> Hi All,
+>>>
+>>> I'm wondering if there are any potential problems or unforseen 
+>>> pitfalls with having
+>>>
+>>>   setnames(x, nms)
+>>>
+>>> call
+>>>    setattr(x, "names", nms)
+>>>
+>>> when x is not a data.table.
+>>>
+>>> Thoughts?
+>>>
+>>> Rick
+>>>
+>>> Ricardo Saporta
+>>> Graduate Student, Data Analytics
+>>> Rutgers University, New Jersey
+>>> e: saporta at rutgers.edu <mailto:saporta at rutgers.edu>
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131002/bde13585/attachment.html>
+
+From mdowle at mdowle.plus.com  Wed Oct  2 18:28:57 2013
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Wed, 02 Oct 2013 17:28:57 +0100
+Subject: [datatable-help] setnames on a non-data.table object
+In-Reply-To: <524C29F5.5030207@mdowle.plus.com>
+References: <CAE7Aa4QB-eZiM1YTkYE2TN8feZ6dW92v8cP66=k_wuFPVD2fyw@mail.gmail.com>
+ <524BBFBB.3060905@mdowle.plus.com>
+ <085806D7-2265-4EDE-B47E-5822BD73E3BB@scarletmail.rutgers.edu>
+ <524C29F5.5030207@mdowle.plus.com>
+Message-ID: <524C49C9.4080305@mdowle.plus.com>
+
+
+Rick,
+
+Oh - setnames already does work on data.frame.   That was a change in 
+v1.8.4.
+
+Was the question more for lists and vectors then (anything that can have 
+names),  rather than just data.frame/data.table?
+
+Matt
+
+On 02/10/13 15:13, Matt Dowle wrote:
+> On 02/10/13 12:50, Ricky Saporta wrote:
+>>
+>> This might be a topic to raise in a separate email:
+>> What do you think of adapting a naming convention where the name of 
+>> the function indicates when a function will modify an object by 
+>> reference?  In my personal work, I have been trying to end such 
+>> functions with an underscore.  Putting aside for the moment all 
+>> obvious and not so obvious issues with changing the names of existing 
+>> functions & backwards compatibility, is the idea itself worth 
+>> considering?
+>
+> Maybe.  But the convention was already that any function started "set" 
+> indicates it will change the object by reference. The documentation 
+> uses "set*" in several places with this in mind.
+>
+> > objects("package:data.table", pattern="^set")
+> [1] "set"         "setattr"     "setcolorder" "setkey" "setkeyv"
+> [6] "setnames"
+> >
+>
+> If the functions insert() and delete() are added, they'll add and 
+> remove rows by reference.  Those verbs don't start with set, but it's 
+> clear (in my mind) that they'd change the data.table by reference; 
+> e.g. insert(DT, row number | "end", some data).
+>
+> Looking at base etc for functions starting "set*" there's some 
+> side-effect meaning intended there too (setwd, setTimeLimit, 
+> set.seed).  setdiff and setequal are about sets in the collection 
+> sense.  So it's just setNames as a one off really.   And we don't use 
+> camelCase in data.table, so that's how to remember that.
+>
+> > objects("package:base", pattern="^set")
+> [1] "setdiff"             "setequal" "setHook"
+> [4] "setNamespaceInfo"    "set.seed" "setSessionTimeLimit"
+> [7] "setTimeLimit"        "setwd"
+> > objects("package:stats", pattern="^set")
+> [1] "setNames"
+> > objects("package:utils", pattern="^set")
+> [1] "setBreakpoint"     "setRepositories"   "setTxtProgressBar"
+>
+> Since other set* functions work on data.frame  (set() for example!), 
+> setnames should too.  I was forgetting that. Let's change it then.
+>
+> Matt
+>
+>>
+>> Rick
+>>
+>>
+>>>
+>>> Matt
+>>>
+>>>
+>>> On 01/10/13 20:51, Ricardo Saporta wrote:
+>>>> Hi All,
+>>>>
+>>>> I'm wondering if there are any potential problems or unforseen 
+>>>> pitfalls with having
+>>>>
+>>>>   setnames(x, nms)
+>>>>
+>>>> call
+>>>>    setattr(x, "names", nms)
+>>>>
+>>>> when x is not a data.table.
+>>>>
+>>>> Thoughts?
+>>>>
+>>>> Rick
+>>>>
+>>>> Ricardo Saporta
+>>>> Graduate Student, Data Analytics
+>>>> Rutgers University, New Jersey
+>>>> e: saporta at rutgers.edu <mailto:saporta at rutgers.edu>
+>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> datatable-help mailing list
+>>>> datatable-help at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131002/f704f7c6/attachment.html>
+
+From saporta at scarletmail.rutgers.edu  Wed Oct  2 19:13:09 2013
+From: saporta at scarletmail.rutgers.edu (Ricardo Saporta)
+Date: Wed, 2 Oct 2013 13:13:09 -0400
+Subject: [datatable-help] setnames on a non-data.table object
+In-Reply-To: <524C49C9.4080305@mdowle.plus.com>
+References: <CAE7Aa4QB-eZiM1YTkYE2TN8feZ6dW92v8cP66=k_wuFPVD2fyw@mail.gmail.com>
+ <524BBFBB.3060905@mdowle.plus.com>
+ <085806D7-2265-4EDE-B47E-5822BD73E3BB@scarletmail.rutgers.edu>
+ <524C29F5.5030207@mdowle.plus.com>
+ <524C49C9.4080305@mdowle.plus.com>
+Message-ID: <CAE7Aa4TJDeGhb5ykYpVoe_QxzfQ_2a_KHN5Oi9DCdbZMNfpZ1Q@mail.gmail.com>
+
+yes, it was mostly in general.  eg
+
+  X <- 1:5
+  setnames(X, LETTERS[X])
+  # Error in setnames(X, LETTERS[X]) : x is not a data.table or data.frame
+
+
+Ricardo Saporta
+Graduate Student, Data Analytics
+Rutgers University, New Jersey
+e: saporta at rutgers.edu
+
+
+
+On Wed, Oct 2, 2013 at 12:28 PM, Matt Dowle <mdowle at mdowle.plus.com> wrote:
+
+>
+> Rick,
+>
+> Oh - setnames already does work on data.frame.   That was a change in
+> v1.8.4.
+>
+> Was the question more for lists and vectors then (anything that can have
+> names),  rather than just data.frame/data.table?
+>
+> Matt
+>
+>
+> On 02/10/13 15:13, Matt Dowle wrote:
+>
+> On 02/10/13 12:50, Ricky Saporta wrote:
+>
+>
+>  This might be a topic to raise in a separate email:
+> What do you think of adapting a naming convention where the name of the
+> function indicates when a function will modify an object by reference?  In
+> my personal work, I have been trying to end such functions with an
+> underscore.  Putting aside for the moment all obvious and not so obvious
+> issues with changing the names of existing functions & backwards
+> compatibility, is the idea itself worth considering?
+>
+>
+> Maybe.  But the convention was already that any function started "set"
+> indicates it will change the object by reference. The documentation uses
+> "set*" in several places with this in mind.
+>
+> > objects("package:data.table", pattern="^set")
+> [1] "set"         "setattr"     "setcolorder" "setkey"      "setkeyv"
+> [6] "setnames"
+> >
+>
+> If the functions insert() and delete() are added, they'll add and remove
+> rows by reference.  Those verbs don't start with set, but it's clear (in my
+> mind) that they'd change the data.table by reference; e.g. insert(DT, row
+> number | "end", some data).
+>
+> Looking at base etc for functions starting "set*" there's some side-effect
+> meaning intended there too (setwd, setTimeLimit, set.seed).  setdiff and
+> setequal are about sets in the collection sense.  So it's just setNames as
+> a one off really.   And we don't use camelCase in data.table, so that's how
+> to remember that.
+>
+> > objects("package:base", pattern="^set")
+> [1] "setdiff"             "setequal"            "setHook"
+> [4] "setNamespaceInfo"    "set.seed"            "setSessionTimeLimit"
+> [7] "setTimeLimit"        "setwd"
+> > objects("package:stats", pattern="^set")
+> [1] "setNames"
+> > objects("package:utils", pattern="^set")
+> [1] "setBreakpoint"     "setRepositories"   "setTxtProgressBar"
+>
+> Since other set* functions work on data.frame  (set() for example!),
+> setnames should too.  I was forgetting that. Let's change it then.
+>
+> Matt
+>
+>
+>  Rick
+>
+>
+>
+> Matt
+>
+>
+> On 01/10/13 20:51, Ricardo Saporta wrote:
+>
+>  Hi All,
+>
+>  I'm wondering if there are any potential problems or unforseen pitfalls
+> with having
+>
+>    setnames(x, nms)
+>
+>  call
+>     setattr(x, "names", nms)
+>
+>  when x is not a data.table.
+>
+>  Thoughts?
+>
+>  Rick
+>
+>  Ricardo Saporta
+> Graduate Student, Data Analytics
+> Rutgers University, New Jersey
+> e: saporta at rutgers.edu
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing listdatatable-help at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing listdatatable-help at lists.r-forge.r-project.orghttps://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131002/d14d0816/attachment-0001.html>
+
+From kofmank at gmail.com  Thu Oct  3 10:25:02 2013
+From: kofmank at gmail.com (Kostia)
+Date: Thu, 3 Oct 2013 01:25:02 -0700 (PDT)
+Subject: [datatable-help] Running on variables in data.table
+Message-ID: <1380788702441-4677480.post@n4.nabble.com>
+
+Hi,
+
+I have a data table with a number of variables and I wish to do some
+function on each variable,
+my data table looks like this:
+
+type   att1   att2  att3  att4
+black    1        2     2       1
+white    0        2     1       0
+green    4        2     1       0  
+black     1        1     1       1 
+green    2        1      2       2
+
+I would like to sum on each attribute by type, so my function will be:
+
+dt[,att1type := sum(att1),by = type]
+
+The problem is that I want to taht in a loop and don't know how to run on
+all the columns.
+
+dt[,att1type := sum(dt[[i]]),by = type]
+or
+dt[,att1type := sum(dt[i]),by = type]
+
+doesn't work.
+
+Thanks,
+
+Kostia
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Running-on-variables-in-data-table-tp4677480.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Thu Oct  3 10:38:42 2013
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Thu, 03 Oct 2013 09:38:42 +0100
+Subject: [datatable-help] Running on variables in data.table
+In-Reply-To: <1380788702441-4677480.post@n4.nabble.com>
+References: <1380788702441-4677480.post@n4.nabble.com>
+Message-ID: <524D2D12.80805@mdowle.plus.com>
+
+Hi,
+
+Likely :
+
+     dt[,lapply(.SD,sum),by=type]
+
+See the examples section of ?data.table for an example.  `.SD` is 
+explained on that page too.
+
+Matt
+
+On 03/10/13 09:25, Kostia wrote:
+> Hi,
+>
+> I have a data table with a number of variables and I wish to do some
+> function on each variable,
+> my data table looks like this:
+>
+> type   att1   att2  att3  att4
+> black    1        2     2       1
+> white    0        2     1       0
+> green    4        2     1       0
+> black     1        1     1       1
+> green    2        1      2       2
+>
+> I would like to sum on each attribute by type, so my function will be:
+>
+> dt[,att1type := sum(att1),by = type]
+>
+> The problem is that I want to taht in a loop and don't know how to run on
+> all the columns.
+>
+> dt[,att1type := sum(dt[[i]]),by = type]
+> or
+> dt[,att1type := sum(dt[i]),by = type]
+>
+> doesn't work.
+>
+> Thanks,
+>
+> Kostia
+>
+>
+>
+> --
+> View this message in context: http://r.789695.n4.nabble.com/Running-on-variables-in-data-table-tp4677480.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+From schristel at wisc.edu  Fri Oct  4 17:57:56 2013
+From: schristel at wisc.edu (limno.sam)
+Date: Fri, 4 Oct 2013 08:57:56 -0700 (PDT)
+Subject: [datatable-help] Flagging duplicate (non-unique) values based on
+	specifications
+Message-ID: <1380902276566-4677610.post@n4.nabble.com>
+
+Hi,
+
+I'm working with about 60 data sets which need to have duplicate
+(non-unique) values removed. 
+
+The data sets have 22 unique column names (the same for each data set):
+[1] "LakeID"                    "LakeName"                 
+"SourceVariableName"       
+ [4] "SourceVariableDescription" "SourceFlags"              
+"LagosVariableID"          
+ [7] "LagosVariableName"         "Value"                     "Units"                    
+[10] "CensorCode"                "DetectionLimit"            "Date"                     
+[13] "LabMethodName"             "LabMethodInfo"             "SampleType"               
+[16] "SamplePosition"            "SampleDepth"               "MethodInfo"               
+[19] "BasinType"                 "Subprogram"                "Comments"                 
+[22] "Dup" 
+
+I am interested in flagging observations that are duplicate (replicate)
+values. I am defining observations that are NOT duplicate as unique for
+"LakeID" "LagosVariableID" "Value" "Date" "SamplePosition" and "SampleDepth
+for each row.  
+
+Note that the "Dup" column is where I want to flag whether or not an
+observation is duplicate (NA= not duplicate, 1= duplicate)
+
+I have tried the follow code, where Final.Export= the data set with the 22
+columns listed above:
+
+library(data.table)
+#flag the unique (non-duplicate) values as NA
+data1=data.table(Final.Export,key=c('LakeID','Date','LagosVariableID','SampleDepth','SamplePosition','Value')
+data1=data1[unique(data1[,key(data1),with=FALSE]),mult='first']
+data1$Dup=NA
+#flag the duplicate values as "1"
+data2=data.table(Final.Export,key=c('LakeID','Date','LagosVariableID','SampleDepth','SamplePosition','Value')
+data2=data2[duplicated(data2[,key(data2),with=FALSE]),mult='first']
+data2$Dup=1
+#check to see if adds to total
+(length(data1$Value))+((length(data2$Value)))
+length(data2$Value)
+length(Final.Export$Value) #adds up to total  
+#bind the tables
+Final.Export1=rbind(data1,data2,use.names=TRUE)    
+
+The code works for flagging the duplicate observations, however, the values
+for several of the variables in the original data frame "Final.Export" are
+converted to NA in "Final.Export1."  
+
+Any ideas how to prevent that from happening?    
+  
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Flagging-duplicate-non-unique-values-based-on-specifications-tp4677610.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From mdowle at mdowle.plus.com  Fri Oct  4 18:29:09 2013
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Fri, 04 Oct 2013 17:29:09 +0100
+Subject: [datatable-help] Flagging duplicate (non-unique) values based
+ on specifications
+In-Reply-To: <1380902276566-4677610.post@n4.nabble.com>
+References: <1380902276566-4677610.post@n4.nabble.com>
+Message-ID: <524EECD5.7030605@mdowle.plus.com>
+
+It's more efficient to ask questions like this on Stack Overflow please :
+http://stackoverflow.com/questions/tagged/data.table 
+<http://stackoverflow.com/questions/tagged/data.table?sort=active&pagesize=50>
+You can edit the question there, and people can add or remove quick 
+comments.
+
+In v1.8.10 on CRAN you can pass 'by' to unique and duplicated (thanks to 
+Steve).  This would simplify the question and make it easier to answer.
+
+Matt
+
+On 04/10/13 16:57, limno.sam wrote:
+> Hi,
+>
+> I'm working with about 60 data sets which need to have duplicate
+> (non-unique) values removed.
+>
+> The data sets have 22 unique column names (the same for each data set):
+> [1] "LakeID"                    "LakeName"
+> "SourceVariableName"
+>   [4] "SourceVariableDescription" "SourceFlags"
+> "LagosVariableID"
+>   [7] "LagosVariableName"         "Value"                     "Units"
+> [10] "CensorCode"                "DetectionLimit"            "Date"
+> [13] "LabMethodName"             "LabMethodInfo"             "SampleType"
+> [16] "SamplePosition"            "SampleDepth"               "MethodInfo"
+> [19] "BasinType"                 "Subprogram"                "Comments"
+> [22] "Dup"
+>
+> I am interested in flagging observations that are duplicate (replicate)
+> values. I am defining observations that are NOT duplicate as unique for
+> "LakeID" "LagosVariableID" "Value" "Date" "SamplePosition" and "SampleDepth
+> for each row.
+>
+> Note that the "Dup" column is where I want to flag whether or not an
+> observation is duplicate (NA= not duplicate, 1= duplicate)
+>
+> I have tried the follow code, where Final.Export= the data set with the 22
+> columns listed above:
+>
+> library(data.table)
+> #flag the unique (non-duplicate) values as NA
+> data1=data.table(Final.Export,key=c('LakeID','Date','LagosVariableID','SampleDepth','SamplePosition','Value')
+> data1=data1[unique(data1[,key(data1),with=FALSE]),mult='first']
+> data1$Dup=NA
+> #flag the duplicate values as "1"
+> data2=data.table(Final.Export,key=c('LakeID','Date','LagosVariableID','SampleDepth','SamplePosition','Value')
+> data2=data2[duplicated(data2[,key(data2),with=FALSE]),mult='first']
+> data2$Dup=1
+> #check to see if adds to total
+> (length(data1$Value))+((length(data2$Value)))
+> length(data2$Value)
+> length(Final.Export$Value) #adds up to total
+> #bind the tables
+> Final.Export1=rbind(data1,data2,use.names=TRUE)
+>
+> The code works for flagging the duplicate observations, however, the values
+> for several of the variables in the original data frame "Final.Export" are
+> converted to NA in "Final.Export1."
+>
+> Any ideas how to prevent that from happening?
+>    
+>
+>
+>
+> --
+> View this message in context: http://r.789695.n4.nabble.com/Flagging-duplicate-non-unique-values-based-on-specifications-tp4677610.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131004/d8ceffb1/attachment.html>
+
+From chinmay.patil at gmail.com  Sun Oct  6 07:17:54 2013
+From: chinmay.patil at gmail.com (Chinmay Patil)
+Date: Sun, 6 Oct 2013 13:17:54 +0800
+Subject: [datatable-help] Secondary keys
+Message-ID: <CA+kDFFUrGvVjj_+eRCxN-46OPwVbYPdp2d6hNVJcX9EeGx5=eQ@mail.gmail.com>
+
+Hi devs,
+
+I was wondering if there are any plans to implement this feature.
+
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+
+Alternatively, is there a way to refer to key of the data.table object in
+"J" function used for subsetting?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131006/70bfdfbe/attachment.html>
+
+From clark9876 at airquality.dk  Mon Oct  7 00:29:29 2013
+From: clark9876 at airquality.dk (drclark)
+Date: Sun, 6 Oct 2013 15:29:29 -0700 (PDT)
+Subject: [datatable-help] between() versus %between% - why different results?
+Message-ID: <1381098568901-4677718.post@n4.nabble.com>
+
+Dear data.table experts,
+
+I was inspired by SO topic How to match two data.frames with an inexact
+matching identifier (one identifier has to be in the range of the other) for
+a problem I have to calculate pollutant statistics during various episodes
+from monitoring data. The episodes (like the fiscal quarters in the SO
+topic) are defined for each site in a lookup table with starting and ending
+dates. The start and end dates can be different at different sites. The SO
+answer used >= and <= to check the date was in the range from start to end.
+  mD[qD][Month>=startMonth & Month<=endMonth]
+
+This approach may suit my problem, but I thought that I could use "between"
+rather than the two logical comparisons.  I tried both the between()
+function and its equivalent %between% operator -- and I get two different
+results. The between() version is correct, but %between% gives a wrong
+answer. Am I missing something in the syntax for using between?
+
+My version of the SO data, merge and results below. I changed the variable
+names to suit my work: ID->site, Month->date, MonValue->conc,
+QTRValue->episodeID.
+
+require(data.table)   # data.table 1.8.10  on R 3.0.2 under Win7x64
+# the measurement data
+dat <- data.table(site = rep(c("A","B"), each=10),
+                  date = rep(1:10, times = 2),     # could be day or hour
+                  conc = sample(30:50,2*10,replace=TRUE),  # the pollutant
+data
+                  key="site,date")
+dat
+#    site date conc
+# 1:    A    1   48
+# 2:    A    2   44
+# 3:    A    3   50
+# 4:    A    4   47
+# 5:    A    5   35
+# 6:    A    6   47
+# 7:    A    7   38
+# 8:    A    8   34
+# 9:    A    9   46
+#10:    A   10   35
+#11:    B    1   45
+#12:    B    2   35
+#13:    B    3   40
+#14:    B    4   41
+#15:    B    5   37
+#16:    B    6   37
+#17:    B    7   32
+#18:    B    8   41
+#19:    B    9   31
+#20:    B   10   32
+#
+# definitions for the episodes                  
+episode <- data.table(
+                site = rep(c("A", "B"), each = 3),
+                start = c(1, 4, 7, 1, 3, 8),
+                end = c(3, 5, 10, 2, 5, 10),
+                episodeID = rep(1:3, 2),
+                key="site")
+episode
+#   site start end episodeID
+# 1:    A     1   3         1
+# 2:    A     4   5         2
+# 3:    A     7  10         3
+# 4:    B     1   2         1
+# 5:    B     3   5         2
+# 6:    B     8  10         3
+#
+# join measurement data and episode list  (for later aggregation using
+mean() etc.)
+# approach from the SO thread -- gives the right result
+dat[episode, allow.cartesian=TRUE][date>=start & date<=end]
+    site date conc start end episodeID
+#   1:    A    1   48     1   3         1
+#   2:    A    2   44     1   3         1
+#   3:    A    3   50     1   3         1
+#   4:    A    4   47     4   5         2
+#   5:    A    5   35     4   5         2
+#   6:    A    7   38     7  10         3
+#   7:    A    8   34     7  10         3
+#   8:    A    9   46     7  10         3
+#   9:    A   10   35     7  10         3
+# 10:    B    1   45     1   2         1
+# 11:    B    2   35     1   2         1
+# 12:    B    3   40     3   5         2
+# 13:    B    4   41     3   5         2
+# 14:    B    5   37     3   5         2
+# 15:    B    8   41     8  10         3
+# 16:    B    9   31     8  10         3
+# 17:    B   10   32     8  10         3
+
+# using between() -- also gives the desired result
+dat[episode, allow.cartesian=TRUE][between (date,start,end)]
+#  (returns same result as above)
+
+# using %between% -- gives different result - not the right answer
+dat[episode, allow.cartesian=TRUE][date %between% c(start,end)]
+#    site date conc start end episodeID
+# 1:    A    1   48     1   3         1
+# 2:    A    1   48     4   5         2
+# 3:    A    1   48     7  10         3
+# 4:    B    1   45     1   2         1
+# 5:    B    1   45     3   5         2
+# 6:    B    1   45     8  10         3
+
+So why does the %between% operator give a different result than between()? 
+There must be some detail of syntax I need to learn here.  I also tried
+putting the whole %between% expression in parenthesis, but that doesn't make
+any difference:
+  dat[episode, allow.cartesian=TRUE][(date %between% c(start,end))]
+
+Best regards.
+Douglas Clark 
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/between-versus-between-why-different-results-tp4677718.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From eduard.antonyan at gmail.com  Mon Oct  7 20:31:30 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Mon, 7 Oct 2013 13:31:30 -0500
+Subject: [datatable-help] between() versus %between% - why different
+	results?
+In-Reply-To: <1381098568901-4677718.post@n4.nabble.com>
+References: <1381098568901-4677718.post@n4.nabble.com>
+Message-ID: <CAHZcBOrdJcTE9emjvfniV2wpxh1qBVW1hBj8SokRN6DjkCNQQg@mail.gmail.com>
+
+This is because `x %between% y` works by calling `between(x, y[1], y[2])`,
+so your call becomes:
+
+   dt[date %between c(start, end)]  ----> dt[between(date, c(start,
+end)[1], c(start, end)[2])]
+
+I don't know if there is anything that can be done about it (aside from not
+using the operator version with vectors).
+
+
+On Sun, Oct 6, 2013 at 5:29 PM, drclark <clark9876 at airquality.dk> wrote:
+
+> Dear data.table experts,
+>
+> I was inspired by SO topic How to match two data.frames with an inexact
+> matching identifier (one identifier has to be in the range of the other)
+> for
+> a problem I have to calculate pollutant statistics during various episodes
+> from monitoring data. The episodes (like the fiscal quarters in the SO
+> topic) are defined for each site in a lookup table with starting and ending
+> dates. The start and end dates can be different at different sites. The SO
+> answer used >= and <= to check the date was in the range from start to end.
+>   mD[qD][Month>=startMonth & Month<=endMonth]
+>
+> This approach may suit my problem, but I thought that I could use "between"
+> rather than the two logical comparisons.  I tried both the between()
+> function and its equivalent %between% operator -- and I get two different
+> results. The between() version is correct, but %between% gives a wrong
+> answer. Am I missing something in the syntax for using between?
+>
+> My version of the SO data, merge and results below. I changed the variable
+> names to suit my work: ID->site, Month->date, MonValue->conc,
+> QTRValue->episodeID.
+>
+> require(data.table)   # data.table 1.8.10  on R 3.0.2 under Win7x64
+> # the measurement data
+> dat <- data.table(site = rep(c("A","B"), each=10),
+>                   date = rep(1:10, times = 2),     # could be day or hour
+>                   conc = sample(30:50,2*10,replace=TRUE),  # the pollutant
+> data
+>                   key="site,date")
+> dat
+> #    site date conc
+> # 1:    A    1   48
+> # 2:    A    2   44
+> # 3:    A    3   50
+> # 4:    A    4   47
+> # 5:    A    5   35
+> # 6:    A    6   47
+> # 7:    A    7   38
+> # 8:    A    8   34
+> # 9:    A    9   46
+> #10:    A   10   35
+> #11:    B    1   45
+> #12:    B    2   35
+> #13:    B    3   40
+> #14:    B    4   41
+> #15:    B    5   37
+> #16:    B    6   37
+> #17:    B    7   32
+> #18:    B    8   41
+> #19:    B    9   31
+> #20:    B   10   32
+> #
+> # definitions for the episodes
+> episode <- data.table(
+>                 site = rep(c("A", "B"), each = 3),
+>                 start = c(1, 4, 7, 1, 3, 8),
+>                 end = c(3, 5, 10, 2, 5, 10),
+>                 episodeID = rep(1:3, 2),
+>                 key="site")
+> episode
+> #   site start end episodeID
+> # 1:    A     1   3         1
+> # 2:    A     4   5         2
+> # 3:    A     7  10         3
+> # 4:    B     1   2         1
+> # 5:    B     3   5         2
+> # 6:    B     8  10         3
+> #
+> # join measurement data and episode list  (for later aggregation using
+> mean() etc.)
+> # approach from the SO thread -- gives the right result
+> dat[episode, allow.cartesian=TRUE][date>=start & date<=end]
+>     site date conc start end episodeID
+> #   1:    A    1   48     1   3         1
+> #   2:    A    2   44     1   3         1
+> #   3:    A    3   50     1   3         1
+> #   4:    A    4   47     4   5         2
+> #   5:    A    5   35     4   5         2
+> #   6:    A    7   38     7  10         3
+> #   7:    A    8   34     7  10         3
+> #   8:    A    9   46     7  10         3
+> #   9:    A   10   35     7  10         3
+> # 10:    B    1   45     1   2         1
+> # 11:    B    2   35     1   2         1
+> # 12:    B    3   40     3   5         2
+> # 13:    B    4   41     3   5         2
+> # 14:    B    5   37     3   5         2
+> # 15:    B    8   41     8  10         3
+> # 16:    B    9   31     8  10         3
+> # 17:    B   10   32     8  10         3
+>
+> # using between() -- also gives the desired result
+> dat[episode, allow.cartesian=TRUE][between (date,start,end)]
+> #  (returns same result as above)
+>
+> # using %between% -- gives different result - not the right answer
+> dat[episode, allow.cartesian=TRUE][date %between% c(start,end)]
+> #    site date conc start end episodeID
+> # 1:    A    1   48     1   3         1
+> # 2:    A    1   48     4   5         2
+> # 3:    A    1   48     7  10         3
+> # 4:    B    1   45     1   2         1
+> # 5:    B    1   45     3   5         2
+> # 6:    B    1   45     8  10         3
+>
+> So why does the %between% operator give a different result than between()?
+> There must be some detail of syntax I need to learn here.  I also tried
+> putting the whole %between% expression in parenthesis, but that doesn't
+> make
+> any difference:
+>   dat[episode, allow.cartesian=TRUE][(date %between% c(start,end))]
+>
+> Best regards.
+> Douglas Clark
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/between-versus-between-why-different-results-tp4677718.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131007/137f332c/attachment.html>
+
+From eduard.antonyan at gmail.com  Tue Oct  8 16:47:42 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Tue, 8 Oct 2013 09:47:42 -0500
+Subject: [datatable-help] Secondary keys
+In-Reply-To: <CA+kDFFUrGvVjj_+eRCxN-46OPwVbYPdp2d6hNVJcX9EeGx5=eQ@mail.gmail.com>
+References: <CA+kDFFUrGvVjj_+eRCxN-46OPwVbYPdp2d6hNVJcX9EeGx5=eQ@mail.gmail.com>
+Message-ID: <CAHZcBOrHVQk4iCCkun4Yw13-41QkHodJeWjOTFjq7-pQOA=Mow@mail.gmail.com>
+
+I don't think I understand what secondary keys are (supposed to be), can
+someone who knows please elaborate?
+
+
+On Sun, Oct 6, 2013 at 12:17 AM, Chinmay Patil <chinmay.patil at gmail.com>wrote:
+
+> Hi devs,
+>
+> I was wondering if there are any plans to implement this feature.
+>
+>
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+>
+> Alternatively, is there a way to refer to key of the data.table object in
+> "J" function used for subsetting?
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131008/4386e2fa/attachment.html>
+
+From chinmay.patil at gmail.com  Wed Oct  9 05:48:14 2013
+From: chinmay.patil at gmail.com (Chinmay Patil)
+Date: Wed, 9 Oct 2013 11:48:14 +0800
+Subject: [datatable-help] Secondary keys
+In-Reply-To: <CAHZcBOrHVQk4iCCkun4Yw13-41QkHodJeWjOTFjq7-pQOA=Mow@mail.gmail.com>
+References: <CA+kDFFUrGvVjj_+eRCxN-46OPwVbYPdp2d6hNVJcX9EeGx5=eQ@mail.gmail.com>
+ <CAHZcBOrHVQk4iCCkun4Yw13-41QkHodJeWjOTFjq7-pQOA=Mow@mail.gmail.com>
+Message-ID: <CA+kDFFWusVSXcHr6wLEYkb9Nf96nH5MWQMV80U2njC5dh2xPzg@mail.gmail.com>
+
+Eduard,
+
+Details of the issue raised are in this question.
+
+http://stackoverflow.com/questions/15769837/
+
+
+On Tue, Oct 8, 2013 at 10:47 PM, Eduard Antonyan
+<eduard.antonyan at gmail.com>wrote:
+
+> I don't think I understand what secondary keys are (supposed to be), can
+> someone who knows please elaborate?
+>
+>
+> On Sun, Oct 6, 2013 at 12:17 AM, Chinmay Patil <chinmay.patil at gmail.com>wrote:
+>
+>> Hi devs,
+>>
+>> I was wondering if there are any plans to implement this feature.
+>>
+>>
+>> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+>>
+>> Alternatively, is there a way to refer to key of the data.table object in
+>> "J" function used for subsetting?
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131009/244f77b2/attachment.html>
+
+From eduard.antonyan at gmail.com  Wed Oct  9 05:56:27 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Tue, 8 Oct 2013 22:56:27 -0500
+Subject: [datatable-help] Secondary keys
+In-Reply-To: <CA+kDFFWusVSXcHr6wLEYkb9Nf96nH5MWQMV80U2njC5dh2xPzg@mail.gmail.com>
+References: <CA+kDFFUrGvVjj_+eRCxN-46OPwVbYPdp2d6hNVJcX9EeGx5=eQ@mail.gmail.com>
+ <CAHZcBOrHVQk4iCCkun4Yw13-41QkHodJeWjOTFjq7-pQOA=Mow@mail.gmail.com>
+ <CA+kDFFWusVSXcHr6wLEYkb9Nf96nH5MWQMV80U2njC5dh2xPzg@mail.gmail.com>
+Message-ID: <CAHZcBOo0gWJHTHcWr90UD8dkGUgbrFHm59c_COxz-Nx_10Jqqg@mail.gmail.com>
+
+I understand the problem you want solved (fast search by e.g. second key
+element), but I don't understand what secondary keys would mean/be...?
+On Oct 8, 2013 10:48 PM, "Chinmay Patil" <chinmay.patil at gmail.com> wrote:
+
+> Eduard,
+>
+> Details of the issue raised are in this question.
+>
+> http://stackoverflow.com/questions/15769837/
+>
+>
+> On Tue, Oct 8, 2013 at 10:47 PM, Eduard Antonyan <
+> eduard.antonyan at gmail.com> wrote:
+>
+>> I don't think I understand what secondary keys are (supposed to be), can
+>> someone who knows please elaborate?
+>>
+>>
+>> On Sun, Oct 6, 2013 at 12:17 AM, Chinmay Patil <chinmay.patil at gmail.com>wrote:
+>>
+>>> Hi devs,
+>>>
+>>> I was wondering if there are any plans to implement this feature.
+>>>
+>>>
+>>> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+>>>
+>>> Alternatively, is there a way to refer to key of the data.table object
+>>> in "J" function used for subsetting?
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131008/394b1be5/attachment.html>
+
+From chinmay.patil at gmail.com  Wed Oct  9 06:04:42 2013
+From: chinmay.patil at gmail.com (Chinmay Patil)
+Date: Wed, 9 Oct 2013 12:04:42 +0800
+Subject: [datatable-help] Secondary keys
+In-Reply-To: <CAHZcBOo0gWJHTHcWr90UD8dkGUgbrFHm59c_COxz-Nx_10Jqqg@mail.gmail.com>
+References: <CA+kDFFUrGvVjj_+eRCxN-46OPwVbYPdp2d6hNVJcX9EeGx5=eQ@mail.gmail.com>
+ <CAHZcBOrHVQk4iCCkun4Yw13-41QkHodJeWjOTFjq7-pQOA=Mow@mail.gmail.com>
+ <CA+kDFFWusVSXcHr6wLEYkb9Nf96nH5MWQMV80U2njC5dh2xPzg@mail.gmail.com>
+ <CAHZcBOo0gWJHTHcWr90UD8dkGUgbrFHm59c_COxz-Nx_10Jqqg@mail.gmail.com>
+Message-ID: <CA+kDFFXJTDhCJJAF98n6qYG49vGy=oRTug0zFesUPiuF1DOEhg@mail.gmail.com>
+
+I just used the terminology that was used in issue
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+by Matt.
+
+Essentially, it would mean that whole table is also pre-sorted by some
+other column than it's primary key and that sort order is also saved.
+Perhaps, Matt would shed some light on it?
+
+
+On Wed, Oct 9, 2013 at 11:56 AM, Eduard Antonyan
+<eduard.antonyan at gmail.com>wrote:
+
+> I understand the problem you want solved (fast search by e.g. second key
+> element), but I don't understand what secondary keys would mean/be...?
+> On Oct 8, 2013 10:48 PM, "Chinmay Patil" <chinmay.patil at gmail.com> wrote:
+>
+>> Eduard,
+>>
+>> Details of the issue raised are in this question.
+>>
+>> http://stackoverflow.com/questions/15769837/
+>>
+>>
+>> On Tue, Oct 8, 2013 at 10:47 PM, Eduard Antonyan <
+>> eduard.antonyan at gmail.com> wrote:
+>>
+>>> I don't think I understand what secondary keys are (supposed to be), can
+>>> someone who knows please elaborate?
+>>>
+>>>
+>>> On Sun, Oct 6, 2013 at 12:17 AM, Chinmay Patil <chinmay.patil at gmail.com>wrote:
+>>>
+>>>> Hi devs,
+>>>>
+>>>> I was wondering if there are any plans to implement this feature.
+>>>>
+>>>>
+>>>> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+>>>>
+>>>> Alternatively, is there a way to refer to key of the data.table object
+>>>> in "J" function used for subsetting?
+>>>>
+>>>> _______________________________________________
+>>>> datatable-help mailing list
+>>>> datatable-help at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>>
+>>>
+>>>
+>>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131009/bbbc37d3/attachment.html>
+
+From FErickson at psu.edu  Wed Oct  9 06:28:04 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Wed, 9 Oct 2013 00:28:04 -0400
+Subject: [datatable-help] Secondary keys
+In-Reply-To: <CA+kDFFXJTDhCJJAF98n6qYG49vGy=oRTug0zFesUPiuF1DOEhg@mail.gmail.com>
+References: <CA+kDFFUrGvVjj_+eRCxN-46OPwVbYPdp2d6hNVJcX9EeGx5=eQ@mail.gmail.com>
+ <CAHZcBOrHVQk4iCCkun4Yw13-41QkHodJeWjOTFjq7-pQOA=Mow@mail.gmail.com>
+ <CA+kDFFWusVSXcHr6wLEYkb9Nf96nH5MWQMV80U2njC5dh2xPzg@mail.gmail.com>
+ <CAHZcBOo0gWJHTHcWr90UD8dkGUgbrFHm59c_COxz-Nx_10Jqqg@mail.gmail.com>
+ <CA+kDFFXJTDhCJJAF98n6qYG49vGy=oRTug0zFesUPiuF1DOEhg@mail.gmail.com>
+Message-ID: <CAJd-hdniL=x1EqJnjvC7V6voYuBmDKnrd=-UVOFXXKzMMg5mnw@mail.gmail.com>
+
+I figure it means that -- if I set2key(DT,V1,V2) -- you store the integer
+vectors order(V1), order(V1,V2) ...(are both needed?)...with the object and
+somehow use that information to permit the use of the secondary key just
+like (from the user's perspective) the primary key (joining on it with
+appropriate syntax, automatically speeding up anything ending in by='V1,V2'
+or by=V1 and whatever else).
+
+Matt says in the FR: "add secondary order vectors as attribute to DT"
+
+
+On Wed, Oct 9, 2013 at 12:04 AM, Chinmay Patil <chinmay.patil at gmail.com>wrote:
+
+> I just used the terminology that was used in issue
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+> by Matt.
+>
+> Essentially, it would mean that whole table is also pre-sorted by some
+> other column than it's primary key and that sort order is also saved.
+> Perhaps, Matt would shed some light on it?
+>
+>
+> On Wed, Oct 9, 2013 at 11:56 AM, Eduard Antonyan <
+> eduard.antonyan at gmail.com> wrote:
+>
+>> I understand the problem you want solved (fast search by e.g. second key
+>> element), but I don't understand what secondary keys would mean/be...?
+>> On Oct 8, 2013 10:48 PM, "Chinmay Patil" <chinmay.patil at gmail.com> wrote:
+>>
+>>> Eduard,
+>>>
+>>> Details of the issue raised are in this question.
+>>>
+>>> http://stackoverflow.com/questions/15769837/
+>>>
+>>>
+>>> On Tue, Oct 8, 2013 at 10:47 PM, Eduard Antonyan <
+>>> eduard.antonyan at gmail.com> wrote:
+>>>
+>>>> I don't think I understand what secondary keys are (supposed to be),
+>>>> can someone who knows please elaborate?
+>>>>
+>>>>
+>>>> On Sun, Oct 6, 2013 at 12:17 AM, Chinmay Patil <chinmay.patil at gmail.com
+>>>> > wrote:
+>>>>
+>>>>> Hi devs,
+>>>>>
+>>>>> I was wondering if there are any plans to implement this feature.
+>>>>>
+>>>>>
+>>>>> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=1007&group_id=240&atid=978
+>>>>>
+>>>>> Alternatively, is there a way to refer to key of the data.table object
+>>>>> in "J" function used for subsetting?
+>>>>>
+>>>>> _______________________________________________
+>>>>> datatable-help mailing list
+>>>>> datatable-help at lists.r-forge.r-project.org
+>>>>>
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>>>
+>>>>
+>>>>
+>>>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131009/775b2a97/attachment-0001.html>
+
+From statquant at outlook.com  Wed Oct  9 11:52:41 2013
+From: statquant at outlook.com (statquant3)
+Date: Wed, 9 Oct 2013 02:52:41 -0700 (PDT)
+Subject: [datatable-help] What about this FR ?
+Message-ID: <1381312361592-4677877.post@n4.nabble.com>
+
+Hello,
+Being a heavy user of data.table I would like to suggest the following:
+
+I find data.table lakes a fast "fills" function (the equivalent of
+zoo::na.locf), is there something I am missing ?
+If not what about adding one, one day ?
+
+++
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/What-about-this-FR-tp4677877.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From FErickson at psu.edu  Wed Oct  9 17:44:08 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Wed, 9 Oct 2013 11:44:08 -0400
+Subject: [datatable-help] What about this FR ?
+In-Reply-To: <1381312361592-4677877.post@n4.nabble.com>
+References: <1381312361592-4677877.post@n4.nabble.com>
+Message-ID: <CAJd-hdmWLYMiMVJfMhFjphSvgF3zTLWRzBTz4Qk61YGOU_E4HA@mail.gmail.com>
+
+?`[.data.table` says that its roll argument can be used for LOCF. I haven't
+started using zoo, but the function you mention has the same acronym, so I
+guess those are related...?
+
+
+On Wed, Oct 9, 2013 at 5:52 AM, statquant3 <statquant at outlook.com> wrote:
+
+> Hello,
+> Being a heavy user of data.table I would like to suggest the following:
+>
+> I find data.table lakes a fast "fills" function (the equivalent of
+> zoo::na.locf), is there something I am missing ?
+> If not what about adding one, one day ?
+>
+> ++
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/What-about-this-FR-tp4677877.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131009/234b0c7c/attachment.html>
+
+From statquant at outlook.com  Wed Oct  9 19:54:13 2013
+From: statquant at outlook.com (statquant3)
+Date: Wed, 9 Oct 2013 10:54:13 -0700 (PDT)
+Subject: [datatable-help] What about this FR ?
+In-Reply-To: <CAJd-hdmWLYMiMVJfMhFjphSvgF3zTLWRzBTz4Qk61YGOU_E4HA@mail.gmail.com>
+References: <1381312361592-4677877.post@n4.nabble.com>
+ <CAJd-hdmWLYMiMVJfMhFjphSvgF3zTLWRzBTz4Qk61YGOU_E4HA@mail.gmail.com>
+Message-ID: <1381341253455-4677908.post@n4.nabble.com>
+
+Yes you can do it with a window join but that's clearly overshoot...
+Just a very simple function would do 
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/What-about-this-FR-tp4677877p4677908.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From eduard.antonyan at gmail.com  Wed Oct  9 21:29:44 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Wed, 9 Oct 2013 14:29:44 -0500
+Subject: [datatable-help] What about this FR ?
+In-Reply-To: <1381341253455-4677908.post@n4.nabble.com>
+References: <1381312361592-4677877.post@n4.nabble.com>
+ <CAJd-hdmWLYMiMVJfMhFjphSvgF3zTLWRzBTz4Qk61YGOU_E4HA@mail.gmail.com>
+ <1381341253455-4677908.post@n4.nabble.com>
+Message-ID: <CAHZcBOpAyvjj7F0BPgGy1QyS9-4F_8apMG-OyJUC3SKs-b5nkQ@mail.gmail.com>
+
+What's unsatisfactory about the zoo function? Speed or smth else?
+
+
+On Wed, Oct 9, 2013 at 12:54 PM, statquant3 <statquant at outlook.com> wrote:
+
+> Yes you can do it with a window join but that's clearly overshoot...
+> Just a very simple function would do
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/What-about-this-FR-tp4677877p4677908.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131009/54ccf470/attachment.html>
+
+From statquant at outlook.com  Thu Oct 10 12:14:21 2013
+From: statquant at outlook.com (stat quant)
+Date: Thu, 10 Oct 2013 12:14:21 +0200
+Subject: [datatable-help] What about this FR ?
+In-Reply-To: <CAHZcBOpAyvjj7F0BPgGy1QyS9-4F_8apMG-OyJUC3SKs-b5nkQ@mail.gmail.com>
+References: <1381312361592-4677877.post@n4.nabble.com>
+ <CAJd-hdmWLYMiMVJfMhFjphSvgF3zTLWRzBTz4Qk61YGOU_E4HA@mail.gmail.com>
+ <1381341253455-4677908.post@n4.nabble.com>
+ <CAHZcBOpAyvjj7F0BPgGy1QyS9-4F_8apMG-OyJUC3SKs-b5nkQ@mail.gmail.com>
+Message-ID: <CAJJHHA_7YEjOPBz3VReFWY=bi45u6YTALTSGBgUkkmahvkS03g@mail.gmail.com>
+
+Speed is not too good and even behaviour is strange.
+I really think this is anyway a very usefull feature and that data.table
+should implement it (so you would not need zoo)
+na.locf might do fancy stuff you don't need
+
+I implemented mine with Rcpp, truly it is just a for loop and that's it...
+
+
+2013/10/9 Eduard Antonyan <eduard.antonyan at gmail.com>
+
+> What's unsatisfactory about the zoo function? Speed or smth else?
+>
+>
+> On Wed, Oct 9, 2013 at 12:54 PM, statquant3 <statquant at outlook.com> wrote:
+>
+>> Yes you can do it with a window join but that's clearly overshoot...
+>> Just a very simple function would do
+>>
+>>
+>>
+>> --
+>> View this message in context:
+>> http://r.789695.n4.nabble.com/What-about-this-FR-tp4677877p4677908.html
+>>
+>> Sent from the datatable-help mailing list archive at Nabble.com.
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131010/d9711357/attachment.html>
+
+From eduard.antonyan at gmail.com  Thu Oct 10 17:11:52 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Thu, 10 Oct 2013 10:11:52 -0500
+Subject: [datatable-help] What about this FR ?
+In-Reply-To: <CAJJHHA_7YEjOPBz3VReFWY=bi45u6YTALTSGBgUkkmahvkS03g@mail.gmail.com>
+References: <1381312361592-4677877.post@n4.nabble.com>
+ <CAJd-hdmWLYMiMVJfMhFjphSvgF3zTLWRzBTz4Qk61YGOU_E4HA@mail.gmail.com>
+ <1381341253455-4677908.post@n4.nabble.com>
+ <CAHZcBOpAyvjj7F0BPgGy1QyS9-4F_8apMG-OyJUC3SKs-b5nkQ@mail.gmail.com>
+ <CAJJHHA_7YEjOPBz3VReFWY=bi45u6YTALTSGBgUkkmahvkS03g@mail.gmail.com>
+Message-ID: <CAHZcBOrpqHGDnadn_RH0Pv7s9a7Az-feEH8A+ux54y8+T-3sbA@mail.gmail.com>
+
+Do you think it might be better to submit the speed FR to zoo instead?
+
+
+On Thu, Oct 10, 2013 at 5:14 AM, stat quant <statquant at outlook.com> wrote:
+
+> Speed is not too good and even behaviour is strange.
+> I really think this is anyway a very usefull feature and that data.table
+> should implement it (so you would not need zoo)
+> na.locf might do fancy stuff you don't need
+>
+> I implemented mine with Rcpp, truly it is just a for loop and that's it...
+>
+>
+> 2013/10/9 Eduard Antonyan <eduard.antonyan at gmail.com>
+>
+>> What's unsatisfactory about the zoo function? Speed or smth else?
+>>
+>>
+>> On Wed, Oct 9, 2013 at 12:54 PM, statquant3 <statquant at outlook.com>wrote:
+>>
+>>> Yes you can do it with a window join but that's clearly overshoot...
+>>> Just a very simple function would do
+>>>
+>>>
+>>>
+>>> --
+>>> View this message in context:
+>>> http://r.789695.n4.nabble.com/What-about-this-FR-tp4677877p4677908.html
+>>>
+>>> Sent from the datatable-help mailing list archive at Nabble.com.
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131010/fd5501b6/attachment.html>
+
+From statquant at outlook.com  Fri Oct 11 19:28:51 2013
+From: statquant at outlook.com (stat quant)
+Date: Fri, 11 Oct 2013 19:28:51 +0200
+Subject: [datatable-help] What about this FR ?
+In-Reply-To: <CAHZcBOrpqHGDnadn_RH0Pv7s9a7Az-feEH8A+ux54y8+T-3sbA@mail.gmail.com>
+References: <1381312361592-4677877.post@n4.nabble.com>
+ <CAJd-hdmWLYMiMVJfMhFjphSvgF3zTLWRzBTz4Qk61YGOU_E4HA@mail.gmail.com>
+ <1381341253455-4677908.post@n4.nabble.com>
+ <CAHZcBOpAyvjj7F0BPgGy1QyS9-4F_8apMG-OyJUC3SKs-b5nkQ@mail.gmail.com>
+ <CAJJHHA_7YEjOPBz3VReFWY=bi45u6YTALTSGBgUkkmahvkS03g@mail.gmail.com>
+ <CAHZcBOrpqHGDnadn_RH0Pv7s9a7Az-feEH8A+ux54y8+T-3sbA@mail.gmail.com>
+Message-ID: <CAJJHHA-x=KyorRE4d4_CAggwfFORWw1tH1dCkhFtgMZh+m4h3g@mail.gmail.com>
+
+Not really...
+
+
+2013/10/10 Eduard Antonyan <eduard.antonyan at gmail.com>
+
+> Do you think it might be better to submit the speed FR to zoo instead?
+>
+>
+> On Thu, Oct 10, 2013 at 5:14 AM, stat quant <statquant at outlook.com> wrote:
+>
+>> Speed is not too good and even behaviour is strange.
+>> I really think this is anyway a very usefull feature and that data.table
+>> should implement it (so you would not need zoo)
+>> na.locf might do fancy stuff you don't need
+>>
+>> I implemented mine with Rcpp, truly it is just a for loop and that's it...
+>>
+>>
+>> 2013/10/9 Eduard Antonyan <eduard.antonyan at gmail.com>
+>>
+>>> What's unsatisfactory about the zoo function? Speed or smth else?
+>>>
+>>>
+>>> On Wed, Oct 9, 2013 at 12:54 PM, statquant3 <statquant at outlook.com>wrote:
+>>>
+>>>> Yes you can do it with a window join but that's clearly overshoot...
+>>>> Just a very simple function would do
+>>>>
+>>>>
+>>>>
+>>>> --
+>>>> View this message in context:
+>>>> http://r.789695.n4.nabble.com/What-about-this-FR-tp4677877p4677908.html
+>>>>
+>>>> Sent from the datatable-help mailing list archive at Nabble.com.
+>>>> _______________________________________________
+>>>> datatable-help mailing list
+>>>> datatable-help at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>>
+>>>
+>>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131011/a0d57f34/attachment.html>
+
+From clark9876 at airquality.dk  Thu Oct 10 11:34:25 2013
+From: clark9876 at airquality.dk (Douglas Clark)
+Date: Thu, 10 Oct 2013 02:34:25 -0700 (PDT)
+Subject: [datatable-help] between() versus %between% - why different
+	results?
+In-Reply-To: <CAHZcBOrdJcTE9emjvfniV2wpxh1qBVW1hBj8SokRN6DjkCNQQg@mail.gmail.com>
+References: <1381098568901-4677718.post@n4.nabble.com>
+ <CAHZcBOrdJcTE9emjvfniV2wpxh1qBVW1hBj8SokRN6DjkCNQQg@mail.gmail.com>
+Message-ID: <1381397665922-4677962.post@n4.nabble.com>
+
+Thanks eddi, that clears it up for me. But it is unfortunate that %between%
+does not support the full vector comparison that my problem requires.
+
+It would be nice if %between% would allow a 2-column RHS, equivalent to
+cbind(start,end) in my case. This does not work at present, because current
+implementation appears to use:
+
+dt[ x %between% cbind(start,end) ] ---> dt[ between(x, cbind(start,end)[1],
+cbind(start,end)[2]) ]
+
+which is also equivalent to dt[ between(x, start[1], start[2]) ] when
+length(start) > 1
+
+Does anyone see a problem if %between% were enhanced to allow the RHS to be
+a 2-column vector?
+That is, for dim(y) > 1, x %between% y  would be executed as between( x,
+y[,1], y[,2] ) 
+
+If not, I will propose it as a FR.
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/between-versus-between-why-different-results-tp4677718p4677962.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From FErickson at psu.edu  Sun Oct 13 05:20:22 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Sat, 12 Oct 2013 23:20:22 -0400
+Subject: [datatable-help] unkey when I use rbind and/or warn when I try a
+	broken key
+Message-ID: <CAJd-hdnMw7B+FNsO=5uy4B8OzQs+kp6WigiKBa=1DpsZAgA3jQ@mail.gmail.com>
+
+So, I recently did something like this:
+
+DT <- data.table(name=c('Guff','Aw'),id=101:102,id2=1:2,key='id')
+y   <- rbind(list('No','NON',0L),DT,list('Extra','XTR',3L))
+x   <- data.table(id=as.character(101:102),z=1:2,key='id')
+
+Those rows I added on do not belong in the positions I pasted them into, so
+when I tried...
+
+options(datatable.verbose=TRUE)
+x[y,newcol:=name]
+
+...it failed, silently.
+
+I'm guessing it saw the invalid key column in y and then proceeded to merge
+by y's column order instead. Because "name" comes before "id" (the column I
+thought was my key), no matches are found and newcol is not created. This
+is very, very confusing to see. Even with verbose on, I see no mention of
+"assigned to zero rows of x" or "matched on zero groups in y".
+
+I've got several problems with how this worked:
+
+(1) y should not inherit DT's key when I rbind it, or I should get a
+warning when rbinding a keyed data.table suggesting a better approach (that
+I clearly do not know about yet...?).
+
+(2) I really don't like the silent failure to assign to or create newcol.
+Warnings are nice.
+
+(3) It failed because DT1 had an invalid key (i.e., a "sorted" attribute on
+which it is not actually sorted). When I merge DT2[DT1] and it is found
+that DT1's key is invalid, I'd like to see (3a) a warning and (3b) it tell
+me explicitly that its merging on column order instead.
+
+Note that there's a nice warning message when I reset the key:
+
+setkey(y,id)
+# Warning message:
+# In setkeyv(x, cols, verbose = verbose) :
+#   Already keyed by this key but had invalid row order, key rebuilt. If
+you didn't go under the hood please let datatable-help know so the root
+cause can be fixed.
+
+What do you all think? Also, is there a right or safe way to do rbinding?
+
+Thanks,
+
+Frank
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131012/e495ccd1/attachment.html>
+
+From FErickson at psu.edu  Sun Oct 13 05:40:49 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Sat, 12 Oct 2013 23:40:49 -0400
+Subject: [datatable-help] unkey when I use rbind and/or warn when I try
+	a broken key
+In-Reply-To: <CAJd-hdnMw7B+FNsO=5uy4B8OzQs+kp6WigiKBa=1DpsZAgA3jQ@mail.gmail.com>
+References: <CAJd-hdnMw7B+FNsO=5uy4B8OzQs+kp6WigiKBa=1DpsZAgA3jQ@mail.gmail.com>
+Message-ID: <CAJd-hdk6O6YZk_-GxFYP9QtKwM8utiZZHxiRJqFxLYyHF95Btg@mail.gmail.com>
+
+Quick follow-up: I should use rbindlist, which unsets the key.
+
+yy <-
+rbindlist(list(setnames(data.table('No','NON',0L),names(DT)),DT,list('Extra','XTR',3L)))
+
+but maybe an rbind.data.table could be made that behaves better (in terms
+of key maintenance) than the rbind.data.frame that is apparently called. I
+guess this is related to my earlier thread on using unique.data.frame, in
+that sense.
+
+My takeaway is: Bad things happen when creating data.tables using functions
+designed for data.frames.
+
+--Frank
+
+
+On Sat, Oct 12, 2013 at 11:20 PM, Frank Erickson <FErickson at psu.edu> wrote:
+
+> So, I recently did something like this:
+>
+> DT <- data.table(name=c('Guff','Aw'),id=101:102,id2=1:2,key='id')
+> y   <- rbind(list('No','NON',0L),DT,list('Extra','XTR',3L))
+> x   <- data.table(id=as.character(101:102),z=1:2,key='id')
+>
+> Those rows I added on do not belong in the positions I pasted them into,
+> so when I tried...
+>
+> options(datatable.verbose=TRUE)
+> x[y,newcol:=name]
+>
+> ...it failed, silently.
+>
+> I'm guessing it saw the invalid key column in y and then proceeded to
+> merge by y's column order instead. Because "name" comes before "id" (the
+> column I thought was my key), no matches are found and newcol is not
+> created. This is very, very confusing to see. Even with verbose on, I see
+> no mention of "assigned to zero rows of x" or "matched on zero groups in y".
+>
+> I've got several problems with how this worked:
+>
+> (1) y should not inherit DT's key when I rbind it, or I should get a
+> warning when rbinding a keyed data.table suggesting a better approach (that
+> I clearly do not know about yet...?).
+>
+> (2) I really don't like the silent failure to assign to or create newcol.
+> Warnings are nice.
+>
+> (3) It failed because DT1 had an invalid key (i.e., a "sorted" attribute
+> on which it is not actually sorted). When I merge DT2[DT1] and it is found
+> that DT1's key is invalid, I'd like to see (3a) a warning and (3b) it tell
+> me explicitly that its merging on column order instead.
+>
+> Note that there's a nice warning message when I reset the key:
+>
+> setkey(y,id)
+> # Warning message:
+> # In setkeyv(x, cols, verbose = verbose) :
+> #   Already keyed by this key but had invalid row order, key rebuilt. If
+> you didn't go under the hood please let datatable-help know so the root
+> cause can be fixed.
+>
+> What do you all think? Also, is there a right or safe way to do rbinding?
+>
+> Thanks,
+>
+> Frank
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131012/fe79e943/attachment.html>
+
+From eduard.antonyan at gmail.com  Sun Oct 13 19:54:02 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Sun, 13 Oct 2013 12:54:02 -0500
+Subject: [datatable-help] unkey when I use rbind and/or warn when I try
+ a broken key
+In-Reply-To: <CAJd-hdk6O6YZk_-GxFYP9QtKwM8utiZZHxiRJqFxLYyHF95Btg@mail.gmail.com>
+References: <CAJd-hdnMw7B+FNsO=5uy4B8OzQs+kp6WigiKBa=1DpsZAgA3jQ@mail.gmail.com>
+ <CAJd-hdk6O6YZk_-GxFYP9QtKwM8utiZZHxiRJqFxLYyHF95Btg@mail.gmail.com>
+Message-ID: <CAHZcBOrN83oLhdLU+j5dmLuNT2uL8qq84fKk77GkPtXSV-9KYg@mail.gmail.com>
+
+Frank,
+
+Great examples!
+
+1) it's a bug, please file a report
+
+2-3) those sound like good FRs to me
+
+Ed
+
+
+On Sat, Oct 12, 2013 at 10:40 PM, Frank Erickson <FErickson at psu.edu> wrote:
+
+> Quick follow-up: I should use rbindlist, which unsets the key.
+>
+> yy <-
+> rbindlist(list(setnames(data.table('No','NON',0L),names(DT)),DT,list('Extra','XTR',3L)))
+>
+> but maybe an rbind.data.table could be made that behaves better (in terms
+> of key maintenance) than the rbind.data.frame that is apparently called. I
+> guess this is related to my earlier thread on using unique.data.frame, in
+> that sense.
+>
+> My takeaway is: Bad things happen when creating data.tables using
+> functions designed for data.frames.
+>
+> --Frank
+>
+>
+> On Sat, Oct 12, 2013 at 11:20 PM, Frank Erickson <FErickson at psu.edu>wrote:
+>
+>> So, I recently did something like this:
+>>
+>> DT <- data.table(name=c('Guff','Aw'),id=101:102,id2=1:2,key='id')
+>>  y   <- rbind(list('No','NON',0L),DT,list('Extra','XTR',3L))
+>> x   <- data.table(id=as.character(101:102),z=1:2,key='id')
+>>
+>> Those rows I added on do not belong in the positions I pasted them into,
+>> so when I tried...
+>>
+>> options(datatable.verbose=TRUE)
+>> x[y,newcol:=name]
+>>
+>> ...it failed, silently.
+>>
+>> I'm guessing it saw the invalid key column in y and then proceeded to
+>> merge by y's column order instead. Because "name" comes before "id" (the
+>> column I thought was my key), no matches are found and newcol is not
+>> created. This is very, very confusing to see. Even with verbose on, I see
+>> no mention of "assigned to zero rows of x" or "matched on zero groups in y".
+>>
+>> I've got several problems with how this worked:
+>>
+>> (1) y should not inherit DT's key when I rbind it, or I should get a
+>> warning when rbinding a keyed data.table suggesting a better approach (that
+>> I clearly do not know about yet...?).
+>>
+>> (2) I really don't like the silent failure to assign to or create newcol.
+>> Warnings are nice.
+>>
+>> (3) It failed because DT1 had an invalid key (i.e., a "sorted" attribute
+>> on which it is not actually sorted). When I merge DT2[DT1] and it is found
+>> that DT1's key is invalid, I'd like to see (3a) a warning and (3b) it tell
+>> me explicitly that its merging on column order instead.
+>>
+>> Note that there's a nice warning message when I reset the key:
+>>
+>> setkey(y,id)
+>> # Warning message:
+>> # In setkeyv(x, cols, verbose = verbose) :
+>> #   Already keyed by this key but had invalid row order, key rebuilt. If
+>> you didn't go under the hood please let datatable-help know so the root
+>> cause can be fixed.
+>>
+>> What do you all think? Also, is there a right or safe way to do rbinding?
+>>
+>> Thanks,
+>>
+>> Frank
+>>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131013/84ba6ddb/attachment.html>
+
+From FErickson at psu.edu  Sun Oct 13 23:17:37 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Sun, 13 Oct 2013 17:17:37 -0400
+Subject: [datatable-help] unkey when I use rbind and/or warn when I try
+ a broken key
+In-Reply-To: <CAHZcBOrN83oLhdLU+j5dmLuNT2uL8qq84fKk77GkPtXSV-9KYg@mail.gmail.com>
+References: <CAJd-hdnMw7B+FNsO=5uy4B8OzQs+kp6WigiKBa=1DpsZAgA3jQ@mail.gmail.com>
+ <CAJd-hdk6O6YZk_-GxFYP9QtKwM8utiZZHxiRJqFxLYyHF95Btg@mail.gmail.com>
+ <CAHZcBOrN83oLhdLU+j5dmLuNT2uL8qq84fKk77GkPtXSV-9KYg@mail.gmail.com>
+Message-ID: <CAJd-hd=vaydG1ftgKUayMy4Gbj-N0x_9xF+dk8EG8=H8G7iy8g@mail.gmail.com>
+
+Okay, posted. Thanks, Ed. --Frank
+
+
+On Sun, Oct 13, 2013 at 1:54 PM, Eduard Antonyan
+<eduard.antonyan at gmail.com>wrote:
+
+> Frank,
+>
+> Great examples!
+>
+> 1) it's a bug, please file a report
+>
+> 2-3) those sound like good FRs to me
+>
+> Ed
+>
+>
+> On Sat, Oct 12, 2013 at 10:40 PM, Frank Erickson <FErickson at psu.edu>wrote:
+>
+>> Quick follow-up: I should use rbindlist, which unsets the key.
+>>
+>> yy <-
+>> rbindlist(list(setnames(data.table('No','NON',0L),names(DT)),DT,list('Extra','XTR',3L)))
+>>
+>> but maybe an rbind.data.table could be made that behaves better (in terms
+>> of key maintenance) than the rbind.data.frame that is apparently called. I
+>> guess this is related to my earlier thread on using unique.data.frame, in
+>> that sense.
+>>
+>> My takeaway is: Bad things happen when creating data.tables using
+>> functions designed for data.frames.
+>>
+>> --Frank
+>>
+>>
+>> On Sat, Oct 12, 2013 at 11:20 PM, Frank Erickson <FErickson at psu.edu>wrote:
+>>
+>>> So, I recently did something like this:
+>>>
+>>> DT <- data.table(name=c('Guff','Aw'),id=101:102,id2=1:2,key='id')
+>>>  y   <- rbind(list('No','NON',0L),DT,list('Extra','XTR',3L))
+>>> x   <- data.table(id=as.character(101:102),z=1:2,key='id')
+>>>
+>>> Those rows I added on do not belong in the positions I pasted them into,
+>>> so when I tried...
+>>>
+>>> options(datatable.verbose=TRUE)
+>>> x[y,newcol:=name]
+>>>
+>>> ...it failed, silently.
+>>>
+>>> I'm guessing it saw the invalid key column in y and then proceeded to
+>>> merge by y's column order instead. Because "name" comes before "id" (the
+>>> column I thought was my key), no matches are found and newcol is not
+>>> created. This is very, very confusing to see. Even with verbose on, I see
+>>> no mention of "assigned to zero rows of x" or "matched on zero groups in y".
+>>>
+>>> I've got several problems with how this worked:
+>>>
+>>> (1) y should not inherit DT's key when I rbind it, or I should get a
+>>> warning when rbinding a keyed data.table suggesting a better approach (that
+>>> I clearly do not know about yet...?).
+>>>
+>>> (2) I really don't like the silent failure to assign to or create
+>>> newcol. Warnings are nice.
+>>>
+>>> (3) It failed because DT1 had an invalid key (i.e., a "sorted" attribute
+>>> on which it is not actually sorted). When I merge DT2[DT1] and it is found
+>>> that DT1's key is invalid, I'd like to see (3a) a warning and (3b) it tell
+>>> me explicitly that its merging on column order instead.
+>>>
+>>> Note that there's a nice warning message when I reset the key:
+>>>
+>>> setkey(y,id)
+>>> # Warning message:
+>>> # In setkeyv(x, cols, verbose = verbose) :
+>>> #   Already keyed by this key but had invalid row order, key rebuilt. If
+>>> you didn't go under the hood please let datatable-help know so the root
+>>> cause can be fixed.
+>>>
+>>> What do you all think? Also, is there a right or safe way to do rbinding?
+>>>
+>>> Thanks,
+>>>
+>>> Frank
+>>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131013/71316e17/attachment.html>
+
+From FErickson at psu.edu  Mon Oct 14 04:03:38 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Sun, 13 Oct 2013 22:03:38 -0400
+Subject: [datatable-help] possible FR: in x[y],
+ switch to nomatch=0 instead of failing with "Error in vecseq..."
+Message-ID: <CAJd-hd=qopD4yxNyn7cAbo4YZ9_Y+FZv+FO0XnTxtPYtwWj5KA@mail.gmail.com>
+
+I don't know if this error shows up in other cases, but I always see it
+when I'm about to do
+
+x[y,b:=b]
+
+but first want to check how
+
+x[y]
+
+looks before creating or overwriting x$b. Here's an example:
+
+x <- data.table(a=rep(2:3,2),key='a')
+y <- data.table(a=1:4,b=4:1,key='a')
+
+x[y]           # error
+x[y,nomatch=0] # ok
+x[y,b:=b]      # ok
+
+I'd prefer to see the first attempt mapped to the second (with a suitable
+message), instead of erroring out. What do you all think? Is that
+reasonable/worthwhile?
+
+Best,
+
+Frank
+
+P.S. One other point, regarding the message itself (reproduced down below):
+I don't understand why repeated values in i are mentioned.
+
+-- For x[y] in my example, the problem seems to be coming from x having
+repeated rows, not i (y in this case);
+-- whereas y[x] works just fine (despite the repeated/duplicated values in
+i...which is x here).
+
+Error in vecseq(f__, len__, if (allow.cartesian) NULL else
+as.integer(max(nrow(x),  :
+  Join results in 6 rows; more than 4 = max(nrow(x),nrow(i)). Check for
+duplicate key values in i, each of which join to the same group in x over
+and over again. If that's ok, try including `j` and dropping `by`
+(by-without-by) so that j runs for each group to avoid the large
+allocation. If you are sure you wish to proceed, rerun with
+allow.cartesian=TRUE. Otherwise, please search for this error message in
+the FAQ, Wiki, Stack Overflow and datatable-help for advice.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131013/898bce43/attachment.html>
+
+From michael.nelson at sydney.edu.au  Mon Oct 14 06:42:00 2013
+From: michael.nelson at sydney.edu.au (Michael Nelson)
+Date: Mon, 14 Oct 2013 04:42:00 +0000
+Subject: [datatable-help] possible FR: in x[y],
+ switch to nomatch=0 instead of failing with "Error in vecseq..."
+In-Reply-To: <CAJd-hd=qopD4yxNyn7cAbo4YZ9_Y+FZv+FO0XnTxtPYtwWj5KA@mail.gmail.com>
+References: <CAJd-hd=qopD4yxNyn7cAbo4YZ9_Y+FZv+FO0XnTxtPYtwWj5KA@mail.gmail.com>
+Message-ID: <6FB5193A6CDCDF499486A833B7AFBDCD94D85FDF@ex-mbx-pro-05>
+
+
+The default argument to nomatch is `'getOption("datatable.nomatch")`. The default value for this is `NA`.
+
+If you want to change this option, simply set `options(datatable.nomatch = 0)`, then the default will be as you want.
+
+I think the current datatable.nomatch = NA is reasonable, as you are often interested in non-matches as well as matches.
+
+x[y, nomatch=NA] to give a error in your case, then follow the advice of the error message and run
+
+x[y, nomatch=NA, allow.cartesian = TRUE]
+
+
+
+
+
+________________________________
+From: datatable-help-bounces at lists.r-forge.r-project.org [datatable-help-bounces at lists.r-forge.r-project.org] on behalf of Frank Erickson [FErickson at psu.edu]
+Sent: Monday, 14 October 2013 1:03 PM
+To: data.table source forge
+Subject: [datatable-help] possible FR: in x[y], switch to nomatch=0 instead of failing with "Error in vecseq..."
+
+I don't know if this error shows up in other cases, but I always see it when I'm about to do
+
+x[y,b:=b]
+
+but first want to check how
+
+x[y]
+
+looks before creating or overwriting x$b. Here's an example:
+
+x <- data.table(a=rep(2:3,2),key='a')
+y <- data.table(a=1:4,b=4:1,key='a')
+
+x[y]           # error
+x[y,nomatch=0] # ok
+x[y,b:=b]      # ok
+
+I'd prefer to see the first attempt mapped to the second (with a suitable message), instead of erroring out. What do you all think? Is that reasonable/worthwhile?
+
+Best,
+
+Frank
+
+P.S. One other point, regarding the message itself (reproduced down below): I don't understand why repeated values in i are mentioned.
+
+-- For x[y] in my example, the problem seems to be coming from x having repeated rows, not i (y in this case);
+-- whereas y[x] works just fine (despite the repeated/duplicated values in i...which is x here).
+
+Error in vecseq(f__, len__, if (allow.cartesian) NULL else as.integer(max(nrow(x),  :
+  Join results in 6 rows; more than 4 = max(nrow(x),nrow(i)). Check for duplicate key values in i, each of which join to the same group in x over and over again. If that's ok, try including `j` and dropping `by` (by-without-by) so that j runs for each group to avoid the large allocation. If you are sure you wish to proceed, rerun with allow.cartesian=TRUE. Otherwise, please search for this error message in the FAQ, Wiki, Stack Overflow and datatable-help for advice.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131014/7c14521a/attachment-0001.html>
+
+From FErickson at psu.edu  Mon Oct 14 07:02:12 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Mon, 14 Oct 2013 01:02:12 -0400
+Subject: [datatable-help] possible FR: in x[y],
+ switch to nomatch=0 instead of failing with "Error in vecseq..."
+In-Reply-To: <6FB5193A6CDCDF499486A833B7AFBDCD94D85FDF@ex-mbx-pro-05>
+References: <CAJd-hd=qopD4yxNyn7cAbo4YZ9_Y+FZv+FO0XnTxtPYtwWj5KA@mail.gmail.com>
+ <6FB5193A6CDCDF499486A833B7AFBDCD94D85FDF@ex-mbx-pro-05>
+Message-ID: <CAJd-hdkCKDsZYQ6gr+5WVqtUT5pvGV8jTAnufGY0FUiaDGPYow@mail.gmail.com>
+
+Thanks for pointing that out. I didn't know about (= think to search
+for) that global option. I think I'll leave it as NA since, as you say,
+it's reasonably useful.
+
+I forgot that people may want to switch to allow.cartesian = TRUE (although
+I never find myself wanting to use this) after seeing the error. So, a
+modified (very minor) FR: have the error message suggest switching to
+nomatch=0 (because this is what I personally find myself switching to after
+I see the error, though I don't know how common that choice is...).
+
+I still don't understand the mention of "duplicate key values in i" in the
+message, as the problem seems to be with duplicated values in x (at least
+in my example above).
+
+--Frank
+
+
+On Mon, Oct 14, 2013 at 12:42 AM, Michael Nelson <
+michael.nelson at sydney.edu.au> wrote:
+
+>
+> The default argument to nomatch is `'getOption("datatable.nomatch")`. The
+> default value for this is `NA`.
+>
+>  If you want to change this option, simply set `options(datatable.nomatch
+> = 0)`, then the default will be as you want.
+>
+>  I think the current datatable.nomatch = NA is reasonable, as you are
+> often interested in non-matches as well as matches.
+>
+>  x[y, nomatch=NA] to give a error in your case, then follow the advice of
+> the error message and run
+>
+>  x[y, nomatch=NA, allow.cartesian = TRUE]
+>
+>
+>
+>
+>
+>  ------------------------------
+> *From:* datatable-help-bounces at lists.r-forge.r-project.org [
+> datatable-help-bounces at lists.r-forge.r-project.org] on behalf of Frank
+> Erickson [FErickson at psu.edu]
+> *Sent:* Monday, 14 October 2013 1:03 PM
+> *To:* data.table source forge
+> *Subject:* [datatable-help] possible FR: in x[y], switch to nomatch=0
+> instead of failing with "Error in vecseq..."
+>
+>   I don't know if this error shows up in other cases, but I always see it
+> when I'm about to do
+>
+>  x[y,b:=b]
+>
+>  but first want to check how
+>
+>  x[y]
+>
+>  looks before creating or overwriting x$b. Here's an example:
+>
+>  x <- data.table(a=rep(2:3,2),key='a')
+> y <- data.table(a=1:4,b=4:1,key='a')
+>
+>  x[y]           # error
+>  x[y,nomatch=0] # ok
+>  x[y,b:=b]      # ok
+>
+>  I'd prefer to see the first attempt mapped to the second (with a
+> suitable message), instead of erroring out. What do you all think? Is that
+> reasonable/worthwhile?
+>
+>  Best,
+>
+>  Frank
+>
+>  P.S. One other point, regarding the message itself (reproduced down
+> below): I don't understand why repeated values in i are mentioned.
+>
+>  -- For x[y] in my example, the problem seems to be coming from x having
+> repeated rows, not i (y in this case);
+> -- whereas y[x] works just fine (despite the repeated/duplicated values in
+> i...which is x here).
+>
+>  Error in vecseq(f__, len__, if (allow.cartesian) NULL else
+> as.integer(max(nrow(x),  :
+>   Join results in 6 rows; more than 4 = max(nrow(x),nrow(i)). Check for
+> duplicate key values in i, each of which join to the same group in x over
+> and over again. If that's ok, try including `j` and dropping `by`
+> (by-without-by) so that j runs for each group to avoid the large
+> allocation. If you are sure you wish to proceed, rerun with
+> allow.cartesian=TRUE. Otherwise, please search for this error message in
+> the FAQ, Wiki, Stack Overflow and datatable-help for advice.
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131014/37242fe3/attachment.html>
+
+From kpm.nachtmann at gmail.com  Mon Oct 14 08:57:03 2013
+From: kpm.nachtmann at gmail.com (Gerhard Nachtmann)
+Date: Mon, 14 Oct 2013 08:57:03 +0200
+Subject: [datatable-help] fread(colClasses = "factor")
+Message-ID: <CAH4K44jFVh7hYyaUR57j-YPxShY492+uMzwuYE-0=fVT9oFxtA@mail.gmail.com>
+
+Hi there!
+
+Thanks for the great data.table package first!
+
+I tried fread and got one of the rare errors of unknown colClasses:
+
+##########
+R version 3.0.1 (2013-05-16)
+Platform: powerpc64-unknown-linux-gnu (64-bit)
+
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C
+ [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8
+ [7] LC_PAPER=C                 LC_NAME=C
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C
+[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] data.table_1.8.10
+
+##> ab1 <- fread("./daten/out_
+abschluesse.csv", verbose = TRUE)
+
+Detected eol as \r\n (CRLF) in that order, the Windows standard.
+Using line 30 to detect sep (the last non blank line in the first
+'autostart') ... sep=';'
+Found 30 columns
+First row with 30 fields occurs on line 1 (either column names or
+first row of data) All the fields on line 1 are character fields.
+Treating as the column names.
+Count of eol after first data row: 289491 Subtracted 1 for last eol
+and any trailing empty lines, leaving 289490 data rows Type codes:
+000300000000000303003303030000 (first 5 rows) Type codes:
+000300000000000303003303030000 (+middle 5 rows) Type codes:
+000300000000300303003303030000 (+last 5 rows) Bumping column 28 from
+INT to INT64 on data row 12, field contains 'O'
+Bumping column 28 from INT64 to REAL on data row 12, field contains 'O'
+Bumping column 28 from REAL to STR on data row 12, field contains 'O'
+Bumping column 29 from INT to INT64 on data row 12, field contains 'E'
+Bumping column 29 from INT64 to REAL on data row 12, field contains 'E'
+Bumping column 29 from REAL to STR on data row 12, field contains 'E'
+Bumping column 30 from INT to INT64 on data row 12, field contains 'E'
+Bumping column 30 from INT64 to REAL on data row 12, field contains 'E'
+Bumping column 30 from REAL to STR on data row 12, field contains 'E'
+Bumping column 1 from INT to INT64 on data row 132736, field contains '2.2e+07'
+Bumping column 1 from INT64 to REAL on data row 132736, field contains '2.2e+07'
+   0.000s (  0%) Memory map (rerun may be quicker)
+   0.000s (  0%) sep and header detection
+   0.030s ( 10%) Count rows (wc -l)
+   0.000s (  0%) Column type detection (first, middle and last 5 rows)
+   0.050s ( 17%) Allocation of 289490x30 result (xMB) in RAM
+   0.190s ( 66%) Reading data
+   0.000s (  0%) Allocation for type bumps (if any), including gc time
+if triggered
+   0.010s (  3%) Coercing data already read in type bumps (if any)
+   0.010s (  3%) Changing na.strings to NA
+   0.290s        Total
+
+Warning messages:
+1: In fread("./daten/out_abschluesse.csv", verbose = TRUE) :
+  Bumped column 28 to type character on data row 12, field contains
+'O'. Coercing previously read values in this column from integer or
+numeric back to character which may not be lossless; e.g., if '00' and
+'000' occurred before they will now be just '0', and there may be
+inconsistencies with treatment of ',,' and ',NA,' too (if they
+occurred in this column before the bump). If this matters please rerun
+and set 'colClasses' to 'character' for this column. Please note that
+column type detection uses the first 5 rows, the middle 5 rows and the
+last 5 rows, so hopefully this message should be very rare. If
+reporting to datatable-help, please rerun and include the output from
+verbose=TRUE.
+2: In fread("./daten/out_abschluesse.csv", verbose = TRUE) :
+  Bumped column 29 to type character on data row 12, field contains
+'E'. Coercing previously read values in this column from integer or
+numeric back to character which may not be lossless; e.g., if '00' and
+'000' occurred before they will now be just '0', and there may be
+inconsistencies with treatment of ',,' and ',NA,' too (if they
+occurred in this column before the bump). If this matters please rerun
+and set 'colClasses' to 'character' for this column. Please note that
+column type detection uses the first 5 rows, the middle 5 rows and the
+last 5 rows, so hopefully this message should be very rare. If
+reporting to datatable-help, please rerun and include the output from
+verbose=TRUE.
+3: In fread("./daten/out_abschluesse.csv", verbose = TRUE) :
+  Bumped column 30 to type character on data row 12, field contains
+'E'. Coercing previously read values in this column from integer or
+numeric back to character which may not be lossless; e.g., if '00' and
+'000' occurred before they will now be just '0', and there may be
+inconsistencies with treatment of ',,' and ',NA,' too (if they
+occurred in this column before the bump). If this matters please rerun
+and set 'colClasses' to 'character' for this column. Please note that
+column type detection uses the first 5 rows, the middle 5 rows and the
+last 5 rows, so hopefully this message should be very rare. If
+reporting to datatable-help, please rerun and include the output from
+verbose=TRUE.
+
+##> ab1 <- fread("./daten/out_abschluesse.csv", verbose = TRUE,
+colClasses = "character")
+
+##### worked
+##### fread(..., stringsAsFactors = TRUE) seems to be unused: I could
+not find colClasses in fread.c
+##### fread(..., colClasses = "factor") is unknown, but results in "character"
+
+#####  in Windows 7 using data.table 1.8.8 it was the same warning,
+but colClasses was unknown:
+
+R version 3.0.1 (2013-05-16)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+
+locale:
+[1] LC_COLLATE=German_Austria.1252  LC_CTYPE=German_Austria.1252
+[3] LC_MONETARY=German_Austria.1252 LC_NUMERIC=C
+[5] LC_TIME=German_Austria.1252
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] data.table_1.8.8
+
+##> ab1 <- fread("./daten/out_abschluesse.csv", verbose = TRUE,
+colClasses = "character") Error in
+fread("./daten/out_abschluesse.csv", verbose = TRUE, colClasses =
+"character") :
+  unused argument (colClasses = "character")
+##########
+
+Is there a possibility to read all columns as factors directly?
+
+Have a nice day,
+Gerhard
+
+From FErickson at psu.edu  Fri Oct 18 19:03:57 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Fri, 18 Oct 2013 13:03:57 -0400
+Subject: [datatable-help] possible FR: let as.matrix.data.table
+ automatically grab a column named "rn"
+Message-ID: <CAJd-hdnjE1eP8QujW6QpB9aF2h-j+dWs8w4fee6E68Qc0BTAvg@mail.gmail.com>
+
+In trying to come up with a simple answer here
+http://stackoverflow.com/a/19454986/1191259
+
+...I found myself doing something like this:
+
+adj1mat           <- as.matrix(adj1[,-1,with=FALSE])
+rownames(adj1mat) <- as.character(adj1$rn)
+
+which is awkward. It would be nice if as.matrix.data.table could invert
+keep.rownames=TRUE from as.data.table.* (for data.frames or matrices) by
+putting the rownames in place. If that were the case, I could just write...
+
+adj1mat           <- as.matrix(adj1)
+
+I see in getAnywhere(as.matrix.data.table), that it currently always
+assigns NULL rownames. Anyway, it's a minor suggestion.
+
+--Frank
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131018/8847a1ef/attachment.html>
+
+From aragorn168b at gmail.com  Mon Oct 21 08:06:41 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Mon, 21 Oct 2013 08:06:41 +0200
+Subject: [datatable-help] Bug #4990 regarding
+Message-ID: <CAAf756O=3bTBH3VqUvt-6Bnm0BfY842yNm_DJAUPYxc8iH2GqA@mail.gmail.com>
+
+Hi all,
+
+Here's the link to #4990:
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=4990&group_id=240&atid=975
+
+I'm not sure there should be any warning here. A warning message is created
+in `:=` if the RHS that's assigned is "bigger" in length than the LHS.
+
+For ex:
+
+dt <- data.table(a=rep(1:2, c(5,2)))
+dt[, b := c(1,2,3), by=a]
+
+# creates warning that RHS is of length 3 and LHS is of length 2 for a ==2.
+Warning message:
+In `[.data.table`(dt, , `:=`(b, c(1, 2, 3)), by = a) :
+  RHS 1 is length 3 (greater than the size (2) of group 2). The last 1
+element(s) will be discarded.
+
+Other than that, there need not be any warning because it's being recycled.
+For example,
+
+x <- 1:5
+x[c(TRUE, FALSE)]
+# [1] 1 3 5.
+
+Here, the number of elements of x are odd, but the recycling produces no
+warning. It may not exactly be the same issue, but to give an idea of
+silent recycling.
+
+What do you guys think?
+
+Arun.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131021/a104d644/attachment.html>
+
+From aragorn168b at gmail.com  Mon Oct 21 20:18:48 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Mon, 21 Oct 2013 20:18:48 +0200
+Subject: [datatable-help] #4990 regarding
+Message-ID: <AE8583820B744178A030872A2FFBDD5C@gmail.com>
+
+Hi all,
+
+Here's the link to #4990: https://r-forge.r-project.org/tracker/index.php?func=detail&aid=4990&group_id=240&atid=975
+
+
+
+I'm not sure there should be any warning here. A warning message is created in `:=` if the RHS that's assigned is "bigger" in length than the LHS. 
+
+For ex:
+
+dt <- data.table(a=rep(1:2, c(5,2)))
+dt[, b := c(1,2,3), by=a]
+
+# creates warning that RHS is of length 3 and LHS is of length 2 for a ==2.
+Warning message:
+In `[.data.table`(dt, , `:=`(b, c(1, 2, 3)), by = a) :
+  RHS 1 is length 3 (greater than the size (2) of group 2). The last 1 element(s) will be discarded.
+
+
+Other than that, there need not be any warning because it's being recycled. For example, 
+
+x <- 1:5
+x[c(TRUE, FALSE)]
+# [1] 1 3 5. 
+
+Here, the number of elements of x are odd, but the recycling produces no warning. It may not exactly be the same issue, but to give an idea of silent recycling.
+
+What do you guys think?
+
+Arun
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131021/5236815d/attachment.html>
+
+From eduard.antonyan at gmail.com  Mon Oct 21 20:45:56 2013
+From: eduard.antonyan at gmail.com (eddi)
+Date: Mon, 21 Oct 2013 11:45:56 -0700 (PDT)
+Subject: [datatable-help] test post, please ignore
+Message-ID: <1382381156461-4678727.post@n4.nabble.com>
+
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/test-post-please-ignore-tp4678727.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From saporta at scarletmail.rutgers.edu  Wed Oct 23 22:31:53 2013
+From: saporta at scarletmail.rutgers.edu (Ricardo Saporta)
+Date: Wed, 23 Oct 2013 16:31:53 -0400
+Subject: [datatable-help] #4990 regarding
+In-Reply-To: <AE8583820B744178A030872A2FFBDD5C@gmail.com>
+References: <AE8583820B744178A030872A2FFBDD5C@gmail.com>
+Message-ID: <CAE7Aa4QQCL1GpbsORLGYTnPiuZEnbYLB3hPvtCXdKM2g=OYLJw@mail.gmail.com>
+
+I think we should have a warning  iff  it is not a "clean" recycle  (ie,
+the set gets cut off)
+
+In other words
+
+  if (length(longer) %% length(shorter) != 0)
+     warning()
+
+
+
+Ricardo Saporta
+Graduate Student, Data Analytics
+Rutgers University, New Jersey
+e: saporta at rutgers.edu
+
+
+
+On Mon, Oct 21, 2013 at 2:18 PM, Arunkumar Srinivasan <aragorn168b at gmail.com
+> wrote:
+
+>  Hi all,
+>
+> Here's the link to #4990: https://r-forge.r-**
+> project.org/tracker/index.php?**func=detail&aid=4990&group_id=**
+> 240&atid=975<https://r-forge.r-project.org/tracker/index.php?func=detail&aid=4990&group_id=240&atid=975>
+>
+> I'm not sure there should be any warning here. A warning message is
+> created in `:=` if the RHS that's assigned is "bigger" in length than the
+> LHS.
+>
+> For ex:
+>
+> dt <- data.table(a=rep(1:2, c(5,2)))
+> dt[, b := c(1,2,3), by=a]
+>
+> # creates warning that RHS is of length 3 and LHS is of length 2 for a ==2.
+> Warning message:
+> In `[.data.table`(dt, , `:=`(b, c(1, 2, 3)), by = a) :
+>   RHS 1 is length 3 (greater than the size (2) of group 2). The last 1
+> element(s) will be discarded.
+>
+> Other than that, there need not be any warning because it's being
+> recycled. For example,
+>
+> x <- 1:5
+> x[c(TRUE, FALSE)]
+> # [1] 1 3 5.
+>
+> Here, the number of elements of x are odd, but the recycling produces no
+> warning. It may not exactly be the same issue, but to give an idea of
+> silent recycling.
+>
+> What do you guys think?
+>
+> Arun
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131023/f793bccd/attachment.html>
+
+From aragorn168b at gmail.com  Wed Oct 23 22:39:48 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Wed, 23 Oct 2013 22:39:48 +0200
+Subject: [datatable-help] #4990 regarding
+In-Reply-To: <CAE7Aa4QQCL1GpbsORLGYTnPiuZEnbYLB3hPvtCXdKM2g=OYLJw@mail.gmail.com>
+References: <AE8583820B744178A030872A2FFBDD5C@gmail.com>
+ <CAE7Aa4QQCL1GpbsORLGYTnPiuZEnbYLB3hPvtCXdKM2g=OYLJw@mail.gmail.com>
+Message-ID: <B92C4F97-054F-40BA-888A-B5186B261421@gmail.com>
+
+Ricardo, 
+
+Thanks for the reply. Yes I agree. Eddi pointed out that, dt[, x := c(1:2)] when dt! for example! has a column y of length 5 will give a warning that it did not completely recycle. But when used with "by" it does not. This is obviously a bug. I will fix it to add the same warning for "by".
+
+Arun.
+
+Sent from my iPad
+
+> On 23.10.2013, at 22:31, Ricardo Saporta <saporta at scarletmail.rutgers.edu> wrote:
+> 
+> I think we should have a warning  iff  it is not a "clean" recycle  (ie, the set gets cut off)
+> 
+> In other words 
+> 
+>   if (length(longer) %% length(shorter) != 0)
+>      warning()
+> 
+> 
+> 
+> Ricardo Saporta
+> Graduate Student, Data Analytics
+> Rutgers University, New Jersey
+> e: saporta at rutgers.edu
+> 
+> 
+> 
+>> On Mon, Oct 21, 2013 at 2:18 PM, Arunkumar Srinivasan <aragorn168b at gmail.com> wrote:
+>> Hi all,
+>> 
+>> Here's the link to #4990: https://r-forge.r-project.org/tracker/index.php?func=detail&aid=4990&group_id=240&atid=975
+>> 
+>> I'm not sure there should be any warning here. A warning message is created in `:=` if the RHS that's assigned is "bigger" in length than the LHS. 
+>> 
+>> For ex:
+>> 
+>> dt <- data.table(a=rep(1:2, c(5,2)))
+>> dt[, b := c(1,2,3), by=a]
+>> 
+>> # creates warning that RHS is of length 3 and LHS is of length 2 for a ==2.
+>> Warning message:
+>> In `[.data.table`(dt, , `:=`(b, c(1, 2, 3)), by = a) :
+>>   RHS 1 is length 3 (greater than the size (2) of group 2). The last 1 element(s) will be discarded.
+>> 
+>> Other than that, there need not be any warning because it's being recycled. For example, 
+>> 
+>> x <- 1:5
+>> x[c(TRUE, FALSE)]
+>> # [1] 1 3 5. 
+>> 
+>> Here, the number of elements of x are odd, but the recycling produces no warning. It may not exactly be the same issue, but to give an idea of silent recycling.
+>> 
+>> What do you guys think?
+>> 
+>> Arun
+>> 
+>> 
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131023/11eae525/attachment-0001.html>
+
+From FErickson at psu.edu  Fri Oct 25 03:14:20 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Thu, 24 Oct 2013 21:14:20 -0400
+Subject: [datatable-help] possible FR: row.names=FALSE option for
+	print.data.table
+Message-ID: <CAJd-hd=Hmynz8L+sY=ay-VAkKHqPAXphxnxWA8k6stN2i8=-OQ@mail.gmail.com>
+
+Hi,
+
+I like to lazily copy-paste stuff from the R console into documents. With a
+data.frame, I can turn off row numbers or names with the option in the
+title.
+
+Maybe it would be useful to have this for data.tables as well? Compare:
+
+print(data.table(1))
+print.data.frame(data.table(1),row.names=FALSE)
+
+As you can see, there's already a workaround.
+
+Let me know if it would be better to just post suggestions like this on the
+tracker. I figure I should run them by you all since (1) maybe I'm missing
+something and (2) I've only used the tracker when referred by someone on
+the dev team.
+
+--Frank
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131024/ad3c85bb/attachment.html>
+
+From aragorn168b at gmail.com  Fri Oct 25 08:14:44 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Fri, 25 Oct 2013 08:14:44 +0200
+Subject: [datatable-help] possible FR:
+ =?utf-8?Q?row.names=3DFALSE_?=option for print.data.table
+In-Reply-To: <CAJd-hd=Hmynz8L+sY=ay-VAkKHqPAXphxnxWA8k6stN2i8=-OQ@mail.gmail.com>
+References: <CAJd-hd=Hmynz8L+sY=ay-VAkKHqPAXphxnxWA8k6stN2i8=-OQ@mail.gmail.com>
+Message-ID: <EC348D457ABD49B297E5478F1893E775@gmail.com>
+
+Frank, 
+Seems a nice feature. You should add a FR.
+
+Arun
+
+
+On Friday, October 25, 2013 at 3:14 AM, Frank Erickson wrote:
+
+> Hi,
+> 
+> I like to lazily copy-paste stuff from the R console into documents. With a data.frame, I can turn off row numbers or names with the option in the title.
+> 
+> Maybe it would be useful to have this for data.tables as well? Compare: 
+> 
+> print(data.table(1))
+> print.data.frame(data.table(1),row.names=FALSE) 
+> 
+> As you can see, there's already a workaround.
+> 
+> Let me know if it would be better to just post suggestions like this on the tracker. I figure I should run them by you all since (1) maybe I'm missing something and (2) I've only used the tracker when referred by someone on the dev team. 
+> 
+> --Frank 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131025/20307363/attachment.html>
+
+From cedric.duprez at ign.fr  Sun Oct 27 09:37:33 2013
+From: cedric.duprez at ign.fr (cduprez)
+Date: Sun, 27 Oct 2013 01:37:33 -0700 (PDT)
+Subject: [datatable-help] Update data.table columns by multiplication of
+	another column
+Message-ID: <1382863053050-4679124.post@n4.nabble.com>
+
+Hi all,
+
+I am trying to update columns of a data.table, whose names are in a vector,
+by multiplicating their values with the values of another column (whose name
+is in another vector).
+Example : 
+dt <- data.table(a=c(1, 1, 1, 1, 1), b=c(2, 2, 2, 2, 2), c=c(3, 3, 3, 3, 3),
+d=c(4, 4, 4, 4, 4), e=c(5, 5, 5, 5, 5), coef = c(1, 2, 3, 4, 5))
+v <- c("b", "c")
+coef <- c("coef")
+
+dt
+   a b c d e coef
+1: 1 2 3 4 5    1
+2: 1 2 3 4 5    2
+3: 1 2 3 4 5    3
+4: 1 2 3 4 5    4
+5: 1 2 3 4 5    5
+
+And what I am looking for, as result, is : b = b*coef, c = c*coef
+   a b c d e coef
+1: 1 2 3 4 5    1
+2: 1 4 6 4 5    2
+3: 1 6 9 4 5    3
+4: 1 8 12 4 5    4
+5: 1 10 15 4 5    5
+
+How can I compute that result by keeping the columns to update and the coef
+column in character vectors containing the columns names.
+I precise that the coef vector still contains only one column name.
+
+Thanks in advance for you help.
+
+Regards,
+
+Cedric
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Update-data-table-columns-by-multiplication-of-another-column-tp4679124.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From aragorn168b at gmail.com  Sun Oct 27 10:54:28 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Sun, 27 Oct 2013 10:54:28 +0100
+Subject: [datatable-help] Update data.table columns by multiplication of
+ another column
+In-Reply-To: <1382863053050-4679124.post@n4.nabble.com>
+References: <1382863053050-4679124.post@n4.nabble.com>
+Message-ID: <2F2D553477CC4E5A833B5F5DA8F3E537@gmail.com>
+
+How about this?
+for (j in v) set(dt, i=NULL, j=j, dt[[j]]*dt[[coeff]]) 
+
+Arun
+
+
+On Sunday, October 27, 2013 at 9:37 AM, cduprez wrote:
+
+> Hi all,
+> 
+> I am trying to update columns of a data.table, whose names are in a vector,
+> by multiplicating their values with the values of another column (whose name
+> is in another vector).
+> Example : 
+> dt <- data.table(a=c(1, 1, 1, 1, 1), b=c(2, 2, 2, 2, 2), c=c(3, 3, 3, 3, 3),
+> d=c(4, 4, 4, 4, 4), e=c(5, 5, 5, 5, 5), coef = c(1, 2, 3, 4, 5))
+> v <- c("b", "c")
+> coef <- c("coef")
+> 
+> dt
+> a b c d e coef
+> 1: 1 2 3 4 5 1
+> 2: 1 2 3 4 5 2
+> 3: 1 2 3 4 5 3
+> 4: 1 2 3 4 5 4
+> 5: 1 2 3 4 5 5
+> 
+> And what I am looking for, as result, is : b = b*coef, c = c*coef
+> a b c d e coef
+> 1: 1 2 3 4 5 1
+> 2: 1 4 6 4 5 2
+> 3: 1 6 9 4 5 3
+> 4: 1 8 12 4 5 4
+> 5: 1 10 15 4 5 5
+> 
+> How can I compute that result by keeping the columns to update and the coef
+> column in character vectors containing the columns names.
+> I precise that the coef vector still contains only one column name.
+> 
+> Thanks in advance for you help.
+> 
+> Regards,
+> 
+> Cedric
+> 
+> 
+> 
+> --
+> View this message in context: http://r.789695.n4.nabble.com/Update-data-table-columns-by-multiplication-of-another-column-tp4679124.html
+> Sent from the datatable-help mailing list archive at Nabble.com (http://Nabble.com).
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> 
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131027/7c3c86b3/attachment.html>
+
+From aragorn168b at gmail.com  Sun Oct 27 10:58:33 2013
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Sun, 27 Oct 2013 10:58:33 +0100
+Subject: [datatable-help] Update data.table columns by multiplication of
+ another column
+In-Reply-To: <2F2D553477CC4E5A833B5F5DA8F3E537@gmail.com>
+References: <1382863053050-4679124.post@n4.nabble.com>
+ <2F2D553477CC4E5A833B5F5DA8F3E537@gmail.com>
+Message-ID: <ACD0D0156D8B489793097B093B4E89BE@gmail.com>
+
+I realise that if you may be using 1.8.10 (and not dev. version 1.8.11), you may have to provide column indices to "j" instead of column names. So this should work:
+
+for(j in which(names(dt) %chin% v)) set(dt, i=NULL, j=j, dt[[j]]*dt[[coef]]) 
+
+Arun
+
+
+On Sunday, October 27, 2013 at 10:54 AM, Arunkumar Srinivasan wrote:
+
+> How about this?
+> for (j in v) set(dt, i=NULL, j=j, dt[[j]]*dt[[coeff]]) 
+> 
+> Arun
+> 
+> 
+> On Sunday, October 27, 2013 at 9:37 AM, cduprez wrote:
+> 
+> > Hi all,
+> > 
+> > I am trying to update columns of a data.table, whose names are in a vector,
+> > by multiplicating their values with the values of another column (whose name
+> > is in another vector).
+> > Example : 
+> > dt <- data.table(a=c(1, 1, 1, 1, 1), b=c(2, 2, 2, 2, 2), c=c(3, 3, 3, 3, 3),
+> > d=c(4, 4, 4, 4, 4), e=c(5, 5, 5, 5, 5), coef = c(1, 2, 3, 4, 5))
+> > v <- c("b", "c")
+> > coef <- c("coef")
+> > 
+> > dt
+> > a b c d e coef
+> > 1: 1 2 3 4 5 1
+> > 2: 1 2 3 4 5 2
+> > 3: 1 2 3 4 5 3
+> > 4: 1 2 3 4 5 4
+> > 5: 1 2 3 4 5 5
+> > 
+> > And what I am looking for, as result, is : b = b*coef, c = c*coef
+> > a b c d e coef
+> > 1: 1 2 3 4 5 1
+> > 2: 1 4 6 4 5 2
+> > 3: 1 6 9 4 5 3
+> > 4: 1 8 12 4 5 4
+> > 5: 1 10 15 4 5 5
+> > 
+> > How can I compute that result by keeping the columns to update and the coef
+> > column in character vectors containing the columns names.
+> > I precise that the coef vector still contains only one column name.
+> > 
+> > Thanks in advance for you help.
+> > 
+> > Regards,
+> > 
+> > Cedric
+> > 
+> > 
+> > 
+> > --
+> > View this message in context: http://r.789695.n4.nabble.com/Update-data-table-columns-by-multiplication-of-another-column-tp4679124.html
+> > Sent from the datatable-help mailing list archive at Nabble.com (http://Nabble.com).
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org (mailto:datatable-help at lists.r-forge.r-project.org)
+> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> > 
+> > 
+> > 
+> 
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131027/910e802e/attachment.html>
+
+From cedric.duprez at ign.fr  Sun Oct 27 19:32:45 2013
+From: cedric.duprez at ign.fr (cduprez)
+Date: Sun, 27 Oct 2013 11:32:45 -0700 (PDT)
+Subject: [datatable-help] Update data.table columns by multiplication of
+	another column
+In-Reply-To: <ACD0D0156D8B489793097B093B4E89BE@gmail.com>
+References: <1382863053050-4679124.post@n4.nabble.com>
+ <2F2D553477CC4E5A833B5F5DA8F3E537@gmail.com>
+ <ACD0D0156D8B489793097B093B4E89BE@gmail.com>
+Message-ID: <1382898765021-4679140.post@n4.nabble.com>
+
+Absolutely perfect!
+
+Thanks a lot!
+
+Regards,
+Cedric
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Update-data-table-columns-by-multiplication-of-another-column-tp4679124p4679140.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From dila_radi21 at yahoo.com  Mon Oct 28 07:18:40 2013
+From: dila_radi21 at yahoo.com (dila radi)
+Date: Sun, 27 Oct 2013 23:18:40 -0700 (PDT)
+Subject: [datatable-help] Problem in reading the data set
+Message-ID: <1382941119736-4679156.post@n4.nabble.com>
+
+Hi all,
+
+I have this kind of data. The data consist from year 1971-2000.
+
+Station	Station ID Year Month Day Rainfall Amount(mm)
+Kuantan	48657	71	1	1	125
+Kuantan	48657	71	1	2	130.3
+Kuantan	48657	71	1	3	327.2
+Kuantan	48657	71	1	4	252.2
+Kuantan	48657	71	1	5	33.8
+Kuantan	48657	71	1	6	6.1
+Kuantan	48657	71	1	7	5.1
+
+................................................................
+..............................................................
+................................................................
+................................................................
+
+Kuantan	48657	00	12	24	0
+Kuantan	48657	00	12	25	2.7
+Kuantan	48657	00	12	26	0
+Kuantan	48657	00	12	27	0
+Kuantan	48657	00	12	28	20
+Kuantan	48657	00	12	29	15.5
+Kuantan	48657	00	12	30	6.4
+Kuantan	48657	00	12	31	9.3
+
+When I run for the Summary, the third column (year) give the output as
+below:
+
+Year
+Min.   : 0.00   
+1st Qu.:77.00   
+Median :84.00  
+Mean   :82.16   
+3rd Qu.:92.00   
+Max.   :99.00   
+
+The minimum should be 1971 and maximum is 2000. But R misinterpret 2000 as
+00 value.
+How I want to solve this?
+
+Thank you in advance.
+
+Regards,
+Dila.
+
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Problem-in-reading-the-data-set-tp4679156.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From FErickson at psu.edu  Mon Oct 28 09:00:05 2013
+From: FErickson at psu.edu (Frank Erickson)
+Date: Mon, 28 Oct 2013 04:00:05 -0400
+Subject: [datatable-help] Problem in reading the data set
+In-Reply-To: <1382941119736-4679156.post@n4.nabble.com>
+References: <1382941119736-4679156.post@n4.nabble.com>
+Message-ID: <CAJd-hdnutN1PC--9ohxQSUhgM3U3ogOkZNa=0cTP8MpaMoCjEg@mail.gmail.com>
+
+Hi Dila,
+
+I think you have the wrong mailing list; this one is specifically for the
+data.table package. You can see some other mailing lists here:
+http://r.789695.n4.nabble.com/R-f789695.subapps.html
+
+Since you only have one year to change, you can do something like
+
+dat$Year <- ifelse(dat$Year==0,2000L,as.integer(dat$Year)+1900L)
+
+You should run the right-hand side on its own first to make sure that it is
+giving the correct result. The <- will overwrite the original column, and
+the L and as.integer ensure that you store the new column as an integer.
+
+For documentation, see for example help("<-") and help("ifelse")
+
+Best,
+
+Frank
+
+
+On Mon, Oct 28, 2013 at 2:18 AM, dila radi <dila_radi21 at yahoo.com> wrote:
+
+> Hi all,
+>
+> I have this kind of data. The data consist from year 1971-2000.
+>
+> Station Station ID Year Month Day Rainfall Amount(mm)
+> Kuantan 48657   71      1       1       125
+> Kuantan 48657   71      1       2       130.3
+> Kuantan 48657   71      1       3       327.2
+> Kuantan 48657   71      1       4       252.2
+> Kuantan 48657   71      1       5       33.8
+> Kuantan 48657   71      1       6       6.1
+> Kuantan 48657   71      1       7       5.1
+>
+> ................................................................
+> ..............................................................
+> ................................................................
+> ................................................................
+>
+> Kuantan 48657   00      12      24      0
+> Kuantan 48657   00      12      25      2.7
+> Kuantan 48657   00      12      26      0
+> Kuantan 48657   00      12      27      0
+> Kuantan 48657   00      12      28      20
+> Kuantan 48657   00      12      29      15.5
+> Kuantan 48657   00      12      30      6.4
+> Kuantan 48657   00      12      31      9.3
+>
+> When I run for the Summary, the third column (year) give the output as
+> below:
+>
+> Year
+> Min.   : 0.00
+> 1st Qu.:77.00
+> Median :84.00
+> Mean   :82.16
+> 3rd Qu.:92.00
+> Max.   :99.00
+>
+> The minimum should be 1971 and maximum is 2000. But R misinterpret 2000 as
+> 00 value.
+> How I want to solve this?
+>
+> Thank you in advance.
+>
+> Regards,
+> Dila.
+>
+>
+>
+>
+> --
+> View this message in context:
+> http://r.789695.n4.nabble.com/Problem-in-reading-the-data-set-tp4679156.html
+> Sent from the datatable-help mailing list archive at Nabble.com.
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131028/cf18fe99/attachment.html>
+
+From caneff at gmail.com  Tue Oct 29 18:47:25 2013
+From: caneff at gmail.com (Chris Neff)
+Date: Tue, 29 Oct 2013 13:47:25 -0400
+Subject: [datatable-help] rbindlist(x) doesn't behave like rbind for all
+	null lists
+Message-ID: <CAAuY0RVX17X8=DKC+km25Loy1-Rx63PexDw-sEn8m7Sj-1_J7A@mail.gmail.com>
+
+Simple thing:
+
+dt <- rbindlist(list(NULL, NULL)) #dt is a data.table with 0 rows and
+columns
+
+is.null(dt) # Prints false
+
+d <- rbind(NULL, NULL)  #d is NULL
+
+is.null(d) # Prints true
+
+
+I would expect the two to be equivalent.  This bit me when I was relying on
+!is.null(dt) before assigning other columns in the data.table.  rbindlist
+should return NULL in this case I would think.
+
+Is this working as intended? Or should I file a bug?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131029/077d5419/attachment.html>
+
+From eduard.antonyan at gmail.com  Tue Oct 29 19:01:14 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Tue, 29 Oct 2013 13:01:14 -0500
+Subject: [datatable-help] rbindlist(x) doesn't behave like rbind for all
+ null lists
+In-Reply-To: <CAAuY0RVX17X8=DKC+km25Loy1-Rx63PexDw-sEn8m7Sj-1_J7A@mail.gmail.com>
+References: <CAAuY0RVX17X8=DKC+km25Loy1-Rx63PexDw-sEn8m7Sj-1_J7A@mail.gmail.com>
+Message-ID: <CAHZcBOpcbj+CAZ_n1yYBBkNA7UnJUj4hBRRvz1FmUD4dsMFrQQ@mail.gmail.com>
+
+This is by design, and is not a bug.
+
+If you try
+
+    data.table:::.rbind.data.table(NULL, NULL)
+
+in version 1.8.10 you will also get a 0-size data.table in agreement with
+rbindlist (if you try the above in the very latest version, you will get an
+error, and I may change that to be same as 1.8.10 - but it doesn't matter
+much, as you can't get there unless you use ":::", and then all bets are
+off anyway). Both are supposed to always return data.tables.
+
+The reason you're getting something else with rbind(NULL, NULL) is because
+those NULL's are not data.tables, so a *different* rbind is called, which
+has nothing to do with data.table.
+
+
+
+On Tue, Oct 29, 2013 at 12:47 PM, Chris Neff <caneff at gmail.com> wrote:
+
+> Simple thing:
+>
+> dt <- rbindlist(list(NULL, NULL)) #dt is a data.table with 0 rows and
+> columns
+>
+> is.null(dt) # Prints false
+>
+> d <- rbind(NULL, NULL)  #d is NULL
+>
+> is.null(d) # Prints true
+>
+>
+> I would expect the two to be equivalent.  This bit me when I was relying
+> on !is.null(dt) before assigning other columns in the data.table.
+>  rbindlist should return NULL in this case I would think.
+>
+> Is this working as intended? Or should I file a bug?
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131029/8a7a5ecb/attachment.html>
+
+From eduard.antonyan at gmail.com  Tue Oct 29 19:11:10 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Tue, 29 Oct 2013 13:11:10 -0500
+Subject: [datatable-help] rbindlist(x) doesn't behave like rbind for all
+ null lists
+In-Reply-To: <CAHZcBOpcbj+CAZ_n1yYBBkNA7UnJUj4hBRRvz1FmUD4dsMFrQQ@mail.gmail.com>
+References: <CAAuY0RVX17X8=DKC+km25Loy1-Rx63PexDw-sEn8m7Sj-1_J7A@mail.gmail.com>
+ <CAHZcBOpcbj+CAZ_n1yYBBkNA7UnJUj4hBRRvz1FmUD4dsMFrQQ@mail.gmail.com>
+Message-ID: <CAHZcBOoVjz=frQ0uVqGTHkbcPiz2WS4e05s0JLu6FJKSPjfxMQ@mail.gmail.com>
+
+perhaps you can use length() == 0 instead of is.null() for your purposes
+
+
+On Tue, Oct 29, 2013 at 1:01 PM, Eduard Antonyan
+<eduard.antonyan at gmail.com>wrote:
+
+> This is by design, and is not a bug.
+>
+> If you try
+>
+>     data.table:::.rbind.data.table(NULL, NULL)
+>
+> in version 1.8.10 you will also get a 0-size data.table in agreement with
+> rbindlist (if you try the above in the very latest version, you will get an
+> error, and I may change that to be same as 1.8.10 - but it doesn't matter
+> much, as you can't get there unless you use ":::", and then all bets are
+> off anyway). Both are supposed to always return data.tables.
+>
+> The reason you're getting something else with rbind(NULL, NULL) is because
+> those NULL's are not data.tables, so a *different* rbind is called, which
+> has nothing to do with data.table.
+>
+>
+>
+> On Tue, Oct 29, 2013 at 12:47 PM, Chris Neff <caneff at gmail.com> wrote:
+>
+>> Simple thing:
+>>
+>> dt <- rbindlist(list(NULL, NULL)) #dt is a data.table with 0 rows and
+>> columns
+>>
+>> is.null(dt) # Prints false
+>>
+>> d <- rbind(NULL, NULL)  #d is NULL
+>>
+>> is.null(d) # Prints true
+>>
+>>
+>> I would expect the two to be equivalent.  This bit me when I was relying
+>> on !is.null(dt) before assigning other columns in the data.table.
+>>  rbindlist should return NULL in this case I would think.
+>>
+>> Is this working as intended? Or should I file a bug?
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131029/6ed75f12/attachment.html>
+
+From caneff at gmail.com  Tue Oct 29 20:17:43 2013
+From: caneff at gmail.com (caneff at gmail.com)
+Date: Tue, 29 Oct 2013 19:17:43 +0000
+Subject: [datatable-help] rbindlist(x) doesn't behave like rbind for all
+ null lists
+References: <CAAuY0RVX17X8=DKC+km25Loy1-Rx63PexDw-sEn8m7Sj-1_J7A@mail.gmail.com>
+ <CAHZcBOpcbj+CAZ_n1yYBBkNA7UnJUj4hBRRvz1FmUD4dsMFrQQ@mail.gmail.com>
+ <CAHZcBOoVjz=frQ0uVqGTHkbcPiz2WS4e05s0JLu6FJKSPjfxMQ@mail.gmail.com>
+Message-ID: <1895142357102799182@gmail297201516>
+
+Yes I can. I suppose the actual inconsistency lies in rbind.data.frame
+then. It doesn't follow the same guarantee of "always outputs a
+data.table". Otherwise
+
+rbind(NULL, NULL)
+
+and
+
+data.frame(NULL)
+
+would have the same result.
+
+
+Maybe I would wonder if calling it a "null data.table" is the right
+terminology, since it really is just an empty data.table.  A null
+data.table would imply that is.null would be true.
+
+On Tue Oct 29 2013 at 2:11:30 PM, Eduard Antonyan <eduard.antonyan at gmail.com>
+wrote:
+
+> perhaps you can use length() == 0 instead of is.null() for your purposes
+>
+>
+> On Tue, Oct 29, 2013 at 1:01 PM, Eduard Antonyan <
+> eduard.antonyan at gmail.com> wrote:
+>
+> This is by design, and is not a bug.
+>
+> If you try
+>
+>     data.table:::.rbind.data.table(NULL, NULL)
+>
+> in version 1.8.10 you will also get a 0-size data.table in agreement with
+> rbindlist (if you try the above in the very latest version, you will get an
+> error, and I may change that to be same as 1.8.10 - but it doesn't matter
+> much, as you can't get there unless you use ":::", and then all bets are
+> off anyway). Both are supposed to always return data.tables.
+>
+> The reason you're getting something else with rbind(NULL, NULL) is because
+> those NULL's are not data.tables, so a *different* rbind is called, which
+> has nothing to do with data.table.
+>
+>
+>
+> On Tue, Oct 29, 2013 at 12:47 PM, Chris Neff <caneff at gmail.com> wrote:
+>
+> Simple thing:
+>
+> dt <- rbindlist(list(NULL, NULL)) #dt is a data.table with 0 rows and
+> columns
+>
+> is.null(dt) # Prints false
+>
+> d <- rbind(NULL, NULL)  #d is NULL
+>
+> is.null(d) # Prints true
+>
+>
+> I would expect the two to be equivalent.  This bit me when I was relying
+> on !is.null(dt) before assigning other columns in the data.table.
+>  rbindlist should return NULL in this case I would think.
+>
+> Is this working as intended? Or should I file a bug?
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131029/dbc1758e/attachment.html>
+
+From eduard.antonyan at gmail.com  Tue Oct 29 20:26:42 2013
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Tue, 29 Oct 2013 14:26:42 -0500
+Subject: [datatable-help] rbindlist(x) doesn't behave like rbind for all
+ null lists
+In-Reply-To: <1895142357102799182@gmail297201516>
+References: <CAAuY0RVX17X8=DKC+km25Loy1-Rx63PexDw-sEn8m7Sj-1_J7A@mail.gmail.com>
+ <CAHZcBOpcbj+CAZ_n1yYBBkNA7UnJUj4hBRRvz1FmUD4dsMFrQQ@mail.gmail.com>
+ <CAHZcBOoVjz=frQ0uVqGTHkbcPiz2WS4e05s0JLu6FJKSPjfxMQ@mail.gmail.com>
+ <1895142357102799182@gmail297201516>
+Message-ID: <CAHZcBOoMDLvBdoQmjyxekprXgViaXmYPc0ZiZ_-MTUwcbxfHEw@mail.gmail.com>
+
+data.frame does the same thing:
+
+  > rbind.data.frame(NULL, NULL)
+  data frame with 0 columns and 0 rows
+  > data.frame(NULL)
+  data frame with 0 columns and 0 rows
+
+rbind(NULL, NULL) is just a different beast.
+
+A part of me want to have an is.null generic function, but then it's not
+clear how you'd check for NULL.
+
+
+
+On Tue, Oct 29, 2013 at 2:17 PM, caneff at gmail.com <caneff at gmail.com> wrote:
+
+> Yes I can. I suppose the actual inconsistency lies in rbind.data.frame
+> then. It doesn't follow the same guarantee of "always outputs a
+> data.table". Otherwise
+>
+> rbind(NULL, NULL)
+>
+> and
+>
+> data.frame(NULL)
+>
+> would have the same result.
+>
+>
+> Maybe I would wonder if calling it a "null data.table" is the right
+> terminology, since it really is just an empty data.table.  A null
+> data.table would imply that is.null would be true.
+>
+> On Tue Oct 29 2013 at 2:11:30 PM, Eduard Antonyan <
+> eduard.antonyan at gmail.com> wrote:
+>
+>> perhaps you can use length() == 0 instead of is.null() for your purposes
+>>
+>>
+>> On Tue, Oct 29, 2013 at 1:01 PM, Eduard Antonyan <
+>> eduard.antonyan at gmail.com> wrote:
+>>
+>> This is by design, and is not a bug.
+>>
+>> If you try
+>>
+>>     data.table:::.rbind.data.table(NULL, NULL)
+>>
+>> in version 1.8.10 you will also get a 0-size data.table in agreement with
+>> rbindlist (if you try the above in the very latest version, you will get an
+>> error, and I may change that to be same as 1.8.10 - but it doesn't matter
+>> much, as you can't get there unless you use ":::", and then all bets are
+>> off anyway). Both are supposed to always return data.tables.
+>>
+>> The reason you're getting something else with rbind(NULL, NULL) is
+>> because those NULL's are not data.tables, so a *different* rbind is called,
+>> which has nothing to do with data.table.
+>>
+>>
+>>
+>> On Tue, Oct 29, 2013 at 12:47 PM, Chris Neff <caneff at gmail.com> wrote:
+>>
+>> Simple thing:
+>>
+>> dt <- rbindlist(list(NULL, NULL)) #dt is a data.table with 0 rows and
+>> columns
+>>
+>> is.null(dt) # Prints false
+>>
+>> d <- rbind(NULL, NULL)  #d is NULL
+>>
+>> is.null(d) # Prints true
+>>
+>>
+>> I would expect the two to be equivalent.  This bit me when I was relying
+>> on !is.null(dt) before assigning other columns in the data.table.
+>>  rbindlist should return NULL in this case I would think.
+>>
+>> Is this working as intended? Or should I file a bug?
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>>
+>>
+>>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20131029/ecdddc1d/attachment-0001.html>
+

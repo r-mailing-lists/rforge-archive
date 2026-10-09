@@ -1,0 +1,5268 @@
+From mdowle at mdowle.plus.com  Sun Mar  2 13:26:42 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Sun, 02 Mar 2014 12:26:42 +0000
+Subject: [datatable-help] integer64 group by doesn't find all groups
+In-Reply-To: <CAO=aP+dZmtC5d1c62dTeSfDRSn0Fb_XWstpRA6kA5uTd=eaS5w@mail.gmail.com>
+References: <CAO=aP+fO5r+LzChLDCJAW42JVznho2rAKxY6Mw+k_4PVbOb4AQ@mail.gmail.com>	<52FB9FC2.4000305@mdowle.plus.com>	<CAAuY0RWEqyVHmmd29hZwjPsNvt76frsJ+Jc9DFiifVNFHWutzA@mail.gmail.com>	<52FBA3D0.60109@mdowle.plus.com>	<CAAuY0RVqNdVo1MERu1WjDeO+=ffpo2DEuFN_TSR7zeDniEYx8A@mail.gmail.com>
+ <CAO=aP+dZmtC5d1c62dTeSfDRSn0Fb_XWstpRA6kA5uTd=eaS5w@mail.gmail.com>
+Message-ID: <53132382.9000404@mdowle.plus.com>
+
+
+On 14/02/14 15:07, Yike Lu wrote:
+> Thanks for the info guys! Wondering if there's any way I can help?
+
+Thanks for your offer.  The function iradix in forder.c needs copying 
+and tweaking to become i64radix (8 passes instead of 4), or making 
+general so that 4 or 8 can be passed in. Should also check first how the 
+bit64 package sorts integer64. Then in bmerge.c add a case to the switch 
+for integer64 to cast to long long,  add tests to tests.Rraw for 
+grouping and joining, update documentation (.Rd) files and add checks to 
+init.c.
+
+Is that something you could do?  If you are rusty on C I don't mind 
+guiding you through.
+
+Matt
+
+>
+>
+> On Wed, Feb 12, 2014 at 11:17 AM, caneff at gmail.com 
+> <mailto:caneff at gmail.com> <caneff at gmail.com <mailto:caneff at gmail.com>> 
+> wrote:
+>
+>     Yes this isn't a data.table criticism, just a bit64 one in general.
+>
+>
+>     On Wed Feb 12 2014 at 11:39:47 AM, Matt Dowle
+>     <mdowle at mdowle.plus.com <mailto:mdowle at mdowle.plus.com>> wrote:
+>
+>
+>         Sometimes we take the hard road in data.table, to get to a
+>         better place.  Once bit64::integer64 is fully supported, it'll
+>         be much easier.   All the recent radix work for double applies
+>         almost automatically to integer64 for example,  but that radix
+>         work had to be done first.
+>
+>
+>         On 12/02/14 16:26, caneff at gmail.com <mailto:caneff at gmail.com>
+>         wrote:
+>>         FYI (and this is a long outstanding argument) this is why I
+>>         don't like the bit64 package.  These sorts of errors happen
+>>         silently.  I understand that data.table can't use the other
+>>         integer64 package, but at least there it is obvious when
+>>         things are being coerced.
+>>
+>>         In my situations, if I am grouping by a int64, it is usually
+>>         either an ID so I can just make it a character vector
+>>         instead, or it is something where I don't mind lost precision
+>>         so I just make it numeric.
+>>
+>>         On Wed Feb 12 2014 at 11:22:40 AM, Matt Dowle
+>>         <mdowle at mdowle.plus.com <mailto:mdowle at mdowle.plus.com>> wrote:
+>>
+>>
+>>             Hi,
+>>
+>>             You're doing nothing wrong.  Although you can load
+>>             integer64 using fread
+>>             and create them directly,  data.table's grouping and keys
+>>             don't work on
+>>             them yet.  Sorry,  just not yet implemented. Because
+>>             integer64 are
+>>             internally stored as type double  (a good idea by package
+>>             bit64),
+>>             data.table sees them internally as double and doesn't
+>>             catch that the
+>>             type isn't supported yet (hence no error message such as
+>>             you get for
+>>             type 'complex').   The particular integer64 numbers in
+>>             this example are
+>>             quite small so will use the lower bits.  In double, those
+>>             are the most
+>>             precise part of the significand, which would explain why
+>>             only one group
+>>             comes out here since data.table groups and joins floating
+>>             point data
+>>             within tolerance.
+>>
+>>             Matt
+>>
+>>             On 06/02/14 23:38, Yike Lu wrote:
+>>             > After a long hiatus, I am back to using data.table.
+>>             Unfortunately,
+>>             > I've encountered a problem. Am I doing something wrong
+>>             here?
+>>             >
+>>             > require(data.table)
+>>             >
+>>             > dt = data.table(idx = 1:100 %% 3, 1:100)
+>>             > dt[, list(sum(V2)), by = idx]
+>>             > # normal
+>>             >
+>>             > require(bit64)
+>>             >
+>>             > dt2 = data.table(idx = integer64(100) + 1:100 %% 3, 1:100)
+>>             > dt2[, list(sum(V2)), by = idx]
+>>             > # only has one group:
+>>             > #   idx   V1
+>>             > #1:   1 5050
+>>             >
+>>
+>>             _______________________________________________
+>>             datatable-help mailing list
+>>             datatable-help at lists.r-forge.r-project.org
+>>             <mailto:datatable-help at lists.r-forge.r-project.org>
+>>             https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140302/77eac0b3/attachment.html>
+
+From yikelu.home at gmail.com  Sun Mar  2 19:45:17 2014
+From: yikelu.home at gmail.com (Yike Lu)
+Date: Sun, 2 Mar 2014 12:45:17 -0600
+Subject: [datatable-help] integer64 group by doesn't find all groups
+In-Reply-To: <53132382.9000404@mdowle.plus.com>
+References: <CAO=aP+fO5r+LzChLDCJAW42JVznho2rAKxY6Mw+k_4PVbOb4AQ@mail.gmail.com>
+ <52FB9FC2.4000305@mdowle.plus.com>
+ <CAAuY0RWEqyVHmmd29hZwjPsNvt76frsJ+Jc9DFiifVNFHWutzA@mail.gmail.com>
+ <52FBA3D0.60109@mdowle.plus.com>
+ <CAAuY0RVqNdVo1MERu1WjDeO+=ffpo2DEuFN_TSR7zeDniEYx8A@mail.gmail.com>
+ <CAO=aP+dZmtC5d1c62dTeSfDRSn0Fb_XWstpRA6kA5uTd=eaS5w@mail.gmail.com>
+ <53132382.9000404@mdowle.plus.com>
+Message-ID: <CAO=aP+fmvqjmkTHO37JGVnHX_8utVVce1zQjS3W=f9infdzmDA@mail.gmail.com>
+
+Yes, I'm up for it. The C edits sound relatively straightforward actually.
+
+It's the other parts I'm not as familiar with: what's the SCM procedure,
+what's the build procedure going to be?
+
+
+On Sun, Mar 2, 2014 at 6:26 AM, Matt Dowle <mdowle at mdowle.plus.com> wrote:
+
+>
+> On 14/02/14 15:07, Yike Lu wrote:
+>
+> Thanks for the info guys! Wondering if there's any way I can help?
+>
+>
+> Thanks for your offer.  The function iradix in forder.c needs copying and
+> tweaking to become i64radix (8 passes instead of 4), or making general so
+> that 4 or 8 can be passed in. Should also check first how the bit64 package
+> sorts integer64. Then in bmerge.c add a case to the switch for integer64 to
+> cast to long long,  add tests to tests.Rraw for grouping and joining,
+> update documentation (.Rd) files and add checks to init.c.
+>
+> Is that something you could do?  If you are rusty on C I don't mind
+> guiding you through.
+>
+> Matt
+>
+>
+>
+>
+> On Wed, Feb 12, 2014 at 11:17 AM, caneff at gmail.com <caneff at gmail.com>wrote:
+>
+>> Yes this isn't a data.table criticism, just a bit64 one in general.
+>>
+>>
+>>  On Wed Feb 12 2014 at 11:39:47 AM, Matt Dowle <mdowle at mdowle.plus.com>
+>> wrote:
+>>
+>>>
+>>> Sometimes we take the hard road in data.table, to get to a better
+>>> place.  Once bit64::integer64 is fully supported, it'll be much easier.
+>>> All the recent radix work for double applies almost automatically to
+>>> integer64 for example,  but that radix work had to be done first.
+>>>
+>>>
+>>> On 12/02/14 16:26, caneff at gmail.com wrote:
+>>>
+>>> FYI (and this is a long outstanding argument) this is why I don't like
+>>> the bit64 package.  These sorts of errors happen silently.  I understand
+>>> that data.table can't use the other integer64 package, but at least there
+>>> it is obvious when things are being coerced.
+>>>
+>>>  In my situations, if I am grouping by a int64, it is usually either an
+>>> ID so I can just make it a character vector instead, or it is something
+>>> where I don't mind lost precision so I just make it numeric.
+>>>
+>>> On Wed Feb 12 2014 at 11:22:40 AM, Matt Dowle <mdowle at mdowle.plus.com>
+>>> wrote:
+>>>
+>>>
+>>> Hi,
+>>>
+>>> You're doing nothing wrong.  Although you can load integer64 using fread
+>>> and create them directly,  data.table's grouping and keys don't work on
+>>> them yet.  Sorry,  just not yet implemented. Because integer64 are
+>>> internally stored as type double  (a good idea by package bit64),
+>>> data.table sees them internally as double and doesn't catch that the
+>>> type isn't supported yet (hence no error message such as you get for
+>>> type 'complex').   The particular integer64 numbers in this example are
+>>> quite small so will use the lower bits.  In double, those are the most
+>>> precise part of the significand, which would explain why only one group
+>>> comes out here since data.table groups and joins floating point data
+>>> within tolerance.
+>>>
+>>> Matt
+>>>
+>>> On 06/02/14 23:38, Yike Lu wrote:
+>>> > After a long hiatus, I am back to using data.table. Unfortunately,
+>>> > I've encountered a problem. Am I doing something wrong here?
+>>> >
+>>> > require(data.table)
+>>> >
+>>> > dt = data.table(idx = 1:100 %% 3, 1:100)
+>>> > dt[, list(sum(V2)), by = idx]
+>>> > # normal
+>>> >
+>>> > require(bit64)
+>>> >
+>>> > dt2 = data.table(idx = integer64(100) + 1:100 %% 3, 1:100)
+>>> > dt2[, list(sum(V2)), by = idx]
+>>> > # only has one group:
+>>> > #   idx   V1
+>>> > #1:   1 5050
+>>> >
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>>
+>>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140302/fc28f75f/attachment-0001.html>
+
+From mdowle at mdowle.plus.com  Mon Mar  3 02:14:28 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Mon, 03 Mar 2014 01:14:28 +0000
+Subject: [datatable-help] integer64 group by doesn't find all groups
+In-Reply-To: <CAO=aP+fmvqjmkTHO37JGVnHX_8utVVce1zQjS3W=f9infdzmDA@mail.gmail.com>
+References: <CAO=aP+fO5r+LzChLDCJAW42JVznho2rAKxY6Mw+k_4PVbOb4AQ@mail.gmail.com>	<52FB9FC2.4000305@mdowle.plus.com>	<CAAuY0RWEqyVHmmd29hZwjPsNvt76frsJ+Jc9DFiifVNFHWutzA@mail.gmail.com>	<52FBA3D0.60109@mdowle.plus.com>	<CAAuY0RVqNdVo1MERu1WjDeO+=ffpo2DEuFN_TSR7zeDniEYx8A@mail.gmail.com>	<CAO=aP+dZmtC5d1c62dTeSfDRSn0Fb_XWstpRA6kA5uTd=eaS5w@mail.gmail.com>	<53132382.9000404@mdowle.plus.com>
+ <CAO=aP+fmvqjmkTHO37JGVnHX_8utVVce1zQjS3W=f9infdzmDA@mail.gmail.com>
+Message-ID: <5313D774.7060101@mdowle.plus.com>
+
+
+Great.  Just click 'join project', follow the instructions on the 
+R-Forge homepage to connect and then commit.  We can discuss the finer 
+points off-list.
+
+Matt
+
+On 02/03/14 18:45, Yike Lu wrote:
+> Yes, I'm up for it. The C edits sound relatively straightforward actually.
+>
+> It's the other parts I'm not as familiar with: what's the SCM 
+> procedure, what's the build procedure going to be?
+>
+>
+> On Sun, Mar 2, 2014 at 6:26 AM, Matt Dowle <mdowle at mdowle.plus.com 
+> <mailto:mdowle at mdowle.plus.com>> wrote:
+>
+>
+>     On 14/02/14 15:07, Yike Lu wrote:
+>>     Thanks for the info guys! Wondering if there's any way I can help?
+>
+>     Thanks for your offer.  The function iradix in forder.c needs
+>     copying and tweaking to become i64radix (8 passes instead of 4),
+>     or making general so that 4 or 8 can be passed in. Should also
+>     check first how the bit64 package sorts integer64. Then in
+>     bmerge.c add a case to the switch for integer64 to cast to long
+>     long,  add tests to tests.Rraw for grouping and joining, update
+>     documentation (.Rd) files and add checks to init.c.
+>
+>     Is that something you could do?  If you are rusty on C I don't
+>     mind guiding you through.
+>
+>     Matt
+>
+>
+>>
+>>
+>>     On Wed, Feb 12, 2014 at 11:17 AM, caneff at gmail.com
+>>     <mailto:caneff at gmail.com> <caneff at gmail.com
+>>     <mailto:caneff at gmail.com>> wrote:
+>>
+>>         Yes this isn't a data.table criticism, just a bit64 one in
+>>         general.
+>>
+>>
+>>         On Wed Feb 12 2014 at 11:39:47 AM, Matt Dowle
+>>         <mdowle at mdowle.plus.com <mailto:mdowle at mdowle.plus.com>> wrote:
+>>
+>>
+>>             Sometimes we take the hard road in data.table, to get to
+>>             a better place.  Once bit64::integer64 is fully
+>>             supported, it'll be much easier.   All the recent radix
+>>             work for double applies almost automatically to integer64
+>>             for example,  but that radix work had to be done first.
+>>
+>>
+>>             On 12/02/14 16:26, caneff at gmail.com
+>>             <mailto:caneff at gmail.com> wrote:
+>>>             FYI (and this is a long outstanding argument) this is
+>>>             why I don't like the bit64 package.  These sorts of
+>>>             errors happen silently.  I understand that data.table
+>>>             can't use the other integer64 package, but at least
+>>>             there it is obvious when things are being coerced.
+>>>
+>>>             In my situations, if I am grouping by a int64, it is
+>>>             usually either an ID so I can just make it a character
+>>>             vector instead, or it is something where I don't mind
+>>>             lost precision so I just make it numeric.
+>>>
+>>>             On Wed Feb 12 2014 at 11:22:40 AM, Matt Dowle
+>>>             <mdowle at mdowle.plus.com <mailto:mdowle at mdowle.plus.com>>
+>>>             wrote:
+>>>
+>>>
+>>>                 Hi,
+>>>
+>>>                 You're doing nothing wrong.  Although you can load
+>>>                 integer64 using fread
+>>>                 and create them directly,  data.table's grouping and
+>>>                 keys don't work on
+>>>                 them yet.  Sorry,  just not yet implemented. Because
+>>>                 integer64 are
+>>>                 internally stored as type double  (a good idea by
+>>>                 package bit64),
+>>>                 data.table sees them internally as double and
+>>>                 doesn't catch that the
+>>>                 type isn't supported yet (hence no error message
+>>>                 such as you get for
+>>>                 type 'complex').   The particular integer64 numbers
+>>>                 in this example are
+>>>                 quite small so will use the lower bits.  In double,
+>>>                 those are the most
+>>>                 precise part of the significand, which would explain
+>>>                 why only one group
+>>>                 comes out here since data.table groups and joins
+>>>                 floating point data
+>>>                 within tolerance.
+>>>
+>>>                 Matt
+>>>
+>>>                 On 06/02/14 23:38, Yike Lu wrote:
+>>>                 > After a long hiatus, I am back to using
+>>>                 data.table. Unfortunately,
+>>>                 > I've encountered a problem. Am I doing something
+>>>                 wrong here?
+>>>                 >
+>>>                 > require(data.table)
+>>>                 >
+>>>                 > dt = data.table(idx = 1:100 %% 3, 1:100)
+>>>                 > dt[, list(sum(V2)), by = idx]
+>>>                 > # normal
+>>>                 >
+>>>                 > require(bit64)
+>>>                 >
+>>>                 > dt2 = data.table(idx = integer64(100) + 1:100 %%
+>>>                 3, 1:100)
+>>>                 > dt2[, list(sum(V2)), by = idx]
+>>>                 > # only has one group:
+>>>                 > #   idx   V1
+>>>                 > #1:   1 5050
+>>>                 >
+>>>
+>>>                 _______________________________________________
+>>>                 datatable-help mailing list
+>>>                 datatable-help at lists.r-forge.r-project.org
+>>>                 <mailto:datatable-help at lists.r-forge.r-project.org>
+>>>                 https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>>
+>
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140303/69efc4e3/attachment.html>
+
+From mdowle at mdowle.plus.com  Mon Mar  3 14:37:55 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Mon, 03 Mar 2014 13:37:55 +0000
+Subject: [datatable-help] More info on GForce
+Message-ID: <531485B3.5090903@mdowle.plus.com>
+
+
+More background info and example of GForce :
+
+http://stackoverflow.com/a/22146905/403310
+
+Matt
+
+
+
+From sams.james at gmail.com  Wed Mar  5 00:49:50 2014
+From: sams.james at gmail.com (James Sams)
+Date: Tue, 04 Mar 2014 17:49:50 -0600
+Subject: [datatable-help] using a UPC as identifier broken in 1.9.2 (related
+ to 'tolerance of precision' NEWS item)
+Message-ID: <5316669E.7010303@gmail.com>
+
+I suspect there are plenty of data.table users that use UPCs and other 
+large integer-like doubles as identifiers in their data. Storing UPCs as 
+character data takes up an order of magnitude more space compared to a 
+double; not really an acceptable alternative for a 1.5 billion row 
+table, i.e. 10 GiB of RAM just for UPCs as doubles (*crosses fingers for 
+long vector support*).
+
+However, the newest data.table breaks that (see example below). The 
+developers are aware of this, but I guess speed for imprecise numbers is 
+a higher priority than proper results for people using data with large IDs.
+
+In any case, I thought people should be more aware of this, and maybe 
+someone would have a suggested workaround. I'm currently stuck at SVN 
+r1129 because I was hitting some crashing bugs in 1.8.10.
+
+For the interested, you can track the feature request at:
+https://r-forge.r-project.org/tracker/index.php?func=detail&aid=5369&group_id=240&atid=978
+
+The relevant NEWS item:
+> Numeric data is still joined and grouped within tolerance as before but instead of tolerance
+>       being sqrt(.Machine$double.eps) == 1.490116e-08 (the same as base::all.equal's default) the
+>       the significand is now rounded to the last 2 bytes, apx 11 s.f. This is more appropriate
+>       for large (1.23e20) and small (1.23e-20) numerics and is faster via a simple bit twiddle.
+>       A few functions provided a 'tolerance' argument but this wasn't being passed through so has
+>       been removed. We aim to add a global option (e.g. 2, 1 or 0 byte rounding) in a future release.
+
+
+library(data.table)
+DT <- data.table(upc = c(301426027592, 301426027593, 314775802939,
+                          314775802940, 314775803490, 314775803491,
+                          314775815510, 314775815511, 314933000171,
+                          314933000172), d=rnorm(10), key='upc')
+
+DT[, list(length=length(d)), keyby=upc]
+
+Output with 1.9.2 is:
+ > DT[, list(length=length(d)), keyby=upc]
+             upc length
+1: 301426027592      2
+2: 314775802939      2
+3: 314775803490      2
+4: 314775815510      2
+5: 314933000171      2
+
+Instead of:
+ > DT[, list(length=length(d)), keyby=upc]
+              upc length
+  1: 301426027592      1
+  2: 301426027593      1
+  3: 314775802939      1
+  4: 314775802940      1
+  5: 314775803490      1
+  6: 314775803491      1
+  7: 314775815510      1
+  8: 314775815511      1
+  9: 314933000171      1
+10: 314933000172      1
+
+
+From mdowle at mdowle.plus.com  Wed Mar  5 13:24:58 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Wed, 05 Mar 2014 12:24:58 +0000
+Subject: [datatable-help] using a UPC as identifier broken in 1.9.2
+ (related to 'tolerance of precision' NEWS item)
+In-Reply-To: <5316669E.7010303@gmail.com>
+References: <5316669E.7010303@gmail.com>
+Message-ID: <5317179A.9000906@mdowle.plus.com>
+
+On 04/03/14 23:49, James Sams wrote:
+> I suspect there are plenty of data.table users that use UPCs and other 
+> large integer-like doubles as identifiers in their data. Storing UPCs 
+> as character data takes up an order of magnitude more space compared 
+> to a double; not really an acceptable alternative for a 1.5 billion 
+> row table, i.e. 10 GiB of RAM just for UPCs as doubles (*crosses 
+> fingers for long vector support*).
+>
+> However, the newest data.table breaks that (see example below). The 
+> developers are aware of this, but I guess speed for imprecise numbers 
+> is a higher priority than proper results for people using data with 
+> large IDs.
+I knew of such ids but I hadn't fully connected that numeric was being 
+used for them currently which relied on the old value for tolerance.  In 
+my mind, such ids are what we've been working on integer64 for.  Which 
+is what the sweeping changes to sorting have been leading up to.  The 
+new radix sort for integer can now be applied to integer64 which is the 
+right type for UPCs it seems. Yike is having a look at that.   I'll see 
+if I can quickly add the option to do full 8 byte radix passes 
+optionally (it isn't just a single number somewhere otherwise the option 
+would have been trivial).
+
+Matt
+
+>
+> In any case, I thought people should be more aware of this, and maybe 
+> someone would have a suggested workaround. I'm currently stuck at SVN 
+> r1129 because I was hitting some crashing bugs in 1.8.10.
+>
+> For the interested, you can track the feature request at:
+> https://r-forge.r-project.org/tracker/index.php?func=detail&aid=5369&group_id=240&atid=978 
+>
+>
+> The relevant NEWS item:
+>> Numeric data is still joined and grouped within tolerance as before 
+>> but instead of tolerance
+>>       being sqrt(.Machine$double.eps) == 1.490116e-08 (the same as 
+>> base::all.equal's default) the
+>>       the significand is now rounded to the last 2 bytes, apx 11 s.f. 
+>> This is more appropriate
+>>       for large (1.23e20) and small (1.23e-20) numerics and is faster 
+>> via a simple bit twiddle.
+>>       A few functions provided a 'tolerance' argument but this wasn't 
+>> being passed through so has
+>>       been removed. We aim to add a global option (e.g. 2, 1 or 0 
+>> byte rounding) in a future release.
+>
+>
+> library(data.table)
+> DT <- data.table(upc = c(301426027592, 301426027593, 314775802939,
+>                          314775802940, 314775803490, 314775803491,
+>                          314775815510, 314775815511, 314933000171,
+>                          314933000172), d=rnorm(10), key='upc')
+>
+> DT[, list(length=length(d)), keyby=upc]
+>
+> Output with 1.9.2 is:
+> > DT[, list(length=length(d)), keyby=upc]
+>             upc length
+> 1: 301426027592      2
+> 2: 314775802939      2
+> 3: 314775803490      2
+> 4: 314775815510      2
+> 5: 314933000171      2
+>
+> Instead of:
+> > DT[, list(length=length(d)), keyby=upc]
+>              upc length
+>  1: 301426027592      1
+>  2: 301426027593      1
+>  3: 314775802939      1
+>  4: 314775802940      1
+>  5: 314775803490      1
+>  6: 314775803491      1
+>  7: 314775815510      1
+>  8: 314775815511      1
+>  9: 314933000171      1
+> 10: 314933000172      1
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help 
+>
+>
+
+
+From tobbenlorentzen at gmail.com  Wed Mar  5 16:49:12 2014
+From: tobbenlorentzen at gmail.com (tobbenlorentzen)
+Date: Wed, 05 Mar 2014 16:49:12 +0100
+Subject: [datatable-help] Stopping emails from data table help.
+Message-ID: <i0ef38hoic4mv5k4ac2nuu27.1394034552535@email.android.com>
+
+
+Hi person(s) in charge,
+
+I'm registeret to this list, but I do not want to receive emails. I successfully stopped receiving emails from R-help, but to stop receiving emails from data table help was difficult. ?Could someone help me solve the problem.
+
+Thank
+Torbj?rn
+
+Sendt fra en Samsung Mobil
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140305/02d0d545/attachment.html>
+
+From lianoglou.steve at gene.com  Wed Mar  5 18:15:57 2014
+From: lianoglou.steve at gene.com (Steve Lianoglou)
+Date: Wed, 5 Mar 2014 09:15:57 -0800
+Subject: [datatable-help] Stopping emails from data table help.
+In-Reply-To: <i0ef38hoic4mv5k4ac2nuu27.1394034552535@email.android.com>
+References: <i0ef38hoic4mv5k4ac2nuu27.1394034552535@email.android.com>
+Message-ID: <CAHA9McPuXPCAXy=P_+bdUTp6JWsk3KDfeDE_BwLW5O0KR-LKYQ@mail.gmail.com>
+
+Hi,
+
+On Wed, Mar 5, 2014 at 7:49 AM, tobbenlorentzen
+<tobbenlorentzen at gmail.com> wrote:
+>
+> Hi person(s) in charge,
+>
+> I'm registeret to this list, but I do not want to receive emails. I
+> successfully stopped receiving emails from R-help, but to stop receiving
+> emails from data table help was difficult.  Could someone help me solve the
+> problem.
+
+Have you gone to the mailman page for this list (the link is at the
+bottom of every email) and put your email in the box where it says "To
+unsubscribe from datatable-help, ..."?
+
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-steve
+
+-- 
+Steve Lianoglou
+Computational Biologist
+Genentech
+
+From fjbuch at gmail.com  Thu Mar  6 04:53:20 2014
+From: fjbuch at gmail.com (Farrel Buchinsky)
+Date: Wed, 5 Mar 2014 22:53:20 -0500
+Subject: [datatable-help] Odd problem using fread to read in a csv file: no
+	data, just headers
+Message-ID: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>
+
+Any idea why I am getting a data.table with headers only and zero data? How
+can I get around the problem.
+
+fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv", verbose=T)
+fails
+read.csv("http://www.cdc.gov/growthcharts/data/zscore/statage.csv") succeeds
+
+> statagecdc <- fread("
+http://www.cdc.gov/growthcharts/data/zscore/statage.csv", verbose=T)
+trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+opened URL
+downloaded 64 Kb
+
+Input contains no \n. Taking this to be a filename to open
+File opened, filesize is  6.2E-05B
+File is opened and mapped ok
+Detected eol as \r only (no \n afterwards). An old Mac 9 standard,
+discontinued in 2002 according to Wikipedia.
+Using line 1 to detect sep (the last non blank line in the first
+'autostart') ... sep=','
+Found 14 columns
+First row with 14 fields occurs on line 1 (either column names or first row
+of data)
+All the fields on line 1 are character fields. Treating as the column names.
+Byte after header row is eof or eol, 0 data rows present.
+Type codes: 00000000000000 (first 5 rows)
+Type codes: 00000000000000 (after applying colClasses and integer64)
+Type codes: 00000000000000 (after applying drop or select (if supplied)
+Allocating 14 column slots (14 - 0 NULL)
+   0.000s (  0%) Memory map (rerun may be quicker)
+   0.000s (  0%) sep and header detection
+   0.001s (100%) Count rows (wc -l)
+   0.000s (  0%) Column type detection (first, middle and last 5 rows)
+   0.000s (  0%) Allocation of 0x14 result (xMB) in RAM
+   0.000s (  0%) Reading data
+   0.000s (  0%) Allocation for type bumps (if any), including gc time if
+triggered
+   0.000s (  0%) Coercing data already read in type bumps (if any)
+   0.000s (  0%) Changing na.strings to NA
+   0.001s        Total
+
+
+Thanks a lot.
+
+Farrel Buchinsky
+Google Voice Tel: (412) 567-7870
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140305/97c7fc99/attachment.html>
+
+From kevinushey at gmail.com  Thu Mar  6 04:55:57 2014
+From: kevinushey at gmail.com (Kevin Ushey)
+Date: Wed, 5 Mar 2014 19:55:57 -0800
+Subject: [datatable-help] Odd problem using fread to read in a csv file:
+ no data, just headers
+In-Reply-To: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>
+References: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>
+Message-ID: <CAJXgQP2g+0dVgy+yk38jq0NNm7OJnR2ESoJEkx7P5tTqYbe_+Q@mail.gmail.com>
+
+Works fine for me with data.table 1.9.1 on OS X. What is your sessionInfo()?
+
+Kevin
+
+On Wed, Mar 5, 2014 at 7:53 PM, Farrel Buchinsky <fjbuch at gmail.com> wrote:
+> Any idea why I am getting a data.table with headers only and zero data? How
+> can I get around the problem.
+>
+> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv", verbose=T)
+> fails
+> read.csv("http://www.cdc.gov/growthcharts/data/zscore/statage.csv") succeeds
+>
+>> statagecdc <-
+>> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv", verbose=T)
+> trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+> Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+> opened URL
+> downloaded 64 Kb
+>
+> Input contains no \n. Taking this to be a filename to open
+> File opened, filesize is  6.2E-05B
+> File is opened and mapped ok
+> Detected eol as \r only (no \n afterwards). An old Mac 9 standard,
+> discontinued in 2002 according to Wikipedia.
+> Using line 1 to detect sep (the last non blank line in the first
+> 'autostart') ... sep=','
+> Found 14 columns
+> First row with 14 fields occurs on line 1 (either column names or first row
+> of data)
+> All the fields on line 1 are character fields. Treating as the column names.
+> Byte after header row is eof or eol, 0 data rows present.
+> Type codes: 00000000000000 (first 5 rows)
+> Type codes: 00000000000000 (after applying colClasses and integer64)
+> Type codes: 00000000000000 (after applying drop or select (if supplied)
+> Allocating 14 column slots (14 - 0 NULL)
+>    0.000s (  0%) Memory map (rerun may be quicker)
+>    0.000s (  0%) sep and header detection
+>    0.001s (100%) Count rows (wc -l)
+>    0.000s (  0%) Column type detection (first, middle and last 5 rows)
+>    0.000s (  0%) Allocation of 0x14 result (xMB) in RAM
+>    0.000s (  0%) Reading data
+>    0.000s (  0%) Allocation for type bumps (if any), including gc time if
+> triggered
+>    0.000s (  0%) Coercing data already read in type bumps (if any)
+>    0.000s (  0%) Changing na.strings to NA
+>    0.001s        Total
+>
+>
+> Thanks a lot.
+>
+> Farrel Buchinsky
+> Google Voice Tel: (412) 567-7870
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+From fjbuch at gmail.com  Thu Mar  6 06:04:06 2014
+From: fjbuch at gmail.com (Farrel Buchinsky)
+Date: Thu, 6 Mar 2014 00:04:06 -0500
+Subject: [datatable-help] Odd problem using fread to read in a csv file:
+ no data, just headers
+In-Reply-To: <CAJXgQP2g+0dVgy+yk38jq0NNm7OJnR2ESoJEkx7P5tTqYbe_+Q@mail.gmail.com>
+References: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>
+ <CAJXgQP2g+0dVgy+yk38jq0NNm7OJnR2ESoJEkx7P5tTqYbe_+Q@mail.gmail.com>
+Message-ID: <CACAnkwB=ZBBXZ8zU8wJ1P3AZ4opJkh-HEhtDk-f5YyDMCcc55A@mail.gmail.com>
+
+> sessionInfo()
+R version 3.0.2 (2013-09-25)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+
+locale:
+[1] LC_COLLATE=English_United States.1252  LC_CTYPE=English_United
+States.1252    LC_MONETARY=English_United States.1252
+[4] LC_NUMERIC=C                           LC_TIME=English_United
+States.1252
+
+attached base packages:
+[1] grid      stats     graphics  grDevices utils     datasets  methods
+base
+
+other attached packages:
+[1] reshape2_1.2.2    data.table_1.9.2  gridExtra_0.9.1   ggplot2_0.9.3.1
+RGoogleDocs_0.7-0
+
+loaded via a namespace (and not attached):
+ [1] colorspace_1.2-4   dichromat_2.0-0    digest_0.6.4       gtable_0.1.2
+      labeling_0.2       MASS_7.3-29        munsell_0.4.2
+ [8] plyr_1.8.1         proto_0.3-10       RColorBrewer_1.0-5 Rcpp_0.11.0
+     RCurl_1.95-4.1     scales_0.2.3       stringr_0.6.2
+[15] tools_3.0.2        XML_3.98-1.1
+
+Farrel Buchinsky
+Google Voice Tel: (412) 567-7870
+
+
+On Wed, Mar 5, 2014 at 10:55 PM, Kevin Ushey <kevinushey at gmail.com> wrote:
+
+> Works fine for me with data.table 1.9.1 on OS X. What is your
+> sessionInfo()?
+>
+> Kevin
+>
+> On Wed, Mar 5, 2014 at 7:53 PM, Farrel Buchinsky <fjbuch at gmail.com> wrote:
+> > Any idea why I am getting a data.table with headers only and zero data?
+> How
+> > can I get around the problem.
+> >
+> > fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+> verbose=T)
+> > fails
+> > read.csv("http://www.cdc.gov/growthcharts/data/zscore/statage.csv")
+> succeeds
+> >
+> >> statagecdc <-
+> >> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+> verbose=T)
+> > trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+> > Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+> > opened URL
+> > downloaded 64 Kb
+> >
+> > Input contains no \n. Taking this to be a filename to open
+> > File opened, filesize is  6.2E-05B
+> > File is opened and mapped ok
+> > Detected eol as \r only (no \n afterwards). An old Mac 9 standard,
+> > discontinued in 2002 according to Wikipedia.
+> > Using line 1 to detect sep (the last non blank line in the first
+> > 'autostart') ... sep=','
+> > Found 14 columns
+> > First row with 14 fields occurs on line 1 (either column names or first
+> row
+> > of data)
+> > All the fields on line 1 are character fields. Treating as the column
+> names.
+> > Byte after header row is eof or eol, 0 data rows present.
+> > Type codes: 00000000000000 (first 5 rows)
+> > Type codes: 00000000000000 (after applying colClasses and integer64)
+> > Type codes: 00000000000000 (after applying drop or select (if supplied)
+> > Allocating 14 column slots (14 - 0 NULL)
+> >    0.000s (  0%) Memory map (rerun may be quicker)
+> >    0.000s (  0%) sep and header detection
+> >    0.001s (100%) Count rows (wc -l)
+> >    0.000s (  0%) Column type detection (first, middle and last 5 rows)
+> >    0.000s (  0%) Allocation of 0x14 result (xMB) in RAM
+> >    0.000s (  0%) Reading data
+> >    0.000s (  0%) Allocation for type bumps (if any), including gc time if
+> > triggered
+> >    0.000s (  0%) Coercing data already read in type bumps (if any)
+> >    0.000s (  0%) Changing na.strings to NA
+> >    0.001s        Total
+> >
+> >
+> > Thanks a lot.
+> >
+> > Farrel Buchinsky
+> > Google Voice Tel: (412) 567-7870
+> >
+> > _______________________________________________
+> > datatable-help mailing list
+> > datatable-help at lists.r-forge.r-project.org
+> >
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140306/361f326c/attachment-0001.html>
+
+From kevinushey at gmail.com  Thu Mar  6 06:19:36 2014
+From: kevinushey at gmail.com (Kevin Ushey)
+Date: Wed, 5 Mar 2014 21:19:36 -0800
+Subject: [datatable-help] Odd problem using fread to read in a csv file:
+ no data, just headers
+In-Reply-To: <CACAnkwB=ZBBXZ8zU8wJ1P3AZ4opJkh-HEhtDk-f5YyDMCcc55A@mail.gmail.com>
+References: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>
+ <CAJXgQP2g+0dVgy+yk38jq0NNm7OJnR2ESoJEkx7P5tTqYbe_+Q@mail.gmail.com>
+ <CACAnkwB=ZBBXZ8zU8wJ1P3AZ4opJkh-HEhtDk-f5YyDMCcc55A@mail.gmail.com>
+Message-ID: <CAJXgQP22QVZQJLQ_DDXv7SbPrNtBti9j83WpXuHuwu24UUxjSw@mail.gmail.com>
+
+I think Matt and Arun will have more information -- IIUC, fread is
+only now gaining support for reading from URLs on Windows.
+
+Something strange: I get different output on the file structure with
+fread. Posting in case it's useful:
+
+> statagecdc <- fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv", verbose=T)
+Input contains no \n. Taking this to be a filename to open
+File opened, filesize is 0.000 GB
+File is opened and mapped ok
+Detected eol as \r\n (CRLF) in that order, the Windows standard.
+Using line 30 to detect sep (the last non blank line in the first
+'autostart') ... sep=','
+Found 14 columns
+First row with 14 fields occurs on line 1 (either column names or
+first row of data)
+All the fields on line 1 are character fields. Treating as the column names.
+Count of eol after first data row: 437
+Subtracted 1 for last eol and any trailing empty lines, leaving 436 data rows
+Type codes: 13333333333333 (first 5 rows)
+Type codes: 13333333333333 (+middle 5 rows)
+Type codes: 13333333333333 (+last 5 rows)
+Type codes: 13333333333333 (after applying colClasses and integer64)
+Type codes: 13333333333333 (after applying drop or select (if supplied)
+Allocating 14 column slots (14 - 0 NULL)
+   0.000s ( 13%) Memory map (rerun may be quicker)
+   0.000s (  4%) sep and header detection
+   0.000s ( 13%) Count rows (wc -l)
+   0.001s ( 49%) Column type detection (first, middle and last 5 rows)
+   0.000s (  1%) Allocation of 436x14 result (xMB) in RAM
+   0.000s ( 19%) Reading data
+   0.000s (  0%) Allocation for type bumps (if any), including gc time
+if triggered
+   0.000s (  0%) Coercing data already read in type bumps (if any)
+   0.000s (  0%) Changing na.strings to NA
+   0.002s        Total
+
+Note that fread sees \r\n as newlines for me.
+
+> sessionInfo()
+R Under development (unstable) (2014-02-12 r64976)
+Platform: x86_64-apple-darwin13.0.0 (64-bit)
+
+locale:
+[1] en_CA.UTF-8/en_CA.UTF-8/en_CA.UTF-8/C/en_CA.UTF-8/en_CA.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] data.table_1.9.1     knitr_1.5.15         devtools_1.4.1.99
+BiocInstaller_1.13.3
+
+loaded via a namespace (and not attached):
+ [1] compiler_3.1.0    digest_0.6.4      evaluate_0.5.1
+formatR_0.10      httr_0.2          memoise_0.1
+ [7] parallel_3.1.0    plyr_1.8          Rcpp_0.11.0.3
+RCurl_1.95-4.1    reshape2_1.3.0.99 stringr_0.6.2
+[13] tools_3.1.0       whisker_0.3-2
+
+Kevin
+
+On Wed, Mar 5, 2014 at 9:04 PM, Farrel Buchinsky <fjbuch at gmail.com> wrote:
+>> sessionInfo()
+> R version 3.0.2 (2013-09-25)
+> Platform: x86_64-w64-mingw32/x64 (64-bit)
+>
+> locale:
+> [1] LC_COLLATE=English_United States.1252  LC_CTYPE=English_United
+> States.1252    LC_MONETARY=English_United States.1252
+> [4] LC_NUMERIC=C                           LC_TIME=English_United
+> States.1252
+>
+> attached base packages:
+> [1] grid      stats     graphics  grDevices utils     datasets  methods
+> base
+>
+> other attached packages:
+> [1] reshape2_1.2.2    data.table_1.9.2  gridExtra_0.9.1   ggplot2_0.9.3.1
+> RGoogleDocs_0.7-0
+>
+> loaded via a namespace (and not attached):
+>  [1] colorspace_1.2-4   dichromat_2.0-0    digest_0.6.4       gtable_0.1.2
+> labeling_0.2       MASS_7.3-29        munsell_0.4.2
+>  [8] plyr_1.8.1         proto_0.3-10       RColorBrewer_1.0-5 Rcpp_0.11.0
+> RCurl_1.95-4.1     scales_0.2.3       stringr_0.6.2
+> [15] tools_3.0.2        XML_3.98-1.1
+>
+> Farrel Buchinsky
+> Google Voice Tel: (412) 567-7870
+>
+>
+> On Wed, Mar 5, 2014 at 10:55 PM, Kevin Ushey <kevinushey at gmail.com> wrote:
+>>
+>> Works fine for me with data.table 1.9.1 on OS X. What is your
+>> sessionInfo()?
+>>
+>> Kevin
+>>
+>> On Wed, Mar 5, 2014 at 7:53 PM, Farrel Buchinsky <fjbuch at gmail.com> wrote:
+>> > Any idea why I am getting a data.table with headers only and zero data?
+>> > How
+>> > can I get around the problem.
+>> >
+>> > fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>> > verbose=T)
+>> > fails
+>> > read.csv("http://www.cdc.gov/growthcharts/data/zscore/statage.csv")
+>> > succeeds
+>> >
+>> >> statagecdc <-
+>> >> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>> >> verbose=T)
+>> > trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+>> > Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+>> > opened URL
+>> > downloaded 64 Kb
+>> >
+>> > Input contains no \n. Taking this to be a filename to open
+>> > File opened, filesize is  6.2E-05B
+>> > File is opened and mapped ok
+>> > Detected eol as \r only (no \n afterwards). An old Mac 9 standard,
+>> > discontinued in 2002 according to Wikipedia.
+>> > Using line 1 to detect sep (the last non blank line in the first
+>> > 'autostart') ... sep=','
+>> > Found 14 columns
+>> > First row with 14 fields occurs on line 1 (either column names or first
+>> > row
+>> > of data)
+>> > All the fields on line 1 are character fields. Treating as the column
+>> > names.
+>> > Byte after header row is eof or eol, 0 data rows present.
+>> > Type codes: 00000000000000 (first 5 rows)
+>> > Type codes: 00000000000000 (after applying colClasses and integer64)
+>> > Type codes: 00000000000000 (after applying drop or select (if supplied)
+>> > Allocating 14 column slots (14 - 0 NULL)
+>> >    0.000s (  0%) Memory map (rerun may be quicker)
+>> >    0.000s (  0%) sep and header detection
+>> >    0.001s (100%) Count rows (wc -l)
+>> >    0.000s (  0%) Column type detection (first, middle and last 5 rows)
+>> >    0.000s (  0%) Allocation of 0x14 result (xMB) in RAM
+>> >    0.000s (  0%) Reading data
+>> >    0.000s (  0%) Allocation for type bumps (if any), including gc time
+>> > if
+>> > triggered
+>> >    0.000s (  0%) Coercing data already read in type bumps (if any)
+>> >    0.000s (  0%) Changing na.strings to NA
+>> >    0.001s        Total
+>> >
+>> >
+>> > Thanks a lot.
+>> >
+>> > Farrel Buchinsky
+>> > Google Voice Tel: (412) 567-7870
+>> >
+>> > _______________________________________________
+>> > datatable-help mailing list
+>> > datatable-help at lists.r-forge.r-project.org
+>> >
+>> > https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+
+From mdowle at mdowle.plus.com  Thu Mar  6 13:34:04 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Thu, 06 Mar 2014 12:34:04 +0000
+Subject: [datatable-help] Odd problem using fread to read in a csv file:
+ no data, just headers
+In-Reply-To: <CAJXgQP22QVZQJLQ_DDXv7SbPrNtBti9j83WpXuHuwu24UUxjSw@mail.gmail.com>
+References: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>
+ <CAJXgQP2g+0dVgy+yk38jq0NNm7OJnR2ESoJEkx7P5tTqYbe_+Q@mail.gmail.com>
+ <CACAnkwB=ZBBXZ8zU8wJ1P3AZ4opJkh-HEhtDk-f5YyDMCcc55A@mail.gmail.com>
+ <CAJXgQP22QVZQJLQ_DDXv7SbPrNtBti9j83WpXuHuwu24UUxjSw@mail.gmail.com>
+Message-ID: <53186B3C.6070001@mdowle.plus.com>
+
+
+Works for me as well on linux,  same output as Kevin's.
+
+I was perplexed as to why Farrel's output has :
+    File opened, filesize is 6.2E-05B
+but we see :
+    File opened, filesize is 0.000 GB
+That line is switched depending on Windows or not. Comparing them :
+
+// On Windows :
+if (verbose) Rprintf("File opened, filesize is %.3 GB\n", 
+1.0*filesize/(1024*1024*1024));
+
+// On non-Windows :
+if (verbose) Rprintf("File opened, filesize is %.3f GB\n", 
+1.0*filesize/(1024*1024*1024));
+
+So, a missing "f". Just committed a fix for that (r1223). That line is 
+part of a block that is necessarily different on Windows because its 
+file and mmap commands are different.  The missing 'f' could have 
+feasibly corrupted memory somehow (strange that the "G" of "GB" got 
+overwritten) and if so would explain why it thought it got to the end of 
+the file before seeing the \n after the \r.
+
+Farrel - does v1.9.2 work for you on Windows with verbose=FALSE? If yes, 
+then very likely verbose=TRUE will now work with commit 1223.  Best to 
+start with a new R session to clear any possible memory corruption and 
+then try :
+
+    fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv", verbose=FALSE)
+
+If not, can anyone else reproduce on Windows? If so, I'll need to debug 
+it on Windows.
+
+Thanks,
+Matt
+
+
+On 06/03/14 05:19, Kevin Ushey wrote:
+> I think Matt and Arun will have more information -- IIUC, fread is
+> only now gaining support for reading from URLs on Windows.
+>
+> Something strange: I get different output on the file structure with
+> fread. Posting in case it's useful:
+>
+>> statagecdc <- fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv", verbose=T)
+> Input contains no \n. Taking this to be a filename to open
+> File opened, filesize is 0.000 GB
+> File is opened and mapped ok
+> Detected eol as \r\n (CRLF) in that order, the Windows standard.
+> Using line 30 to detect sep (the last non blank line in the first
+> 'autostart') ... sep=','
+> Found 14 columns
+> First row with 14 fields occurs on line 1 (either column names or
+> first row of data)
+> All the fields on line 1 are character fields. Treating as the column names.
+> Count of eol after first data row: 437
+> Subtracted 1 for last eol and any trailing empty lines, leaving 436 data rows
+> Type codes: 13333333333333 (first 5 rows)
+> Type codes: 13333333333333 (+middle 5 rows)
+> Type codes: 13333333333333 (+last 5 rows)
+> Type codes: 13333333333333 (after applying colClasses and integer64)
+> Type codes: 13333333333333 (after applying drop or select (if supplied)
+> Allocating 14 column slots (14 - 0 NULL)
+>     0.000s ( 13%) Memory map (rerun may be quicker)
+>     0.000s (  4%) sep and header detection
+>     0.000s ( 13%) Count rows (wc -l)
+>     0.001s ( 49%) Column type detection (first, middle and last 5 rows)
+>     0.000s (  1%) Allocation of 436x14 result (xMB) in RAM
+>     0.000s ( 19%) Reading data
+>     0.000s (  0%) Allocation for type bumps (if any), including gc time
+> if triggered
+>     0.000s (  0%) Coercing data already read in type bumps (if any)
+>     0.000s (  0%) Changing na.strings to NA
+>     0.002s        Total
+>
+> Note that fread sees \r\n as newlines for me.
+>
+>> sessionInfo()
+> R Under development (unstable) (2014-02-12 r64976)
+> Platform: x86_64-apple-darwin13.0.0 (64-bit)
+>
+> locale:
+> [1] en_CA.UTF-8/en_CA.UTF-8/en_CA.UTF-8/C/en_CA.UTF-8/en_CA.UTF-8
+>
+> attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods   base
+>
+> other attached packages:
+> [1] data.table_1.9.1     knitr_1.5.15         devtools_1.4.1.99
+> BiocInstaller_1.13.3
+>
+> loaded via a namespace (and not attached):
+>   [1] compiler_3.1.0    digest_0.6.4      evaluate_0.5.1
+> formatR_0.10      httr_0.2          memoise_0.1
+>   [7] parallel_3.1.0    plyr_1.8          Rcpp_0.11.0.3
+> RCurl_1.95-4.1    reshape2_1.3.0.99 stringr_0.6.2
+> [13] tools_3.1.0       whisker_0.3-2
+>
+> Kevin
+>
+> On Wed, Mar 5, 2014 at 9:04 PM, Farrel Buchinsky <fjbuch at gmail.com> wrote:
+>>> sessionInfo()
+>> R version 3.0.2 (2013-09-25)
+>> Platform: x86_64-w64-mingw32/x64 (64-bit)
+>>
+>> locale:
+>> [1] LC_COLLATE=English_United States.1252  LC_CTYPE=English_United
+>> States.1252    LC_MONETARY=English_United States.1252
+>> [4] LC_NUMERIC=C                           LC_TIME=English_United
+>> States.1252
+>>
+>> attached base packages:
+>> [1] grid      stats     graphics  grDevices utils     datasets  methods
+>> base
+>>
+>> other attached packages:
+>> [1] reshape2_1.2.2    data.table_1.9.2  gridExtra_0.9.1   ggplot2_0.9.3.1
+>> RGoogleDocs_0.7-0
+>>
+>> loaded via a namespace (and not attached):
+>>   [1] colorspace_1.2-4   dichromat_2.0-0    digest_0.6.4       gtable_0.1.2
+>> labeling_0.2       MASS_7.3-29        munsell_0.4.2
+>>   [8] plyr_1.8.1         proto_0.3-10       RColorBrewer_1.0-5 Rcpp_0.11.0
+>> RCurl_1.95-4.1     scales_0.2.3       stringr_0.6.2
+>> [15] tools_3.0.2        XML_3.98-1.1
+>>
+>> Farrel Buchinsky
+>> Google Voice Tel: (412) 567-7870
+>>
+>>
+>> On Wed, Mar 5, 2014 at 10:55 PM, Kevin Ushey <kevinushey at gmail.com> wrote:
+>>> Works fine for me with data.table 1.9.1 on OS X. What is your
+>>> sessionInfo()?
+>>>
+>>> Kevin
+>>>
+>>> On Wed, Mar 5, 2014 at 7:53 PM, Farrel Buchinsky <fjbuch at gmail.com> wrote:
+>>>> Any idea why I am getting a data.table with headers only and zero data?
+>>>> How
+>>>> can I get around the problem.
+>>>>
+>>>> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>>>> verbose=T)
+>>>> fails
+>>>> read.csv("http://www.cdc.gov/growthcharts/data/zscore/statage.csv")
+>>>> succeeds
+>>>>
+>>>>> statagecdc <-
+>>>>> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>>>>> verbose=T)
+>>>> trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+>>>> Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+>>>> opened URL
+>>>> downloaded 64 Kb
+>>>>
+>>>> Input contains no \n. Taking this to be a filename to open
+>>>> File opened, filesize is  6.2E-05B
+>>>> File is opened and mapped ok
+>>>> Detected eol as \r only (no \n afterwards). An old Mac 9 standard,
+>>>> discontinued in 2002 according to Wikipedia.
+>>>> Using line 1 to detect sep (the last non blank line in the first
+>>>> 'autostart') ... sep=','
+>>>> Found 14 columns
+>>>> First row with 14 fields occurs on line 1 (either column names or first
+>>>> row
+>>>> of data)
+>>>> All the fields on line 1 are character fields. Treating as the column
+>>>> names.
+>>>> Byte after header row is eof or eol, 0 data rows present.
+>>>> Type codes: 00000000000000 (first 5 rows)
+>>>> Type codes: 00000000000000 (after applying colClasses and integer64)
+>>>> Type codes: 00000000000000 (after applying drop or select (if supplied)
+>>>> Allocating 14 column slots (14 - 0 NULL)
+>>>>     0.000s (  0%) Memory map (rerun may be quicker)
+>>>>     0.000s (  0%) sep and header detection
+>>>>     0.001s (100%) Count rows (wc -l)
+>>>>     0.000s (  0%) Column type detection (first, middle and last 5 rows)
+>>>>     0.000s (  0%) Allocation of 0x14 result (xMB) in RAM
+>>>>     0.000s (  0%) Reading data
+>>>>     0.000s (  0%) Allocation for type bumps (if any), including gc time
+>>>> if
+>>>> triggered
+>>>>     0.000s (  0%) Coercing data already read in type bumps (if any)
+>>>>     0.000s (  0%) Changing na.strings to NA
+>>>>     0.001s        Total
+>>>>
+>>>>
+>>>> Thanks a lot.
+>>>>
+>>>> Farrel Buchinsky
+>>>> Google Voice Tel: (412) 567-7870
+>>>>
+>>>> _______________________________________________
+>>>> datatable-help mailing list
+>>>> datatable-help at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+From carrieromichele at gmail.com  Thu Mar  6 13:43:12 2014
+From: carrieromichele at gmail.com (carrieromichele)
+Date: Thu, 6 Mar 2014 12:43:12 +0000
+Subject: [datatable-help] Odd problem using fread to read in a csv file:
+ no data, just headers
+In-Reply-To: <53186B3C.6070001@mdowle.plus.com>
+References: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>
+ <CAJXgQP2g+0dVgy+yk38jq0NNm7OJnR2ESoJEkx7P5tTqYbe_+Q@mail.gmail.com>
+ <CACAnkwB=ZBBXZ8zU8wJ1P3AZ4opJkh-HEhtDk-f5YyDMCcc55A@mail.gmail.com>
+ <CAJXgQP22QVZQJLQ_DDXv7SbPrNtBti9j83WpXuHuwu24UUxjSw@mail.gmail.com>
+ <53186B3C.6070001@mdowle.plus.com>
+Message-ID: <CAP=9f+p1uRP1XTE23cfni4UQWx3cxNqiTHLNoik3V5UPxs_P+A@mail.gmail.com>
+
+I quickly read the last mail, Is this the test you needed guys?
+
+> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+verbose=FALSE)
+trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+opened URL
+downloaded 64 Kb
+
+Empty data.table (0 rows) of 14 cols: Sex,Agemos,L,M,S,P3...
+> sessionInfo()
+R version 3.0.2 (2013-09-25)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+
+locale:
+[1] LC_COLLATE=English_United Kingdom.1252  LC_CTYPE=English_United
+Kingdom.1252
+[3] LC_MONETARY=English_United Kingdom.1252 LC_NUMERIC=C
+
+[5] LC_TIME=English_United Kingdom.1252
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base
+
+other attached packages:
+[1] data.table_1.9.3
+
+loaded via a namespace (and not attached):
+[1] plyr_1.8.1     Rcpp_0.11.0    reshape2_1.2.2 Rook_1.0-9
+stringr_0.6.2  tools_3.0.2
+> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+verbose=FALSE)
+trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+opened URL
+downloaded 64 Kb
+
+Empty data.table (0 rows) of 14 cols: Sex,Agemos,L,M,S,P3...
+
+
+On 6 March 2014 12:34, Matt Dowle <mdowle at mdowle.plus.com> wrote:
+
+>
+> Works for me as well on linux,  same output as Kevin's.
+>
+> I was perplexed as to why Farrel's output has :
+>
+>    File opened, filesize is 6.2E-05B
+> but we see :
+>
+>    File opened, filesize is 0.000 GB
+> That line is switched depending on Windows or not. Comparing them :
+>
+> // On Windows :
+> if (verbose) Rprintf("File opened, filesize is %.3 GB\n",
+> 1.0*filesize/(1024*1024*1024));
+>
+> // On non-Windows :
+> if (verbose) Rprintf("File opened, filesize is %.3f GB\n",
+> 1.0*filesize/(1024*1024*1024));
+>
+> So, a missing "f". Just committed a fix for that (r1223). That line is
+> part of a block that is necessarily different on Windows because its file
+> and mmap commands are different.  The missing 'f' could have feasibly
+> corrupted memory somehow (strange that the "G" of "GB" got overwritten) and
+> if so would explain why it thought it got to the end of the file before
+> seeing the \n after the \r.
+>
+> Farrel - does v1.9.2 work for you on Windows with verbose=FALSE? If yes,
+> then very likely verbose=TRUE will now work with commit 1223.  Best to
+> start with a new R session to clear any possible memory corruption and then
+> try :
+>
+>    fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+> verbose=FALSE)
+>
+> If not, can anyone else reproduce on Windows? If so, I'll need to debug it
+> on Windows.
+>
+> Thanks,
+> Matt
+>
+>
+>
+> On 06/03/14 05:19, Kevin Ushey wrote:
+>
+>> I think Matt and Arun will have more information -- IIUC, fread is
+>> only now gaining support for reading from URLs on Windows.
+>>
+>> Something strange: I get different output on the file structure with
+>> fread. Posting in case it's useful:
+>>
+>>  statagecdc <- fread("http://www.cdc.gov/growthcharts/data/zscore/
+>>> statage.csv", verbose=T)
+>>>
+>> Input contains no \n. Taking this to be a filename to open
+>> File opened, filesize is 0.000 GB
+>> File is opened and mapped ok
+>> Detected eol as \r\n (CRLF) in that order, the Windows standard.
+>> Using line 30 to detect sep (the last non blank line in the first
+>> 'autostart') ... sep=','
+>> Found 14 columns
+>> First row with 14 fields occurs on line 1 (either column names or
+>> first row of data)
+>> All the fields on line 1 are character fields. Treating as the column
+>> names.
+>> Count of eol after first data row: 437
+>> Subtracted 1 for last eol and any trailing empty lines, leaving 436 data
+>> rows
+>> Type codes: 13333333333333 (first 5 rows)
+>> Type codes: 13333333333333 (+middle 5 rows)
+>> Type codes: 13333333333333 (+last 5 rows)
+>> Type codes: 13333333333333 (after applying colClasses and integer64)
+>> Type codes: 13333333333333 (after applying drop or select (if supplied)
+>> Allocating 14 column slots (14 - 0 NULL)
+>>     0.000s ( 13%) Memory map (rerun may be quicker)
+>>     0.000s (  4%) sep and header detection
+>>     0.000s ( 13%) Count rows (wc -l)
+>>     0.001s ( 49%) Column type detection (first, middle and last 5 rows)
+>>     0.000s (  1%) Allocation of 436x14 result (xMB) in RAM
+>>     0.000s ( 19%) Reading data
+>>     0.000s (  0%) Allocation for type bumps (if any), including gc time
+>> if triggered
+>>     0.000s (  0%) Coercing data already read in type bumps (if any)
+>>     0.000s (  0%) Changing na.strings to NA
+>>     0.002s        Total
+>>
+>> Note that fread sees \r\n as newlines for me.
+>>
+>>  sessionInfo()
+>>>
+>> R Under development (unstable) (2014-02-12 r64976)
+>> Platform: x86_64-apple-darwin13.0.0 (64-bit)
+>>
+>> locale:
+>> [1] en_CA.UTF-8/en_CA.UTF-8/en_CA.UTF-8/C/en_CA.UTF-8/en_CA.UTF-8
+>>
+>> attached base packages:
+>> [1] stats     graphics  grDevices utils     datasets  methods   base
+>>
+>> other attached packages:
+>> [1] data.table_1.9.1     knitr_1.5.15         devtools_1.4.1.99
+>> BiocInstaller_1.13.3
+>>
+>> loaded via a namespace (and not attached):
+>>   [1] compiler_3.1.0    digest_0.6.4      evaluate_0.5.1
+>> formatR_0.10      httr_0.2          memoise_0.1
+>>   [7] parallel_3.1.0    plyr_1.8          Rcpp_0.11.0.3
+>> RCurl_1.95-4.1    reshape2_1.3.0.99 stringr_0.6.2
+>> [13] tools_3.1.0       whisker_0.3-2
+>>
+>> Kevin
+>>
+>> On Wed, Mar 5, 2014 at 9:04 PM, Farrel Buchinsky <fjbuch at gmail.com>
+>> wrote:
+>>
+>>> sessionInfo()
+>>>>
+>>> R version 3.0.2 (2013-09-25)
+>>> Platform: x86_64-w64-mingw32/x64 (64-bit)
+>>>
+>>> locale:
+>>> [1] LC_COLLATE=English_United States.1252  LC_CTYPE=English_United
+>>> States.1252    LC_MONETARY=English_United States.1252
+>>> [4] LC_NUMERIC=C                           LC_TIME=English_United
+>>> States.1252
+>>>
+>>> attached base packages:
+>>> [1] grid      stats     graphics  grDevices utils     datasets  methods
+>>> base
+>>>
+>>> other attached packages:
+>>> [1] reshape2_1.2.2    data.table_1.9.2  gridExtra_0.9.1   ggplot2_0.9.3.1
+>>> RGoogleDocs_0.7-0
+>>>
+>>> loaded via a namespace (and not attached):
+>>>   [1] colorspace_1.2-4   dichromat_2.0-0    digest_0.6.4
+>>> gtable_0.1.2
+>>> labeling_0.2       MASS_7.3-29        munsell_0.4.2
+>>>   [8] plyr_1.8.1         proto_0.3-10       RColorBrewer_1.0-5
+>>> Rcpp_0.11.0
+>>> RCurl_1.95-4.1     scales_0.2.3       stringr_0.6.2
+>>> [15] tools_3.0.2        XML_3.98-1.1
+>>>
+>>> Farrel Buchinsky
+>>> Google Voice Tel: (412) 567-7870
+>>>
+>>>
+>>> On Wed, Mar 5, 2014 at 10:55 PM, Kevin Ushey <kevinushey at gmail.com>
+>>> wrote:
+>>>
+>>>> Works fine for me with data.table 1.9.1 on OS X. What is your
+>>>> sessionInfo()?
+>>>>
+>>>> Kevin
+>>>>
+>>>> On Wed, Mar 5, 2014 at 7:53 PM, Farrel Buchinsky <fjbuch at gmail.com>
+>>>> wrote:
+>>>>
+>>>>> Any idea why I am getting a data.table with headers only and zero data?
+>>>>> How
+>>>>> can I get around the problem.
+>>>>>
+>>>>> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>>>>> verbose=T)
+>>>>> fails
+>>>>> read.csv("http://www.cdc.gov/growthcharts/data/zscore/statage.csv")
+>>>>> succeeds
+>>>>>
+>>>>>  statagecdc <-
+>>>>>> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>>>>>> verbose=T)
+>>>>>>
+>>>>> trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+>>>>> Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+>>>>> opened URL
+>>>>> downloaded 64 Kb
+>>>>>
+>>>>> Input contains no \n. Taking this to be a filename to open
+>>>>> File opened, filesize is  6.2E-05B
+>>>>> File is opened and mapped ok
+>>>>> Detected eol as \r only (no \n afterwards). An old Mac 9 standard,
+>>>>> discontinued in 2002 according to Wikipedia.
+>>>>> Using line 1 to detect sep (the last non blank line in the first
+>>>>> 'autostart') ... sep=','
+>>>>> Found 14 columns
+>>>>> First row with 14 fields occurs on line 1 (either column names or first
+>>>>> row
+>>>>> of data)
+>>>>> All the fields on line 1 are character fields. Treating as the column
+>>>>> names.
+>>>>> Byte after header row is eof or eol, 0 data rows present.
+>>>>> Type codes: 00000000000000 (first 5 rows)
+>>>>> Type codes: 00000000000000 (after applying colClasses and integer64)
+>>>>> Type codes: 00000000000000 (after applying drop or select (if supplied)
+>>>>> Allocating 14 column slots (14 - 0 NULL)
+>>>>>     0.000s (  0%) Memory map (rerun may be quicker)
+>>>>>     0.000s (  0%) sep and header detection
+>>>>>     0.001s (100%) Count rows (wc -l)
+>>>>>     0.000s (  0%) Column type detection (first, middle and last 5 rows)
+>>>>>     0.000s (  0%) Allocation of 0x14 result (xMB) in RAM
+>>>>>     0.000s (  0%) Reading data
+>>>>>     0.000s (  0%) Allocation for type bumps (if any), including gc time
+>>>>> if
+>>>>> triggered
+>>>>>     0.000s (  0%) Coercing data already read in type bumps (if any)
+>>>>>     0.000s (  0%) Changing na.strings to NA
+>>>>>     0.001s        Total
+>>>>>
+>>>>>
+>>>>> Thanks a lot.
+>>>>>
+>>>>> Farrel Buchinsky
+>>>>> Google Voice Tel: (412) 567-7870
+>>>>>
+>>>>> _______________________________________________
+>>>>> datatable-help mailing list
+>>>>> datatable-help at lists.r-forge.r-project.org
+>>>>>
+>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/
+>>>>> listinfo/datatable-help
+>>>>>
+>>>>
+>>>  _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/
+>> listinfo/datatable-help
+>>
+>>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/
+> listinfo/datatable-help
+>
+
+
+
+-- 
+
+
+*PRIVATE**T:* +44 (0)77 3248 1517 *|* * E:*
+carrieromichele at gmail.com<http://@gmail.com>
+
+
+*OFFICET:* +44 (0)20 8236 8992 *|* * E:*
+michele.carriero at evolve-analytics.com
+*T:*  www.evolve-analytics.com
+
+
+<http://www.evolve-analytics.com>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140306/f193bef3/attachment-0001.html>
+
+From mdowle at mdowle.plus.com  Thu Mar  6 13:51:56 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Thu, 06 Mar 2014 12:51:56 +0000
+Subject: [datatable-help] Odd problem using fread to read in a csv file:
+ no data, just headers
+In-Reply-To: <CAP=9f+p1uRP1XTE23cfni4UQWx3cxNqiTHLNoik3V5UPxs_P+A@mail.gmail.com>
+References: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>	<CAJXgQP2g+0dVgy+yk38jq0NNm7OJnR2ESoJEkx7P5tTqYbe_+Q@mail.gmail.com>	<CACAnkwB=ZBBXZ8zU8wJ1P3AZ4opJkh-HEhtDk-f5YyDMCcc55A@mail.gmail.com>	<CAJXgQP22QVZQJLQ_DDXv7SbPrNtBti9j83WpXuHuwu24UUxjSw@mail.gmail.com>	<53186B3C.6070001@mdowle.plus.com>
+ <CAP=9f+p1uRP1XTE23cfni4UQWx3cxNqiTHLNoik3V5UPxs_P+A@mail.gmail.com>
+Message-ID: <53186F6C.5020008@mdowle.plus.com>
+
+
+Yes, thanks.  Are other files reading ok on Windows or is it just this 
+particular file?
+e.g. does this work :
+fread("http://www.stats.ox.ac.uk/pub/datasets/csb/ch11b.dat")
+
+[ I don't have Windows within easy reach. ]
+
+On 06/03/14 12:43, carrieromichele wrote:
+> I quickly read the last mail, Is this the test you needed guys?
+>
+> > fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv", 
+> verbose=FALSE)
+> trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+> Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+> opened URL
+> downloaded 64 Kb
+>
+> Empty data.table (0 rows) of 14 cols: Sex,Agemos,L,M,S,P3...
+> > sessionInfo()
+> R version 3.0.2 (2013-09-25)
+> Platform: x86_64-w64-mingw32/x64 (64-bit)
+>
+> locale:
+> [1] LC_COLLATE=English_United Kingdom.1252  LC_CTYPE=English_United 
+> Kingdom.1252
+> [3] LC_MONETARY=English_United Kingdom.1252 LC_NUMERIC=C
+> [5] LC_TIME=English_United Kingdom.1252
+>
+> attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods   base
+>
+> other attached packages:
+> [1] data.table_1.9.3
+>
+> loaded via a namespace (and not attached):
+> [1] plyr_1.8.1     Rcpp_0.11.0    reshape2_1.2.2 Rook_1.0-9     
+> stringr_0.6.2  tools_3.0.2
+> > fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv", 
+> verbose=FALSE)
+> trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+> Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+> opened URL
+> downloaded 64 Kb
+>
+> Empty data.table (0 rows) of 14 cols: Sex,Agemos,L,M,S,P3...
+>
+>
+> On 6 March 2014 12:34, Matt Dowle <mdowle at mdowle.plus.com 
+> <mailto:mdowle at mdowle.plus.com>> wrote:
+>
+>
+>     Works for me as well on linux,  same output as Kevin's.
+>
+>     I was perplexed as to why Farrel's output has :
+>
+>        File opened, filesize is 6.2E-05B
+>     but we see :
+>
+>        File opened, filesize is 0.000 GB
+>     That line is switched depending on Windows or not. Comparing them :
+>
+>     // On Windows :
+>     if (verbose) Rprintf("File opened, filesize is %.3 GB\n",
+>     1.0*filesize/(1024*1024*1024));
+>
+>     // On non-Windows :
+>     if (verbose) Rprintf("File opened, filesize is %.3f GB\n",
+>     1.0*filesize/(1024*1024*1024));
+>
+>     So, a missing "f". Just committed a fix for that (r1223). That
+>     line is part of a block that is necessarily different on Windows
+>     because its file and mmap commands are different.  The missing 'f'
+>     could have feasibly corrupted memory somehow (strange that the "G"
+>     of "GB" got overwritten) and if so would explain why it thought it
+>     got to the end of the file before seeing the \n after the \r.
+>
+>     Farrel - does v1.9.2 work for you on Windows with verbose=FALSE?
+>     If yes, then very likely verbose=TRUE will now work with commit
+>     1223.  Best to start with a new R session to clear any possible
+>     memory corruption and then try :
+>
+>      
+>      fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>     verbose=FALSE)
+>
+>     If not, can anyone else reproduce on Windows? If so, I'll need to
+>     debug it on Windows.
+>
+>     Thanks,
+>     Matt
+>
+>
+>
+>     On 06/03/14 05:19, Kevin Ushey wrote:
+>
+>         I think Matt and Arun will have more information -- IIUC, fread is
+>         only now gaining support for reading from URLs on Windows.
+>
+>         Something strange: I get different output on the file
+>         structure with
+>         fread. Posting in case it's useful:
+>
+>             statagecdc <-
+>             fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>             verbose=T)
+>
+>         Input contains no \n. Taking this to be a filename to open
+>         File opened, filesize is 0.000 GB
+>         File is opened and mapped ok
+>         Detected eol as \r\n (CRLF) in that order, the Windows standard.
+>         Using line 30 to detect sep (the last non blank line in the first
+>         'autostart') ... sep=','
+>         Found 14 columns
+>         First row with 14 fields occurs on line 1 (either column names or
+>         first row of data)
+>         All the fields on line 1 are character fields. Treating as the
+>         column names.
+>         Count of eol after first data row: 437
+>         Subtracted 1 for last eol and any trailing empty lines,
+>         leaving 436 data rows
+>         Type codes: 13333333333333 (first 5 rows)
+>         Type codes: 13333333333333 (+middle 5 rows)
+>         Type codes: 13333333333333 (+last 5 rows)
+>         Type codes: 13333333333333 (after applying colClasses and
+>         integer64)
+>         Type codes: 13333333333333 (after applying drop or select (if
+>         supplied)
+>         Allocating 14 column slots (14 - 0 NULL)
+>             0.000s ( 13%) Memory map (rerun may be quicker)
+>             0.000s (  4%) sep and header detection
+>             0.000s ( 13%) Count rows (wc -l)
+>             0.001s ( 49%) Column type detection (first, middle and
+>         last 5 rows)
+>             0.000s (  1%) Allocation of 436x14 result (xMB) in RAM
+>             0.000s ( 19%) Reading data
+>             0.000s (  0%) Allocation for type bumps (if any),
+>         including gc time
+>         if triggered
+>             0.000s (  0%) Coercing data already read in type bumps (if
+>         any)
+>             0.000s (  0%) Changing na.strings to NA
+>             0.002s        Total
+>
+>         Note that fread sees \r\n as newlines for me.
+>
+>             sessionInfo()
+>
+>         R Under development (unstable) (2014-02-12 r64976)
+>         Platform: x86_64-apple-darwin13.0.0 (64-bit)
+>
+>         locale:
+>         [1] en_CA.UTF-8/en_CA.UTF-8/en_CA.UTF-8/C/en_CA.UTF-8/en_CA.UTF-8
+>
+>         attached base packages:
+>         [1] stats     graphics  grDevices utils     datasets  methods
+>           base
+>
+>         other attached packages:
+>         [1] data.table_1.9.1     knitr_1.5.15 devtools_1.4.1.99
+>         BiocInstaller_1.13.3
+>
+>         loaded via a namespace (and not attached):
+>           [1] compiler_3.1.0    digest_0.6.4  evaluate_0.5.1
+>         formatR_0.10      httr_0.2          memoise_0.1
+>           [7] parallel_3.1.0    plyr_1.8  Rcpp_0.11.0.3
+>         RCurl_1.95-4.1    reshape2_1.3.0.99 stringr_0.6.2
+>         [13] tools_3.1.0       whisker_0.3-2
+>
+>         Kevin
+>
+>         On Wed, Mar 5, 2014 at 9:04 PM, Farrel Buchinsky
+>         <fjbuch at gmail.com <mailto:fjbuch at gmail.com>> wrote:
+>
+>                 sessionInfo()
+>
+>             R version 3.0.2 (2013-09-25)
+>             Platform: x86_64-w64-mingw32/x64 (64-bit)
+>
+>             locale:
+>             [1] LC_COLLATE=English_United States.1252
+>              LC_CTYPE=English_United
+>             States.1252    LC_MONETARY=English_United States.1252
+>             [4] LC_NUMERIC=C LC_TIME=English_United
+>             States.1252
+>
+>             attached base packages:
+>             [1] grid      stats     graphics  grDevices utils  
+>             datasets  methods
+>             base
+>
+>             other attached packages:
+>             [1] reshape2_1.2.2    data.table_1.9.2  gridExtra_0.9.1  
+>             ggplot2_0.9.3.1
+>             RGoogleDocs_0.7-0
+>
+>             loaded via a namespace (and not attached):
+>               [1] colorspace_1.2-4   dichromat_2.0-0  digest_0.6.4    
+>               gtable_0.1.2
+>             labeling_0.2       MASS_7.3-29        munsell_0.4.2
+>               [8] plyr_1.8.1         proto_0.3-10 RColorBrewer_1.0-5
+>             Rcpp_0.11.0
+>             RCurl_1.95-4.1     scales_0.2.3       stringr_0.6.2
+>             [15] tools_3.0.2        XML_3.98-1.1
+>
+>             Farrel Buchinsky
+>             Google Voice Tel: (412) 567-7870 <tel:%28412%29%20567-7870>
+>
+>
+>             On Wed, Mar 5, 2014 at 10:55 PM, Kevin Ushey
+>             <kevinushey at gmail.com <mailto:kevinushey at gmail.com>> wrote:
+>
+>                 Works fine for me with data.table 1.9.1 on OS X. What
+>                 is your
+>                 sessionInfo()?
+>
+>                 Kevin
+>
+>                 On Wed, Mar 5, 2014 at 7:53 PM, Farrel Buchinsky
+>                 <fjbuch at gmail.com <mailto:fjbuch at gmail.com>> wrote:
+>
+>                     Any idea why I am getting a data.table with
+>                     headers only and zero data?
+>                     How
+>                     can I get around the problem.
+>
+>                     fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>                     verbose=T)
+>                     fails
+>                     read.csv("http://www.cdc.gov/growthcharts/data/zscore/statage.csv")
+>                     succeeds
+>
+>                         statagecdc <-
+>                         fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>                         verbose=T)
+>
+>                     trying URL
+>                     'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+>                     Content type 'application/octet-stream' length
+>                     66087 bytes (64 Kb)
+>                     opened URL
+>                     downloaded 64 Kb
+>
+>                     Input contains no \n. Taking this to be a filename
+>                     to open
+>                     File opened, filesize is  6.2E-05B
+>                     File is opened and mapped ok
+>                     Detected eol as \r only (no \n afterwards). An old
+>                     Mac 9 standard,
+>                     discontinued in 2002 according to Wikipedia.
+>                     Using line 1 to detect sep (the last non blank
+>                     line in the first
+>                     'autostart') ... sep=','
+>                     Found 14 columns
+>                     First row with 14 fields occurs on line 1 (either
+>                     column names or first
+>                     row
+>                     of data)
+>                     All the fields on line 1 are character fields.
+>                     Treating as the column
+>                     names.
+>                     Byte after header row is eof or eol, 0 data rows
+>                     present.
+>                     Type codes: 00000000000000 (first 5 rows)
+>                     Type codes: 00000000000000 (after applying
+>                     colClasses and integer64)
+>                     Type codes: 00000000000000 (after applying drop or
+>                     select (if supplied)
+>                     Allocating 14 column slots (14 - 0 NULL)
+>                         0.000s (  0%) Memory map (rerun may be quicker)
+>                         0.000s (  0%) sep and header detection
+>                         0.001s (100%) Count rows (wc -l)
+>                         0.000s (  0%) Column type detection (first,
+>                     middle and last 5 rows)
+>                         0.000s (  0%) Allocation of 0x14 result (xMB)
+>                     in RAM
+>                         0.000s (  0%) Reading data
+>                         0.000s (  0%) Allocation for type bumps (if
+>                     any), including gc time
+>                     if
+>                     triggered
+>                         0.000s (  0%) Coercing data already read in
+>                     type bumps (if any)
+>                         0.000s (  0%) Changing na.strings to NA
+>                         0.001s        Total
+>
+>
+>                     Thanks a lot.
+>
+>                     Farrel Buchinsky
+>                     Google Voice Tel: (412) 567-7870
+>                     <tel:%28412%29%20567-7870>
+>
+>                     _______________________________________________
+>                     datatable-help mailing list
+>                     datatable-help at lists.r-forge.r-project.org
+>                     <mailto:datatable-help at lists.r-forge.r-project.org>
+>
+>                     https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>         _______________________________________________
+>         datatable-help mailing list
+>         datatable-help at lists.r-forge.r-project.org
+>         <mailto:datatable-help at lists.r-forge.r-project.org>
+>         https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>     _______________________________________________
+>     datatable-help mailing list
+>     datatable-help at lists.r-forge.r-project.org
+>     <mailto:datatable-help at lists.r-forge.r-project.org>
+>     https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+>
+> -- 
+>
+> *PRIVATE
+> **T:*+44 (0)77 3248 1517 *|**E:*carrieromichele at gmail.com 
+> <mailto:carrieromichele at gmail.com><http://@gmail.com>
+>
+> *OFFICE
+> T:*+44 (0)20 8236 8992 *|**E:*michele.carriero at evolve-analytics.com 
+> <mailto:michele.carriero at evolve-analytics.com>_
+> _*T:*www.evolve-analytics.com <http://www.evolve-analytics.com>
+>
+>
+> <http://www.evolve-analytics.com>
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140306/490c3ceb/attachment-0001.html>
+
+From carrieromichele at gmail.com  Thu Mar  6 13:54:12 2014
+From: carrieromichele at gmail.com (carrieromichele)
+Date: Thu, 6 Mar 2014 12:54:12 +0000
+Subject: [datatable-help] Odd problem using fread to read in a csv file:
+ no data, just headers
+In-Reply-To: <53186F6C.5020008@mdowle.plus.com>
+References: <CACAnkwD_UMyiRg1yBSDM+5MwtOtobJknk2BW6kWMcqVa=GBbUA@mail.gmail.com>
+ <CAJXgQP2g+0dVgy+yk38jq0NNm7OJnR2ESoJEkx7P5tTqYbe_+Q@mail.gmail.com>
+ <CACAnkwB=ZBBXZ8zU8wJ1P3AZ4opJkh-HEhtDk-f5YyDMCcc55A@mail.gmail.com>
+ <CAJXgQP22QVZQJLQ_DDXv7SbPrNtBti9j83WpXuHuwu24UUxjSw@mail.gmail.com>
+ <53186B3C.6070001@mdowle.plus.com>
+ <CAP=9f+p1uRP1XTE23cfni4UQWx3cxNqiTHLNoik3V5UPxs_P+A@mail.gmail.com>
+ <53186F6C.5020008@mdowle.plus.com>
+Message-ID: <CAP=9f+rAFV-+yY1HjN815yuqw=BiTVwtkKF-FVQ5JMJZn650Gw@mail.gmail.com>
+
+That works I guess.
+
+> fread("http://www.stats.ox.ac.uk/pub/datasets/csb/ch11b.dat")
+trying URL 'http://www.stats.ox.ac.uk/pub/datasets/csb/ch11b.dat'
+Content type 'application/x-ns-proxy-autoconfig' length 2102 bytes
+opened URL
+downloaded 2102 bytes
+
+      V1  V2   V3    V4 V5
+  1:   1 307  930 36.58  0
+  2:   2 307  940 36.73  0
+  3:   3 307  950 36.93  0
+  4:   4 307 1000 37.15  0
+....
+
+
+On 6 March 2014 12:51, Matt Dowle <mdowle at mdowle.plus.com> wrote:
+
+>
+> Yes, thanks.  Are other files reading ok on Windows or is it just this
+> particular file?
+> e.g. does this work :
+> fread("http://www.stats.ox.ac.uk/pub/datasets/csb/ch11b.dat"<http://www.stats.ox.ac.uk/pub/datasets/csb/ch11b.dat>
+> )
+>
+> [ I don't have Windows within easy reach. ]
+>
+>
+> On 06/03/14 12:43, carrieromichele wrote:
+>
+>  I quickly read the last mail, Is this the test you needed guys?
+>
+>  > fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+> verbose=FALSE)
+> trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+> Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+> opened URL
+> downloaded 64 Kb
+>
+>  Empty data.table (0 rows) of 14 cols: Sex,Agemos,L,M,S,P3...
+> > sessionInfo()
+> R version 3.0.2 (2013-09-25)
+> Platform: x86_64-w64-mingw32/x64 (64-bit)
+>
+>  locale:
+> [1] LC_COLLATE=English_United Kingdom.1252  LC_CTYPE=English_United
+> Kingdom.1252
+> [3] LC_MONETARY=English_United Kingdom.1252 LC_NUMERIC=C
+>
+> [5] LC_TIME=English_United Kingdom.1252
+>
+>  attached base packages:
+> [1] stats     graphics  grDevices utils     datasets  methods   base
+>
+>  other attached packages:
+> [1] data.table_1.9.3
+>
+>  loaded via a namespace (and not attached):
+> [1] plyr_1.8.1     Rcpp_0.11.0    reshape2_1.2.2 Rook_1.0-9
+> stringr_0.6.2  tools_3.0.2
+> > fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+> verbose=FALSE)
+> trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+> Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+> opened URL
+> downloaded 64 Kb
+>
+>  Empty data.table (0 rows) of 14 cols: Sex,Agemos,L,M,S,P3...
+>
+>
+> On 6 March 2014 12:34, Matt Dowle <mdowle at mdowle.plus.com> wrote:
+>
+>>
+>> Works for me as well on linux,  same output as Kevin's.
+>>
+>> I was perplexed as to why Farrel's output has :
+>>
+>>    File opened, filesize is 6.2E-05B
+>>  but we see :
+>>
+>>    File opened, filesize is 0.000 GB
+>>  That line is switched depending on Windows or not. Comparing them :
+>>
+>> // On Windows :
+>> if (verbose) Rprintf("File opened, filesize is %.3 GB\n",
+>> 1.0*filesize/(1024*1024*1024));
+>>
+>> // On non-Windows :
+>> if (verbose) Rprintf("File opened, filesize is %.3f GB\n",
+>> 1.0*filesize/(1024*1024*1024));
+>>
+>> So, a missing "f". Just committed a fix for that (r1223). That line is
+>> part of a block that is necessarily different on Windows because its file
+>> and mmap commands are different.  The missing 'f' could have feasibly
+>> corrupted memory somehow (strange that the "G" of "GB" got overwritten) and
+>> if so would explain why it thought it got to the end of the file before
+>> seeing the \n after the \r.
+>>
+>> Farrel - does v1.9.2 work for you on Windows with verbose=FALSE? If yes,
+>> then very likely verbose=TRUE will now work with commit 1223.  Best to
+>> start with a new R session to clear any possible memory corruption and then
+>> try :
+>>
+>>    fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>> verbose=FALSE)
+>>
+>> If not, can anyone else reproduce on Windows? If so, I'll need to debug
+>> it on Windows.
+>>
+>> Thanks,
+>> Matt
+>>
+>>
+>>
+>> On 06/03/14 05:19, Kevin Ushey wrote:
+>>
+>>> I think Matt and Arun will have more information -- IIUC, fread is
+>>> only now gaining support for reading from URLs on Windows.
+>>>
+>>> Something strange: I get different output on the file structure with
+>>> fread. Posting in case it's useful:
+>>>
+>>>  statagecdc <- fread("
+>>>> http://www.cdc.gov/growthcharts/data/zscore/statage.csv", verbose=T)
+>>>>
+>>> Input contains no \n. Taking this to be a filename to open
+>>> File opened, filesize is 0.000 GB
+>>> File is opened and mapped ok
+>>> Detected eol as \r\n (CRLF) in that order, the Windows standard.
+>>> Using line 30 to detect sep (the last non blank line in the first
+>>> 'autostart') ... sep=','
+>>> Found 14 columns
+>>> First row with 14 fields occurs on line 1 (either column names or
+>>> first row of data)
+>>> All the fields on line 1 are character fields. Treating as the column
+>>> names.
+>>> Count of eol after first data row: 437
+>>> Subtracted 1 for last eol and any trailing empty lines, leaving 436 data
+>>> rows
+>>> Type codes: 13333333333333 (first 5 rows)
+>>> Type codes: 13333333333333 (+middle 5 rows)
+>>> Type codes: 13333333333333 (+last 5 rows)
+>>> Type codes: 13333333333333 (after applying colClasses and integer64)
+>>> Type codes: 13333333333333 (after applying drop or select (if supplied)
+>>> Allocating 14 column slots (14 - 0 NULL)
+>>>     0.000s ( 13%) Memory map (rerun may be quicker)
+>>>     0.000s (  4%) sep and header detection
+>>>     0.000s ( 13%) Count rows (wc -l)
+>>>     0.001s ( 49%) Column type detection (first, middle and last 5 rows)
+>>>     0.000s (  1%) Allocation of 436x14 result (xMB) in RAM
+>>>     0.000s ( 19%) Reading data
+>>>     0.000s (  0%) Allocation for type bumps (if any), including gc time
+>>> if triggered
+>>>     0.000s (  0%) Coercing data already read in type bumps (if any)
+>>>     0.000s (  0%) Changing na.strings to NA
+>>>     0.002s        Total
+>>>
+>>> Note that fread sees \r\n as newlines for me.
+>>>
+>>>  sessionInfo()
+>>>>
+>>> R Under development (unstable) (2014-02-12 r64976)
+>>> Platform: x86_64-apple-darwin13.0.0 (64-bit)
+>>>
+>>> locale:
+>>> [1] en_CA.UTF-8/en_CA.UTF-8/en_CA.UTF-8/C/en_CA.UTF-8/en_CA.UTF-8
+>>>
+>>> attached base packages:
+>>> [1] stats     graphics  grDevices utils     datasets  methods   base
+>>>
+>>> other attached packages:
+>>> [1] data.table_1.9.1     knitr_1.5.15         devtools_1.4.1.99
+>>> BiocInstaller_1.13.3
+>>>
+>>> loaded via a namespace (and not attached):
+>>>   [1] compiler_3.1.0    digest_0.6.4      evaluate_0.5.1
+>>> formatR_0.10      httr_0.2          memoise_0.1
+>>>   [7] parallel_3.1.0    plyr_1.8          Rcpp_0.11.0.3
+>>> RCurl_1.95-4.1    reshape2_1.3.0.99 stringr_0.6.2
+>>> [13] tools_3.1.0       whisker_0.3-2
+>>>
+>>> Kevin
+>>>
+>>> On Wed, Mar 5, 2014 at 9:04 PM, Farrel Buchinsky <fjbuch at gmail.com>
+>>> wrote:
+>>>
+>>>>  sessionInfo()
+>>>>>
+>>>> R version 3.0.2 (2013-09-25)
+>>>> Platform: x86_64-w64-mingw32/x64 (64-bit)
+>>>>
+>>>> locale:
+>>>> [1] LC_COLLATE=English_United States.1252  LC_CTYPE=English_United
+>>>> States.1252    LC_MONETARY=English_United States.1252
+>>>> [4] LC_NUMERIC=C                           LC_TIME=English_United
+>>>> States.1252
+>>>>
+>>>> attached base packages:
+>>>> [1] grid      stats     graphics  grDevices utils     datasets  methods
+>>>> base
+>>>>
+>>>> other attached packages:
+>>>> [1] reshape2_1.2.2    data.table_1.9.2  gridExtra_0.9.1
+>>>> ggplot2_0.9.3.1
+>>>> RGoogleDocs_0.7-0
+>>>>
+>>>> loaded via a namespace (and not attached):
+>>>>   [1] colorspace_1.2-4   dichromat_2.0-0    digest_0.6.4
+>>>> gtable_0.1.2
+>>>> labeling_0.2       MASS_7.3-29        munsell_0.4.2
+>>>>   [8] plyr_1.8.1         proto_0.3-10       RColorBrewer_1.0-5
+>>>> Rcpp_0.11.0
+>>>> RCurl_1.95-4.1     scales_0.2.3       stringr_0.6.2
+>>>> [15] tools_3.0.2        XML_3.98-1.1
+>>>>
+>>>> Farrel Buchinsky
+>>>> Google Voice Tel: (412) 567-7870 <%28412%29%20567-7870>
+>>>>
+>>>>
+>>>> On Wed, Mar 5, 2014 at 10:55 PM, Kevin Ushey <kevinushey at gmail.com>
+>>>> wrote:
+>>>>
+>>>>> Works fine for me with data.table 1.9.1 on OS X. What is your
+>>>>> sessionInfo()?
+>>>>>
+>>>>> Kevin
+>>>>>
+>>>>> On Wed, Mar 5, 2014 at 7:53 PM, Farrel Buchinsky <fjbuch at gmail.com>
+>>>>> wrote:
+>>>>>
+>>>>>> Any idea why I am getting a data.table with headers only and zero
+>>>>>> data?
+>>>>>> How
+>>>>>> can I get around the problem.
+>>>>>>
+>>>>>> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>>>>>> verbose=T)
+>>>>>> fails
+>>>>>> read.csv("http://www.cdc.gov/growthcharts/data/zscore/statage.csv")
+>>>>>> succeeds
+>>>>>>
+>>>>>>  statagecdc <-
+>>>>>>> fread("http://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+>>>>>>> verbose=T)
+>>>>>>>
+>>>>>> trying URL 'http://www.cdc.gov/growthcharts/data/zscore/statage.csv'
+>>>>>> Content type 'application/octet-stream' length 66087 bytes (64 Kb)
+>>>>>> opened URL
+>>>>>> downloaded 64 Kb
+>>>>>>
+>>>>>> Input contains no \n. Taking this to be a filename to open
+>>>>>> File opened, filesize is  6.2E-05B
+>>>>>> File is opened and mapped ok
+>>>>>> Detected eol as \r only (no \n afterwards). An old Mac 9 standard,
+>>>>>> discontinued in 2002 according to Wikipedia.
+>>>>>> Using line 1 to detect sep (the last non blank line in the first
+>>>>>> 'autostart') ... sep=','
+>>>>>> Found 14 columns
+>>>>>> First row with 14 fields occurs on line 1 (either column names or
+>>>>>> first
+>>>>>> row
+>>>>>> of data)
+>>>>>> All the fields on line 1 are character fields. Treating as the column
+>>>>>> names.
+>>>>>> Byte after header row is eof or eol, 0 data rows present.
+>>>>>> Type codes: 00000000000000 (first 5 rows)
+>>>>>> Type codes: 00000000000000 (after applying colClasses and integer64)
+>>>>>> Type codes: 00000000000000 (after applying drop or select (if
+>>>>>> supplied)
+>>>>>> Allocating 14 column slots (14 - 0 NULL)
+>>>>>>     0.000s (  0%) Memory map (rerun may be quicker)
+>>>>>>     0.000s (  0%) sep and header detection
+>>>>>>     0.001s (100%) Count rows (wc -l)
+>>>>>>     0.000s (  0%) Column type detection (first, middle and last 5
+>>>>>> rows)
+>>>>>>     0.000s (  0%) Allocation of 0x14 result (xMB) in RAM
+>>>>>>     0.000s (  0%) Reading data
+>>>>>>     0.000s (  0%) Allocation for type bumps (if any), including gc
+>>>>>> time
+>>>>>> if
+>>>>>> triggered
+>>>>>>     0.000s (  0%) Coercing data already read in type bumps (if any)
+>>>>>>     0.000s (  0%) Changing na.strings to NA
+>>>>>>     0.001s        Total
+>>>>>>
+>>>>>>
+>>>>>> Thanks a lot.
+>>>>>>
+>>>>>> Farrel Buchinsky
+>>>>>> Google Voice Tel: (412) 567-7870 <%28412%29%20567-7870>
+>>>>>>
+>>>>>> _______________________________________________
+>>>>>> datatable-help mailing list
+>>>>>> datatable-help at lists.r-forge.r-project.org
+>>>>>>
+>>>>>>
+>>>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>>>>
+>>>>>
+>>>>  _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140306/5c576770/attachment-0001.html>
+
+From pauljohn32 at gmail.com  Mon Mar 10 02:18:38 2014
+From: pauljohn32 at gmail.com (Paul Johnson)
+Date: Sun, 9 Mar 2014 20:18:38 -0500
+Subject: [datatable-help] what's wrong with my quote()-ing
+Message-ID: <CAErODj_Ud4oLDD1P7UkG8Fgn9+8gayRWwAP_AbxEaqeEjbRO_Q@mail.gmail.com>
+
+Hi
+
+I've been using data.table only 1 week. Some of the idioms still have me
+befuddled.  I'm finding some things that work, and I don't understand why.
+That's bad, but more frustrating, I have usages that seem good, but fail.
+I manage the aggregation on subsets parts more easily than the seemingly
+easier chores where I want to treat this as a data frame.
+
+In this example, accounts is a huge data.table with 41,000 lines, I'm
+pasting in a little dump of a few lines below, if it gives you enough to
+test.
+
+## This works:
+library(gmodels)
+temp1 <- quote(east2a)
+temp2 <- quote(east2b.1)
+accounts[ , CrossTable(eval(temp1), eval(temp2), expected = FALSE,
+prop.chisq = FALSE, prop.c = FALSE)]
+
+
+## why does this not work?
+i <- "east2a"
+temp1 <- quote(paste(i))
+temp2 <- quote(paste0("east2b.", 1))
+accounts[ , CrossTable(eval(temp1), eval(temp2), expected = FALSE,
+prop.chisq = FALSE, prop.c = FALSE)]
+
+Here's what happens when I run that:
+
+> library(gmodels)
+> temp1 <- quote(east2a)
+> temp2 <- quote(east2b.1)
+> accounts[ , CrossTable(eval(temp1), eval(temp2), expected = FALSE,
+prop.chisq = FALSE, prop.c = FALSE)]
+
+
+   Cell Contents
+|-------------------------|
+|                       N |
+|           N / Row Total |
+|         N / Table Total |
+|-------------------------|
+
+
+Total Observations in Table:  41052
+
+
+             | east2b.1
+      east2a |       Yes |        No | Row Total |
+-------------|-----------|-----------|-----------|
+         Yes |      9703 |      3051 |     12754 |
+             |     0.761 |     0.239 |     0.311 |
+             |     0.236 |     0.074 |           |
+-------------|-----------|-----------|-----------|
+          No |      7957 |     20341 |     28298 |
+             |     0.281 |     0.719 |     0.689 |
+             |     0.194 |     0.495 |           |
+-------------|-----------|-----------|-----------|
+Column Total |     17660 |     23392 |     41052 |
+-------------|-----------|-----------|-----------|
+
+
+       t  prop.row  prop.col   prop.tbl
+1:  9703 0.7607809 0.5494337 0.23635876
+2:  7957 0.2811859 0.4505663 0.19382734
+3:  3051 0.2392191 0.1304292 0.07432037
+4: 20341 0.7188141 0.8695708 0.49549352
+> i <- "east2a"
+> temp1 <- quote(paste(i))
+> temp2 <- quote(paste0("east2b.", 1))
+>  eval(temp2)
+[1] "east2b.1"
+> accounts[ , CrossTable(eval(temp1), eval(temp2), expected = FALSE,
+prop.chisq = FALSE, prop.c = FALSE)]
+Error in chisq.test(t, correct = FALSE) :
+  'x' must at least have 2 elements
+
+>From the output of dput here, can you reconstruct accounts for
+demonstration? I could drop it in a website/
+
+> dput(accounts[1:4, .SD])
+structure(list(sippid = c("019003754630:0203", "019003754630:0204",
+"019052074737:0101", "019052074737:0102"), east2bFirst = c("99",
+"11.0", "04.0", "04.0"), east2b = structure(c(2L, 1L, 1L, 1L), .Label =
+c("Yes",
+"No"), class = "factor"), tage = c(19L, 25L, 30L, 29L), east2aFirst =
+c("99",
+"99", "03.0", "03.0"), east2a = structure(c(2L, 2L, 1L, 1L), .Label =
+c("Yes",
+"No"), class = "factor"), east2b.1 = structure(c(2L, 2L, 2L,
+2L), .Label = c("Yes", "No"), class = "factor"), tage.1 = c(19L,
+22L, 30L, 28L), east3bFirst = c("99", "99", "03.0", "03.0"),
+    east3b = structure(c(2L, 2L, 1L, 1L), .Label = c("Yes", "No"
+    ), class = "factor"), east2b.2 = structure(c(2L, 2L, 2L,
+    2L), .Label = c("Yes", "No"), class = "factor"), tage.2 = c(19L,
+    22L, 30L, 28L), east1aFirst = c("99", "99", "11.0", "11.0"
+    ), east1a = structure(c(2L, 2L, 1L, 1L), .Label = c("Yes",
+    "No"), class = "factor"), east2b.3 = structure(c(2L, 2L,
+    1L, 1L), .Label = c("Yes", "No"), class = "factor"), tage.3 = c(19L,
+    22L, 32L, 31L), east3aFirst = c("99", "99", "11.0", "11.0"
+    ), east3a = structure(c(2L, 2L, 1L, 1L), .Label = c("Yes",
+    "No"), class = "factor"), east2b.4 = structure(c(2L, 2L,
+    1L, 1L), .Label = c("Yes", "No"), class = "factor"), tage.4 = c(19L,
+    22L, 32L, 31L), east2cFirst = c("99", "99", "99", "99"),
+    east2c = structure(c(2L, 2L, 2L, 2L), .Label = c("Yes", "No"
+    ), class = "factor"), east2b.5 = structure(c(2L, 2L, 2L,
+    2L), .Label = c("Yes", "No"), class = "factor"), tage.5 = c(19L,
+    22L, 29L, 28L), east1bcFirst = c("99", "99", "08.0", "09.0"
+    ), east1bc = structure(c(2L, 2L, 1L, 1L), .Label = c("Yes",
+    "No"), class = "factor"), east2b.6 = structure(c(2L, 2L,
+    1L, 1L), .Label = c("Yes", "No"), class = "factor"), tage.6 = c(19L,
+    22L, 31L, 30L), east2dFirst = c("99", "99", "99", "99"),
+    east2d = structure(c(2L, 2L, 2L, 2L), .Label = c("Yes", "No"
+    ), class = "factor"), east2b.7 = structure(c(2L, 2L, 2L,
+    2L), .Label = c("Yes", "No"), class = "factor"), tage.7 = c(19L,
+    22L, 29L, 28L)), .Names = c("sippid", "east2bFirst", "east2b",
+"tage", "east2aFirst", "east2a", "east2b.1", "tage.1", "east3bFirst",
+"east3b", "east2b.2", "tage.2", "east1aFirst", "east1a", "east2b.3",
+"tage.3", "east3aFirst", "east3a", "east2b.4", "tage.4", "east2cFirst",
+"east2c", "east2b.5", "tage.5", "east1bcFirst", "east1bc", "east2b.6",
+"tage.6", "east2dFirst", "east2d", "east2b.7", "tage.7"), sorted =
+"sippid", class = c("data.table",
+"data.frame"), row.names = c(NA, -4L), .internal.selfref = <pointer:
+0x1df8f58>)
+
+
+
+
+-- 
+Paul E. Johnson
+Professor, Political Science      Assoc. Director
+1541 Lilac Lane, Room 504      Center for Research Methods
+University of Kansas                 University of Kansas
+http://pj.freefaculty.org               http://quant.ku.edu
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140309/41775ba3/attachment.html>
+
+From stvjc at channing.harvard.edu  Mon Mar 10 04:33:12 2014
+From: stvjc at channing.harvard.edu (Vincent Carey)
+Date: Sun, 9 Mar 2014 23:33:12 -0400
+Subject: [datatable-help] checking an approach to filtering rows in a
+	data.table
+Message-ID: <CAANT7+UMNCb7-SdDXiHNMJ6-zFHmbsP7jWaH=j+WNgPExnrS8Q@mail.gmail.com>
+
+I have looked around for code on row filtering with data.table, but have
+not found anything addressing this use case.
+
+I want to retrieve the rows satisfying a certain condition within groups,
+in this case having the maximum value for a specific variable.  The
+following
+seems to work, but I wonder if there is a more direct approach.
+
+rowsWmaxVinG = function(dt, V, by) {
+#
+# filter dt to the rows possessing max value of
+# variable V within groups formed using by
+#
+# example: data(mtcars)
+# ddt = data.table(mtcars)
+#> rowsWmaxVinG( ddt, by="cyl", V="mpg")
+#    mpg cyl  disp  hp drat    wt  qsec vs am gear carb
+#1: 33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1
+#2: 21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1
+#3: 19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2
+#
+ setkeyv(dt, c(by, V)) # sort within groups
+ dt[ cumsum(dt[, .N, by=by]$N), ]  # take last row from each group
+}
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140309/91b7db32/attachment.html>
+
+From manabu.sakamoto at gmail.com  Mon Mar 10 06:00:43 2014
+From: manabu.sakamoto at gmail.com (Manabu Sakamoto)
+Date: Mon, 10 Mar 2014 14:00:43 +0900
+Subject: [datatable-help] setnames on copy data.table also renames original
+	data.table object
+Message-ID: <CAErHMT1jR9zQzHUUtGeWPTNkjV8bLOxnk_hntE_tkxXvKWM7xw@mail.gmail.com>
+
+Dear list,
+
+I have a data.table object for instance DT:
+
+x <- seq(1:100)
+y <- x^2
+DT <- data.table(X=x, Y=y)
+
+and I produce a copy
+
+DT2 <- DT
+
+which I rename
+
+setnames(DT2, c("A","B"))
+
+this somehow also renames DT, the names of which are now "A" and "B".
+
+How can I just rename the copy and keep the names of the original?
+
+Many thanks,
+Manabu
+
+-- 
+Manabu Sakamoto, PhD
+manabu.sakamoto at gmail.com
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140310/bd40d1cf/attachment.html>
+
+From michael.nelson at sydney.edu.au  Mon Mar 10 06:20:34 2014
+From: michael.nelson at sydney.edu.au (Michael Nelson)
+Date: Mon, 10 Mar 2014 05:20:34 +0000
+Subject: [datatable-help] setnames on copy data.table also renames
+ original	data.table object
+In-Reply-To: <CAErHMT1jR9zQzHUUtGeWPTNkjV8bLOxnk_hntE_tkxXvKWM7xw@mail.gmail.com>
+References: <CAErHMT1jR9zQzHUUtGeWPTNkjV8bLOxnk_hntE_tkxXvKWM7xw@mail.gmail.com>
+Message-ID: <6FB5193A6CDCDF499486A833B7AFBDCDB81A54D9@ex-mbx-pro-05>
+
+This is well explained in the help file for `copy` (and `setnames`)
+
+DT <- DT2
+
+does *not* create a copy, it creates two object names that refer to the same object reference.
+
+If you want force the creation of a copy, use `copy`
+
+DT <- copy(DT2)
+
+Then your example will work as expected.
+
+
+________________________________
+From: datatable-help-bounces at lists.r-forge.r-project.org [datatable-help-bounces at lists.r-forge.r-project.org] on behalf of Manabu Sakamoto [manabu.sakamoto at gmail.com]
+Sent: Monday, 10 March 2014 4:00 PM
+To: datatable-help at lists.r-forge.r-project.org
+Subject: [datatable-help] setnames on copy data.table also renames original data.table object
+
+Dear list,
+
+I have a data.table object for instance DT:
+
+x <- seq(1:100)
+y <- x^2
+DT <- data.table(X=x, Y=y)
+
+and I produce a copy
+
+DT2 <- DT
+
+which I rename
+
+setnames(DT2, c("A","B"))
+
+this somehow also renames DT, the names of which are now "A" and "B".
+
+How can I just rename the copy and keep the names of the original?
+
+Many thanks,
+Manabu
+
+--
+Manabu Sakamoto, PhD
+manabu.sakamoto at gmail.com<mailto:manabu.sakamoto at gmail.com>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140310/a7bcc7c9/attachment-0001.html>
+
+From mdowle at mdowle.plus.com  Mon Mar 10 14:07:14 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Mon, 10 Mar 2014 13:07:14 +0000
+Subject: [datatable-help] setnames on copy data.table also renames
+ original data.table object
+In-Reply-To: <6FB5193A6CDCDF499486A833B7AFBDCDB81A54D9@ex-mbx-pro-05>
+References: <CAErHMT1jR9zQzHUUtGeWPTNkjV8bLOxnk_hntE_tkxXvKWM7xw@mail.gmail.com>
+ <6FB5193A6CDCDF499486A833B7AFBDCDB81A54D9@ex-mbx-pro-05>
+Message-ID: <531DB902.500@mdowle.plus.com>
+
+
+And more info here (see both answers) :
+http://stackoverflow.com/questions/10225098/understanding-exactly-when-a-data-table-is-a-reference-to-vs-a-copy-of-another
+
+On 10/03/14 05:20, Michael Nelson wrote:
+> This is well explained in the help file for `copy` (and `setnames`)
+>
+> DT <- DT2
+>
+> does *not* create a copy, it creates two object names that refer to 
+> the same object reference.
+>
+> If you want force the creation of a copy, use `copy`
+>
+> DT <- copy(DT2)
+>
+> Then your example will work as expected.
+>
+>
+> ------------------------------------------------------------------------
+> *From:* datatable-help-bounces at lists.r-forge.r-project.org 
+> [datatable-help-bounces at lists.r-forge.r-project.org] on behalf of 
+> Manabu Sakamoto [manabu.sakamoto at gmail.com]
+> *Sent:* Monday, 10 March 2014 4:00 PM
+> *To:* datatable-help at lists.r-forge.r-project.org
+> *Subject:* [datatable-help] setnames on copy data.table also renames 
+> original data.table object
+>
+> Dear list,
+>
+> I have a data.table object for instance DT:
+>
+> x <- seq(1:100)
+> y <- x^2
+> DT <- data.table(X=x, Y=y)
+>
+> and I produce a copy
+>
+> DT2 <- DT
+>
+> which I rename
+>
+> setnames(DT2, c("A","B"))
+>
+> this somehow also renames DT, the names of which are now "A" and "B".
+>
+> How can I just rename the copy and keep the names of the original?
+>
+> Many thanks,
+> Manabu
+>
+> -- 
+> Manabu Sakamoto, PhD
+> manabu.sakamoto at gmail.com <mailto:manabu.sakamoto at gmail.com>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140310/eb7c182e/attachment.html>
+
+From aragorn168b at gmail.com  Mon Mar 10 14:08:51 2014
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Mon, 10 Mar 2014 14:08:51 +0100
+Subject: [datatable-help] checking an approach to filtering rows in a
+ data.table
+In-Reply-To: <CAANT7+UMNCb7-SdDXiHNMJ6-zFHmbsP7jWaH=j+WNgPExnrS8Q@mail.gmail.com>
+References: <CAANT7+UMNCb7-SdDXiHNMJ6-zFHmbsP7jWaH=j+WNgPExnrS8Q@mail.gmail.com>
+Message-ID: <etPan.531db963.436c6125.164@Arunkumars-MacBook-Pro.local>
+
+Hi Vincent,
+
+Have you checked out the special variable `.I`? Have a look at `?data.table`. This SO post may also be relevant:?http://stackoverflow.com/questions/21198937/subset-data-table-using-min-condition/21199009#21199009
+Arun
+From:?Vincent Carey Vincent Carey
+Reply:?Vincent Carey stvjc at channing.harvard.edu
+Date:?March 10, 2014 at 4:33:27 AM
+To:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org
+Subject:? [datatable-help] checking an approach to filtering rows in a data.table  
+I have looked around for code on row filtering with data.table, but have
+not found anything addressing this use case.
+
+I want to retrieve the rows satisfying a certain condition within groups, in this case having the maximum value for a specific variable. ?The following
+seems to work, but I wonder if there is a more direct approach.
+
+rowsWmaxVinG = function(dt, V, by) {
+#
+# filter dt to the rows possessing max value of
+# variable V within groups formed using by
+#
+# example: data(mtcars)
+# ddt = data.table(mtcars)
+#> rowsWmaxVinG( ddt, by="cyl", V="mpg")
+# ? ?mpg cyl ?disp ?hp drat ? ?wt ?qsec vs am gear carb
+#1: 33.9 ? 4 ?71.1 ?65 4.22 1.835 19.90 ?1 ?1 ? ?4 ? ?1
+#2: 21.4 ? 6 258.0 110 3.08 3.215 19.44 ?1 ?0 ? ?3 ? ?1
+#3: 19.2 ? 8 400.0 175 3.08 3.845 17.05 ?0 ?0 ? ?3 ? ?2
+#
+?setkeyv(dt, c(by, V)) # sort within groups
+?dt[ cumsum(dt[, .N, by=by]$N), ] ?# take last row from each group
+}
+_______________________________________________  
+datatable-help mailing list  
+datatable-help at lists.r-forge.r-project.org  
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140310/390c9e24/attachment.html>
+
+From mdowle at mdowle.plus.com  Mon Mar 10 14:23:29 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Mon, 10 Mar 2014 13:23:29 +0000
+Subject: [datatable-help] what's wrong with my quote()-ing
+In-Reply-To: <CAErODj_Ud4oLDD1P7UkG8Fgn9+8gayRWwAP_AbxEaqeEjbRO_Q@mail.gmail.com>
+References: <CAErODj_Ud4oLDD1P7UkG8Fgn9+8gayRWwAP_AbxEaqeEjbRO_Q@mail.gmail.com>
+Message-ID: <531DBCD1.8000004@mdowle.plus.com>
+
+
+Hi,
+
+It's easier to use get() to fetch column names dynamically. eval() is 
+more for when you want to construct the 'j' or 'by' clause dynamically 
+and you need to eval the whole argument; e.g. DT[, eval(...), eval(...)]
+
+In your example,
+
+i <- "east2a"
+temp1 <- paste(i)
+temp2 <- paste0("east2b.", 1)
+accounts[ , CrossTable(get(temp1), get(temp2), expected = FALSE, 
+prop.chisq = FALSE, prop.c = FALSE)]
+
+I guess you're placing CrossTable in j like that because you want to do 
+this by group next?  If not,  just use data.table as you would a 
+data.frame for this part.  It doesn't seem CrossTable has a 'data' 
+argument but you could pass data.table to y (since data.table is a 
+data.frame too).
+
+HTH, Matt
+
+
+On 10/03/14 01:18, Paul Johnson wrote:
+> Hi
+>
+> I've been using data.table only 1 week. Some of the idioms still have 
+> me befuddled.  I'm finding some things that work, and I don't 
+> understand why. That's bad, but more frustrating, I have usages that 
+> seem good, but fail.  I manage the aggregation on subsets parts more 
+> easily than the seemingly easier chores where I want to treat this as 
+> a data frame.
+>
+> In this example, accounts is a huge data.table with 41,000 lines, I'm 
+> pasting in a little dump of a few lines below, if it gives you enough 
+> to test.
+>
+> ## This works:
+> library(gmodels)
+> temp1 <- quote(east2a)
+> temp2 <- quote(east2b.1)
+> accounts[ , CrossTable(eval(temp1), eval(temp2), expected = FALSE, 
+> prop.chisq = FALSE, prop.c = FALSE)]
+>
+>
+> ## why does this not work?
+> i <- "east2a"
+> temp1 <- quote(paste(i))
+> temp2 <- quote(paste0("east2b.", 1))
+> accounts[ , CrossTable(eval(temp1), eval(temp2), expected = FALSE, 
+> prop.chisq = FALSE, prop.c = FALSE)]
+>
+> Here's what happens when I run that:
+>
+> > library(gmodels)
+> > temp1 <- quote(east2a)
+> > temp2 <- quote(east2b.1)
+> > accounts[ , CrossTable(eval(temp1), eval(temp2), expected = FALSE, 
+> prop.chisq = FALSE, prop.c = FALSE)]
+>
+>
+>    Cell Contents
+> |-------------------------|
+> |                       N |
+> |           N / Row Total |
+> |         N / Table Total |
+> |-------------------------|
+>
+>
+> Total Observations in Table:  41052
+>
+>
+>              | east2b.1
+>       east2a |       Yes |        No | Row Total |
+> -------------|-----------|-----------|-----------|
+>          Yes |      9703 |      3051 |     12754 |
+>              |     0.761 |     0.239 |     0.311 |
+>              |     0.236 |     0.074 |           |
+> -------------|-----------|-----------|-----------|
+>           No |      7957 |     20341 |     28298 |
+>              |     0.281 |     0.719 |     0.689 |
+>              |     0.194 |     0.495 |           |
+> -------------|-----------|-----------|-----------|
+> Column Total |     17660 |     23392 |     41052 |
+> -------------|-----------|-----------|-----------|
+>
+>
+>        t  prop.row  prop.col   prop.tbl
+> 1:  9703 0.7607809 0.5494337 0.23635876
+> 2:  7957 0.2811859 0.4505663 0.19382734
+> 3:  3051 0.2392191 0.1304292 0.07432037
+> 4: 20341 0.7188141 0.8695708 0.49549352
+> > i <- "east2a"
+> > temp1 <- quote(paste(i))
+> > temp2 <- quote(paste0("east2b.", 1))
+> >  eval(temp2)
+> [1] "east2b.1"
+> > accounts[ , CrossTable(eval(temp1), eval(temp2), expected = FALSE, 
+> prop.chisq = FALSE, prop.c = FALSE)]
+> Error in chisq.test(t, correct = FALSE) :
+>   'x' must at least have 2 elements
+>
+> From the output of dput here, can you reconstruct accounts for 
+> demonstration? I could drop it in a website/
+>
+> > dput(accounts[1:4, .SD])
+> structure(list(sippid = c("019003754630:0203", "019003754630:0204",
+> "019052074737:0101", "019052074737:0102"), east2bFirst = c("99",
+> "11.0", "04.0", "04.0"), east2b = structure(c(2L, 1L, 1L, 1L), .Label 
+> = c("Yes",
+> "No"), class = "factor"), tage = c(19L, 25L, 30L, 29L), east2aFirst = 
+> c("99",
+> "99", "03.0", "03.0"), east2a = structure(c(2L, 2L, 1L, 1L), .Label = 
+> c("Yes",
+> "No"), class = "factor"), east2b.1 = structure(c(2L, 2L, 2L,
+> 2L), .Label = c("Yes", "No"), class = "factor"), tage.1 = c(19L,
+> 22L, 30L, 28L), east3bFirst = c("99", "99", "03.0", "03.0"),
+>     east3b = structure(c(2L, 2L, 1L, 1L), .Label = c("Yes", "No"
+>     ), class = "factor"), east2b.2 = structure(c(2L, 2L, 2L,
+>     2L), .Label = c("Yes", "No"), class = "factor"), tage.2 = c(19L,
+>     22L, 30L, 28L), east1aFirst = c("99", "99", "11.0", "11.0"
+>     ), east1a = structure(c(2L, 2L, 1L, 1L), .Label = c("Yes",
+>     "No"), class = "factor"), east2b.3 = structure(c(2L, 2L,
+>     1L, 1L), .Label = c("Yes", "No"), class = "factor"), tage.3 = c(19L,
+>     22L, 32L, 31L), east3aFirst = c("99", "99", "11.0", "11.0"
+>     ), east3a = structure(c(2L, 2L, 1L, 1L), .Label = c("Yes",
+>     "No"), class = "factor"), east2b.4 = structure(c(2L, 2L,
+>     1L, 1L), .Label = c("Yes", "No"), class = "factor"), tage.4 = c(19L,
+>     22L, 32L, 31L), east2cFirst = c("99", "99", "99", "99"),
+>     east2c = structure(c(2L, 2L, 2L, 2L), .Label = c("Yes", "No"
+>     ), class = "factor"), east2b.5 = structure(c(2L, 2L, 2L,
+>     2L), .Label = c("Yes", "No"), class = "factor"), tage.5 = c(19L,
+>     22L, 29L, 28L), east1bcFirst = c("99", "99", "08.0", "09.0"
+>     ), east1bc = structure(c(2L, 2L, 1L, 1L), .Label = c("Yes",
+>     "No"), class = "factor"), east2b.6 = structure(c(2L, 2L,
+>     1L, 1L), .Label = c("Yes", "No"), class = "factor"), tage.6 = c(19L,
+>     22L, 31L, 30L), east2dFirst = c("99", "99", "99", "99"),
+>     east2d = structure(c(2L, 2L, 2L, 2L), .Label = c("Yes", "No"
+>     ), class = "factor"), east2b.7 = structure(c(2L, 2L, 2L,
+>     2L), .Label = c("Yes", "No"), class = "factor"), tage.7 = c(19L,
+>     22L, 29L, 28L)), .Names = c("sippid", "east2bFirst", "east2b",
+> "tage", "east2aFirst", "east2a", "east2b.1", "tage.1", "east3bFirst",
+> "east3b", "east2b.2", "tage.2", "east1aFirst", "east1a", "east2b.3",
+> "tage.3", "east3aFirst", "east3a", "east2b.4", "tage.4", "east2cFirst",
+> "east2c", "east2b.5", "tage.5", "east1bcFirst", "east1bc", "east2b.6",
+> "tage.6", "east2dFirst", "east2d", "east2b.7", "tage.7"), sorted = 
+> "sippid", class = c("data.table",
+> "data.frame"), row.names = c(NA, -4L), .internal.selfref = <pointer: 
+> 0x1df8f58>)
+>
+>
+>
+>
+> -- 
+> Paul E. Johnson
+> Professor, Political Science      Assoc. Director
+> 1541 Lilac Lane, Room 504      Center for Research Methods
+> University of Kansas                 University of Kansas
+> http://pj.freefaculty.org http://quant.ku.edu
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140310/665d5743/attachment-0001.html>
+
+From stvjc at channing.harvard.edu  Mon Mar 10 15:04:30 2014
+From: stvjc at channing.harvard.edu (Vincent Carey)
+Date: Mon, 10 Mar 2014 10:04:30 -0400
+Subject: [datatable-help] checking an approach to filtering rows in a
+	data.table
+In-Reply-To: <etPan.531db963.436c6125.164@Arunkumars-MacBook-Pro.local>
+References: <CAANT7+UMNCb7-SdDXiHNMJ6-zFHmbsP7jWaH=j+WNgPExnrS8Q@mail.gmail.com>
+ <etPan.531db963.436c6125.164@Arunkumars-MacBook-Pro.local>
+Message-ID: <CAANT7+WhqtDNy6Pr8B_u_N_56ydxqHa8bvE8LG9fE9zmLjH+8Q@mail.gmail.com>
+
+Thanks Arun, I like your approach, and I had looked at the possibility,
+although I had not seen the SO posting, which is indeed relevant.  The .I
+solution seemed underperformant relative to expectations, particularly for
+millions of rows.  Here are some
+timings for 2-300k rows.
+
+> litd = disc_allc200k_dt[1:200000,]
+> microbenchmark(rowsWmaxVinG( litd, "score", "snp" ))
+Unit: milliseconds
+                               expr      min       lq   median       uq
+ rowsWmaxVinG(litd, "score", "snp") 86.83909 87.45823 88.16629 89.26693
+      max neval
+ 440.0069   100
+> microbenchmark(litd[litd[, .I[which.max(score)], snp]$V1 ])
+Unit: milliseconds
+                                       expr      min       lq  median
+ uq
+ litd[litd[, .I[which.max(score)], snp]$V1] 241.3669 252.2612 279.342
+602.113
+      max neval
+ 657.7055   100
+> litd = disc_allc200k_dt[1:300000,]
+> microbenchmark(rowsWmaxVinG( litd, "score", "snp" ))
+Unit: milliseconds
+                               expr      min       lq   median       uq
+ rowsWmaxVinG(litd, "score", "snp") 119.6237 120.9789 121.6302 122.7155
+      max neval
+ 489.1918   100
+> microbenchmark(litd[litd[, .I[which.max(score)], snp]$V1 ])
+Unit: milliseconds
+                                       expr      min       lq   median
+ uq
+ litd[litd[, .I[which.max(score)], snp]$V1] 324.7394 347.5972 684.6746
+693.456
+      max neval
+ 1607.186   100
+
+The two approaches do not agree in terms of values returned when there are
+ties in the score within groups.  But otherwise the .N based approach seems
+to work.  I would like to verify that setkeyv accomplishes the sorting
+necessary for the .N based approach to be valid.
+
+> sessionInfo()
+R Under development (unstable) (2014-02-02 r64913)
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+locale:
+[1] C
+
+attached base packages:
+[1] stats     graphics  grDevices datasets  utils     tools     methods
+[8] base
+
+other attached packages:
+[1] microbenchmark_1.3-0 data.table_1.9.2     weaver_1.29.1
+[4] codetools_0.2-8      digest_0.6.4         BiocInstaller_1.13.3
+
+loaded via a namespace (and not attached):
+[1] Rcpp_0.11.0    plyr_1.8.1     reshape2_1.2.2 stringr_0.6.2
+
+
+
+On Mon, Mar 10, 2014 at 9:08 AM, Arunkumar Srinivasan <aragorn168b at gmail.com
+> wrote:
+
+> Hi Vincent,
+>
+> Have you checked out the special variable `.I`? Have a look at
+> `?data.table`. This SO post may also be relevant:
+> http://stackoverflow.com/questions/21198937/subset-data-table-using-min-condition/21199009#21199009
+> Arun
+> ------------------------------
+> From: Vincent Carey Vincent Carey <stvjc at channing.harvard.edu>
+> Reply: Vincent Carey stvjc at channing.harvard.edu
+> Date: March 10, 2014 at 4:33:27 AM
+> To: datatable-help at lists.r-forge.r-project.org
+> datatable-help at lists.r-forge.r-project.org
+> Subject:  [datatable-help] checking an approach to filtering rows in a
+> data.table
+>
+>  I have looked around for code on row filtering with data.table, but have
+> not found anything addressing this use case.
+>
+> I want to retrieve the rows satisfying a certain condition within groups,
+> in this case having the maximum value for a specific variable.  The
+> following
+> seems to work, but I wonder if there is a more direct approach.
+>
+> rowsWmaxVinG = function(dt, V, by) {
+> #
+> # filter dt to the rows possessing max value of
+> # variable V within groups formed using by
+> #
+> # example: data(mtcars)
+> # ddt = data.table(mtcars)
+> #> rowsWmaxVinG( ddt, by="cyl", V="mpg")
+> #    mpg cyl  disp  hp drat    wt  qsec vs am gear carb
+> #1: 33.9   4  71.1  65 4.22 1.835 19.90  1  1    4    1
+> #2: 21.4   6 258.0 110 3.08 3.215 19.44  1  0    3    1
+> #3: 19.2   8 400.0 175 3.08 3.845 17.05  0  0    3    2
+> #
+>  setkeyv(dt, c(by, V)) # sort within groups
+>  dt[ cumsum(dt[, .N, by=by]$N), ]  # take last row from each group
+> }
+>  _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140310/971d149c/attachment.html>
+
+From aragorn168b at gmail.com  Mon Mar 10 15:17:51 2014
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Mon, 10 Mar 2014 15:17:51 +0100
+Subject: [datatable-help] checking an approach to filtering rows in a
+ data.table
+In-Reply-To: <CAANT7+WhqtDNy6Pr8B_u_N_56ydxqHa8bvE8LG9fE9zmLjH+8Q@mail.gmail.com>
+References: <CAANT7+UMNCb7-SdDXiHNMJ6-zFHmbsP7jWaH=j+WNgPExnrS8Q@mail.gmail.com>
+ <etPan.531db963.436c6125.164@Arunkumars-MacBook-Pro.local>
+ <CAANT7+WhqtDNy6Pr8B_u_N_56ydxqHa8bvE8LG9fE9zmLjH+8Q@mail.gmail.com>
+Message-ID: <etPan.531dc98f.6b8b4567.174@Arunkumars-MacBook-Pro.local>
+
+Hi Vincent,
+
+I linked to the SO post to get an idea of how to use .I. I dint mean to say that it's exactly what you're looking for. which.max returns the first index of the max value (even if there are multiple identical max values). So, it might make sense that the results are not identical.
+
+Looking at what you're trying to do with your code, these are the two ways I'd approach it. I can't really tell which one's faster for your dataset. But it'd be great if you could post your benchmarks on these two methods.
+
+Method 1:
+
+# .I[.N] will get the running row number for every group's last index
+ddt[ddt[, .I[.N], by=by]$V1]
+Method 2:
+
+# since you've already keyed your data.table, take adv. of the mult="last" option:
+ddt[J(unique(cyl)), mult="last"]
+
+Arun
+From:?Vincent Carey Vincent Carey
+Reply:?Vincent Carey stvjc at channing.harvard.edu
+Date:?March 10, 2014 at 3:04:31 PM
+To:?Arunkumar Srinivasan aragorn168b at gmail.com
+Subject:? Re: [datatable-help] checking an approach to filtering rows in a data.table  
+Thanks Arun, I like your approach, and I had looked at the possibility, although I had not seen the SO posting, which is indeed relevant. ?The .I solution seemed underperformant relative to expectations, particularly for millions of rows. ?Here are some
+timings for 2-300k rows.
+
+> litd = disc_allc200k_dt[1:200000,]
+> microbenchmark(rowsWmaxVinG( litd, "score", "snp" ))
+Unit: milliseconds
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?expr ? ? ?min ? ? ? lq ? median ? ? ? uq
+?rowsWmaxVinG(litd, "score", "snp") 86.83909 87.45823 88.16629 89.26693
+? ? ? max neval
+?440.0069 ? 100
+> microbenchmark(litd[litd[, .I[which.max(score)], snp]$V1 ])
+Unit: milliseconds
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?expr ? ? ?min ? ? ? lq ?median ? ? ?uq
+?litd[litd[, .I[which.max(score)], snp]$V1] 241.3669 252.2612 279.342 602.113
+? ? ? max neval
+?657.7055 ? 100
+> litd = disc_allc200k_dt[1:300000,]
+> microbenchmark(rowsWmaxVinG( litd, "score", "snp" ))
+Unit: milliseconds
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?expr ? ? ?min ? ? ? lq ? median ? ? ? uq
+?rowsWmaxVinG(litd, "score", "snp") 119.6237 120.9789 121.6302 122.7155
+? ? ? max neval
+?489.1918 ? 100
+> microbenchmark(litd[litd[, .I[which.max(score)], snp]$V1 ])
+Unit: milliseconds
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?expr ? ? ?min ? ? ? lq ? median ? ? ?uq
+?litd[litd[, .I[which.max(score)], snp]$V1] 324.7394 347.5972 684.6746 693.456
+? ? ? max neval
+?1607.186 ? 100
+
+The two approaches do not agree in terms of values returned when there are ties in the score within groups. ?But otherwise the .N based approach seems to work. ?I would like to verify that setkeyv accomplishes the sorting necessary for the .N based approach to be valid.
+
+> sessionInfo()
+R Under development (unstable) (2014-02-02 r64913)
+Platform: x86_64-unknown-linux-gnu (64-bit)
+
+locale:
+[1] C
+
+attached base packages:
+[1] stats ? ? graphics ?grDevices datasets ?utils ? ? tools ? ? methods ?
+[8] base ? ??
+
+other attached packages:
+[1] microbenchmark_1.3-0 data.table_1.9.2 ? ? weaver_1.29.1 ? ? ??
+[4] codetools_0.2-8 ? ? ?digest_0.6.4 ? ? ? ? BiocInstaller_1.13.3
+
+loaded via a namespace (and not attached):
+[1] Rcpp_0.11.0 ? ?plyr_1.8.1 ? ? reshape2_1.2.2 stringr_0.6.2?
+
+
+
+On Mon, Mar 10, 2014 at 9:08 AM, Arunkumar Srinivasan <aragorn168b at gmail.com> wrote:
+Hi Vincent,
+
+Have you checked out the special variable `.I`? Have a look at `?data.table`. This SO post may also be relevant:?http://stackoverflow.com/questions/21198937/subset-data-table-using-min-condition/21199009#21199009
+Arun
+From:?Vincent Carey Vincent Carey
+Reply:?Vincent Carey stvjc at channing.harvard.edu
+Date:?March 10, 2014 at 4:33:27 AM
+To:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org
+Subject:? [datatable-help] checking an approach to filtering rows in a data.table
+I have looked around for code on row filtering with data.table, but have
+not found anything addressing this use case.
+
+I want to retrieve the rows satisfying a certain condition within groups, in this case having the maximum value for a specific variable. ?The following
+seems to work, but I wonder if there is a more direct approach.
+
+rowsWmaxVinG = function(dt, V, by) {
+#
+# filter dt to the rows possessing max value of
+# variable V within groups formed using by
+#
+# example: data(mtcars)
+# ddt = data.table(mtcars)
+#> rowsWmaxVinG( ddt, by="cyl", V="mpg")
+# ? ?mpg cyl ?disp ?hp drat ? ?wt ?qsec vs am gear carb
+#1: 33.9 ? 4 ?71.1 ?65 4.22 1.835 19.90 ?1 ?1 ? ?4 ? ?1
+#2: 21.4 ? 6 258.0 110 3.08 3.215 19.44 ?1 ?0 ? ?3 ? ?1
+#3: 19.2 ? 8 400.0 175 3.08 3.845 17.05 ?0 ?0 ? ?3 ? ?2
+#
+?setkeyv(dt, c(by, V)) # sort within groups
+?dt[ cumsum(dt[, .N, by=by]$N), ] ?# take last row from each group
+}
+_______________________________________________
+datatable-help mailing list
+datatable-help at lists.r-forge.r-project.org
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140310/e0bf9c50/attachment-0001.html>
+
+From tjohnson at src.riken.jp  Wed Mar 12 11:59:43 2014
+From: tjohnson at src.riken.jp (Todd A. Johnson)
+Date: Wed, 12 Mar 2014 19:59:43 +0900
+Subject: [datatable-help] Is assignment such as DT[,
+ a:=7] supposed to print DT when surrounded by braces?
+Message-ID: <CF466D2F.600A5%tjohnson@src.riken.jp>
+
+I am using data.table Version 1.9.2 with R 3.0.2 on Mac OS 10.6.8.
+
+I've looked through 6 months worth of the mailing list as well as the Bug
+reports and of course the FAQ vignette.  However, while my question seems
+related to FAQ 2.21, that answer seems to say that returning DT when
+assigning DT[i,col:=value] was made invisible in v1.8.3.
+
+My question comes from observing different behavior for assignment by
+reference to a column when a data.table DT is surrounded by braces compared
+to without braces (such as within an if..else statement).
+
+Here's a simple test program:
+
+library(data.table)
+DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+DT[,d:=7]
+
+DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+if( nrow(DT)>0 ){DT[,d:=7]}
+
+
+
+On my computer, it does the following:
+> DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+> DT[,d:=7]
+> DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+> if( nrow(DT)>0 ){DT[,d:=7]}
+   a b d
+1: 1 4 7
+2: 2 5 7
+3: 3 6 7
+
+
+So, should the second assignment within the 'if' statement print out DT?  To
+get rid of this effect in my scripts (which potentially could result in
+printing out tens-of-thousands of rows of data into a log file...), I
+surrounded my last assignment to DT with invisible(), but it seems strange
+to me that that would be necessary.
+
+Thank you!
+
+Todd
+
+
+
+
+From lianoglou.steve at gene.com  Wed Mar 12 18:47:39 2014
+From: lianoglou.steve at gene.com (Steve Lianoglou)
+Date: Wed, 12 Mar 2014 10:47:39 -0700
+Subject: [datatable-help] Is assignment such as DT[,
+ a:=7] supposed to print DT when surrounded by braces?
+In-Reply-To: <CF466D2F.600A5%tjohnson@src.riken.jp>
+References: <CF466D2F.600A5%tjohnson@src.riken.jp>
+Message-ID: <CAHA9McMbCBVP5=kuqRUXyxHOGfSY8uQsZFzJ5h+BqUA_Ht2Vhg@mail.gmail.com>
+
+Hi,
+
+On Wed, Mar 12, 2014 at 3:59 AM, Todd A. Johnson <tjohnson at src.riken.jp> wrote:
+> I am using data.table Version 1.9.2 with R 3.0.2 on Mac OS 10.6.8.
+>
+> I've looked through 6 months worth of the mailing list as well as the Bug
+> reports and of course the FAQ vignette.  However, while my question seems
+> related to FAQ 2.21, that answer seems to say that returning DT when
+> assigning DT[i,col:=value] was made invisible in v1.8.3.
+>
+> My question comes from observing different behavior for assignment by
+> reference to a column when a data.table DT is surrounded by braces compared
+> to without braces (such as within an if..else statement).
+>
+> Here's a simple test program:
+>
+> library(data.table)
+> DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+> DT[,d:=7]
+>
+> DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+> if( nrow(DT)>0 ){DT[,d:=7]}
+
+I can reproduce what you're seeing, but I don't think it has anything
+to do with DT being surrounded by {}, a simple:
+
+    if (nrow(DT) > 0) DT[, d := 7]
+
+will trigger a dump to the console as well
+
+> So, should the second assignment within the 'if' statement print out DT?
+
+I don't think it should. Note that if the := isn't the last clause in
+the expression block, nothing is printed, eg. this will be silent:
+
+    if (nrow(DT) > 0) {
+      DT[, d := 7]
+      x <- 1
+    }
+
+>  To
+> get rid of this effect in my scripts (which potentially could result in
+> printing out tens-of-thousands of rows of data into a log file...),
+
+That wouldn't happen, data.table "dumps" are always trimmed if they
+are too long (this is configured by the 'datatable.print.nrows' and
+'datatable.print.topn' otions).
+
+By default, if the data.table is > 100 rows, you will only print the
+top 5 and bottom 5 rows.
+
+In fact, as a workaround for you, if you set:
+
+    options(datatable.print.nrows=0)
+
+Your "problem" will now go away, meaning:
+
+    if (nrow(DT) > 0) DT[, d := 7]
+
+will be silent
+
+But so will all of your data.table "console dumps". Which is to say,
+just typing `DT` would not print anything to the console. You'd now
+have to explicitly set the 'nrows' option in a call to `print` to see
+your data.table, eg: `print(DT, nrows=100)` so you could explore the
+data.table on the console.
+
+There are people who say you should never dump a data.table or
+data.frame to the console, but rather look at str(dt) ... not sure
+that I agree with that, but that is another thing to consider if you
+hammer datatable.print.nrows to 0.
+
+HTH,
+-steve
+
+-- 
+Steve Lianoglou
+Computational Biologist
+Genentech
+
+From szehnder at uni-bonn.de  Wed Mar 12 20:28:09 2014
+From: szehnder at uni-bonn.de (Simon Zehnder)
+Date: Wed, 12 Mar 2014 20:28:09 +0100
+Subject: [datatable-help] Weird error in package with older data.table
+	version
+Message-ID: <B8E4C73A-6CB2-4052-9D15-DD7E554BACED@uni-bonn.de>
+
+I am having a weird error in a package I wrote some time ago with an older data.table version. ?fread? gives:
+
+Internal error: attempt to bump from type 0 to type 1. Please report to datatable-help
+
+The data is the same that I read in before. Any ideas? 
+
+
+Best
+
+Simon
+
+
+From szehnder at uni-bonn.de  Thu Mar 13 09:18:25 2014
+From: szehnder at uni-bonn.de (Simon Zehnder)
+Date: Thu, 13 Mar 2014 09:18:25 +0100
+Subject: [datatable-help] Weird error in package with older data.table
+	version
+In-Reply-To: <B8E4C73A-6CB2-4052-9D15-DD7E554BACED@uni-bonn.de>
+References: <B8E4C73A-6CB2-4052-9D15-DD7E554BACED@uni-bonn.de>
+Message-ID: <0649C5B6-B62E-4D55-B18C-B0C4D37A9833@uni-bonn.de>
+
+Ok, what I found out so far is the following:
+
+Column 9 (containing characters in the .csv-file) is read first as LGL (logical I think) because the character in the first rows of this column is just ?T? (and ?fread' reads T/True/TRUE as TRUE). After some lines there comes a ?C? and now this column cannot be anymore logical (LGL) but has to be character. Therefore this column gets bumped and the program stops.
+
+As the ordering of columns can change in my package I need to tell ?fread', that it should not consider LGL at all - is that possible? I would like to avoid to bother the user by asking him to provide colClasses. 
+
+My data sample is always the TRACE data but I cannot know what variables of the TRACE data a user has retrieved. So my only idea to avoid the above mentioned error in my fread would be:
+
+1. Read column names via ?scan?.
+
+2. Check what variables are in and then choose via key/value pairs the appropriate colClasses and use them in ?fread?.
+
+Any other suggestions?
+
+
+Best
+
+Simon
+ 
+On 12 Mar 2014, at 20:28, Simon Zehnder <szehnder at uni-bonn.de> wrote:
+
+> I am having a weird error in a package I wrote some time ago with an older data.table version. ?fread? gives:
+> 
+> Internal error: attempt to bump from type 0 to type 1. Please report to datatable-help
+> 
+> The data is the same that I read in before. Any ideas? 
+> 
+> 
+> Best
+> 
+> Simon
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+From mdowle at mdowle.plus.com  Thu Mar 13 12:35:50 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Thu, 13 Mar 2014 11:35:50 +0000
+Subject: [datatable-help] by=.EACHI and related -  please check ok
+Message-ID: <53219816.5070301@mdowle.plus.com>
+
+
+Dear all,
+
+by=.EACHI is now implemented and available in v1.9.3 from R-Forge.
+
+Please take a look at NEWS and see what you think :
+https://r-forge.r-project.org/scm/viewvc.php/pkg/NEWS?view=markup&root=datatable
+
+Quite a few related bugs and feature requests get resolved by this, 
+still going through them updating NEWS and adding tests.  Thanks to all.
+
+The changes are very much up for debate and change at this stage.
+
+Matt
+
+
+
+From carrieromichele at gmail.com  Thu Mar 13 13:21:52 2014
+From: carrieromichele at gmail.com (carrieromichele)
+Date: Thu, 13 Mar 2014 12:21:52 +0000
+Subject: [datatable-help] by=.EACHI and related - please check ok
+In-Reply-To: <53219816.5070301@mdowle.plus.com>
+References: <53219816.5070301@mdowle.plus.com>
+Message-ID: <CAP=9f+rCE+tP0mRBy+j38xGViQjrJ1-cmGqjn-6VU7u7JZ0wBw@mail.gmail.com>
+
+Cool! But I still remain a fan of the "by-without-by" :-)
+
+Is there a option to make the future stable version 1.9.4 to behave exactly
+as the 1.8.10? (same script same results)
+
+Thanks,
+
+Michele
+ On 13 Mar 2014 11:36, "Matt Dowle" <mdowle at mdowle.plus.com> wrote:
+
+>
+> Dear all,
+>
+> by=.EACHI is now implemented and available in v1.9.3 from R-Forge.
+>
+> Please take a look at NEWS and see what you think :
+> https://r-forge.r-project.org/scm/viewvc.php/pkg/NEWS?view=
+> markup&root=datatable
+>
+> Quite a few related bugs and feature requests get resolved by this, still
+> going through them updating NEWS and adding tests.  Thanks to all.
+>
+> The changes are very much up for debate and change at this stage.
+>
+> Matt
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/
+> listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140313/ff36c0be/attachment.html>
+
+From mdowle at mdowle.plus.com  Thu Mar 13 13:45:50 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Thu, 13 Mar 2014 12:45:50 +0000
+Subject: [datatable-help] by=.EACHI and related - please check ok
+In-Reply-To: <CAP=9f+rCE+tP0mRBy+j38xGViQjrJ1-cmGqjn-6VU7u7JZ0wBw@mail.gmail.com>
+References: <53219816.5070301@mdowle.plus.com>
+ <CAP=9f+rCE+tP0mRBy+j38xGViQjrJ1-cmGqjn-6VU7u7JZ0wBw@mail.gmail.com>
+Message-ID: <5321A87E.8070509@mdowle.plus.com>
+
+
+Not yet,  but yes NEWS says :
+
+     A "classic" option to restore the previous default behaviour is to be discussed and confirmed.
+
+Maybe :
+
+   options(datatable.bywithoutby = TRUE)
+
+is all that's needed.  Will do.
+
+Matt
+
+
+On 13/03/14 12:21, carrieromichele wrote:
+>
+> Cool! But I still remain a fan of the "by-without-by" :-)
+>
+> Is there a option to make the future stable version 1.9.4 to behave 
+> exactly as the 1.8.10? (same script same results)
+>
+> Thanks,
+>
+> Michele
+>
+> On 13 Mar 2014 11:36, "Matt Dowle" <mdowle at mdowle.plus.com 
+> <mailto:mdowle at mdowle.plus.com>> wrote:
+>
+>
+>     Dear all,
+>
+>     by=.EACHI is now implemented and available in v1.9.3 from R-Forge.
+>
+>     Please take a look at NEWS and see what you think :
+>     https://r-forge.r-project.org/scm/viewvc.php/pkg/NEWS?view=markup&root=datatable
+>
+>     Quite a few related bugs and feature requests get resolved by
+>     this, still going through them updating NEWS and adding tests.
+>      Thanks to all.
+>
+>     The changes are very much up for debate and change at this stage.
+>
+>     Matt
+>
+>
+>     _______________________________________________
+>     datatable-help mailing list
+>     datatable-help at lists.r-forge.r-project.org
+>     <mailto:datatable-help at lists.r-forge.r-project.org>
+>     https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140313/a413e8fe/attachment.html>
+
+From manabu.sakamoto at gmail.com  Thu Mar 13 15:48:18 2014
+From: manabu.sakamoto at gmail.com (Manabu Sakamoto)
+Date: Thu, 13 Mar 2014 23:48:18 +0900
+Subject: [datatable-help] How to replace values in data.table conditionally
+Message-ID: <CAErHMT2G8aWUC1vLkyDMaa9YBJUCtjkCPAGRgS7mTfKwfcDKvA@mail.gmail.com>
+
+Dear list
+
+I'm trying to access values within a data.table column by matching to
+elements in a vector and replacing with corresponding elements in a second
+vector. But I want to loop through specific column names also stored as a
+character vector.
+So something like:
+
+DT <- data.table(A=seq(1:10),B=seq(1:10),C=seq(1:10))
+
+cnm <- c("A", "B", "C")
+before <- c(4, 5, 6)
+after <- c(3, 7, 8)
+
+nm <- cnm[i]
+bfr <- before[i]
+afr <- after[i]
+
+DT[nm==bfr, nm:=afr]
+
+I'm sure this is completely wrong because it didn't work.
+So does anyone know how to correctly do this data.table solution?
+
+Many thanks,
+Manabu
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140313/ff164115/attachment.html>
+
+From eduard.antonyan at gmail.com  Thu Mar 13 16:22:24 2014
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Thu, 13 Mar 2014 10:22:24 -0500
+Subject: [datatable-help] by=.EACHI and related - please check ok
+In-Reply-To: <5321A87E.8070509@mdowle.plus.com>
+References: <53219816.5070301@mdowle.plus.com>
+ <CAP=9f+rCE+tP0mRBy+j38xGViQjrJ1-cmGqjn-6VU7u7JZ0wBw@mail.gmail.com>
+ <5321A87E.8070509@mdowle.plus.com>
+Message-ID: <CAHZcBOrkzXwx_XfSq4iSx8k2inx=vfr35Z4mX5EZXOFbtfdWtQ@mail.gmail.com>
+
+Looks great!!
+
+I think there were two extensions for this floating around, which are now
+possible to have - one (I think suggested by Gabor?) was to have by=.EACHI
+work with other types of i-expressions - simplest example would be d[, j,
+by=.EACHI] doing the same as d[, j, by = 1:nrow(d)], and another one was to
+be able to combine .EACHI with other by's, i.e. have smth like d[i, j, by =
+list(.EACHI, somecol)] (this one is somewhat more exotic and doesn't have
+an existing analogue afaik). Not sure if an FR for these exists.
+
+
+On Thu, Mar 13, 2014 at 7:45 AM, Matt Dowle <mdowle at mdowle.plus.com> wrote:
+
+>
+> Not yet,  but yes NEWS says :
+>
+>
+>     A "classic" option to restore the previous default behaviour is to be discussed and confirmed.
+>
+> Maybe :
+>
+>   options(datatable.bywithoutby = TRUE)
+>
+> is all that's needed.  Will do.
+>
+> Matt
+>
+>
+>
+> On 13/03/14 12:21, carrieromichele wrote:
+>
+> Cool! But I still remain a fan of the "by-without-by" :-)
+>
+> Is there a option to make the future stable version 1.9.4 to behave
+> exactly as the 1.8.10? (same script same results)
+>
+> Thanks,
+>
+> Michele
+>  On 13 Mar 2014 11:36, "Matt Dowle" <mdowle at mdowle.plus.com> wrote:
+>
+>>
+>> Dear all,
+>>
+>> by=.EACHI is now implemented and available in v1.9.3 from R-Forge.
+>>
+>> Please take a look at NEWS and see what you think :
+>>
+>> https://r-forge.r-project.org/scm/viewvc.php/pkg/NEWS?view=markup&root=datatable
+>>
+>> Quite a few related bugs and feature requests get resolved by this, still
+>> going through them updating NEWS and adding tests.  Thanks to all.
+>>
+>> The changes are very much up for debate and change at this stage.
+>>
+>> Matt
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140313/bf50afb4/attachment.html>
+
+From mdowle at mdowle.plus.com  Thu Mar 13 18:47:22 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Thu, 13 Mar 2014 17:47:22 +0000
+Subject: [datatable-help] How to replace values in data.table
+	conditionally
+In-Reply-To: <CAErHMT2G8aWUC1vLkyDMaa9YBJUCtjkCPAGRgS7mTfKwfcDKvA@mail.gmail.com>
+References: <CAErHMT2G8aWUC1vLkyDMaa9YBJUCtjkCPAGRgS7mTfKwfcDKvA@mail.gmail.com>
+Message-ID: <5321EF2A.6000103@mdowle.plus.com>
+
+On 13/03/14 14:48, Manabu Sakamoto wrote:
+> Dear list
+>
+> I'm trying to access values within a data.table column by matching to 
+> elements in a vector and replacing with corresponding elements in a 
+> second vector. But I want to loop through specific column names also 
+> stored as a character vector.
+> So something like:
+>
+> DT<- data.table(A=seq(1:10),B=seq(1:10),C=seq(1:10))
+>
+> cnm <- c("A", "B", "C")
+> before <- c(4, 5, 6)
+> after <- c(3, 7, 8)
+>
+> nm <- cnm[i]
+> bfr <- before[i]
+> afr <- after[i]
+>
+> DT[nm==bfr, nm:=afr]
+>
+> I'm sure this is completely wrong because it didn't work.
+> So does anyone know how to correctly do this data.table solution?
+
+DT[get(nm)==bfr, (nm):=afr]
+
+or
+
+set(DT, i=DT[[nm]]==bfr, j=nm, value=afr)
+
+I prefer the first way but if you're looping through many columns (say 
+1,000+) then using set() should be faster, see ?set.
+
+HTH, Matt
+
+>
+> Many thanks,
+> Manabu
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140313/8fc07051/attachment-0001.html>
+
+From carrieromichele at gmail.com  Fri Mar 14 09:31:15 2014
+From: carrieromichele at gmail.com (carrieromichele)
+Date: Fri, 14 Mar 2014 08:31:15 +0000
+Subject: [datatable-help] Possible FR - but just checking opinons
+Message-ID: <CAP=9f+pEUSP07yWH6wZN7a2Fx_ABu-fjHTzGJyYiXDMcUnfNww@mail.gmail.com>
+
+Hello list,
+
+I know this may sound weird and I understand that what follows might be
+considered as out of scope but I'd like your opinions on this.
+
+I've just seen a new comment to FR  #1007 and it got me thinking about the
+SQL concept of primary and secondary key (where the latter is linked to the
+primary key of another table). Again, this is a pure speculation post. I
+just wanted your opinions about having such features in R (via data.table)
+
+Thanks,
+
+Michele.
+
+
+<http://www.evolve-analytics.com>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140314/a10ed787/attachment.html>
+
+From mdowle at mdowle.plus.com  Fri Mar 14 11:55:21 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Fri, 14 Mar 2014 10:55:21 +0000
+Subject: [datatable-help] Possible FR - but just checking opinons
+In-Reply-To: <CAP=9f+pEUSP07yWH6wZN7a2Fx_ABu-fjHTzGJyYiXDMcUnfNww@mail.gmail.com>
+References: <CAP=9f+pEUSP07yWH6wZN7a2Fx_ABu-fjHTzGJyYiXDMcUnfNww@mail.gmail.com>
+Message-ID: <5322E019.5060709@mdowle.plus.com>
+
+
+Hi,
+
+It sounds like you mean 'foreign' key.  This could be useful, yes.  In 
+simple cases,  I've seen that used in SQL to do what R does 
+automatically.  A de-normalised database in SQL may have lookup tables 
+with two columns mapping say country id to country name,  to save 
+storing long country names over and over in a CHAR() or VARCHAR() 
+field.  We used to do that more simply in R using factors, and then R 
+itself introduced the global string cache so it does that for us now.   
+If you have a country name in full repeated 10 million times in a 
+data.table (or data.frame or any character vector) then all R is storing 
+there is 10 million pointers (4 or 8 bytes) to the unique strings it has 
+already cached.  That's similar to what foreign keys in SQL do,  but 
+much simpler.
+
+That said, we're settling on i. and x. prefixes in j  (changes in v1.9.3 
+for that to be checked ok please as per other email).  So to use a 
+foreign key for more complicated cases could be an extension of this by 
+using the table name as a prefix, provided that table was linked to x 
+via a previous foreign key definition (similar to SQL).
+
+'Secondary' keys on the other hand are different.  That's just like 
+having several pre-saved indexes on a table so you can join to it in 
+different ways.  Currently data.table's key is analogous to SQL's 
+clustered index (actually how the rows are ordered on disk, in RAM),  
+and secondary keys in data.table would be analogous to a regular SQL index.
+
+Interesting area.  Any real world examples anyone has would be useful to 
+illustrate.
+
+Matt
+
+
+On 14/03/14 08:31, carrieromichele wrote:
+> Hello list,
+>
+> I know this may sound weird and I understand that what follows might 
+> be considered as out of scope but I'd like your opinions on this.
+>
+> I've just seen a new comment to FR  #1007 and it got me thinking about 
+> the SQL concept of primary and secondary key (where the latter is 
+> linked to the primary key of another table). Again, this is a pure 
+> speculation post. I just wanted your opinions about having such 
+> features in R (via data.table)
+>
+> Thanks,
+>
+> Michele.
+>
+>
+> <http://www.evolve-analytics.com>
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140314/1fd5bad6/attachment.html>
+
+From carrieromichele at gmail.com  Fri Mar 14 12:16:44 2014
+From: carrieromichele at gmail.com (carrieromichele)
+Date: Fri, 14 Mar 2014 11:16:44 +0000
+Subject: [datatable-help] Possible FR - but just checking opinons
+In-Reply-To: <5322E019.5060709@mdowle.plus.com>
+References: <CAP=9f+pEUSP07yWH6wZN7a2Fx_ABu-fjHTzGJyYiXDMcUnfNww@mail.gmail.com>
+ <5322E019.5060709@mdowle.plus.com>
+Message-ID: <CAP=9f+pmUhxzax08UuJdbrjcPoK39qq71Hzqv=hmoaLjR03y3A@mail.gmail.com>
+
+Hi,
+
+Thanks for the lesson! I didn't know about the 'global string cache', I'll
+study it over the weekend! And yes I meant 'foreign'. I'll try to prepare
+an example from my real data, then.
+
+Thanks again
+
+Michele
+
+
+<http://www.evolve-analytics.com>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140314/8492d619/attachment.html>
+
+From tjohnson at src.riken.jp  Fri Mar 14 12:48:32 2014
+From: tjohnson at src.riken.jp (Todd A. Johnson)
+Date: Fri, 14 Mar 2014 20:48:32 +0900
+Subject: [datatable-help] Is assignment such as DT[,
+ a:=7] supposed to print DT when surrounded by braces?
+In-Reply-To: <CAHA9McMbCBVP5=kuqRUXyxHOGfSY8uQsZFzJ5h+BqUA_Ht2Vhg@mail.gmail.com>
+Message-ID: <CF491BA0.601B4%tjohnson@src.riken.jp>
+
+Hi Steve,
+
+Thanks for your thorough answer.  I suppose that my problem was that for
+some iterations of my script, the last update of DT was to a DT with just
+under 100 rows, so the not-so-silent column update then printed those rows
+into my log file, making the size of certain log files very different from
+the others.   Setting options(datatable.print.nrows=0) at the top of my
+script seems like a more elegant way than finding the last DT[,d:=7] update
+in a script and surrounding it with 'invisible'. :-)
+
+
+Todd
+
+
+On 3/13/14 2:47 AM, "Steve Lianoglou" <lianoglou.steve at gene.com> wrote:
+
+> Hi,
+> 
+> On Wed, Mar 12, 2014 at 3:59 AM, Todd A. Johnson <tjohnson at src.riken.jp>
+> wrote:
+>> I am using data.table Version 1.9.2 with R 3.0.2 on Mac OS 10.6.8.
+>> 
+>> I've looked through 6 months worth of the mailing list as well as the Bug
+>> reports and of course the FAQ vignette.  However, while my question seems
+>> related to FAQ 2.21, that answer seems to say that returning DT when
+>> assigning DT[i,col:=value] was made invisible in v1.8.3.
+>> 
+>> My question comes from observing different behavior for assignment by
+>> reference to a column when a data.table DT is surrounded by braces compared
+>> to without braces (such as within an if..else statement).
+>> 
+>> Here's a simple test program:
+>> 
+>> library(data.table)
+>> DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+>> DT[,d:=7]
+>> 
+>> DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+>> if( nrow(DT)>0 ){DT[,d:=7]}
+> 
+> I can reproduce what you're seeing, but I don't think it has anything
+> to do with DT being surrounded by {}, a simple:
+> 
+>     if (nrow(DT) > 0) DT[, d := 7]
+> 
+> will trigger a dump to the console as well
+> 
+>> So, should the second assignment within the 'if' statement print out DT?
+> 
+> I don't think it should. Note that if the := isn't the last clause in
+> the expression block, nothing is printed, eg. this will be silent:
+> 
+>     if (nrow(DT) > 0) {
+>       DT[, d := 7]
+>       x <- 1
+>     }
+> 
+>>  To
+>> get rid of this effect in my scripts (which potentially could result in
+>> printing out tens-of-thousands of rows of data into a log file...),
+> 
+> That wouldn't happen, data.table "dumps" are always trimmed if they
+> are too long (this is configured by the 'datatable.print.nrows' and
+> 'datatable.print.topn' otions).
+> 
+> By default, if the data.table is > 100 rows, you will only print the
+> top 5 and bottom 5 rows.
+> 
+> In fact, as a workaround for you, if you set:
+> 
+>     options(datatable.print.nrows=0)
+> 
+> Your "problem" will now go away, meaning:
+> 
+>     if (nrow(DT) > 0) DT[, d := 7]
+> 
+> will be silent
+> 
+> But so will all of your data.table "console dumps". Which is to say,
+> just typing `DT` would not print anything to the console. You'd now
+> have to explicitly set the 'nrows' option in a call to `print` to see
+> your data.table, eg: `print(DT, nrows=100)` so you could explore the
+> data.table on the console.
+> 
+> There are people who say you should never dump a data.table or
+> data.frame to the console, but rather look at str(dt) ... not sure
+> that I agree with that, but that is another thing to consider if you
+> hammer datatable.print.nrows to 0.
+> 
+> HTH,
+> -steve
+
+
+
+From szehnder at uni-bonn.de  Fri Mar 14 13:01:43 2014
+From: szehnder at uni-bonn.de (Simon Zehnder)
+Date: Fri, 14 Mar 2014 13:01:43 +0100
+Subject: [datatable-help] Weird error in package with older data.table
+	version
+In-Reply-To: <0649C5B6-B62E-4D55-B18C-B0C4D37A9833@uni-bonn.de>
+References: <B8E4C73A-6CB2-4052-9D15-DD7E554BACED@uni-bonn.de>
+ <0649C5B6-B62E-4D55-B18C-B0C4D37A9833@uni-bonn.de>
+Message-ID: <35D1D944-0C50-4483-A8CB-BA50D573387A@uni-bonn.de>
+
+My idea below made everything work ? problem solved.
+
+Best
+
+Simon
+
+On 13 Mar 2014, at 09:18, Simon Zehnder <szehnder at uni-bonn.de> wrote:
+
+> Ok, what I found out so far is the following:
+> 
+> Column 9 (containing characters in the .csv-file) is read first as LGL (logical I think) because the character in the first rows of this column is just ?T? (and ?fread' reads T/True/TRUE as TRUE). After some lines there comes a ?C? and now this column cannot be anymore logical (LGL) but has to be character. Therefore this column gets bumped and the program stops.
+> 
+> As the ordering of columns can change in my package I need to tell ?fread', that it should not consider LGL at all - is that possible? I would like to avoid to bother the user by asking him to provide colClasses. 
+> 
+> My data sample is always the TRACE data but I cannot know what variables of the TRACE data a user has retrieved. So my only idea to avoid the above mentioned error in my fread would be:
+> 
+> 1. Read column names via ?scan?.
+> 
+> 2. Check what variables are in and then choose via key/value pairs the appropriate colClasses and use them in ?fread?.
+> 
+> Any other suggestions?
+> 
+> 
+> Best
+> 
+> Simon
+> 
+> On 12 Mar 2014, at 20:28, Simon Zehnder <szehnder at uni-bonn.de> wrote:
+> 
+>> I am having a weird error in a package I wrote some time ago with an older data.table version. ?fread? gives:
+>> 
+>> Internal error: attempt to bump from type 0 to type 1. Please report to datatable-help
+>> 
+>> The data is the same that I read in before. Any ideas? 
+>> 
+>> 
+>> Best
+>> 
+>> Simon
+>> 
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+
+From mdowle at mdowle.plus.com  Fri Mar 14 15:03:03 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Fri, 14 Mar 2014 14:03:03 +0000
+Subject: [datatable-help] Is assignment such as DT[,
+ a:=7] supposed to print DT when surrounded by braces?
+In-Reply-To: <CF491BA0.601B4%tjohnson@src.riken.jp>
+References: <CF491BA0.601B4%tjohnson@src.riken.jp>
+Message-ID: <53230C17.1090701@mdowle.plus.com>
+
+
+Interesting.  What's happening is due to the result of DT[,d:=7] being 
+DT.  That's so that compound statements can work e.g.
+
+     DT[is.na(d),d:=0][,sum(a),by=d]
+
+If  DT[,d:=7] is the last line of a function or last line inside braces, 
+then R is printing the result.  It's not DT[,:=] printing, per se.   You 
+don't have to 'wrap' with invisible,  it's quite common for the last 
+line of a function to be invisible() on its own with no arguments,  just 
+as another option.
+
+I'll take a look to see if we can trap DT[,:=] printing when it's the 
+return value.  If you could file an item on the tracker please.  It's a 
+new one so haven't considered it before.
+
+Matt
+
+On 14/03/14 11:48, Todd A. Johnson wrote:
+> Hi Steve,
+>
+> Thanks for your thorough answer.  I suppose that my problem was that for
+> some iterations of my script, the last update of DT was to a DT with just
+> under 100 rows, so the not-so-silent column update then printed those rows
+> into my log file, making the size of certain log files very different from
+> the others.   Setting options(datatable.print.nrows=0) at the top of my
+> script seems like a more elegant way than finding the last DT[,d:=7] update
+> in a script and surrounding it with 'invisible'. :-)
+>
+>
+> Todd
+>
+>
+> On 3/13/14 2:47 AM, "Steve Lianoglou" <lianoglou.steve at gene.com> wrote:
+>
+>> Hi,
+>>
+>> On Wed, Mar 12, 2014 at 3:59 AM, Todd A. Johnson <tjohnson at src.riken.jp>
+>> wrote:
+>>> I am using data.table Version 1.9.2 with R 3.0.2 on Mac OS 10.6.8.
+>>>
+>>> I've looked through 6 months worth of the mailing list as well as the Bug
+>>> reports and of course the FAQ vignette.  However, while my question seems
+>>> related to FAQ 2.21, that answer seems to say that returning DT when
+>>> assigning DT[i,col:=value] was made invisible in v1.8.3.
+>>>
+>>> My question comes from observing different behavior for assignment by
+>>> reference to a column when a data.table DT is surrounded by braces compared
+>>> to without braces (such as within an if..else statement).
+>>>
+>>> Here's a simple test program:
+>>>
+>>> library(data.table)
+>>> DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+>>> DT[,d:=7]
+>>>
+>>> DT <- data.table(a=c(1,2,3), b=c(4,5,6))
+>>> if( nrow(DT)>0 ){DT[,d:=7]}
+>> I can reproduce what you're seeing, but I don't think it has anything
+>> to do with DT being surrounded by {}, a simple:
+>>
+>>      if (nrow(DT) > 0) DT[, d := 7]
+>>
+>> will trigger a dump to the console as well
+>>
+>>> So, should the second assignment within the 'if' statement print out DT?
+>> I don't think it should. Note that if the := isn't the last clause in
+>> the expression block, nothing is printed, eg. this will be silent:
+>>
+>>      if (nrow(DT) > 0) {
+>>        DT[, d := 7]
+>>        x <- 1
+>>      }
+>>
+>>>   To
+>>> get rid of this effect in my scripts (which potentially could result in
+>>> printing out tens-of-thousands of rows of data into a log file...),
+>> That wouldn't happen, data.table "dumps" are always trimmed if they
+>> are too long (this is configured by the 'datatable.print.nrows' and
+>> 'datatable.print.topn' otions).
+>>
+>> By default, if the data.table is > 100 rows, you will only print the
+>> top 5 and bottom 5 rows.
+>>
+>> In fact, as a workaround for you, if you set:
+>>
+>>      options(datatable.print.nrows=0)
+>>
+>> Your "problem" will now go away, meaning:
+>>
+>>      if (nrow(DT) > 0) DT[, d := 7]
+>>
+>> will be silent
+>>
+>> But so will all of your data.table "console dumps". Which is to say,
+>> just typing `DT` would not print anything to the console. You'd now
+>> have to explicitly set the 'nrows' option in a call to `print` to see
+>> your data.table, eg: `print(DT, nrows=100)` so you could explore the
+>> data.table on the console.
+>>
+>> There are people who say you should never dump a data.table or
+>> data.frame to the console, but rather look at str(dt) ... not sure
+>> that I agree with that, but that is another thing to consider if you
+>> hammer datatable.print.nrows to 0.
+>>
+>> HTH,
+>> -steve
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+From mdowle at mdowle.plus.com  Fri Mar 14 15:13:16 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Fri, 14 Mar 2014 14:13:16 +0000
+Subject: [datatable-help] Weird error in package with older data.table
+ version
+In-Reply-To: <35D1D944-0C50-4483-A8CB-BA50D573387A@uni-bonn.de>
+References: <B8E4C73A-6CB2-4052-9D15-DD7E554BACED@uni-bonn.de>
+ <0649C5B6-B62E-4D55-B18C-B0C4D37A9833@uni-bonn.de>
+ <35D1D944-0C50-4483-A8CB-BA50D573387A@uni-bonn.de>
+Message-ID: <53230E7C.8020206@mdowle.plus.com>
+
+What do you mean by older data.table version, which one?  Can you 
+upgrade to v1.9.2?
+
+ > Therefore this column gets bumped and the program stops.
+
+It shouldn't stop.  It should bump the column and continue. That's what 
+happens for me.  Could be a bug then,  which is why it's confusing 
+talking about an older version of data.table. Thinking about it, maybe 
+those bump warning messages should be downgraded to verbose=TRUE 
+output.    It might be stopping if you've set options(warn=2).
+
+Matt
+
+On 14/03/14 12:01, Simon Zehnder wrote:
+> My idea below made everything work ? problem solved.
+>
+> Best
+>
+> Simon
+>
+> On 13 Mar 2014, at 09:18, Simon Zehnder <szehnder at uni-bonn.de> wrote:
+>
+>> Ok, what I found out so far is the following:
+>>
+>> Column 9 (containing characters in the .csv-file) is read first as LGL (logical I think) because the character in the first rows of this column is just ?T? (and ?fread' reads T/True/TRUE as TRUE). After some lines there comes a ?C? and now this column cannot be anymore logical (LGL) but has to be character. Therefore this column gets bumped and the program stops.
+>>
+>> As the ordering of columns can change in my package I need to tell ?fread', that it should not consider LGL at all - is that possible? I would like to avoid to bother the user by asking him to provide colClasses.
+>>
+>> My data sample is always the TRACE data but I cannot know what variables of the TRACE data a user has retrieved. So my only idea to avoid the above mentioned error in my fread would be:
+>>
+>> 1. Read column names via ?scan?.
+>>
+>> 2. Check what variables are in and then choose via key/value pairs the appropriate colClasses and use them in ?fread?.
+>>
+>> Any other suggestions?
+>>
+>>
+>> Best
+>>
+>> Simon
+>>
+>> On 12 Mar 2014, at 20:28, Simon Zehnder <szehnder at uni-bonn.de> wrote:
+>>
+>>> I am having a weird error in a package I wrote some time ago with an older data.table version. ?fread? gives:
+>>>
+>>> Internal error: attempt to bump from type 0 to type 1. Please report to datatable-help
+>>>
+>>> The data is the same that I read in before. Any ideas?
+>>>
+>>>
+>>> Best
+>>>
+>>> Simon
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+From szehnder at uni-bonn.de  Fri Mar 14 16:01:55 2014
+From: szehnder at uni-bonn.de (Simon Zehnder)
+Date: Fri, 14 Mar 2014 16:01:55 +0100
+Subject: [datatable-help] Weird error in package with older data.table
+	version
+In-Reply-To: <53230E7C.8020206@mdowle.plus.com>
+References: <B8E4C73A-6CB2-4052-9D15-DD7E554BACED@uni-bonn.de>
+ <0649C5B6-B62E-4D55-B18C-B0C4D37A9833@uni-bonn.de>
+ <35D1D944-0C50-4483-A8CB-BA50D573387A@uni-bonn.de>
+ <53230E7C.8020206@mdowle.plus.com>
+Message-ID: <A959CE12-E73C-4728-9E00-4B1C6EC160F3@uni-bonn.de>
+
+Hi Matt,
+
+the ?older version? was 1.8.10. With the newer version it bumps and stops. No change there (options(warn = 2)) ?.only if I give colClasses it runs through. 
+
+Best
+
+Simon
+
+On 14 Mar 2014, at 15:13, Matt Dowle <mdowle at mdowle.plus.com> wrote:
+
+> What do you mean by older data.table version, which one?  Can you upgrade to v1.9.2?
+> 
+> > Therefore this column gets bumped and the program stops.
+> 
+> It shouldn't stop.  It should bump the column and continue. That's what happens for me.  Could be a bug then,  which is why it's confusing talking about an older version of data.table. Thinking about it, maybe those bump warning messages should be downgraded to verbose=TRUE output.    It might be stopping if you've set options(warn=2).
+> 
+> Matt
+> 
+> On 14/03/14 12:01, Simon Zehnder wrote:
+>> My idea below made everything work ? problem solved.
+>> 
+>> Best
+>> 
+>> Simon
+>> 
+>> On 13 Mar 2014, at 09:18, Simon Zehnder <szehnder at uni-bonn.de> wrote:
+>> 
+>>> Ok, what I found out so far is the following:
+>>> 
+>>> Column 9 (containing characters in the .csv-file) is read first as LGL (logical I think) because the character in the first rows of this column is just ?T? (and ?fread' reads T/True/TRUE as TRUE). After some lines there comes a ?C? and now this column cannot be anymore logical (LGL) but has to be character. Therefore this column gets bumped and the program stops.
+>>> 
+>>> As the ordering of columns can change in my package I need to tell ?fread', that it should not consider LGL at all - is that possible? I would like to avoid to bother the user by asking him to provide colClasses.
+>>> 
+>>> My data sample is always the TRACE data but I cannot know what variables of the TRACE data a user has retrieved. So my only idea to avoid the above mentioned error in my fread would be:
+>>> 
+>>> 1. Read column names via ?scan?.
+>>> 
+>>> 2. Check what variables are in and then choose via key/value pairs the appropriate colClasses and use them in ?fread?.
+>>> 
+>>> Any other suggestions?
+>>> 
+>>> 
+>>> Best
+>>> 
+>>> Simon
+>>> 
+>>> On 12 Mar 2014, at 20:28, Simon Zehnder <szehnder at uni-bonn.de> wrote:
+>>> 
+>>>> I am having a weird error in a package I wrote some time ago with an older data.table version. ?fread? gives:
+>>>> 
+>>>> Internal error: attempt to bump from type 0 to type 1. Please report to datatable-help
+>>>> 
+>>>> The data is the same that I read in before. Any ideas?
+>>>> 
+>>>> 
+>>>> Best
+>>>> 
+>>>> Simon
+>>>> 
+>>>> _______________________________________________
+>>>> datatable-help mailing list
+>>>> datatable-help at lists.r-forge.r-project.org
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>> 
+> 
+
+
+From my.r.help at gmail.com  Sun Mar 16 09:02:39 2014
+From: my.r.help at gmail.com (Michael Smith)
+Date: Sun, 16 Mar 2014 16:02:39 +0800
+Subject: [datatable-help] `:=` Fails When Called From Function Inside a
+	Package
+Message-ID: <53255A9F.7020809@gmail.com>
+
+All,
+
+This is my first post on this list, thanks to all those who have made
+data.table such a wonderful package.
+
+I have a simple function that looks like this (for reproducibility):
+
+myfun <- function() {
+  DT <- data.table(a = 1:4, b = 5:8)
+  DT[, x := a + 2]
+  DT
+}
+
+It works perfectly fine, until I add it to a custom R package that I
+just wrote. If I add it to the package and try to call it, I get the
+following error:
+
+> mypackage::myfun()
+Error in `:=`(x, a + 2) :
+  Check that is.data.table(DT) == TRUE. Otherwise, := and `:=`(...) are
+defined for use in j, once only and in particular ways. See help(":=").
+
+Not really sure what's going on here. Any ideas? Is this a bug or am I
+doing something wrong?
+
+Thanks,
+
+M
+
+From my.r.help at gmail.com  Sun Mar 16 09:21:59 2014
+From: my.r.help at gmail.com (Michael Smith)
+Date: Sun, 16 Mar 2014 16:21:59 +0800
+Subject: [datatable-help] `:=` Fails When Called From Function Inside a
+	Package
+In-Reply-To: <53255A9F.7020809@gmail.com>
+References: <53255A9F.7020809@gmail.com>
+Message-ID: <53255F27.7000106@gmail.com>
+
+... Problem solved (it helps to import data.table into the package...)
+
+Thanks, M
+
+
+On 03/16/2014 04:02 PM, Michael Smith wrote:
+> All,
+> 
+> This is my first post on this list, thanks to all those who have made
+> data.table such a wonderful package.
+> 
+> I have a simple function that looks like this (for reproducibility):
+> 
+> myfun <- function() {
+>   DT <- data.table(a = 1:4, b = 5:8)
+>   DT[, x := a + 2]
+>   DT
+> }
+> 
+> It works perfectly fine, until I add it to a custom R package that I
+> just wrote. If I add it to the package and try to call it, I get the
+> following error:
+> 
+>> mypackage::myfun()
+> Error in `:=`(x, a + 2) :
+>   Check that is.data.table(DT) == TRUE. Otherwise, := and `:=`(...) are
+> defined for use in j, once only and in particular ways. See help(":=").
+> 
+> Not really sure what's going on here. Any ideas? Is this a bug or am I
+> doing something wrong?
+> 
+> Thanks,
+> 
+> M
+> 
+
+From FErickson at psu.edu  Mon Mar 17 23:30:05 2014
+From: FErickson at psu.edu (Frank Erickson)
+Date: Mon, 17 Mar 2014 17:30:05 -0500
+Subject: [datatable-help] by=.EACHI and related - please check ok
+In-Reply-To: <CAJd-hdmLn6mJv271AQRSShYhOU-jBBHY3TXejfWyiZA4V_R8xQ@mail.gmail.com>
+References: <53219816.5070301@mdowle.plus.com>
+ <CAP=9f+rCE+tP0mRBy+j38xGViQjrJ1-cmGqjn-6VU7u7JZ0wBw@mail.gmail.com>
+ <5321A87E.8070509@mdowle.plus.com>
+ <CAHZcBOrkzXwx_XfSq4iSx8k2inx=vfr35Z4mX5EZXOFbtfdWtQ@mail.gmail.com>
+ <CAJd-hdmLn6mJv271AQRSShYhOU-jBBHY3TXejfWyiZA4V_R8xQ@mail.gmail.com>
+Message-ID: <CAJd-hd=620jgEz4XpXNAP6CV_uaS8QqXuW8WK-rMnBubBnOGzw@mail.gmail.com>
+
+Cool stuff! I'd like to see eddi's second extension, too. It would be nice
+if ".EACHI" were shorter to type, though, like ".i" or ".is" or something.
+--Frank
+
+p.s. Hmm, got stopped by the mailer daemon the first time I sent this:
+
+
+On Mon, Mar 17, 2014 at 11:26 AM, Frank Erickson <FErickson at psu.edu> wrote:
+
+> Cool stuff! I'd like to see eddi's second extension, too. It would be nice
+> if ".EACHI" were shorter to type, though, like ".i" or ".is" or something.
+> --Frank
+>
+>
+> On Thu, Mar 13, 2014 at 10:22 AM, Eduard Antonyan <
+> eduard.antonyan at gmail.com> wrote:
+>
+>> Looks great!!
+>>
+>> I think there were two extensions for this floating around, which are now
+>> possible to have - one (I think suggested by Gabor?) was to have by=.EACHI
+>> work with other types of i-expressions - simplest example would be d[, j,
+>> by=.EACHI] doing the same as d[, j, by = 1:nrow(d)], and another one was to
+>> be able to combine .EACHI with other by's, i.e. have smth like d[i, j, by =
+>> list(.EACHI, somecol)] (this one is somewhat more exotic and doesn't have
+>> an existing analogue afaik). Not sure if an FR for these exists.
+>>
+>>
+>> On Thu, Mar 13, 2014 at 7:45 AM, Matt Dowle <mdowle at mdowle.plus.com>wrote:
+>>
+>>>
+>>> Not yet,  but yes NEWS says :
+>>>
+>>>
+>>>     A "classic" option to restore the previous default behaviour is to be discussed and confirmed.
+>>>
+>>> Maybe :
+>>>
+>>>   options(datatable.bywithoutby = TRUE)
+>>>
+>>> is all that's needed.  Will do.
+>>>
+>>> Matt
+>>>
+>>>
+>>>
+>>> On 13/03/14 12:21, carrieromichele wrote:
+>>>
+>>> Cool! But I still remain a fan of the "by-without-by" :-)
+>>>
+>>> Is there a option to make the future stable version 1.9.4 to behave
+>>> exactly as the 1.8.10? (same script same results)
+>>>
+>>> Thanks,
+>>>
+>>> Michele
+>>>  On 13 Mar 2014 11:36, "Matt Dowle" <mdowle at mdowle.plus.com> wrote:
+>>>
+>>>>
+>>>> Dear all,
+>>>>
+>>>> by=.EACHI is now implemented and available in v1.9.3 from R-Forge.
+>>>>
+>>>> Please take a look at NEWS and see what you think :
+>>>>
+>>>> https://r-forge.r-project.org/scm/viewvc.php/pkg/NEWS?view=markup&root=datatable
+>>>>
+>>>> Quite a few related bugs and feature requests get resolved by this,
+>>>> still going through them updating NEWS and adding tests.  Thanks to all.
+>>>>
+>>>> The changes are very much up for debate and change at this stage.
+>>>>
+>>>> Matt
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> datatable-help mailing list
+>>>> datatable-help at lists.r-forge.r-project.org
+>>>>
+>>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>>
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>
+>>
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>>
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140317/1875c2ba/attachment.html>
+
+From aragorn168b at gmail.com  Wed Mar 19 03:00:52 2014
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Wed, 19 Mar 2014 03:00:52 +0100
+Subject: [datatable-help] FR #2722 testing
+Message-ID: <etPan.5328fa54.643c9869.1445d@Arunkumars-MacBook-Pro.local>
+
+Hi everybody,
+
+FR #2722 is now implemented and committed recently. It'd be great if people who're used to using devel versions could test it out and let us know if things are alright.
+
+Here's an explanation of what the FR is and what's being optimised: 
+Assuming a data.table with 4 columns x,y,z,grp, something like:
+
+DT[, c(sum(y), lapply(.SD, sum), .N .I, lapply(.SD, mean)), by=grp]
+will usually be quite slow because of using eval with lapply. This will now be optimised to:
+
+DT[, list(sum(y), sum(x), sum(y), sum(z), .N, .I, mean(x), mean(y), mean(z)), by=grp]
+However, we don't optimise if .SD is present in j in the form c(.) in any other form other than lapply(.SD, fun), because there are quite a few possibilities with .SD:
+
+DT[, c(.SD, .SD[1], .SD+a, .SD[x>1], .SD[J(.), .SD[.(.)], lapply(.SD, sum)), by=grp]
+Also, consider the case .SD[sample(.N, 1)] - this can't be optimised to list(x=x[sample(.)], y=y[sample(.)], z=y[sample(.)] obviously. So, the expression inside .SD has to be evaluated first, checked for type - logical, numeric, integer, data.table? and then must be optimised accordingly.
+
+Therefore, this'll be postponed, if at all possible in a clear way. However, we've not come across such a case here on the mailing list or on SO yet. I'm therefore assuming it's a very rare case, which is good.
+
+Summary: The most common cases should therefore be very fast. Here's a benchmark comparing the timings with and without optimisation:
+
+require(data.table)
+set.seed(1L)
+dt <- data.table(x=rep(1:1e6, each=10), y=sample(10), z=sample(2))
+
+options(datatable.verbose=TRUE) # not pasting verbose messages here.
+
+# without optimisation
+options(datatable.optimize=0L)
+system.time(ans1 <- dt[, c(bla = sum(y), lapply(.SD, mean)), by=x])
+#   user  system elapsed 
+# 90.705   5.184 121.274 
+
+# with optimisation
+options(datatable.optimize=Inf)
+system.time(ans2 <- dt[, c(bla = sum(y), lapply(.SD, mean)), by=x])
+#   user  system elapsed 
+#  0.450   0.128   0.690 
+Note that the case DT[, c(sum(y), lapply(.SD, sum)), by=grp, .SDcols=..] is still not implemented - FR #5222. So the optimisation will also result in object not found. When this FR is taken care of, the optimisation will also work automatically.
+
+
+
+Arun
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140319/184dc199/attachment.html>
+
+From statquant at outlook.com  Fri Mar 21 19:37:46 2014
+From: statquant at outlook.com (statquant3)
+Date: Fri, 21 Mar 2014 11:37:46 -0700 (PDT)
+Subject: [datatable-help] AM I getting crazy
+Message-ID: <1395427065922-4687317.post@n4.nabble.com>
+
+There is something I do not understand
+I have a table with columns a,b,c,d,e,z,w
+
+can DT[,list(sum(a+b)),by='z,w'] ever give a different number of lines than
+DT[,list(sum(a+b),c*d*e),by='z,w']
+That's what I am getting !!!
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/AM-I-getting-crazy-tp4687317.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From statquant at outlook.com  Fri Mar 21 19:42:29 2014
+From: statquant at outlook.com (statquant3)
+Date: Fri, 21 Mar 2014 11:42:29 -0700 (PDT)
+Subject: [datatable-help] AM I getting crazy
+In-Reply-To: <1395427065922-4687317.post@n4.nabble.com>
+References: <1395427065922-4687317.post@n4.nabble.com>
+Message-ID: <1395427349272-4687318.post@n4.nabble.com>
+
+Please ignore my previous message I was very tired
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/AM-I-getting-crazy-tp4687317p4687318.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From danielrlabar at gmail.com  Mon Mar 24 06:35:55 2014
+From: danielrlabar at gmail.com (dnlbrky)
+Date: Sun, 23 Mar 2014 22:35:55 -0700 (PDT)
+Subject: [datatable-help] "Error in Ops.POSIXt" using 1.9.x
+Message-ID: <1395639355745-4687400.post@n4.nabble.com>
+
+Running the following using data.table version 1.8.10 or 1.8.11 (Windows 7)
+works as expected:
+
+n <- 12
+dt <- data.table(id=rep(letters[1:(n/3)], each=3),
+                 d=seq(as.POSIXct("2013-01-01"), by="month", length.out=n))
+dt[, list(d2=seq(d, dt[, max(d)], by="month")), by=list(id, d)][1:15]
+
+>     id          d         d2
+>  1:  a 2013-01-01 2013-01-01
+>  2:  a 2013-01-01 2013-02-01
+>  3:  a 2013-01-01 2013-03-01
+>  4:  a 2013-01-01 2013-04-01
+>  5:  a 2013-01-01 2013-05-01
+>  6:  a 2013-01-01 2013-06-01
+>  7:  a 2013-01-01 2013-07-01
+>  8:  a 2013-01-01 2013-08-01
+>  9:  a 2013-01-01 2013-09-01
+> 10:  a 2013-01-01 2013-10-01
+> 11:  a 2013-01-01 2013-11-01
+> 12:  a 2013-01-01 2013-12-01
+> 13:  a 2013-02-01 2013-02-01
+> 14:  a 2013-02-01 2013-03-01
+> 15:  a 2013-02-01 2013-04-01
+
+After upgrading to 1.9.x (latest version at writing was 1.9.3) however, I
+get the following:
+
+>Error in Ops.POSIXt(del, by) : '/' not defined for "POSIXt" objects
+
+If I replace `seq` with `seq.Date` then I get:
+
+>Error in seq.Date(d, dt[, max(d)], by = "month") : 
+  'from' must be a "Date" object
+
+Am I doing something wrong?  Is this a bug?  Is there a workaround?
+
+
+
+--
+View this message in context: http://r.789695.n4.nabble.com/Error-in-Ops-POSIXt-using-1-9-x-tp4687400.html
+Sent from the datatable-help mailing list archive at Nabble.com.
+
+From aragorn168b at gmail.com  Mon Mar 24 12:23:08 2014
+From: aragorn168b at gmail.com (Arunkumar Srinivasan)
+Date: Mon, 24 Mar 2014 12:23:08 +0100
+Subject: [datatable-help] "Error in Ops.POSIXt" using 1.9.x
+In-Reply-To: <1395639355745-4687400.post@n4.nabble.com>
+References: <1395639355745-4687400.post@n4.nabble.com>
+Message-ID: <etPan.5330159c.62bbd95a.16e5b@Arunkumars-MacBook-Pro.local>
+
+Hello,
+
+Yes this seems to be a bug introduced sometime towards the end of the development cycle towards 1.9.x. Thanks for reporting. Will try to fix asap.
+
+The problem is that `by=` doesn't retain the class. If you do: `dt[, print(d), by=list(id, d)]` you'll see that. For now, I guess you'll have to explicitly convert it back to POSIX/Date class and do your operations in `j`, until a commit with the fix is rolled out.
+
+Arun
+
+From:?dnlbrky danielrlabar at gmail.com
+Reply:?dnlbrky danielrlabar at gmail.com
+Date:?March 24, 2014 at 6:36:41 AM
+To:?datatable-help at lists.r-forge.r-project.org datatable-help at lists.r-forge.r-project.org
+Subject:? [datatable-help] "Error in Ops.POSIXt" using 1.9.x  
+
+Running the following using data.table version 1.8.10 or 1.8.11 (Windows 7)  
+works as expected:  
+
+n <- 12  
+dt <- data.table(id=rep(letters[1:(n/3)], each=3),  
+d=seq(as.POSIXct("2013-01-01"), by="month", length.out=n))  
+dt[, list(d2=seq(d, dt[, max(d)], by="month")), by=list(id, d)][1:15]  
+
+> id d d2  
+> 1: a 2013-01-01 2013-01-01  
+> 2: a 2013-01-01 2013-02-01  
+> 3: a 2013-01-01 2013-03-01  
+> 4: a 2013-01-01 2013-04-01  
+> 5: a 2013-01-01 2013-05-01  
+> 6: a 2013-01-01 2013-06-01  
+> 7: a 2013-01-01 2013-07-01  
+> 8: a 2013-01-01 2013-08-01  
+> 9: a 2013-01-01 2013-09-01  
+> 10: a 2013-01-01 2013-10-01  
+> 11: a 2013-01-01 2013-11-01  
+> 12: a 2013-01-01 2013-12-01  
+> 13: a 2013-02-01 2013-02-01  
+> 14: a 2013-02-01 2013-03-01  
+> 15: a 2013-02-01 2013-04-01  
+
+After upgrading to 1.9.x (latest version at writing was 1.9.3) however, I  
+get the following:  
+
+>Error in Ops.POSIXt(del, by) : '/' not defined for "POSIXt" objects  
+
+If I replace `seq` with `seq.Date` then I get:  
+
+>Error in seq.Date(d, dt[, max(d)], by = "month") :  
+'from' must be a "Date" object  
+
+Am I doing something wrong? Is this a bug? Is there a workaround?  
+
+
+
+--  
+View this message in context: http://r.789695.n4.nabble.com/Error-in-Ops-POSIXt-using-1-9-x-tp4687400.html  
+Sent from the datatable-help mailing list archive at Nabble.com.  
+_______________________________________________  
+datatable-help mailing list  
+datatable-help at lists.r-forge.r-project.org  
+https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help  
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140324/aa4490b5/attachment.html>
+
+From levkowitz at dc-energy.com  Mon Mar 24 20:37:49 2014
+From: levkowitz at dc-energy.com (Shir Levkowitz)
+Date: Mon, 24 Mar 2014 15:37:49 -0400
+Subject: [datatable-help] Change in list( ) behavior inside join
+Message-ID: <70C43702-3298-4DE8-8CF9-0D425BAD1A1F@dc-energy.com>
+
+It looks like the latest version of data.table has changed the behavior of list( ) inside of a join - is this behavior as expected? Has anyone reported or encountered this change? It seems like a bug to me. I am using data.table v1.9.2 in R 3.2.0 .
+
+Thanks,
+Shir Levkowitz
+
+
+
+
+
+#-----------------------------------------------
+
+
+library(data.table)
+
+# dates
+dt.dateEx <- data.table(date = as.character(seq(as.Date('2014-04-01'), as.Date('2014-04-15'), by = 1)))
+setkey(dt.dateEx, date)
+
+# hours 
+dt.hrEx <- copy(dt.dateEx)
+dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt = date)] # rep x24 per date
+setkey(dt.hrEx, dt, hour_beginning)
+
+# as expected
+dt.classEx[dt.dateEx][, list(dt, hour_beginning)]
+
+# not expected outcome
+dt.classEx[dt.dateEx, list(hour_beginning)]
+
+
+From eduard.antonyan at gmail.com  Mon Mar 24 20:57:06 2014
+From: eduard.antonyan at gmail.com (Eduard Antonyan)
+Date: Mon, 24 Mar 2014 14:57:06 -0500
+Subject: [datatable-help] Change in list( ) behavior inside join
+In-Reply-To: <70C43702-3298-4DE8-8CF9-0D425BAD1A1F@dc-energy.com>
+References: <70C43702-3298-4DE8-8CF9-0D425BAD1A1F@dc-energy.com>
+Message-ID: <CAHZcBOrxJ8PCGa3mVLPEcmZ8nhTSr5zApUCnxZ63dTpraNCtDw@mail.gmail.com>
+
+You're probably expecting the by-without-by behavior - see this post:
+http://r.789695.n4.nabble.com/by-EACHI-and-related-please-check-ok-td4686732.htmland
+follow the links within for more detail.
+
+
+On Mon, Mar 24, 2014 at 2:37 PM, Shir Levkowitz <levkowitz at dc-energy.com>wrote:
+
+> It looks like the latest version of data.table has changed the behavior of
+> list( ) inside of a join - is this behavior as expected? Has anyone
+> reported or encountered this change? It seems like a bug to me. I am using
+> data.table v1.9.2 in R 3.2.0 .
+>
+> Thanks,
+> Shir Levkowitz
+>
+>
+>
+>
+>
+> #-----------------------------------------------
+>
+>
+> library(data.table)
+>
+> # dates
+> dt.dateEx <- data.table(date = as.character(seq(as.Date('2014-04-01'),
+> as.Date('2014-04-15'), by = 1)))
+> setkey(dt.dateEx, date)
+>
+> # hours
+> dt.hrEx <- copy(dt.dateEx)
+> dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt = date)] #
+> rep x24 per date
+> setkey(dt.hrEx, dt, hour_beginning)
+>
+> # as expected
+> dt.classEx[dt.dateEx][, list(dt, hour_beginning)]
+>
+> # not expected outcome
+> dt.classEx[dt.dateEx, list(hour_beginning)]
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140324/8f421a97/attachment.html>
+
+From mdowle at mdowle.plus.com  Tue Mar 25 14:45:02 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Tue, 25 Mar 2014 13:45:02 +0000
+Subject: [datatable-help] Change in list( ) behavior inside join
+In-Reply-To: <CAHZcBOrxJ8PCGa3mVLPEcmZ8nhTSr5zApUCnxZ63dTpraNCtDw@mail.gmail.com>
+References: <70C43702-3298-4DE8-8CF9-0D425BAD1A1F@dc-energy.com>
+ <CAHZcBOrxJ8PCGa3mVLPEcmZ8nhTSr5zApUCnxZ63dTpraNCtDw@mail.gmail.com>
+Message-ID: <5331885E.9040108@mdowle.plus.com>
+
+
+Shir is using v1.9.2 though, although in R 3.2.0 apparently which might 
+mean R 3.0.2 perhaps.
+Anyway regardless of versions, the example code results in errors.  Shir?
+
+ > # dates
+ > dt.dateEx <- data.table(date = 
+as.character(seq(as.Date('2014-04-01'), as.Date('2014-04-15'), by = 1)))
+ > setkey(dt.dateEx, date)
+ >
+ > # hours
+ > dt.hrEx <- copy(dt.dateEx)
+ > dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt = 
+date)] # rep x24 per date
+ > setkey(dt.hrEx, dt, hour_beginning)
+ >
+ > # as expected
+ > dt.classEx[dt.dateEx][, list(dt, hour_beginning)]
+Error: object 'dt.classEx' not found
+ >
+ > # not expected outcome
+ > dt.classEx[dt.dateEx, list(hour_beginning)]
+Error: object 'dt.classEx' not found
+ >
+
+
+
+
+On 24/03/14 19:57, Eduard Antonyan wrote:
+> You're probably expecting the by-without-by behavior - see this post: 
+> http://r.789695.n4.nabble.com/by-EACHI-and-related-please-check-ok-td4686732.html 
+> and follow the links within for more detail.
+>
+>
+> On Mon, Mar 24, 2014 at 2:37 PM, Shir Levkowitz 
+> <levkowitz at dc-energy.com <mailto:levkowitz at dc-energy.com>> wrote:
+>
+>     It looks like the latest version of data.table has changed the
+>     behavior of list( ) inside of a join - is this behavior as
+>     expected? Has anyone reported or encountered this change? It seems
+>     like a bug to me. I am using data.table v1.9.2 in R 3.2.0 .
+>
+>     Thanks,
+>     Shir Levkowitz
+>
+>
+>
+>
+>
+>     #-----------------------------------------------
+>
+>
+>     library(data.table)
+>
+>     # dates
+>     dt.dateEx <- data.table(date =
+>     as.character(seq(as.Date('2014-04-01'), as.Date('2014-04-15'), by
+>     = 1)))
+>     setkey(dt.dateEx, date)
+>
+>     # hours
+>     dt.hrEx <- copy(dt.dateEx)
+>     dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt =
+>     date)] # rep x24 per date
+>     setkey(dt.hrEx, dt, hour_beginning)
+>
+>     # as expected
+>     dt.classEx[dt.dateEx][, list(dt, hour_beginning)]
+>
+>     # not expected outcome
+>     dt.classEx[dt.dateEx, list(hour_beginning)]
+>
+>     _______________________________________________
+>     datatable-help mailing list
+>     datatable-help at lists.r-forge.r-project.org
+>     <mailto:datatable-help at lists.r-forge.r-project.org>
+>     https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140325/88abc0a6/attachment.html>
+
+From levkowitz at dc-energy.com  Tue Mar 25 14:51:45 2014
+From: levkowitz at dc-energy.com (Shir Levkowitz)
+Date: Tue, 25 Mar 2014 09:51:45 -0400
+Subject: [datatable-help] Change in list( ) behavior inside join
+In-Reply-To: <5331885E.9040108@mdowle.plus.com>
+References: <70C43702-3298-4DE8-8CF9-0D425BAD1A1F@dc-energy.com>
+ <CAHZcBOrxJ8PCGa3mVLPEcmZ8nhTSr5zApUCnxZ63dTpraNCtDw@mail.gmail.com>
+ <5331885E.9040108@mdowle.plus.com>
+Message-ID: <AB6CF493-0BC5-4C9F-B3C5-19CA23812DBF@dc-energy.com>
+
+Sorry about that! dt.classEx should just be dt.hrEx? Full corrected example below. Also you are correct 3.0.2 is the R version, not 3.2.0. 
+Shir
+
+-----
+
+
+library(data.table)
+
+# dates
+dt.dateEx <- data.table(date = as.character(seq(as.Date('2014-04-01'), as.Date('2014-04-15'), by = 1)))
+setkey(dt.dateEx, date)
+
+# hours 
+dt.hrEx <- copy(dt.dateEx)
+dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt = date)] # rep x24 per date
+setkey(dt.hrEx, dt, hour_beginning)
+
+# as expected
+dt.hrEx[dt.dateEx][, list(dt, hour_beginning)]
+
+# not expected outcome
+dt.hrEx[dt.dateEx, list(hour_beginning)]
+
+
+
+
+
+
+On Mar 25, 2014, at 9:45 AM, Matt Dowle <mdowle at mdowle.plus.com> wrote:
+
+> 
+> Shir is using v1.9.2 though, although in R 3.2.0 apparently which might mean R 3.0.2 perhaps.
+> Anyway regardless of versions, the example code results in errors.  Shir?
+> 
+> > # dates
+> > dt.dateEx <- data.table(date = as.character(seq(as.Date('2014-04-01'), as.Date('2014-04-15'), by = 1)))
+> > setkey(dt.dateEx, date)
+> > 
+> > # hours
+> > dt.hrEx <- copy(dt.dateEx)
+> > dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt = date)] # rep x24 per date
+> > setkey(dt.hrEx, dt, hour_beginning)
+> > 
+> > # as expected
+> > dt.classEx[dt.dateEx][, list(dt, hour_beginning)]
+> Error: object 'dt.classEx' not found
+> > 
+> > # not expected outcome
+> > dt.classEx[dt.dateEx, list(hour_beginning)]
+> Error: object 'dt.classEx' not found
+> > 
+> 
+> 
+> 
+> 
+> On 24/03/14 19:57, Eduard Antonyan wrote:
+>> You're probably expecting the by-without-by behavior - see this post: http://r.789695.n4.nabble.com/by-EACHI-and-related-please-check-ok-td4686732.html and follow the links within for more detail.
+>> 
+>> 
+>> On Mon, Mar 24, 2014 at 2:37 PM, Shir Levkowitz <levkowitz at dc-energy.com> wrote:
+>> It looks like the latest version of data.table has changed the behavior of list( ) inside of a join - is this behavior as expected? Has anyone reported or encountered this change? It seems like a bug to me. I am using data.table v1.9.2 in R 3.2.0 .
+>> 
+>> Thanks,
+>> Shir Levkowitz
+>> 
+>> 
+>> 
+>> 
+>> 
+>> #-----------------------------------------------
+>> 
+>> 
+>> library(data.table)
+>> 
+>> # dates
+>> dt.dateEx <- data.table(date = as.character(seq(as.Date('2014-04-01'), as.Date('2014-04-15'), by = 1)))
+>> setkey(dt.dateEx, date)
+>> 
+>> # hours
+>> dt.hrEx <- copy(dt.dateEx)
+>> dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt = date)] # rep x24 per date
+>> setkey(dt.hrEx, dt, hour_beginning)
+>> 
+>> # as expected
+>> dt.classEx[dt.dateEx][, list(dt, hour_beginning)]
+>> 
+>> # not expected outcome
+>> dt.classEx[dt.dateEx, list(hour_beginning)]
+>> 
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>> 
+>> 
+>> 
+>> _______________________________________________
+>> datatable-help mailing list
+>> datatable-help at lists.r-forge.r-project.org
+>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140325/e5ba243e/attachment.html>
+
+From mdowle at mdowle.plus.com  Tue Mar 25 15:04:11 2014
+From: mdowle at mdowle.plus.com (Matt Dowle)
+Date: Tue, 25 Mar 2014 14:04:11 +0000
+Subject: [datatable-help] Change in list( ) behavior inside join
+In-Reply-To: <AB6CF493-0BC5-4C9F-B3C5-19CA23812DBF@dc-energy.com>
+References: <70C43702-3298-4DE8-8CF9-0D425BAD1A1F@dc-energy.com>
+ <CAHZcBOrxJ8PCGa3mVLPEcmZ8nhTSr5zApUCnxZ63dTpraNCtDw@mail.gmail.com>
+ <5331885E.9040108@mdowle.plus.com>
+ <AB6CF493-0BC5-4C9F-B3C5-19CA23812DBF@dc-energy.com>
+Message-ID: <53318CDB.3060008@mdowle.plus.com>
+
+
+Thanks, now runs.  That is a bug in v1.9.2 which is fixed in v1.9.3 (I 
+ran it to check),  from NEWS :
+
+   o  When joining to fewer columns than the key has, using one of the 
+later key columns
+      explicitly in j repeated the first value. A problem introduced by 
+v1.9.2 and not
+      caught by our 1,220 tests, or tests in 37 dependent packages. Test 
+added. Many
+      thanks to Michele Carriero for reporting.
+        DT = data.table(a=1:2, b=letters[1:6], key="a,b")    # keyed by 
+a and b
+        DT[.(1), list(b,...)]    # correct result again (joining just to 
+a not b but using b)
+
+Matt
+
+
+On 25/03/14 13:51, Shir Levkowitz wrote:
+> Sorry about that! dt.classEx should just be dt.hrEx? Full corrected 
+> example below. Also you are correct 3.0.2 is the R version, not 3.2.0.
+> Shir
+>
+> -----
+>
+>
+> library(data.table)
+>
+> # dates
+> dt.dateEx <- data.table(date = as.character(seq(as.Date('2014-04-01'), 
+> as.Date('2014-04-15'), by = 1)))
+> setkey(dt.dateEx, date)
+>
+> # hours
+> dt.hrEx <- copy(dt.dateEx)
+> dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt = 
+> date)] # rep x24 per date
+> setkey(dt.hrEx, dt, hour_beginning)
+>
+> # as expected
+> dt.hrEx[dt.dateEx][, list(dt, hour_beginning)]
+>
+> # not expected outcome
+> dt.hrEx[dt.dateEx, list(hour_beginning)]
+>
+>
+>
+>
+>
+>
+> On Mar 25, 2014, at 9:45 AM, Matt Dowle <mdowle at mdowle.plus.com 
+> <mailto:mdowle at mdowle.plus.com>> wrote:
+>
+>>
+>> Shir is using v1.9.2 though, although in R 3.2.0 apparently which 
+>> might mean R 3.0.2 perhaps.
+>> Anyway regardless of versions, the example code results in errors.  Shir?
+>>
+>> > # dates
+>> > dt.dateEx <- data.table(date = 
+>> as.character(seq(as.Date('2014-04-01'), as.Date('2014-04-15'), by = 1)))
+>> > setkey(dt.dateEx, date)
+>> >
+>> > # hours
+>> > dt.hrEx <- copy(dt.dateEx)
+>> > dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt = 
+>> date)] # rep x24 per date
+>> > setkey(dt.hrEx, dt, hour_beginning)
+>> >
+>> > # as expected
+>> > dt.classEx[dt.dateEx][, list(dt, hour_beginning)]
+>> Error: object 'dt.classEx' not found
+>> >
+>> > # not expected outcome
+>> > dt.classEx[dt.dateEx, list(hour_beginning)]
+>> Error: object 'dt.classEx' not found
+>> >
+>>
+>>
+>>
+>>
+>> On 24/03/14 19:57, Eduard Antonyan wrote:
+>>> You're probably expecting the by-without-by behavior - see this 
+>>> post: 
+>>> http://r.789695.n4.nabble.com/by-EACHI-and-related-please-check-ok-td4686732.html 
+>>> and follow the links within for more detail.
+>>>
+>>>
+>>> On Mon, Mar 24, 2014 at 2:37 PM, Shir Levkowitz 
+>>> <levkowitz at dc-energy.com <mailto:levkowitz at dc-energy.com>> wrote:
+>>>
+>>>     It looks like the latest version of data.table has changed the
+>>>     behavior of list( ) inside of a join - is this behavior as
+>>>     expected? Has anyone reported or encountered this change? It
+>>>     seems like a bug to me. I am using data.table v1.9.2 in R 3.2.0 .
+>>>
+>>>     Thanks,
+>>>     Shir Levkowitz
+>>>
+>>>
+>>>
+>>>
+>>>
+>>>     #-----------------------------------------------
+>>>
+>>>
+>>>     library(data.table)
+>>>
+>>>     # dates
+>>>     dt.dateEx <- data.table(date =
+>>>     as.character(seq(as.Date('2014-04-01'), as.Date('2014-04-15'),
+>>>     by = 1)))
+>>>     setkey(dt.dateEx, date)
+>>>
+>>>     # hours
+>>>     dt.hrEx <- copy(dt.dateEx)
+>>>     dt.hrEx <- dt.hrEx[,  list(hour_beginning =0:23), by = list(dt =
+>>>     date)] # rep x24 per date
+>>>     setkey(dt.hrEx, dt, hour_beginning)
+>>>
+>>>     # as expected
+>>>     dt.classEx[dt.dateEx][, list(dt, hour_beginning)]
+>>>
+>>>     # not expected outcome
+>>>     dt.classEx[dt.dateEx, list(hour_beginning)]
+>>>
+>>>     _______________________________________________
+>>>     datatable-help mailing list
+>>>     datatable-help at lists.r-forge.r-project.org
+>>>     <mailto:datatable-help at lists.r-forge.r-project.org>
+>>>     https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>>
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> datatable-help mailing list
+>>> datatable-help at lists.r-forge.r-project.org
+>>> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>>
+>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140325/cfc40738/attachment-0001.html>
+
+From christophe.dervieux at rte-france.com  Fri Mar 28 11:29:40 2014
+From: christophe.dervieux at rte-france.com (DERVIEUX Christophe)
+Date: Fri, 28 Mar 2014 10:29:40 +0000
+Subject: [datatable-help] In 1.9.2,
+	By with factor column do not work the same as in 1.8.10
+Message-ID: <CB636B351210A549AB0CC743EC38FF0F5C793123@SNP01SEM11.bureau.si.interne>
+
+Hi,
+
+I have updated data.table package to 1.9.2 recently from 1.8.10 and I found errors on my previous code.
+
+See reproductible example below:
+
+On 1.8.10 :
+DT<-data.table(X=factor(2006:2012),Y=rep(1:7,2))
+DT[,Z:=paste(X,.N,sep=" - "),by=list(X)][]
+
+X Y Z
+1: 2006 1 2006 - 2
+2: 2007 2 2007 - 2
+3: 2008 3 2008 - 2
+4: 2009 4 2009 - 2
+5: 2010 5 2010 - 2
+6: 2011 6 2011 - 2
+7: 2012 7 2012 - 2
+8: 2006 1 2006 - 2
+9: 2007 2 2007 - 2
+10: 2008 3 2008 - 2
+11: 2009 4 2009 - 2
+12: 2010 5 2010 - 2
+13: 2011 6 2011 - 2
+14: 2012 7 2012 - 2
+
+In column Z, I get the level of the factor column X
+pasted with count '.N' as expected
+
+However, in the 1.9.2, with same code :
+DT<-data.table(X=factor(2006:2012),Y=rep(1:7,2))
+DT[,Z:=paste(X,.N,sep=" - "),by=list(X)][]
+
+X Y Z
+1: 2006 1 1 - 2
+2: 2007 2 2 - 2
+3: 2008 3 3 - 2
+4: 2009 4 4 - 2
+5: 2010 5 5 - 2
+6: 2011 6 6 - 2
+7: 2012 7 7 - 2
+8: 2006 1 1 - 2
+9: 2007 2 2 - 2
+10: 2008 3 3 - 2
+11: 2009 4 4 - 2
+12: 2010 5 5 - 2
+13: 2011 6 6 - 2
+14: 2012 7 7 - 2
+
+as results, I do not get levels of factor column X but the numeric values associated with the level.
+
+is this working normally? Why has it changed? Is that a bug?
+
+I use this kind of procedure to make labels for ggplot. All my previous code is not working anymore. It's kind of annoying.
+
+Thanks
+
+Christophe
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140328/3b07770d/attachment.html>
+
+From pauljohn32 at gmail.com  Mon Mar 31 02:03:34 2014
+From: pauljohn32 at gmail.com (Paul Johnson)
+Date: Sun, 30 Mar 2014 19:03:34 -0500
+Subject: [datatable-help] In 1.9.2,
+ By with factor column do not work the same as in 1.8.10
+In-Reply-To: <CB636B351210A549AB0CC743EC38FF0F5C793123@SNP01SEM11.bureau.si.interne>
+References: <CB636B351210A549AB0CC743EC38FF0F5C793123@SNP01SEM11.bureau.si.interne>
+Message-ID: <CAErODj8=MkVpTi_74r3OOFLYzk5XA9FvYpq9AETpyXijRGh11Q@mail.gmail.com>
+
+Hi
+I see this problem too. I was not using data.table before 1.9, so I did no
+realize it ever behaved differently.  In the examples I've tried, any
+calculation that I expect to create a factor seems to create an integer
+that uses the R internal integer of the factor.
+
+I noticed this, I thought maybe I needed to do more explicit casting to
+make it come out as a factor. Here's my variable to lag a factor that beats
+the point into the ground.
+
+lagFactor <- function(x, N){
+    xold <- x
+    if (is.factor(x)) {
+        xlev <- levels(x)
+        xnum <- as.numeric(x)
+    } else {
+        xlev <- unique(x)
+    }
+    xlag <- c(rep(NA, N), xnum[-(length(xnum):(length(xnum)-N+1))])
+    xlagf <- factor(xlev[xlag], levels = xlev)
+    xlagf
+}
+
+dat is a data.table with lots of lines, I can give you a copy if you want.
+
+Now I'll show you that the result is different in and out of a data.table.
+
+> xx <- lagFactor(dat$east2b, 1)
+> table(xx)
+xx
+   Yes     No
+130232 151885
+> levels(xx)
+[1] "Yes" "No"
+> dat[ , xx := lagFactor(east2b, 1), by = c("sippid"), roll  = TRUE]
+> table(dat$xx)
+
+     1      2
+114963 130095
+> levels(dat$xx)
+NULL
+> table(xx, dat$xx)
+
+xx         1      2
+  Yes 114963      0
+  No       0 130095
+
+
+For my case, the only fix is an explicit re-factoring.
+
+ pj
+
+
+On Fri, Mar 28, 2014 at 5:29 AM, DERVIEUX Christophe <
+christophe.dervieux at rte-france.com> wrote:
+
+>  Hi,
+>
+> I have updated data.table package to 1.9.2 recently from 1.8.10 and I
+> found errors on my previous code.
+>
+> See reproductible example below:
+>
+> On 1.8.10 :
+> DT<-data.table(X=factor(2006:2012),Y=rep(1:7,2))
+> DT[,Z:=paste(X,.N,sep=" - "),by=list(X)][]
+>
+> X Y Z
+> 1: 2006 1 2006 - 2
+> 2: 2007 2 2007 - 2
+> 3: 2008 3 2008 - 2
+> 4: 2009 4 2009 - 2
+> 5: 2010 5 2010 - 2
+> 6: 2011 6 2011 - 2
+> 7: 2012 7 2012 - 2
+> 8: 2006 1 2006 - 2
+> 9: 2007 2 2007 - 2
+> 10: 2008 3 2008 - 2
+> 11: 2009 4 2009 - 2
+> 12: 2010 5 2010 - 2
+> 13: 2011 6 2011 - 2
+> 14: 2012 7 2012 - 2
+>
+> In column Z, I get the level of the factor column X
+> pasted with count '.N' as expected
+>
+> However, in the 1.9.2, with same code :
+> DT<-data.table(X=factor(2006:2012),Y=rep(1:7,2))
+> DT[,Z:=paste(X,.N,sep=" - "),by=list(X)][]
+>
+> X Y Z
+> 1: 2006 1 1 - 2
+> 2: 2007 2 2 - 2
+> 3: 2008 3 3 - 2
+> 4: 2009 4 4 - 2
+> 5: 2010 5 5 - 2
+> 6: 2011 6 6 - 2
+> 7: 2012 7 7 - 2
+> 8: 2006 1 1 - 2
+> 9: 2007 2 2 - 2
+> 10: 2008 3 3 - 2
+> 11: 2009 4 4 - 2
+> 12: 2010 5 5 - 2
+> 13: 2011 6 6 - 2
+> 14: 2012 7 7 - 2
+>
+> as results, I do not get levels of factor column X but the numeric values
+> associated with the level.
+>
+> is this working normally? Why has it changed? Is that a bug?
+>
+> I use this kind of procedure to make labels for ggplot. All my previous
+> code is not working anymore. It's kind of annoying.
+>
+> Thanks
+>
+> Christophe
+>
+>
+>
+> _______________________________________________
+> datatable-help mailing list
+> datatable-help at lists.r-forge.r-project.org
+> https://lists.r-forge.r-project.org/cgi-bin/mailman/listinfo/datatable-help
+>
+
+
+
+-- 
+Paul E. Johnson
+Professor, Political Science      Assoc. Director
+1541 Lilac Lane, Room 504      Center for Research Methods
+University of Kansas                 University of Kansas
+http://pj.freefaculty.org               http://quant.ku.edu
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140330/340f14a8/attachment.html>
+
+From john.laing at gmail.com  Mon Mar 31 16:17:04 2014
+From: john.laing at gmail.com (John Laing)
+Date: Mon, 31 Mar 2014 10:17:04 -0400
+Subject: [datatable-help] quote argument to fread
+Message-ID: <CAA3Wa=tXyaWZU0dY=hzUBGzn9=VMHVVXh4YzYkk3YRpMSPGNqA@mail.gmail.com>
+
+Is there any way to tell fread how to look for -- or not to look for --
+quoted strings? In the standard read.table I can use quote="". Since I see
+no such argument is there a good workaround?
+
+The data I'm trying to read are not quoted, in the sense that quotes do not
+define the beginning and end of fields. However there are quoted strings
+that sometimes appear inside a field, and those should be preserved when
+after reading. And sometimes, the quoted strings inside the field are
+actually at the beginning of the field, so fread thinks that the field
+itself is quoted and errors with a message that it expected to see a field
+separator but instead saw more text.
+
+Thanks,
+John
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.r-forge.r-project.org/pipermail/datatable-help/attachments/20140331/771abb67/attachment.html>
+

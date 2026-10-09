@@ -1,0 +1,36 @@
+{
+  "list": "spdep-devel",
+  "description": "",
+  "month": "2010-05",
+  "messages": [
+    {
+      "id": "msg-5250c48db025",
+      "message_id": "<alpine.LRH.2.00.1005031331380.8217@reclus.nhh.no>",
+      "from_name": "Roger Bivand",
+      "from_email_hash": "a0c87926e9477aa221755cc93bdef47227c3563fd707e66ae49044467663d168",
+      "date": "2010-05-03T13:23:02Z",
+      "subject": "[Spdep-devel] poly2nb commits",
+      "subject_clean": "[Spdep-devel] poly2nb commits",
+      "in_reply_to": null,
+      "references": [],
+      "body_plain": "Micah:\n\nSome further work on poly2nb() By taking findInBox() out of the big loop, \nI can now parallelise it. In addition, I re-wrote the big loop in C, which \nmakes less absolute difference for the LA blocks (20 secs -> 1 sec), but a \nlot of difference for the US zip ZCTA (about 30K Polygons, 170 secs -> 40 \nsecs). For the LA blocks and two machines:\n\nMachine 1:\n\nwithout and with C in the big loop:\n\n> load(\"la_blks.RData\")\n> set.VerboseOption(TRUE)\n[1] TRUE\n> system.time(la_nb <- poly2nb(la_blks, useC=FALSE))\nconvert to polylist: 30.883\nhandle IDs: 0\ngenerate BBs: 1.646\nmassage polygons: 5.763\nfindInBox: 1574.904 list size 388001\nwork loop: 20.857\ndone: 0.108\n     user   system  elapsed\n1628.555    0.210 1634.248\n> system.time(la_nbC <- poly2nb(la_blks))\nconvert to polylist: 26.381\nhandle IDs: 0\ngenerate BBs: 1.743\nmassage polygons: 5.874\nfindInBox: 1615.051 list size 388001\nwork loop: 0.542\ndone: 0.133\n     user   system  elapsed\n1644.159    0.203 1649.809\n> all.equal(la_nb, la_nbC, check.attributes=FALSE)\n[1] TRUE\n\nwith a 2x snow socket cluster with and without C:\n\n> library(snow)\n> cl <- makeCluster(2, type=\"SOCK\")\nDetaching after fork from child process 27021.\nDetaching after fork from child process 27025.\n> set.ClusterOption(cl)\n> system.time(la_nb_CL <- poly2nb(la_blks, useC=FALSE))\nconvert to polylist: 26.555\nhandle IDs: 0\ngenerate BBs: 1.69\nmassage polygons: 5.849\ncluster findInBox setup: 9.907\ncluster findInBox: 868.271 list size 388001\nwork loop: 21.656\ndone: 0.134\n    user  system elapsed\n  57.447   0.186 934.153\n> all.equal(la_nb, la_nb_CL, check.attributes=FALSE)\n[1] TRUE\n> system.time(la_nbCCL <- poly2nb(la_blks))\nconvert to polylist: 26.042\nhandle IDs: 0\ngenerate BBs: 1.8\nmassage polygons: 5.857\ncluster findInBox setup: 2.773\ncluster findInBox: 850.392 list size 388001\nwork loop: 1.219\ndone: 0.106\n    user  system elapsed\n  36.585   0.216 888.283\n> all.equal(la_nb, la_nbCCL, check.attributes=FALSE)\n[1] TRUE\n> stopCluster(cl)\n> set.ClusterOption(NULL)\n\nso now at under 15 minutes for a core 2 (RHEL 5 x86_64, R 2.11.0, 3.16GHz, \n6MB L2 cache), down from 27 minutes.\n\nMachine 2:\n\nOn a quad (RHEL 5 x86_64, R 2.11.0, 2.66GHz, 3MB L2 cache, so 1.22 times \nslower than the core 2 per core), I see:\n\n> load(\"la_blks.RData\")\n> set.VerboseOption(TRUE)\n[1] FALSE\n> system.time(la_nb <- poly2nb(la_blks, useC=FALSE))\nconvert to polylist: 36.061\nhandle IDs: 0\ngenerate BBs: 1.632\nmassage polygons: 6.97\nfindInBox: 1918.232 list size 388001\nwork loop: 23.363\ndone: 0.15\n     user   system  elapsed\n1970.291   15.827 1986.502\n> system.time(la_nbC <- poly2nb(la_blks))\nconvert to polylist: 29.241\nhandle IDs: 0\ngenerate BBs: 1.834\nmassage polygons: 6.334\nfindInBox: 1898.911 list size 388001\nwork loop: 0.618\ndone: 0.137\n     user   system  elapsed\n1930.429    6.360 1937.169\n> all.equal(la_nb, la_nbC, check.attributes=FALSE)\n[1] TRUE\n> library(snow)\n> cl <- makeCluster(4, type=\"SOCK\")\n> set.ClusterOption(cl)\n> system.time(la_nb_CL <- poly2nb(la_blks, useC=FALSE))\nconvert to polylist: 29.131\nhandle IDs: 0\ngenerate BBs: 1.787\nmassage polygons: 7.181\ncluster findInBox setup: 21.622\ncluster findInBox: 579.886 list size 388001\nwork loop: 24.731\ndone: 0.118\n    user  system elapsed\n  67.187   1.222 664.548\n> all.equal(la_nb, la_nb_CL, check.attributes=FALSE)\n[1] TRUE\n> system.time(la_nbCCL <- poly2nb(la_blks))\nconvert to polylist: 29.083\nhandle IDs: 0\ngenerate BBs: 1.861\nmassage polygons: 6.483\ncluster findInBox setup: 7.465\ncluster findInBox: 566.255 list size 388001\nwork loop: 1.134\ndone: 0.113\n    user  system elapsed\n  43.451   1.275 612.486\n> all.equal(la_nb, la_nbCCL, check.attributes=FALSE)\n[1] TRUE\n> stopCluster(cl)\n> set.ClusterOption(NULL)\n\nso just over 10 minutes, down from 33 minutes on the same machine.\n\nOf course, using a snow cluster imposes a memory footprint for each worker \nover and above the administrating process - the core 2 went from about \n1.6G to about 2G (with an interactive graphical user and typical \napplications taking space), and on the quad from about 1.0G to 1.7G. I \nthink that this could be reduced, but the concurrent R images do take \nspace.\n\nI'm CC'ing to the new spdep devel list as a record. We're now probably \nwell below your ~1100 seconds, although it is findInBox that is the burden \nhere, I think because of the off-shore polygons. Other data sets, such as \nthe ZCTA boundaries, split 50% findInBox, 50% work loop with no C and no \ncluster; the findInBox speeds up with clusters at about 80% of the number \nof clusters plus setup. The C work loop seems to speed up 4-8 times, I \nthink depending on the numbers of coordinates in polygon boundaries. The \nblocks are often regular, so go fast anyway, once we have the candidate \nsets from findInBox.\n\nRoger\n\n-- \nRoger Bivand\nEconomic Geography Section, Department of Economics, Norwegian School of\nEconomics and Business Administration, Helleveien 30, N-5045 Bergen,\nNorway. voice: +47 55 95 93 55; fax +47 55 95 95 43\ne-mail: Roger.Bivand at nhh.no",
+      "body_snippet": "Micah:\n\nSome further work on poly2nb() By taking findInBox() out of the big loop, \nI can now parallelise it. In addition, I re-wrote the big loop in C, which \nmakes less absolute difference for the LA",
+      "thread_id": "thread-5250c48db025",
+      "thread_depth": 0,
+      "month": "2010-05"
+    }
+  ],
+  "threads": [
+    {
+      "id": "thread-5250c48db025",
+      "subject": "[Spdep-devel] poly2nb commits",
+      "message_count": 1,
+      "participants": [
+        "Roger Bivand"
+      ],
+      "started": "2010-05-03T13:23:02Z",
+      "last_reply": "2010-05-03T13:23:02Z",
+      "root_message_id": "msg-5250c48db025"
+    }
+  ]
+}
