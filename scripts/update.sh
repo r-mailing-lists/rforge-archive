@@ -23,6 +23,17 @@ RMAIL_PARSER=${RMAIL_PARSER:-./rmail-parser}
 ALIASES=${ALIASES:-}
 UA="rforge-archive (+https://github.com/r-mailing-lists/rforge-archive)"
 
+# Every request is bounded. R-Forge is going away, and a server that has stopped
+# answering otherwise holds each request until the connection times out by
+# itself, several minutes at a time.
+fetch() {
+  curl -fsSL --connect-timeout 20 --max-time 300 --retry 2 -A "$UA" "$@"
+}
+
+# Set once the source proves unreachable, so the remaining lists are not each
+# made to wait out the same timeout.
+SOURCE_DOWN=false
+
 FORCE=false
 FETCH=true
 LISTS=()
@@ -50,12 +61,21 @@ CUR_QUARTER="${CUR_YEAR}q$(( ($(date -u +%-m) - 1) / 3 + 1 ))"
 # R-Forge is being retired, so every failure here must leave what is already
 # archived untouched: a file is only replaced by a complete, non-empty download.
 fetch_list() {
-  local list=$1 base_url index archive stem dest tmp
+  local list=$1 base_url index archive stem dest tmp rc=0
   base_url=$(jq -r '.source_url' "$list/config.json")
   mkdir -p "$list/raw"
 
-  if ! index=$(curl -fsSL --retry 2 -A "$UA" "$base_url"); then
-    echo "  $list: archive index unavailable, keeping existing files" >&2
+  index=$(fetch "$base_url") || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    # 22 is an HTTP error, which is about this list alone. Anything else means
+    # the server itself could not be reached.
+    if [ "$rc" -eq 22 ]; then
+      echo "  $list: archive index unavailable, keeping existing files" >&2
+    else
+      SOURCE_DOWN=true
+      echo "  $list: source unreachable (curl exit $rc), keeping existing files" >&2
+      echo "  not asking for the remaining lists" >&2
+    fi
     return 0
   fi
 
@@ -73,7 +93,7 @@ fetch_list() {
       fi
 
       tmp=$(mktemp)
-      if curl -fsSL --retry 2 -A "$UA" -o "$tmp" "${base_url%/}/$archive"; then
+      if fetch -o "$tmp" "${base_url%/}/$archive"; then
         if [[ "$archive" == *.gz ]]; then
           gunzip -c "$tmp" > "$tmp.mbox" 2>/dev/null || : > "$tmp.mbox"
         else
@@ -122,7 +142,7 @@ for list in "${LISTS[@]}"; do
     exit 1
   fi
   echo "$list"
-  if [ "$FETCH" = true ]; then
+  if [ "$FETCH" = true ] && [ "$SOURCE_DOWN" = false ]; then
     fetch_list "$list"
   fi
   parse_list "$list"
