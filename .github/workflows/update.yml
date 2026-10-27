@@ -1,6 +1,11 @@
 name: Update Archive
 
 on:
+  # R-Forge has refused connections since October 2026. Once a day the run
+  # asks whether it answers, and fetches only when it does, so the archive
+  # catches up on its own when R-Forge is back. Its lists close in January 2027.
+  schedule:
+    - cron: '23 3 * * *'
   workflow_dispatch:
     inputs:
       force_redownload:
@@ -16,26 +21,41 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Check that R-Forge answers
+        id: forge
+        run: |
+          if curl -sf -o /dev/null -m 60 https://lists.r-forge.r-project.org/pipermail/; then
+            echo "up=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "up=false" >> "$GITHUB_OUTPUT"
+            echo "R-Forge does not answer; nothing to fetch today"
+          fi
+
       - uses: actions/checkout@v7
+        if: steps.forge.outputs.up == 'true'
 
       - name: Download rmail-parser
+        if: steps.forge.outputs.up == 'true'
         run: |
           curl -sL -o rmail-parser \
             "https://github.com/r-mailing-lists/rmail-parser/releases/latest/download/rmail-parser-linux-x86_64"
           chmod +x rmail-parser
 
       - name: Download aliases
+        if: steps.forge.outputs.up == 'true'
         run: |
           curl -sL -o aliases.json \
             "https://raw.githubusercontent.com/r-mailing-lists/rmail-parser/main/aliases.json" \
             2>/dev/null || echo '{"aliases":[]}' > aliases.json
 
       - name: Fetch and parse all lists
+        if: steps.forge.outputs.up == 'true'
         run: scripts/update.sh ${{ inputs.force_redownload && '--force' || '' }}
         env:
           ALIASES: aliases.json
 
       - name: Commit changes
+        if: steps.forge.outputs.up == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
